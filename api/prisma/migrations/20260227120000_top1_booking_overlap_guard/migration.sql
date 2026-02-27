@@ -9,18 +9,18 @@ BEGIN
     FROM pg_constraint
     WHERE conname = 'booking_no_overlap_company_technician'
   ) THEN
-    ALTER TABLE booking
+    ALTER TABLE "Booking"
       ADD CONSTRAINT booking_no_overlap_company_technician
       EXCLUDE USING gist (
         "companyId" WITH =,
-        "technicianId" WITH =,
+        "assignedUserId" WITH =,
         tstzrange("startsAt", "endsAt", '[)') WITH &&
       );
   END IF;
 END $$;
 
 CREATE INDEX IF NOT EXISTS booking_company_tech_time_idx
-  ON booking ("companyId", "technicianId", "startsAt", "endsAt");
+  ON booking ("companyId", "assignedUserId", "startsAt", "endsAt");
 
 CREATE INDEX IF NOT EXISTS booking_company_startsat_idx
   ON booking ("companyId", "startsAt");
