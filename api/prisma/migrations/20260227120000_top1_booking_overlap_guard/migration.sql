@@ -3,12 +3,12 @@
 -- Requires btree_gist so '=' on text columns can be used in a GiST EXCLUDE constraint.
 CREATE EXTENSION IF NOT EXISTS btree_gist;
 
--- Add a stored range column for overlap checks (IMMUTABLE because it references only row columns)
+-- Add a stored range column for overlap checks
 ALTER TABLE "Booking"
   ADD COLUMN IF NOT EXISTS "timeRange" tstzrange
   GENERATED ALWAYS AS (tstzrange("startsAt", "endsAt", '[)')) STORED;
 
--- Helpful indexes (one GiST for overlap queries, one btree for list-by-start time)
+-- Helpful indexes
 CREATE INDEX IF NOT EXISTS "booking_company_assigned_time_gist_idx"
   ON "Booking"
   USING gist ("companyId", "assignedUserId", "timeRange");
@@ -17,7 +17,7 @@ CREATE INDEX IF NOT EXISTS "booking_company_startsat_idx"
   ON "Booking" ("companyId", "startsAt");
 
 -- Add the exclusion constraint once.
--- NOTE: We exclude only rows where assignedUserId is NOT NULL so unassigned bookings don't collide.
+-- Exclude only rows where assignedUserId is NOT NULL so unassigned bookings don't collide.
 DO $$
 BEGIN
   IF NOT EXISTS (
