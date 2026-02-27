@@ -1,0 +1,11 @@
+
+# --- generated / local ---
+api/node_modules/
+**/node_modules/
+api/node_modules/.prisma/
+api/node_modules/@prisma/
+**/.prisma/
+*.zip
+
+# Prisma generated client (if your repo includes it somewhere unexpected)
+api/src/**/generated/
