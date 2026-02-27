@@ -1,7 +1,23 @@
--- Top-1% broader pass: enforce no overlapping bookings per tenant+technician (Postgres).
--- Requires btree_gist for equality operators in GiST.
+-- Top-1% broader pass: enforce no overlapping bookings per tenant + assigned user (Postgres).
+-- Uses a STORED generated range column so the GiST exclusion uses only IMMUTABLE inputs.
+-- Requires btree_gist so '=' on text columns can be used in a GiST EXCLUDE constraint.
 CREATE EXTENSION IF NOT EXISTS btree_gist;
 
+-- Add a stored range column for overlap checks (IMMUTABLE because it references only row columns)
+ALTER TABLE "Booking"
+  ADD COLUMN IF NOT EXISTS "timeRange" tstzrange
+  GENERATED ALWAYS AS (tstzrange("startsAt", "endsAt", '[)')) STORED;
+
+-- Helpful indexes (one GiST for overlap queries, one btree for list-by-start time)
+CREATE INDEX IF NOT EXISTS "booking_company_assigned_time_gist_idx"
+  ON "Booking"
+  USING gist ("companyId", "assignedUserId", "timeRange");
+
+CREATE INDEX IF NOT EXISTS "booking_company_startsat_idx"
+  ON "Booking" ("companyId", "startsAt");
+
+-- Add the exclusion constraint once.
+-- NOTE: We exclude only rows where assignedUserId is NOT NULL so unassigned bookings don't collide.
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -14,13 +30,9 @@ BEGIN
       EXCLUDE USING gist (
         "companyId" WITH =,
         "assignedUserId" WITH =,
-        tstzrange("startsAt", "endsAt", '[)') WITH &&
-      );
+        "timeRange" WITH &&
+      )
+      WHERE ("assignedUserId" IS NOT NULL);
   END IF;
-END $$;
-
-CREATE INDEX IF NOT EXISTS booking_company_tech_time_idx
-  ON booking ("companyId", "assignedUserId", "startsAt", "endsAt");
-
-CREATE INDEX IF NOT EXISTS booking_company_startsat_idx
-  ON booking ("companyId", "startsAt");
+END;
+$$;
