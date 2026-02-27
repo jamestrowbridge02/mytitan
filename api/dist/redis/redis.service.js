@@ -1,0 +1,46 @@
+"use strict";
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.RedisService = void 0;
+const common_1 = require("@nestjs/common");
+let RedisService = class RedisService {
+    constructor() {
+        this.enabled = false;
+        this.redisUrl = null;
+    }
+    async onModuleInit() {
+        const redisUrl = process.env.REDIS_URL?.trim();
+        if (!redisUrl) {
+            return;
+        }
+        try {
+            new URL(redisUrl);
+            this.redisUrl = redisUrl;
+            this.enabled = true;
+        }
+        catch {
+            this.redisUrl = null;
+            this.enabled = false;
+        }
+    }
+    async onModuleDestroy() {
+        this.enabled = false;
+        this.redisUrl = null;
+    }
+    isEnabled() {
+        return this.enabled;
+    }
+    getRedisUrl() {
+        return this.redisUrl;
+    }
+};
+exports.RedisService = RedisService;
+exports.RedisService = RedisService = __decorate([
+    (0, common_1.Injectable)()
+], RedisService);
+//# sourceMappingURL=redis.service.js.map

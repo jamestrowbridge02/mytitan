@@ -1,0 +1,170 @@
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { DashboardShell } from "../../../components/dashboard-shell";
+import { EmptyState } from "../../../components/states/EmptyState";
+import { ErrorState } from "../../../components/states/ErrorState";
+import { LoadingState } from "../../../components/states/LoadingState";
+import { ApiError, apiFetch } from "../../../lib/api";
+import { isAutomationsV1Enabled } from "../../../lib/feature-flags";
+
+type AutomationSettings = {
+  bookingRemindersEnabled: boolean;
+  approvalRequestEnabled: boolean;
+  reviewRequestEnabled: boolean;
+};
+
+const DEFAULT_SETTINGS: AutomationSettings = {
+  bookingRemindersEnabled: false,
+  approvalRequestEnabled: false,
+  reviewRequestEnabled: false,
+};
+
+export default function AutomationsSettingsPage() {
+  const enabled = isAutomationsV1Enabled();
+  const [settings, setSettings] = useState<AutomationSettings | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [requestId, setRequestId] = useState<string | undefined>(undefined);
+  const [savingKey, setSavingKey] = useState<string | null>(null);
+
+  async function load() {
+    if (!enabled) return;
+    setLoading(true);
+    setError("");
+    setRequestId(undefined);
+    try {
+      const data = await apiFetch("/automations/settings");
+      setSettings({ ...DEFAULT_SETTINGS, ...(data || {}) });
+    } catch (err: any) {
+      setError(err?.message || "Failed to load automations");
+      setRequestId(err instanceof ApiError ? err.requestId : undefined);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    load();
+  }, [enabled]);
+
+  async function updateSetting(key: keyof AutomationSettings, value: boolean) {
+    if (!settings) return;
+    setSavingKey(key);
+    setError("");
+    setRequestId(undefined);
+    const previous = settings[key];
+    setSettings({ ...settings, [key]: value });
+    try {
+      const data = await apiFetch("/automations/settings", {
+        method: "PATCH",
+        body: JSON.stringify({ [key]: value }),
+      });
+      setSettings({ ...DEFAULT_SETTINGS, ...(data || {}) });
+    } catch (err: any) {
+      setSettings({ ...settings, [key]: previous });
+      setError(err?.message || "Failed to update automations");
+      setRequestId(err instanceof ApiError ? err.requestId : undefined);
+    } finally {
+      setSavingKey(null);
+    }
+  }
+
+  if (!enabled) {
+    return (
+      <DashboardShell>
+        <EmptyState
+          title="Automations are not enabled"
+          description="Enable Automations V1 to configure reminders and requests."
+          primaryAction={{ label: "Back to dashboard", href: "/dashboard" }}
+        />
+      </DashboardShell>
+    );
+  }
+
+  if (loading && !settings) {
+    return (
+      <DashboardShell>
+        <LoadingState title="Loading automations" description="Fetching tenant automation settings." />
+      </DashboardShell>
+    );
+  }
+
+  if (error && !settings) {
+    return (
+      <DashboardShell>
+        <ErrorState
+          title="Could not load automations"
+          description={error}
+          requestId={requestId}
+          primaryAction={{ label: "Try again", onClick: load }}
+          secondaryAction={{ label: "Back to settings", href: "/dashboard/settings" }}
+        />
+      </DashboardShell>
+    );
+  }
+
+  const current = settings || DEFAULT_SETTINGS;
+
+  return (
+    <DashboardShell>
+      <div className="card" style={{ marginBottom: 16 }}>
+        <h1 style={{ marginTop: 0 }}>Automations</h1>
+        <p className="muted">Control which automatic customer updates are queued.</p>
+        {error ? (
+          <p className="muted" style={{ marginTop: 0 }}>
+            {error}{requestId ? ` (Support code: ${requestId})` : ""}
+          </p>
+        ) : null}
+      </div>
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div style={{ display: "grid", gap: 14 }}>
+          <label style={{ display: "flex", gap: 12, alignItems: "center" }}>
+            <input
+              type="checkbox"
+              checked={current.bookingRemindersEnabled}
+              onChange={(e) => updateSetting("bookingRemindersEnabled", e.target.checked)}
+              disabled={savingKey === "bookingRemindersEnabled"}
+            />
+            <div>
+              <strong>Booking reminders</strong>
+              <p className="muted" style={{ margin: 0 }}>Queue reminders ahead of scheduled bookings.</p>
+            </div>
+          </label>
+
+          <label style={{ display: "flex", gap: 12, alignItems: "center" }}>
+            <input
+              type="checkbox"
+              checked={current.approvalRequestEnabled}
+              onChange={(e) => updateSetting("approvalRequestEnabled", e.target.checked)}
+              disabled={savingKey === "approvalRequestEnabled"}
+            />
+            <div>
+              <strong>Approval requests</strong>
+              <p className="muted" style={{ margin: 0 }}>Queue approval requests when jobs are completed.</p>
+            </div>
+          </label>
+
+          <label style={{ display: "flex", gap: 12, alignItems: "center" }}>
+            <input
+              type="checkbox"
+              checked={current.reviewRequestEnabled}
+              onChange={(e) => updateSetting("reviewRequestEnabled", e.target.checked)}
+              disabled={savingKey === "reviewRequestEnabled"}
+            />
+            <div>
+              <strong>Review requests</strong>
+              <p className="muted" style={{ margin: 0 }}>Queue review requests after payment is received.</p>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <div className="card">
+        <h2 style={{ marginTop: 0 }}>Need to check timelines?</h2>
+        <p className="muted">Automation events appear in job and booking timelines.</p>
+        <Link className="button secondary" href="/dashboard/command-centre">Open Command Centre</Link>
+      </div>
+    </DashboardShell>
+  );
+}

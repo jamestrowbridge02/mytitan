@@ -1,0 +1,154 @@
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { DashboardShell } from "../../components/dashboard-shell";
+import { EmptyState } from "../../components/states/EmptyState";
+import { ErrorState } from "../../components/states/ErrorState";
+import { LoadingState } from "../../components/states/LoadingState";
+import { ApiError, apiFetch } from "../../lib/api";
+import { isAnalyticsV1Enabled } from "../../lib/feature-flags";
+
+type OpsInsights = {
+  windowDays: number;
+  cashAtRisk7d: number;
+  revenueCollected7d: number;
+  workloadToday: {
+    jobs: number;
+    unassigned: number;
+    overdue: number;
+  };
+  funnel7d: {
+    bookings: number;
+    jobs: number;
+    invoiced: number;
+    paid: number;
+  };
+};
+
+function money(cents: number, currency = "GBP") {
+  return new Intl.NumberFormat("en-GB", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 0,
+  }).format((cents || 0) / 100);
+}
+
+export default function InsightsPage() {
+  const enabled = isAnalyticsV1Enabled();
+  const [data, setData] = useState<OpsInsights | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [requestId, setRequestId] = useState<string | undefined>(undefined);
+
+  async function load() {
+    if (!enabled) return;
+    setLoading(true);
+    setError("");
+    setRequestId(undefined);
+    try {
+      const res = await apiFetch("/analytics/ops-insights?windowDays=7");
+      setData(res || null);
+    } catch (err: any) {
+      setError(err?.message || "Failed to load insights");
+      setRequestId(err instanceof ApiError ? err.requestId : undefined);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    load();
+  }, [enabled]);
+
+  if (!enabled) {
+    return (
+      <DashboardShell>
+        <EmptyState
+          title="Insights are not enabled"
+          description="Enable Analytics V1 to view operational insights."
+          primaryAction={{ label: "Back to dashboard", href: "/dashboard" }}
+        />
+      </DashboardShell>
+    );
+  }
+
+  if (loading && !data) {
+    return (
+      <DashboardShell>
+        <LoadingState title="Loading insights" description="Fetching operational metrics." />
+      </DashboardShell>
+    );
+  }
+
+  if (error && !data) {
+    return (
+      <DashboardShell>
+        <ErrorState
+          title="Could not load insights"
+          description={error}
+          requestId={requestId}
+          primaryAction={{ label: "Try again", onClick: load }}
+          secondaryAction={{ label: "Back to dashboard", href: "/dashboard" }}
+        />
+      </DashboardShell>
+    );
+  }
+
+  const insights = data || {
+    windowDays: 7,
+    cashAtRisk7d: 0,
+    revenueCollected7d: 0,
+    workloadToday: { jobs: 0, unassigned: 0, overdue: 0 },
+    funnel7d: { bookings: 0, jobs: 0, invoiced: 0, paid: 0 },
+  };
+
+  return (
+    <DashboardShell>
+      <div className="card" style={{ marginBottom: 16 }}>
+        <h1 style={{ marginTop: 0 }}>Ops Insights</h1>
+        <p className="muted">Snapshot of the last {insights.windowDays} days and today.</p>
+      </div>
+
+      <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
+        <div className="card">
+          <h3 style={{ marginTop: 0 }}>Cash at Risk</h3>
+          <p className="muted">Outstanding completed/invoiced work.</p>
+          <div style={{ fontSize: 28, fontWeight: 700 }}>{money(insights.cashAtRisk7d)}</div>
+          <Link className="button secondary" href="/dashboard/jobs" style={{ marginTop: 12 }}>View unpaid jobs</Link>
+        </div>
+
+        <div className="card">
+          <h3 style={{ marginTop: 0 }}>Revenue Collected</h3>
+          <p className="muted">Payments received in last 7 days.</p>
+          <div style={{ fontSize: 28, fontWeight: 700 }}>{money(insights.revenueCollected7d)}</div>
+          <Link className="button secondary" href="/dashboard/billing" style={{ marginTop: 12 }}>View billing</Link>
+        </div>
+
+        <div className="card">
+          <h3 style={{ marginTop: 0 }}>Workload Today</h3>
+          <p className="muted">Jobs created today, unassigned, overdue.</p>
+          <div style={{ display: "grid", gap: 6 }}>
+            <span>Jobs today: <strong>{insights.workloadToday.jobs}</strong></span>
+            <span>Unassigned: <strong>{insights.workloadToday.unassigned}</strong></span>
+            <span>Overdue: <strong>{insights.workloadToday.overdue}</strong></span>
+          </div>
+          <Link className="button secondary" href="/dashboard/command-centre" style={{ marginTop: 12 }}>Open Command Centre</Link>
+        </div>
+
+        <div className="card">
+          <h3 style={{ marginTop: 0 }}>7‑Day Funnel</h3>
+          <p className="muted">Bookings → Jobs → Invoiced → Paid.</p>
+          <div style={{ display: "grid", gap: 6 }}>
+            <span>Bookings: <strong>{insights.funnel7d.bookings}</strong></span>
+            <span>Jobs: <strong>{insights.funnel7d.jobs}</strong></span>
+            <span>Invoiced: <strong>{insights.funnel7d.invoiced}</strong></span>
+            <span>Paid: <strong>{insights.funnel7d.paid}</strong></span>
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
+            <Link className="button secondary" href="/dashboard/bookings">Bookings</Link>
+            <Link className="button secondary" href="/dashboard/jobs">Jobs</Link>
+          </div>
+        </div>
+      </div>
+    </DashboardShell>
+  );
+}

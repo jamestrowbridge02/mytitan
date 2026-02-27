@@ -1,0 +1,42 @@
+import { Body, Controller, Get, Patch, Param, Query, Req, UseGuards } from '@nestjs/common';
+import { JwtAuthGuard } from '../auth/auth.guard';
+import { CurrentUser } from '../auth/current-user.decorator';
+import { JwtPayload } from '../auth/auth.types';
+import { requireCalendarV1Enabled } from '../common/feature-flags';
+import { requireCalendarV2DragEnabled } from '../common/feature-flags';
+import { Roles } from '../common/roles.decorator';
+import { RolesGuard } from '../common/roles.guard';
+import { CalendarService } from './calendar.service';
+import type { Request } from 'express';
+
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Controller('calendar')
+export class CalendarController {
+  constructor(private readonly calendarService: CalendarService) {}
+
+  @Get('bookings')
+  @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
+  listBookings(
+    @CurrentUser() user: JwtPayload,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('techId') techId?: string,
+    @Query('locationId') locationId?: string,
+    ) {
+    requireCalendarV1Enabled();
+    return this.calendarService.listBookings(user.companyId, { from, to, techId, locationId });
+  }
+
+  @Patch('bookings/:id/reschedule')
+  @Roles('OWNER', 'ADMIN', 'STAFF')
+  rescheduleBooking(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Body() body: { startsAt: string; endsAt: string; technicianId?: string | null },
+    @Req() req: Request & { requestId?: string },
+  ) {
+    requireCalendarV2DragEnabled();
+    const requestId = String(req.requestId || req.headers['x-request-id'] || '').trim() || undefined;
+    return this.calendarService.rescheduleBooking(user.companyId, id, body, user.sub, requestId);
+  }
+}

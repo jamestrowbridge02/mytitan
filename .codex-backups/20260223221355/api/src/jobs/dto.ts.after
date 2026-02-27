@@ -1,0 +1,126 @@
+import { Type } from "class-transformer";
+import {
+  IsArray,
+  IsDateString,
+  IsEmail,
+  IsIn,
+  IsInt,
+  IsObject,
+  IsOptional,
+  IsString,
+  Min,
+  ValidateNested,
+} from "class-validator";
+import { JOB_STATUSES } from "../common/constants";
+
+export const JOB_ASSET_KINDS = ["BEFORE", "AFTER", "TORQUE", "SIGN_TECH", "SIGN_CUSTOMER"] as const;
+
+export class CreateJobAssetDto {
+  @IsIn(JOB_ASSET_KINDS)
+  kind!: (typeof JOB_ASSET_KINDS)[number];
+
+  @IsOptional()
+  @IsString()
+  url?: string;
+
+  @IsOptional()
+  @IsString()
+  dataUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  mime?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  bytes?: number;
+}
+
+export class CreateJobDto {
+  @IsOptional()
+  @IsString()
+  locationId?: string;
+
+  @IsString()
+  customerName!: string;
+
+  @IsOptional()
+  @IsEmail()
+  customerEmail?: string;
+
+  @IsOptional()
+  @IsString()
+  customerPhone?: string;
+
+  @IsOptional()
+  @IsString()
+  vehicleMake?: string;
+
+  @IsOptional()
+  @IsString()
+  vehicleModel?: string;
+
+  @IsOptional()
+  @IsString()
+  vehicleReg?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  laborCents?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  partsCents?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  miscCents?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  taxRateBps?: number;
+
+  @IsOptional()
+  @IsString()
+  serviceName?: string;
+
+  @IsOptional()
+  @IsIn(["PER_WHEEL", "SET"])
+  wheelPricingMode?: "PER_WHEEL" | "SET";
+
+  @IsOptional()
+  @IsString()
+  whatsappTemplate?: string;
+
+  @IsOptional()
+  @IsDateString()
+  invoiceDueAt?: string;
+
+  @IsOptional()
+  @IsString()
+  tradeCode?: string;
+
+  @IsOptional()
+  @IsString()
+  jobType?: string;
+
+  @IsOptional()
+  @IsObject()
+  formData?: Record<string, any>;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateJobAssetDto)
+  assets?: CreateJobAssetDto[];
+}
+
+export class UpdateJobStatusDto {
+  @IsIn(JOB_STATUSES)
+  status!: (typeof JOB_STATUSES)[number];
+}

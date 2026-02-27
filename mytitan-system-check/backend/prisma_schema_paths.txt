@@ -1,0 +1,2 @@
+./api/prisma/schema.prisma
+./api/node_modules/.prisma/client/schema.prisma

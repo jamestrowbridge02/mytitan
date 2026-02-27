@@ -1,0 +1,867 @@
+#!/usr/bin/env node
+/* eslint-disable no-console */
+const { PrismaClient } = require('@prisma/client');
+const bcrypt = require('bcryptjs');
+const readline = require('readline');
+const crypto = require('crypto');
+
+const prisma = new PrismaClient();
+const DEMO_COMPANY_NAME = 'DEMO';
+const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || 'admin@mytitan.co.uk';
+const DEMO_EMAIL = 'demo@mytitan.co.uk';
+const OWNER_ROLE = 'OWNER';
+const STAFF_ROLE = 'STAFF';
+const DEFAULT_TRADE_PACK = 'WHEELS';
+const DEMO_THEME_MODE = 'light';
+
+const TRADE_PACKS = [
+  {
+    code: 'WHEELS',
+    name: 'Wheels & Tyres',
+    description: 'Preset for wheel and tyre businesses.',
+    tags: ['wheels', 'tyres', 'alignment'],
+  },
+  {
+    code: 'BODYSHOP',
+    name: 'Bodyshop',
+    description: 'Preset for body repair and paint work.',
+    tags: ['bodyshop', 'paint', 'repair'],
+  },
+  {
+    code: 'GARAGE',
+    name: 'General Garage',
+    description: 'Preset for multi-service garages.',
+    tags: ['garage', 'service', 'diagnostics'],
+  },
+  {
+    code: 'MOBILE_TECH',
+    name: 'Mobile Technician',
+    description: 'Preset for mobile technician operations.',
+    tags: ['mobile', 'onsite', 'field'],
+  },
+];
+
+function getArgs() {
+  return new Set(process.argv.slice(2));
+}
+
+function promptHidden(question) {
+  return new Promise((resolve, reject) => {
+    if (!process.stdin.isTTY) {
+      reject(new Error('Interactive reset requires a TTY.'));
+      return;
+    }
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+      terminal: true,
+    });
+    const onData = (char) => {
+      const str = char.toString();
+      if (str === '\n' || str === '\r' || str === '\u0004') {
+        process.stdout.write('\n');
+        return;
+      }
+      if (str === '\u0003') {
+        process.stdout.write('\n');
+        rl.close();
+        reject(new Error('Cancelled.'));
+        return;
+      }
+      process.stdout.write('*');
+    };
+    process.stdin.on('data', onData);
+    rl.question(question, (answer) => {
+      process.stdin.removeListener('data', onData);
+      rl.close();
+      resolve(answer);
+    });
+  });
+}
+
+async function promptPassword(label) {
+  const first = await promptHidden(`${label}: `);
+  const second = await promptHidden(`Confirm ${label}: `);
+  if (!first || first !== second) {
+    throw new Error(`${label} entries did not match.`);
+  }
+  return first;
+}
+
+async function ensureTradePacks() {
+  for (const pack of TRADE_PACKS) {
+    await prisma.tradePack.upsert({
+      where: { code: pack.code },
+      create: {
+        code: pack.code,
+        name: pack.name,
+        description: pack.description,
+        tags: pack.tags,
+        version: 1,
+        isActive: true,
+      },
+      update: {
+        name: pack.name,
+        description: pack.description,
+        tags: pack.tags,
+        isActive: true,
+      },
+    });
+  }
+}
+
+async function ensureDemoCompany() {
+  let company = await prisma.company.findFirst({
+    where: { name: DEMO_COMPANY_NAME },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  if (!company) {
+    company = await prisma.company.create({
+      data: {
+        name: DEMO_COMPANY_NAME,
+        timezone: 'UTC',
+        currency: 'GBP',
+      },
+    });
+  }
+
+  const defaultPlan = await prisma.plan.findFirst({
+    where: { code: 'SOLE_TRADER' },
+  });
+
+  await prisma.tenantSetting.upsert({
+    where: { tenantId: company.id },
+    create: {
+      tenantId: company.id,
+      planId: defaultPlan ? defaultPlan.id : null,
+      companyName: company.name,
+      defaultCurrency: company.currency || 'GBP',
+      defaultTimezone: company.timezone || 'UTC',
+      onboardingCompleted: false,
+      onboardingStep: 0,
+      featurePayments: false,
+      featureAccounting: false,
+      featureBookings: false,
+      featureSocial: false,
+      featureAI: false,
+      featureCustomerPortal: false,
+      featureWhatsApp: false,
+      themeMode: DEMO_THEME_MODE,
+      primaryTrade: 'WHEELS',
+    },
+    update: {
+      companyName: company.name,
+      defaultCurrency: company.currency || 'GBP',
+      defaultTimezone: company.timezone || 'UTC',
+      themeMode: DEMO_THEME_MODE,
+      primaryTrade: 'WHEELS',
+      ...(defaultPlan ? { planId: defaultPlan.id } : {}),
+    },
+  });
+
+  return company;
+}
+
+async function ensureDemoLocation(companyId) {
+  const existing = await prisma.location.findFirst({
+    where: { companyId, name: 'Demo HQ' },
+  });
+  if (existing) return existing;
+  return prisma.location.create({
+    data: {
+      companyId,
+      name: 'Demo HQ',
+      addressLine1: '1 Titan Way',
+      city: 'London',
+      postalCode: 'EC1A 1AA',
+      country: 'GB',
+      timezone: 'Europe/London',
+    },
+  });
+}
+
+const DEMO_SERVICES = [
+  { key: 'diamond_cut', name: 'Diamond Cut', unitPrice: 140, vatEligible: true },
+  { key: 'painted', name: 'Painted', unitPrice: 120, vatEligible: true },
+  { key: 'smart_repair', name: 'Smart Repair', unitPrice: 95, vatEligible: true },
+  { key: 'powder_coat', name: 'Powder Coat', unitPrice: 150, vatEligible: true },
+  { key: 'welding', name: 'Welding', unitPrice: 110, vatEligible: true },
+];
+
+const DEMO_WEEKLY_SCHEDULE = {
+  mon: [{ start: '08:00', end: '17:00' }],
+  tue: [{ start: '08:00', end: '17:00' }],
+  wed: [{ start: '08:00', end: '17:00' }],
+  thu: [{ start: '08:00', end: '17:00' }],
+  fri: [{ start: '08:00', end: '17:00' }],
+  sat: [],
+  sun: [],
+};
+
+async function ensureServiceCatalog(companyId) {
+  const created = [];
+  for (const service of DEMO_SERVICES) {
+    const row = await prisma.serviceCatalogItem.upsert({
+      where: { tenantId_key: { tenantId: companyId, key: service.key } },
+      create: {
+        tenantId: companyId,
+        key: service.key,
+        name: service.name,
+        unitPrice: service.unitPrice,
+        defaultQty: 1,
+        durationMinutes: 60,
+        capacity: 1,
+        active: true,
+        vatEligible: service.vatEligible,
+      },
+      update: {
+        name: service.name,
+        unitPrice: service.unitPrice,
+        active: true,
+        vatEligible: service.vatEligible,
+      },
+    });
+    created.push(row);
+  }
+  return created;
+}
+
+async function ensurePricingPresets(companyId) {
+  await prisma.templatePreset.upsert({
+    where: {
+      tenantId_packCode_type_key: {
+        tenantId: companyId,
+        packCode: DEFAULT_TRADE_PACK,
+        type: 'PRICING_PRESET',
+        key: 'demo-default',
+      },
+    },
+    create: {
+      tenantId: companyId,
+      packCode: DEFAULT_TRADE_PACK,
+      type: 'PRICING_PRESET',
+      key: 'demo-default',
+      name: 'Demo Default Pricing',
+      dataJson: {
+        currency: 'GBP',
+        vatRateBps: 2000,
+        services: DEMO_SERVICES,
+      },
+      isActive: true,
+    },
+    update: {
+      name: 'Demo Default Pricing',
+      dataJson: {
+        currency: 'GBP',
+        vatRateBps: 2000,
+        services: DEMO_SERVICES,
+      },
+      isActive: true,
+    },
+  });
+}
+
+async function ensureTradeAccounts(companyId) {
+  const samples = [
+    { name: 'Fleetline Motors', email: 'accounts@fleetline.example', phone: '+447700900111' },
+    { name: 'Swift Cars Ltd', email: 'ops@swiftcars.example', phone: '+447700900222' },
+    { name: 'Northside Autos', email: 'hello@northside.example', phone: '+447700900333' },
+  ];
+  let touched = 0;
+  for (const sample of samples) {
+    const existing = await prisma.tradeAccount.findFirst({ where: { companyId, name: sample.name } });
+    if (existing) {
+      await prisma.tradeAccount.update({
+        where: { id: existing.id },
+        data: {
+          contactEmail: sample.email,
+          contactPhone: sample.phone,
+          creditLimit: 5000,
+          status: 'ACTIVE',
+        },
+      });
+      touched += 1;
+      continue;
+    }
+    await prisma.tradeAccount.create({
+      data: {
+        companyId,
+        name: sample.name,
+        contactName: sample.name,
+        contactEmail: sample.email,
+        contactPhone: sample.phone,
+        creditLimit: 5000,
+        outstandingBalance: 0,
+        status: 'ACTIVE',
+      },
+    });
+    touched += 1;
+  }
+  return touched;
+}
+
+function buildDemoCustomers() {
+  return [
+    { name: 'Ava Turner', email: 'ava.turner@example.test', phone: '+447900000001' },
+    { name: 'Liam Carter', email: 'liam.carter@example.test', phone: '+447900000002' },
+    { name: 'Mia Harris', email: 'mia.harris@example.test', phone: '+447900000003' },
+    { name: 'Noah Clark', email: 'noah.clark@example.test', phone: '+447900000004' },
+    { name: 'Olivia Scott', email: 'olivia.scott@example.test', phone: '+447900000005' },
+    { name: 'Ethan Reed', email: 'ethan.reed@example.test', phone: '+447900000006' },
+  ];
+}
+
+function demoJobFormData(index) {
+  return {
+    tradeCode: 'WHEELS',
+    jobType: index % 2 === 0 ? 'Diamond Cut' : 'Painted',
+    wheelCount: 4,
+    services: ['Diamond Cut', 'Smart Repair'],
+    paymentStatus: index % 4 === 0 ? 'paid' : 'pending',
+    paymentMethod: index % 4 === 0 ? 'Card' : null,
+    notes: 'Demo seeded job',
+  };
+}
+
+function startOfToday(date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function addMinutes(date, minutes) {
+  return new Date(date.getTime() + minutes * 60000);
+}
+
+function addDays(date, days) {
+  const result = new Date(date);
+  result.setDate(result.getDate() + days);
+  return result;
+}
+
+async function ensureJobsAndBookings(companyId, locationId, serviceItems, demoUserId) {
+  const customers = buildDemoCustomers();
+  // Demo seed uses relative timestamps so bookings/jobs stay fresh on each run.
+  const now = new Date();
+  const today = startOfToday(now);
+  // Curated demo set (about 6 jobs, 6 bookings) with stable identifiers.
+  const jobSeeds = [
+    { id: 'demo-job-1', jobRef: 'DEMO-0001', customerIndex: 0, scenario: 'in_progress' },
+    { id: 'demo-job-2', jobRef: 'DEMO-0002', customerIndex: 1, scenario: 'completed_unpaid' },
+    { id: 'demo-job-3', jobRef: 'DEMO-0003', customerIndex: 2, scenario: 'completed_paid' },
+    { id: 'demo-job-4', jobRef: 'DEMO-0004', customerIndex: 3, scenario: 'awaiting_approval' },
+    { id: 'demo-job-5', jobRef: 'DEMO-0005', customerIndex: 4, scenario: 'unassigned_starting_soon' },
+    { id: 'demo-job-6', jobRef: 'DEMO-0006', customerIndex: 5, scenario: 'open' },
+  ];
+  const bookingSlots = [
+    { id: 'demo-booking-1', customerIndex: 0, start: addMinutes(today, 9 * 60), durationMins: 90, status: 'CONFIRMED', jobRef: 'DEMO-0001' },
+    { id: 'demo-booking-2', customerIndex: 1, start: addMinutes(today, 11 * 60), durationMins: 60, status: 'PLANNED', jobRef: 'DEMO-0002' },
+    { id: 'demo-booking-3', customerIndex: 2, start: addMinutes(today, 13 * 60 + 30), durationMins: 90, status: 'CONFIRMED', jobRef: 'DEMO-0003' },
+    { id: 'demo-booking-4', customerIndex: 3, start: addMinutes(today, 15 * 60), durationMins: 60, status: 'CONFIRMED', jobRef: 'DEMO-0004' },
+    { id: 'demo-booking-5', customerIndex: 4, start: addMinutes(now, -20), durationMins: 75, status: 'PLANNED', jobRef: null },
+    { id: 'demo-booking-6', customerIndex: 5, start: addMinutes(now, 45), durationMins: 60, status: 'CONFIRMED', jobRef: 'DEMO-0005' },
+  ];
+  let jobsCount = 0;
+  let bookingsCount = 0;
+  const seededJobs = {};
+
+  for (const seed of jobSeeds) {
+    const customer = customers[seed.customerIndex];
+    const totalCents = 52000 + seed.customerIndex * 1500;
+    const reg = `DEMO${100 + seed.customerIndex}`;
+    const isInProgress = seed.scenario === 'in_progress';
+    const isCompletedUnpaid = seed.scenario === 'completed_unpaid';
+    const isCompletedPaid = seed.scenario === 'completed_paid';
+    const isAwaitingApproval = seed.scenario === 'awaiting_approval';
+    const isUnassignedSoon = seed.scenario === 'unassigned_starting_soon';
+    const status = isInProgress
+      ? 'IN_PROGRESS'
+      : isCompletedUnpaid || isCompletedPaid || isAwaitingApproval
+      ? 'COMPLETED'
+      : isUnassignedSoon
+      ? 'SCHEDULED'
+      : 'OPEN';
+    const invoiceIssuedAt = isCompletedUnpaid || isCompletedPaid || isAwaitingApproval ? addMinutes(now, -3 * 60) : null;
+    const invoicePaidAt = isCompletedPaid || isAwaitingApproval ? addMinutes(now, -2 * 60) : null;
+    const invoiceDueAt = isCompletedUnpaid ? addMinutes(now, -120) : null;
+    const scheduledAt = isUnassignedSoon
+      ? addMinutes(now, 90)
+      : seed.scenario === 'open'
+      ? addMinutes(now, 6 * 60)
+      : addMinutes(now, -2 * 60);
+    const job = await prisma.job.upsert({
+      where: { companyId_jobRef: { companyId, jobRef: seed.jobRef } },
+      create: {
+        id: seed.id,
+        companyId,
+        locationId,
+        jobRef: seed.jobRef,
+        status,
+        customerName: customer.name,
+        customerEmail: customer.email,
+        customerPhone: customer.phone,
+        vehicleMake: seed.customerIndex % 2 === 0 ? 'BMW' : 'Audi',
+        vehicleModel: seed.customerIndex % 2 === 0 ? 'M4' : 'A5',
+        vehicleReg: reg,
+        serviceName: seed.customerIndex % 2 === 0 ? 'Diamond Cut' : 'Painted',
+        laborCents: totalCents - 8000,
+        partsCents: 5000,
+        miscCents: 3000,
+        subtotalCents: totalCents - 10000,
+        taxRateBps: 2000,
+        taxCents: 10000,
+        totalCents,
+        currency: 'GBP',
+        tradeCode: 'WHEELS',
+        jobType: seed.customerIndex % 2 === 0 ? 'Diamond Cut' : 'Painted',
+        formData: demoJobFormData(seed.customerIndex),
+        paymentLinkUrl: isCompletedUnpaid ? `https://pay.mytitan.demo/invoice/${seed.jobRef}` : null,
+        assignedUserId: isInProgress ? demoUserId || null : null,
+        completedAt: status === 'COMPLETED' ? addMinutes(now, -6 * 60) : null,
+        invoiceIssuedAt,
+        invoiceDueAt,
+        invoicePaidAt,
+        scheduledAt,
+        approvedAt: isAwaitingApproval ? null : undefined,
+        createdAt: addMinutes(now, -((seed.customerIndex + 2) * 6 * 60)),
+      },
+      update: {
+        status,
+        customerName: customer.name,
+        customerEmail: customer.email,
+        customerPhone: customer.phone,
+        vehicleReg: reg,
+        totalCents,
+        formData: demoJobFormData(seed.customerIndex),
+        tradeCode: 'WHEELS',
+        jobType: seed.customerIndex % 2 === 0 ? 'Diamond Cut' : 'Painted',
+        paymentLinkUrl: isCompletedUnpaid ? `https://pay.mytitan.demo/invoice/${seed.jobRef}` : null,
+        assignedUserId: isInProgress ? demoUserId || null : null,
+        completedAt: status === 'COMPLETED' ? addMinutes(now, -6 * 60) : null,
+        invoiceIssuedAt,
+        invoiceDueAt,
+        invoicePaidAt,
+        scheduledAt,
+        createdAt: addMinutes(now, -((seed.customerIndex + 2) * 6 * 60)),
+      },
+    });
+    seededJobs[seed.jobRef] = job;
+
+    await prisma.jobAsset.upsert({
+      where: { id: `demo-before-${job.id}` },
+      create: {
+        id: `demo-before-${job.id}`,
+        jobId: job.id,
+        kind: 'BEFORE',
+        url: `https://cdn.mytitan.demo/assets/${job.id}/before.jpg`,
+        mime: 'image/jpeg',
+      },
+      update: {
+        url: `https://cdn.mytitan.demo/assets/${job.id}/before.jpg`,
+      },
+    });
+
+    await prisma.jobAsset.upsert({
+      where: { id: `demo-after-${job.id}` },
+      create: {
+        id: `demo-after-${job.id}`,
+        jobId: job.id,
+        kind: 'AFTER',
+        url: `https://cdn.mytitan.demo/assets/${job.id}/after.jpg`,
+        mime: 'image/jpeg',
+      },
+      update: {
+        url: `https://cdn.mytitan.demo/assets/${job.id}/after.jpg`,
+      },
+    });
+
+    if (isInProgress) {
+      await prisma.jobActivity.upsert({
+        where: { id: `demo-activity-${job.id}-status` },
+        create: {
+          id: `demo-activity-${job.id}-status`,
+          companyId,
+          jobId: job.id,
+          actorUserId: demoUserId || null,
+          eventType: 'status',
+          message: 'Job started and assigned',
+          createdAt: addMinutes(now, -90),
+        },
+        update: {
+          message: 'Job started and assigned',
+          createdAt: addMinutes(now, -90),
+        },
+      });
+      await prisma.jobActivity.upsert({
+        where: { id: `demo-activity-${job.id}-note` },
+        create: {
+          id: `demo-activity-${job.id}-note`,
+          companyId,
+          jobId: job.id,
+          actorUserId: demoUserId || null,
+          eventType: 'note',
+          message: 'Customer approved finish; awaiting final polish.',
+          createdAt: addMinutes(now, -30),
+        },
+        update: {
+          message: 'Customer approved finish; awaiting final polish.',
+          createdAt: addMinutes(now, -30),
+        },
+      });
+    }
+
+    if (isCompletedUnpaid) {
+      await prisma.jobActivity.upsert({
+        where: { id: `demo-activity-${job.id}-invoice` },
+        create: {
+          id: `demo-activity-${job.id}-invoice`,
+          companyId,
+          jobId: job.id,
+          actorUserId: demoUserId || null,
+          eventType: 'invoice',
+          message: 'Invoice sent; awaiting payment.',
+          createdAt: addMinutes(now, -120),
+        },
+        update: {
+          message: 'Invoice sent; awaiting payment.',
+          createdAt: addMinutes(now, -120),
+        },
+      });
+    }
+
+    jobsCount += 1;
+  }
+
+  if (demoUserId) {
+    const commsJob = seededJobs['DEMO-0004'] || seededJobs['DEMO-0002'] || seededJobs['DEMO-0001'];
+    if (commsJob) {
+      await prisma.notification.upsert({
+        where: { id: 'demo-notification-job-1' },
+        create: {
+          id: 'demo-notification-job-1',
+          companyId,
+          userId: demoUserId,
+          type: 'job.approval.request',
+          title: `Approval request sent for ${commsJob.jobRef || 'job'}`,
+          body: null,
+          entityType: 'job',
+          entityId: commsJob.id,
+          metaJson: { channel: 'email', status: 'sent', reasonKey: 'job.approval.request' },
+          createdAt: addMinutes(now, -50),
+        },
+        update: {
+          type: 'job.approval.request',
+          title: `Approval request sent for ${commsJob.jobRef || 'job'}`,
+          entityType: 'job',
+          entityId: commsJob.id,
+          metaJson: { channel: 'email', status: 'sent', reasonKey: 'job.approval.request' },
+          createdAt: addMinutes(now, -50),
+        },
+      });
+    }
+  }
+
+  for (const slot of bookingSlots) {
+    const customer = customers[slot.customerIndex];
+    const job = slot.jobRef ? seededJobs[slot.jobRef] : null;
+    const startsAt = slot.start;
+    const endsAt = addMinutes(startsAt, slot.durationMins);
+    await prisma.booking.upsert({
+      where: { id: slot.id },
+      create: {
+        id: slot.id,
+        companyId,
+        locationId,
+        jobId: job ? job.id : null,
+        serviceId: serviceItems[slot.customerIndex % serviceItems.length]?.id,
+        customerName: customer.name,
+        customerEmail: customer.email,
+        customerPhone: customer.phone,
+        startsAt,
+        endsAt,
+        assignedUserId: demoUserId || null,
+        status: slot.status,
+        source: 'INTERNAL',
+      },
+      update: {
+        locationId,
+        jobId: job ? job.id : null,
+        serviceId: serviceItems[slot.customerIndex % serviceItems.length]?.id,
+        customerName: customer.name,
+        customerEmail: customer.email,
+        customerPhone: customer.phone,
+        startsAt,
+        endsAt,
+        assignedUserId: demoUserId || null,
+        status: slot.status,
+        source: 'INTERNAL',
+      },
+    });
+  }
+
+  if (demoUserId) {
+    const commsBookingId = bookingSlots[0]?.id || 'demo-booking-1';
+    await prisma.notification.upsert({
+      where: { id: 'demo-notification-booking-1' },
+      create: {
+        id: 'demo-notification-booking-1',
+        companyId,
+        userId: demoUserId,
+        type: 'booking.reminder',
+        title: 'Booking reminder sent',
+        body: null,
+        entityType: 'booking',
+        entityId: commsBookingId,
+        metaJson: { channel: 'sms', status: 'sent', reasonKey: 'booking.reminder' },
+        createdAt: addMinutes(now, -20),
+      },
+      update: {
+        type: 'booking.reminder',
+        title: 'Booking reminder sent',
+        entityType: 'booking',
+        entityId: commsBookingId,
+        metaJson: { channel: 'sms', status: 'sent', reasonKey: 'booking.reminder' },
+        createdAt: addMinutes(now, -20),
+      },
+    });
+  }
+
+  // Note: no safe archive field for Job/Booking in schema, so legacy demo records remain.
+  // Curated records are refreshed with recent timestamps to appear at the top of lists.
+  bookingsCount = bookingSlots.length;
+  return { jobsCount, bookingsCount };
+}
+
+async function ensureDemoTradePack(companyId) {
+  const existing = await prisma.tradePackInstall.findUnique({
+    where: {
+      tenantId_packCode: {
+        tenantId: companyId,
+        packCode: DEFAULT_TRADE_PACK,
+      },
+    },
+  });
+
+  if (existing && existing.configJson && existing.configJson.active === false) {
+    await prisma.tradePackInstall.update({
+      where: {
+        tenantId_packCode: {
+          tenantId: companyId,
+          packCode: DEFAULT_TRADE_PACK,
+        },
+      },
+      data: {
+        configJson: { active: true, seededBy: 'seed-demo' },
+      },
+    });
+    return 'reactivated';
+  }
+
+  if (existing) {
+    return 'exists';
+  }
+
+  await prisma.tradePackInstall.create({
+    data: {
+      tenantId: companyId,
+      packCode: DEFAULT_TRADE_PACK,
+      configJson: { active: true, seededBy: 'seed-demo' },
+    },
+  });
+  return 'created';
+}
+
+async function ensureUser(companyId, email, role, passwordHashOverride) {
+  const normalizedEmail = email.toLowerCase().trim();
+  const existing = await prisma.user.findFirst({
+    where: { companyId, email: normalizedEmail },
+  });
+
+  if (existing) {
+    if (existing.role !== role) {
+      await prisma.user.update({
+        where: { id: existing.id },
+        data: { role },
+      });
+      return 'updated';
+    }
+    return 'exists';
+  }
+
+  let passwordHash = passwordHashOverride;
+  if (!passwordHash) {
+    const randomPassword = crypto.randomBytes(32).toString('base64url');
+    passwordHash = await bcrypt.hash(randomPassword, 10);
+  }
+  await prisma.user.create({
+    data: {
+      companyId,
+      email: normalizedEmail,
+      role,
+      passwordHash,
+    },
+  });
+  return 'created';
+}
+
+async function resetPassword(companyId, email, password) {
+  const normalizedEmail = email.toLowerCase().trim();
+  const user = await prisma.user.findFirst({
+    where: { companyId, email: normalizedEmail },
+  });
+  if (!user) {
+    return 'missing';
+  }
+  const passwordHash = await bcrypt.hash(password, 10);
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { passwordHash },
+  });
+  return 'reset';
+}
+
+async function ensureDemoSchedules(companyId, technicianIds) {
+  if (!technicianIds.length) {
+    return;
+  }
+  for (const technicianId of technicianIds) {
+    await prisma.techScheduleSetting.upsert({
+      where: {
+        companyId_technicianId: {
+          companyId,
+          technicianId,
+        },
+      },
+      create: {
+        companyId,
+        technicianId,
+        weeklyJson: DEMO_WEEKLY_SCHEDULE,
+        timezone: 'Europe/London',
+      },
+      update: {
+        weeklyJson: DEMO_WEEKLY_SCHEDULE,
+        timezone: 'Europe/London',
+      },
+    });
+  }
+}
+
+async function ensureDemoScheduleExceptions(companyId, technicianIds) {
+  if (!technicianIds.length) return;
+  const now = new Date();
+  const trainingStart = addDays(now, 1);
+  trainingStart.setHours(13, 0, 0, 0);
+  const trainingEnd = addMinutes(trainingStart, 120);
+  const dayAfter = addDays(now, 2);
+  dayAfter.setHours(0, 0, 0, 0);
+  const dayAfterEnd = addDays(dayAfter, 1);
+
+  const templates = [];
+  if (technicianIds[0]) {
+    templates.push({
+      id: '11111111-1111-1111-1111-111111111111',
+      technicianId: technicianIds[0],
+      startsAt: trainingStart,
+      endsAt: trainingEnd,
+      allDay: false,
+      reason: 'Training',
+    });
+  }
+  if (technicianIds[1]) {
+    templates.push({
+      id: '22222222-2222-2222-2222-222222222222',
+      technicianId: technicianIds[1],
+      startsAt: dayAfter,
+      endsAt: dayAfterEnd,
+      allDay: true,
+      reason: 'Team offsite',
+    });
+  }
+
+  for (const template of templates) {
+    await prisma.techScheduleException.upsert({
+      where: { id: template.id },
+      create: {
+        id: template.id,
+        companyId,
+        technicianId: template.technicianId,
+        startsAt: template.startsAt,
+        endsAt: template.endsAt,
+        allDay: template.allDay,
+        reason: template.reason,
+      },
+      update: {
+        startsAt: template.startsAt,
+        endsAt: template.endsAt,
+        allDay: template.allDay,
+        reason: template.reason,
+      },
+    });
+  }
+}
+
+async function main() {
+  const args = getArgs();
+  const interactiveReset = args.has('--interactive-reset');
+
+  await ensureTradePacks();
+  const company = await ensureDemoCompany();
+  const tradePackStatus = await ensureDemoTradePack(company.id);
+
+  let supportPassword;
+  let demoPassword;
+  let supportHash;
+  let demoHash;
+
+  if (interactiveReset) {
+    console.log('Interactive password reset enabled.');
+    supportPassword = await promptPassword(`${SUPPORT_EMAIL} password`);
+    demoPassword = await promptPassword(`${DEMO_EMAIL} password`);
+    supportHash = await bcrypt.hash(supportPassword, 10);
+    demoHash = await bcrypt.hash(demoPassword, 10);
+  }
+
+  const supportStatus = await ensureUser(company.id, SUPPORT_EMAIL, OWNER_ROLE, supportHash);
+  const demoStatus = await ensureUser(company.id, DEMO_EMAIL, STAFF_ROLE, demoHash);
+  const demoUser = await prisma.user.findFirst({ where: { companyId: company.id, email: DEMO_EMAIL } });
+  const supportUser = await prisma.user.findFirst({ where: { companyId: company.id, email: SUPPORT_EMAIL } });
+  const location = await ensureDemoLocation(company.id);
+  const services = await ensureServiceCatalog(company.id);
+  await ensurePricingPresets(company.id);
+  const tradeAccountCount = await ensureTradeAccounts(company.id);
+  const seeded = await ensureJobsAndBookings(company.id, location.id, services, demoUser?.id);
+  await ensureDemoSchedules(company.id, [supportUser?.id, demoUser?.id].filter(Boolean));
+  await ensureDemoScheduleExceptions(company.id, [supportUser?.id, demoUser?.id].filter(Boolean));
+
+  if (interactiveReset) {
+    const supportReset = supportStatus === 'created'
+      ? 'reset'
+      : await resetPassword(company.id, SUPPORT_EMAIL, supportPassword);
+    const demoReset = demoStatus === 'created'
+      ? 'reset'
+      : await resetPassword(company.id, DEMO_EMAIL, demoPassword);
+    console.log(`${SUPPORT_EMAIL} password: ${supportReset}`);
+    console.log(`${DEMO_EMAIL} password: ${demoReset}`);
+  }
+
+  console.log(`${SUPPORT_EMAIL} (${supportStatus})`);
+  console.log(`${DEMO_EMAIL} (${demoStatus})`);
+  console.log(`trade-pack:${DEFAULT_TRADE_PACK} (${tradePackStatus})`);
+  console.log(`services:${services.length}`);
+  console.log(`trade-accounts:${tradeAccountCount}`);
+  console.log(`jobs:${seeded.jobsCount}`);
+  console.log(`bookings:${seeded.bookingsCount}`);
+}
+
+main()
+  .catch((err) => {
+    console.error('Seed failed.');
+    if (err && err.message) {
+      console.error(err.message);
+    }
+    process.exitCode = 1;
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

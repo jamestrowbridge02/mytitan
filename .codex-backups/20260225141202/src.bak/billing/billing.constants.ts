@@ -1,0 +1,71 @@
+import type { BillingInterval, PlanCode } from '@prisma/client';
+
+export const FEATURE_KEYS = [
+  'bookings_enabled',
+  'accounting_enabled',
+  'payments_enabled',
+  'social_enabled',
+  'ai_enabled',
+] as const;
+
+export type FeatureKey = (typeof FEATURE_KEYS)[number];
+
+export const DEFAULT_PLAN_CODE: PlanCode = 'SOLE_TRADER';
+export const DEFAULT_INTERVAL: BillingInterval = 'MONTHLY';
+
+export const PLAN_DEFINITIONS: Record<
+  PlanCode,
+  {
+    code: PlanCode;
+    name: string;
+    features: Record<string, boolean | number | null>;
+    aiRequestsLimitMonthly: number;
+    aiTokensLimitMonthly: number | null;
+  }
+> = {
+  SOLE_TRADER: {
+    code: 'SOLE_TRADER',
+    name: 'Sole Trader',
+    features: {
+      bookings_enabled: true,
+      accounting_enabled: false,
+      payments_enabled: true,
+      social_enabled: false,
+      ai_enabled: true,
+      storage_bytes_limit: 1_000_000_000,
+      jobs_created_limit: 200,
+    },
+    aiRequestsLimitMonthly: 200,
+    aiTokensLimitMonthly: 100000,
+  },
+  BUSINESS: {
+    code: 'BUSINESS',
+    name: 'Business',
+    features: {
+      bookings_enabled: true,
+      accounting_enabled: true,
+      payments_enabled: true,
+      social_enabled: false,
+      ai_enabled: true,
+      storage_bytes_limit: 10_000_000_000,
+      jobs_created_limit: 2000,
+    },
+    aiRequestsLimitMonthly: 1000,
+    aiTokensLimitMonthly: 500000,
+  },
+  ENTERPRISE: {
+    code: 'ENTERPRISE',
+    name: 'Enterprise',
+    features: {
+      bookings_enabled: true,
+      accounting_enabled: true,
+      payments_enabled: true,
+      social_enabled: true,
+      ai_enabled: true,
+      storage_bytes_limit: 100_000_000_000,
+      jobs_created_limit: 100000,
+    },
+    aiRequestsLimitMonthly: 10000,
+    aiTokensLimitMonthly: null,
+  },
+};

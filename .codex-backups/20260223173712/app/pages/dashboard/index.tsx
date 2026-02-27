@@ -1,0 +1,103 @@
+import { useEffect, useState } from 'react';
+import { DashboardShell } from '../../components/dashboard-shell';
+import { apiFetch } from '../../lib/api';
+import { isMarketplaceEnabled } from '../../lib/feature-flags';
+
+type ChecklistSummary = {
+  completedCount: number;
+  total: number;
+};
+
+type OverviewMetrics = {
+  jobsCreatedThisMonth: number;
+  bookingsNext7Days: number;
+  outstandingInvoices: { count: number; totalCents: number };
+  revenueThisMonth: number;
+  aiUsageThisMonth: { requests: number; tokens: number };
+  storageUsageBytes: number | null;
+};
+
+export default function Dashboard() {
+  const [summary, setSummary] = useState<ChecklistSummary | null>(null);
+  const [metrics, setMetrics] = useState<OverviewMetrics | null>(null);
+  const marketplaceEnabled = isMarketplaceEnabled();
+
+  useEffect(() => {
+    if (!marketplaceEnabled) return;
+    const load = async () => {
+      try {
+        const data = await apiFetch('/setup/checklist');
+        setSummary({ completedCount: data.completedCount || 0, total: data.total || 0 });
+      } catch {
+        // ignore
+      }
+    };
+    load();
+  }, [marketplaceEnabled]);
+
+  useEffect(() => {
+    if (!marketplaceEnabled) return;
+    const loadMetrics = async () => {
+      try {
+        const data = await apiFetch('/metrics/overview');
+        setMetrics(data);
+      } catch {
+        // ignore
+      }
+    };
+    loadMetrics();
+  }, [marketplaceEnabled]);
+
+  return (
+    <DashboardShell>
+      {summary && summary.completedCount < summary.total ? (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <h2>Setup checklist</h2>
+          <p className="muted">
+            {summary.completedCount}/{summary.total} complete. Finish your setup to unlock the full experience.
+          </p>
+          <a className="button secondary" href="/dashboard/setup">
+            Continue setup
+          </a>
+        </div>
+      ) : null}
+
+      {marketplaceEnabled && metrics ? (
+        <div className="metrics-grid">
+          <div className="metric-card">
+            <p className="muted">Jobs created this month</p>
+            <h2>{metrics.jobsCreatedThisMonth}</h2>
+          </div>
+          <div className="metric-card">
+            <p className="muted">Bookings next 7 days</p>
+            <h2>{metrics.bookingsNext7Days}</h2>
+          </div>
+          <div className="metric-card">
+            <p className="muted">Outstanding invoices</p>
+            <h2>{metrics.outstandingInvoices.count}</h2>
+            <p className="muted">Total: {(metrics.outstandingInvoices.totalCents / 100).toFixed(2)}</p>
+          </div>
+          <div className="metric-card">
+            <p className="muted">Revenue this month</p>
+            <h2>{(metrics.revenueThisMonth / 100).toFixed(2)}</h2>
+          </div>
+          <div className="metric-card">
+            <p className="muted">AI usage this month</p>
+            <h2>{metrics.aiUsageThisMonth.requests}</h2>
+            <p className="muted">Tokens: {metrics.aiUsageThisMonth.tokens}</p>
+          </div>
+          <div className="metric-card">
+            <p className="muted">Storage usage</p>
+            <h2>{metrics.storageUsageBytes ? `${(metrics.storageUsageBytes / 1_000_000).toFixed(1)} MB` : '—'}</h2>
+            {!metrics.storageUsageBytes ? <p className="muted">Tracking not enabled</p> : null}
+          </div>
+        </div>
+      ) : null}
+
+      <div className="card">
+        <h1>MyTitan Dashboard</h1>
+        <p className="muted">Operational backbone for jobs, schedules, and trade accounts.</p>
+      </div>
+    </DashboardShell>
+  );
+}

@@ -1,0 +1,12 @@
+import { DashboardShell } from '../../components/dashboard-shell';
+
+export default function Dashboard() {
+  return (
+    <DashboardShell>
+      <div className="card">
+        <h1>MyTitan Dashboard</h1>
+        <p className="muted">Operational backbone for jobs, schedules, and trade accounts.</p>
+      </div>
+    </DashboardShell>
+  );
+}

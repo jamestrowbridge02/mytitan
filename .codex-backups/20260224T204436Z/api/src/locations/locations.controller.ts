@@ -1,0 +1,44 @@
+import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { JwtAuthGuard } from '../auth/auth.guard';
+import { CurrentUser } from '../auth/current-user.decorator';
+import { JwtPayload } from '../auth/auth.types';
+import { isLocationsV1Enabled } from '../common/feature-flags';
+import { Roles } from '../common/roles.decorator';
+import { RolesGuard } from '../common/roles.guard';
+import { UpsertLocationDto } from './dto';
+import { LocationsService } from './locations.service';
+
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Controller('locations')
+export class LocationsController {
+  constructor(private readonly locationsService: LocationsService) {}
+
+  @Get()
+  @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
+  list(@CurrentUser() user: JwtPayload) {
+    if (!isLocationsV1Enabled()) return [];
+    return this.locationsService.list(user.companyId);
+  }
+
+  @Post()
+  @Roles('OWNER', 'ADMIN')
+  create(@CurrentUser() user: JwtPayload, @Body() dto: UpsertLocationDto) {
+    if (!isLocationsV1Enabled()) return { ok: false, message: 'Locations feature disabled' };
+    return this.locationsService.create(user.companyId, user.sub, dto);
+  }
+
+  @Patch(':id')
+  @Roles('OWNER', 'ADMIN')
+  update(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Body() dto: UpsertLocationDto) {
+    if (!isLocationsV1Enabled()) return { ok: false, message: 'Locations feature disabled' };
+    return this.locationsService.update(user.companyId, user.sub, id, dto);
+  }
+
+  @Post(':id/archive')
+  @Roles('OWNER', 'ADMIN')
+  archive(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    if (!isLocationsV1Enabled()) return { ok: false, message: 'Locations feature disabled' };
+    return this.locationsService.archive(user.companyId, user.sub, id);
+  }
+}
+

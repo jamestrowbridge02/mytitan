@@ -1,0 +1,16 @@
+-- CreateEnum
+CREATE TYPE "CRMTaskStatus" AS ENUM ('OPEN', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED');
+
+-- AlterTable
+ALTER TABLE "CRMTask" ALTER COLUMN "status" DROP DEFAULT;
+ALTER TABLE "CRMTask" ALTER COLUMN "status" TYPE "CRMTaskStatus" USING (
+  CASE
+    WHEN "status" IS NULL THEN 'OPEN'::"CRMTaskStatus"
+    WHEN UPPER("status") = 'OPEN' THEN 'OPEN'::"CRMTaskStatus"
+    WHEN UPPER("status") IN ('IN_PROGRESS', 'INPROGRESS') THEN 'IN_PROGRESS'::"CRMTaskStatus"
+    WHEN UPPER("status") IN ('COMPLETED', 'DONE') THEN 'COMPLETED'::"CRMTaskStatus"
+    WHEN UPPER("status") IN ('CANCELLED', 'CANCELED', 'CLOSED') THEN 'CANCELLED'::"CRMTaskStatus"
+    ELSE 'OPEN'::"CRMTaskStatus"
+  END
+);
+ALTER TABLE "CRMTask" ALTER COLUMN "status" SET DEFAULT 'OPEN';

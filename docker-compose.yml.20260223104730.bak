@@ -1,0 +1,84 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: mytitan_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: mytitan
+      POSTGRES_USER: mytitan
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - internal
+
+  redis:
+    image: redis:7
+    container_name: mytitan_redis
+    restart: unless-stopped
+    networks:
+      - internal
+
+  api:
+    image: node:20-bullseye-slim
+    container_name: mytitan_api
+    restart: unless-stopped
+    working_dir: /app
+    volumes:
+      - ./api:/app
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://mytitan:${POSTGRES_PASSWORD}@postgres:5432/mytitan
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      APP_PUBLIC_URL: https://app.mytitan.co.uk
+      API_PUBLIC_URL: https://api.mytitan.co.uk
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      AI_RATE_LIMIT_MAX_REQUESTS: ${AI_RATE_LIMIT_MAX_REQUESTS:-20}
+      AI_RATE_LIMIT_WINDOW_SECONDS: ${AI_RATE_LIMIT_WINDOW_SECONDS:-60}
+      TENANT_LOGO_MAX_BYTES: ${TENANT_LOGO_MAX_BYTES:-2097152}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+      STRIPE_PRICE_SOLE_TRADER_MONTHLY: ${STRIPE_PRICE_SOLE_TRADER_MONTHLY}
+      STRIPE_PRICE_SOLE_TRADER_ANNUAL: ${STRIPE_PRICE_SOLE_TRADER_ANNUAL}
+      STRIPE_PRICE_BUSINESS_MONTHLY: ${STRIPE_PRICE_BUSINESS_MONTHLY}
+      STRIPE_PRICE_BUSINESS_ANNUAL: ${STRIPE_PRICE_BUSINESS_ANNUAL}
+      STRIPE_PRICE_ENTERPRISE_MONTHLY: ${STRIPE_PRICE_ENTERPRISE_MONTHLY}
+      STRIPE_PRICE_ENTERPRISE_ANNUAL: ${STRIPE_PRICE_ENTERPRISE_ANNUAL}
+      STRIPE_BILLING_RETURN_URL: ${STRIPE_BILLING_RETURN_URL:-https://app.mytitan.co.uk/dashboard/billing}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+    command: bash -lc "if [ -f package.json ]; then command -v python3 >/dev/null 2>&1 || (apt-get update && apt-get install -y --no-install-recommends python3 && rm -rf /var/lib/apt/lists/*); npm ci || npm i; bash /app/scripts/start-api.sh; else sleep 3600; fi"
+    depends_on:
+      - postgres
+      - redis
+    ports:
+      - "127.0.0.1:3000:3000"
+    networks:
+      - internal
+
+  app:
+    image: node:20-bullseye-slim
+    container_name: mytitan_app
+    restart: unless-stopped
+    working_dir: /app
+    volumes:
+      - ./app:/app
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      NEXT_PUBLIC_API_BASE_URL: https://api.mytitan.co.uk
+    command: bash -lc "if [ -f package.json ]; then npm ci || npm i; npm run build || true; npm run start -- -p 3001 || npm run dev -- -p 3001; else sleep 3600; fi"
+    depends_on:
+      - api
+    ports:
+      - "127.0.0.1:3001:3001"
+    networks:
+      - internal
+
+networks:
+  internal:
+
+volumes:
+  pgdata:

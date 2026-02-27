@@ -1,0 +1,18 @@
+export declare const ROLES: readonly ["OWNER", "ADMIN", "STAFF", "READ_ONLY"];
+export type Role = (typeof ROLES)[number];
+export declare const JOB_STATUSES: readonly ["DRAFT", "OPEN", "SCHEDULED", "IN_PROGRESS", "COMPLETED", "INVOICED", "CANCELLED"];
+export type JobStatus = (typeof JOB_STATUSES)[number];
+export declare const JOB_STATUS_ALIASES: Record<string, JobStatus>;
+export declare function normalizeJobStatusInput(value: unknown): JobStatus | null;
+export declare const BOOKING_STATUSES: readonly ["PENDING", "PLANNED", "CONFIRMED", "IN_PROGRESS", "COMPLETED", "CANCELLED"];
+export type BookingStatus = (typeof BOOKING_STATUSES)[number];
+export declare const TRADE_ACCOUNT_STATUSES: readonly ["ACTIVE", "ON_HOLD", "CLOSED"];
+export type TradeAccountStatus = (typeof TRADE_ACCOUNT_STATUSES)[number];
+export declare const CRM_TASK_STATUSES: readonly ["OPEN", "IN_PROGRESS", "COMPLETED", "CANCELLED"];
+export type CrmTaskStatus = (typeof CRM_TASK_STATUSES)[number];
+export declare const CRM_TASK_STATUS_INPUTS: readonly ["OPEN", "IN_PROGRESS", "COMPLETED", "CANCELLED", "DONE", "CLOSED", "CANCELED"];
+export type CrmTaskStatusInput = (typeof CRM_TASK_STATUS_INPUTS)[number];
+export declare const WHEEL_PRICING_MODES: readonly ["PER_WHEEL", "SET"];
+export type WheelPricingMode = (typeof WHEEL_PRICING_MODES)[number];
+export declare const EMAIL_TEMPLATE_TYPES: readonly ["JOB_NOTIFICATION", "INVOICE", "BOOKING_CONFIRMATION"];
+export type EmailTemplateType = (typeof EMAIL_TEMPLATE_TYPES)[number];

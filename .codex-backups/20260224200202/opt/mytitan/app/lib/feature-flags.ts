@@ -1,0 +1,51 @@
+const isEnabled = (value?: string) => {
+  const normalized = (value || '').trim().toLowerCase();
+  return normalized === 'on' || normalized === 'true' || normalized === '1';
+};
+
+export const isMarketplaceEnabled = () => isEnabled(process.env.NEXT_PUBLIC_MYTITAN_FEATURE_MARKETPLACE);
+export const isTradePacksEnabled = () => isEnabled(process.env.NEXT_PUBLIC_MYTITAN_FEATURE_TRADE_PACKS);
+export const isStartHereEnabled = () => isEnabled(process.env.NEXT_PUBLIC_MYTITAN_FEATURE_START_HERE);
+
+export const isWheelsFormV1Enabled = () => isEnabled(process.env.NEXT_PUBLIC_MYTITAN_FEATURE_WHEELS_FORM_V1);
+
+export const isWheelsAutomationV1Enabled = () => isEnabled(process.env.NEXT_PUBLIC_MYTITAN_FEATURE_WHEELS_AUTOMATION_V1);
+
+export const isPortalPolishV1Enabled = () =>
+  isEnabled(process.env.NEXT_PUBLIC_MYTITAN_FEATURE_PORTAL_POLISH_V1);
+
+export const isGuidedSetupV2Enabled = () =>
+  isEnabled(process.env.NEXT_PUBLIC_MYTITAN_FEATURE_GUIDED_SETUP_V2);
+
+export const isPublicDemoEnabled = () =>
+  isEnabled(process.env.NEXT_PUBLIC_MYTITAN_FEATURE_PUBLIC_DEMO);
+
+export const isCommandCentreEnabled = () =>
+  isEnabled(process.env.NEXT_PUBLIC_MYTITAN_FEATURE_COMMAND_CENTRE);
+
+export const isCrmV1Enabled = () =>
+  isEnabled(process.env.NEXT_PUBLIC_MYTITAN_FEATURE_CRM_V1);
+
+export const isDraftsV1Enabled = () =>
+  isEnabled(process.env.NEXT_PUBLIC_MYTITAN_FEATURE_DRAFTS_V1);
+
+export const isDemoTourV1Enabled = () =>
+  isEnabled(process.env.NEXT_PUBLIC_MYTITAN_FEATURE_DEMO_TOUR_V1);
+
+export const isAuthPolishV1Enabled = () =>
+  isEnabled(process.env.NEXT_PUBLIC_MYTITAN_FEATURE_AUTH_POLISH_V1);
+
+export const isMarketingPolishV1Enabled = () =>
+  isEnabled(process.env.NEXT_PUBLIC_MYTITAN_FEATURE_MARKETING_POLISH_V1);
+
+export const isCommandCentreV1Enabled = () =>
+  isEnabled(process.env.NEXT_PUBLIC_MYTITAN_FEATURE_COMMAND_CENTRE_V1);
+
+export const isLocationsV1Enabled = () =>
+  isEnabled(process.env.NEXT_PUBLIC_MYTITAN_FEATURE_LOCATIONS_V1);
+
+export const isInventoryV1Enabled = () =>
+  isEnabled(process.env.NEXT_PUBLIC_MYTITAN_FEATURE_INVENTORY_V1);
+
+export const isLogoutV1Enabled = () =>
+  isEnabled(process.env.NEXT_PUBLIC_MYTITAN_FEATURE_LOGOUT_V1);

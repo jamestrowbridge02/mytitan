@@ -1,0 +1,299 @@
+#!/usr/bin/env node
+/* eslint-disable no-console */
+const { PrismaClient } = require('@prisma/client');
+const bcrypt = require('bcryptjs');
+const readline = require('readline');
+const crypto = require('crypto');
+
+const prisma = new PrismaClient();
+const DEMO_COMPANY_NAME = 'DEMO';
+const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || 'admin@mytitan.co.uk';
+const DEMO_EMAIL = 'demo@mytitan.co.uk';
+const OWNER_ROLE = 'OWNER';
+const STAFF_ROLE = 'STAFF';
+const DEFAULT_TRADE_PACK = 'WHEELS';
+
+const TRADE_PACKS = [
+  {
+    code: 'WHEELS',
+    name: 'Wheels & Tyres',
+    description: 'Preset for wheel and tyre businesses.',
+    tags: ['wheels', 'tyres', 'alignment'],
+  },
+  {
+    code: 'BODYSHOP',
+    name: 'Bodyshop',
+    description: 'Preset for body repair and paint work.',
+    tags: ['bodyshop', 'paint', 'repair'],
+  },
+  {
+    code: 'GARAGE',
+    name: 'General Garage',
+    description: 'Preset for multi-service garages.',
+    tags: ['garage', 'service', 'diagnostics'],
+  },
+  {
+    code: 'MOBILE_TECH',
+    name: 'Mobile Technician',
+    description: 'Preset for mobile technician operations.',
+    tags: ['mobile', 'onsite', 'field'],
+  },
+];
+
+function getArgs() {
+  return new Set(process.argv.slice(2));
+}
+
+function promptHidden(question) {
+  return new Promise((resolve, reject) => {
+    if (!process.stdin.isTTY) {
+      reject(new Error('Interactive reset requires a TTY.'));
+      return;
+    }
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+      terminal: true,
+    });
+    const onData = (char) => {
+      const str = char.toString();
+      if (str === '\n' || str === '\r' || str === '\u0004') {
+        process.stdout.write('\n');
+        return;
+      }
+      if (str === '\u0003') {
+        process.stdout.write('\n');
+        rl.close();
+        reject(new Error('Cancelled.'));
+        return;
+      }
+      process.stdout.write('*');
+    };
+    process.stdin.on('data', onData);
+    rl.question(question, (answer) => {
+      process.stdin.removeListener('data', onData);
+      rl.close();
+      resolve(answer);
+    });
+  });
+}
+
+async function promptPassword(label) {
+  const first = await promptHidden(`${label}: `);
+  const second = await promptHidden(`Confirm ${label}: `);
+  if (!first || first !== second) {
+    throw new Error(`${label} entries did not match.`);
+  }
+  return first;
+}
+
+async function ensureTradePacks() {
+  for (const pack of TRADE_PACKS) {
+    await prisma.tradePack.upsert({
+      where: { code: pack.code },
+      create: {
+        code: pack.code,
+        name: pack.name,
+        description: pack.description,
+        tags: pack.tags,
+        version: 1,
+        isActive: true,
+      },
+      update: {
+        name: pack.name,
+        description: pack.description,
+        tags: pack.tags,
+        isActive: true,
+      },
+    });
+  }
+}
+
+async function ensureDemoCompany() {
+  let company = await prisma.company.findFirst({
+    where: { name: DEMO_COMPANY_NAME },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  if (!company) {
+    company = await prisma.company.create({
+      data: {
+        name: DEMO_COMPANY_NAME,
+        timezone: 'UTC',
+        currency: 'GBP',
+      },
+    });
+  }
+
+  const defaultPlan = await prisma.plan.findFirst({
+    where: { code: 'SOLE_TRADER' },
+  });
+
+  await prisma.tenantSetting.upsert({
+    where: { tenantId: company.id },
+    create: {
+      tenantId: company.id,
+      planId: defaultPlan ? defaultPlan.id : null,
+      companyName: company.name,
+      defaultCurrency: company.currency || 'GBP',
+      defaultTimezone: company.timezone || 'UTC',
+      onboardingCompleted: false,
+      onboardingStep: 0,
+      featurePayments: false,
+      featureAccounting: false,
+      featureBookings: false,
+      featureSocial: false,
+      featureAI: false,
+      featureCustomerPortal: false,
+      featureWhatsApp: false,
+    },
+    update: {
+      companyName: company.name,
+      defaultCurrency: company.currency || 'GBP',
+      defaultTimezone: company.timezone || 'UTC',
+      ...(defaultPlan ? { planId: defaultPlan.id } : {}),
+    },
+  });
+
+  return company;
+}
+
+async function ensureDemoTradePack(companyId) {
+  const existing = await prisma.tradePackInstall.findUnique({
+    where: {
+      tenantId_packCode: {
+        tenantId: companyId,
+        packCode: DEFAULT_TRADE_PACK,
+      },
+    },
+  });
+
+  if (existing && existing.configJson && existing.configJson.active === false) {
+    await prisma.tradePackInstall.update({
+      where: {
+        tenantId_packCode: {
+          tenantId: companyId,
+          packCode: DEFAULT_TRADE_PACK,
+        },
+      },
+      data: {
+        configJson: { active: true, seededBy: 'seed-demo' },
+      },
+    });
+    return 'reactivated';
+  }
+
+  if (existing) {
+    return 'exists';
+  }
+
+  await prisma.tradePackInstall.create({
+    data: {
+      tenantId: companyId,
+      packCode: DEFAULT_TRADE_PACK,
+      configJson: { active: true, seededBy: 'seed-demo' },
+    },
+  });
+  return 'created';
+}
+
+async function ensureUser(companyId, email, role, passwordHashOverride) {
+  const normalizedEmail = email.toLowerCase().trim();
+  const existing = await prisma.user.findFirst({
+    where: { companyId, email: normalizedEmail },
+  });
+
+  if (existing) {
+    if (existing.role !== role) {
+      await prisma.user.update({
+        where: { id: existing.id },
+        data: { role },
+      });
+      return 'updated';
+    }
+    return 'exists';
+  }
+
+  let passwordHash = passwordHashOverride;
+  if (!passwordHash) {
+    const randomPassword = crypto.randomBytes(32).toString('base64url');
+    passwordHash = await bcrypt.hash(randomPassword, 10);
+  }
+  await prisma.user.create({
+    data: {
+      companyId,
+      email: normalizedEmail,
+      role,
+      passwordHash,
+    },
+  });
+  return 'created';
+}
+
+async function resetPassword(companyId, email, password) {
+  const normalizedEmail = email.toLowerCase().trim();
+  const user = await prisma.user.findFirst({
+    where: { companyId, email: normalizedEmail },
+  });
+  if (!user) {
+    return 'missing';
+  }
+  const passwordHash = await bcrypt.hash(password, 10);
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { passwordHash },
+  });
+  return 'reset';
+}
+
+async function main() {
+  const args = getArgs();
+  const interactiveReset = args.has('--interactive-reset');
+
+  await ensureTradePacks();
+  const company = await ensureDemoCompany();
+  const tradePackStatus = await ensureDemoTradePack(company.id);
+
+  let supportPassword;
+  let demoPassword;
+  let supportHash;
+  let demoHash;
+
+  if (interactiveReset) {
+    console.log('Interactive password reset enabled.');
+    supportPassword = await promptPassword(`${SUPPORT_EMAIL} password`);
+    demoPassword = await promptPassword(`${DEMO_EMAIL} password`);
+    supportHash = await bcrypt.hash(supportPassword, 10);
+    demoHash = await bcrypt.hash(demoPassword, 10);
+  }
+
+  const supportStatus = await ensureUser(company.id, SUPPORT_EMAIL, OWNER_ROLE, supportHash);
+  const demoStatus = await ensureUser(company.id, DEMO_EMAIL, STAFF_ROLE, demoHash);
+
+  if (interactiveReset) {
+    const supportReset = supportStatus === 'created'
+      ? 'reset'
+      : await resetPassword(company.id, SUPPORT_EMAIL, supportPassword);
+    const demoReset = demoStatus === 'created'
+      ? 'reset'
+      : await resetPassword(company.id, DEMO_EMAIL, demoPassword);
+    console.log(`${SUPPORT_EMAIL} password: ${supportReset}`);
+    console.log(`${DEMO_EMAIL} password: ${demoReset}`);
+  }
+
+  console.log(`${SUPPORT_EMAIL} (${supportStatus})`);
+  console.log(`${DEMO_EMAIL} (${demoStatus})`);
+  console.log(`trade-pack:${DEFAULT_TRADE_PACK} (${tradePackStatus})`);
+}
+
+main()
+  .catch((err) => {
+    console.error('Seed failed.');
+    if (err && err.message) {
+      console.error(err.message);
+    }
+    process.exitCode = 1;
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

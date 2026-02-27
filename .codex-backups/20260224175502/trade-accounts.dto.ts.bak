@@ -1,0 +1,36 @@
+import { IsEmail, IsIn, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { TRADE_ACCOUNT_STATUSES } from '../common/constants';
+
+export class UpsertTradeAccountDto {
+  @IsOptional()
+  @IsString()
+  id?: string;
+
+  @IsString()
+  name!: string;
+
+  @IsOptional()
+  @IsString()
+  contactName?: string;
+
+  @IsOptional()
+  @IsEmail()
+  contactEmail?: string;
+
+  @IsOptional()
+  @IsString()
+  contactPhone?: string;
+
+  @IsNumber()
+  @Min(0)
+  creditLimit!: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  outstandingBalance?: number;
+
+  @IsOptional()
+  @IsIn(TRADE_ACCOUNT_STATUSES)
+  status?: (typeof TRADE_ACCOUNT_STATUSES)[number];
+}

@@ -1,0 +1,66 @@
+import { Body, Controller, Get, Post, Req, Res, UseGuards } from '@nestjs/common';
+import type { Request, Response } from 'express';
+import { JwtAuthGuard } from '../auth/auth.guard';
+import { CurrentUser } from '../auth/current-user.decorator';
+import { JwtPayload } from '../auth/auth.types';
+import { Roles } from '../common/roles.decorator';
+import { RolesGuard } from '../common/roles.guard';
+import { CheckoutSessionDto } from './billing.dto';
+import { BillingService } from './billing.service';
+
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Controller('billing')
+export class BillingController {
+  constructor(private readonly billing: BillingService) {}
+
+  @Post('checkout-session')
+  @Roles('OWNER')
+  createCheckout(@CurrentUser() user: JwtPayload, @Body() dto: CheckoutSessionDto) {
+    return this.billing.createCheckoutSession(user.companyId, user.sub, dto.planCode, dto.interval);
+  }
+
+  @Get('portal')
+  @Roles('OWNER')
+  createPortal(@CurrentUser() user: JwtPayload) {
+    return this.billing.createBillingPortal(user.companyId, user.sub);
+  }
+
+  @Get('me')
+  me(@CurrentUser() user: JwtPayload) {
+    return this.billing.getBillingInfo(user.companyId);
+  }
+}
+
+@Controller('billing')
+export class BillingWebhookController {
+  constructor(private readonly billing: BillingService) {}
+
+  @Post('webhook')
+  async webhook(@Req() req: Request & { rawBody?: Buffer }, @Res() res: Response) {
+    const signature = req.headers['stripe-signature'];
+    const payload = req.rawBody ?? Buffer.from('');
+    try {
+      const result = await this.billing.handleWebhook(signature, payload);
+      return res.json(result);
+    } catch (err: any) {
+      return res.status(400).json({ error: err?.message || 'Webhook error' });
+    }
+  }
+}
+
+@Controller('stripe')
+export class StripeWebhookAliasController {
+  constructor(private readonly billing: BillingService) {}
+
+  @Post('webhook')
+  async webhook(@Req() req: Request & { rawBody?: Buffer }, @Res() res: Response) {
+    const signature = req.headers['stripe-signature'];
+    const payload = req.rawBody ?? Buffer.from('');
+    try {
+      const result = await this.billing.handleWebhook(signature, payload);
+      return res.json(result);
+    } catch (err: any) {
+      return res.status(400).json({ error: err?.message || 'Webhook error' });
+    }
+  }
+}

@@ -1,0 +1,560 @@
+./api/src/locations/locations.service.ts:3:import { PrismaService } from '../prisma/prisma.service';
+./api/src/locations/locations.service.ts:26:    return db.location.findMany({
+./api/src/locations/locations.service.ts:39:    const created = await db.location.create({
+./api/src/locations/locations.service.ts:86:    const location = await db.location.findFirst({ where: { id, companyId } });
+./api/src/locations/locations.service.ts:88:    const updated = await db.location.update({
+./api/src/locations/locations.service.ts:131:    return db.location.findFirst({
+./api/src/locations/locations.service.ts:143:    const location = await db.location.findFirst({ where: { id, companyId } });
+./api/src/locations/locations.service.ts:145:    const updated = await db.location.update({
+./api/src/locations/locations.service.ts:155:    await db.user.update({
+./api/src/locations/locations.controller.ts:29:    return this.locationsService.create(user.companyId, user.sub, dto);
+./api/src/locations/locations.controller.ts:36:    return this.locationsService.update(user.companyId, user.sub, id, dto);
+./api/src/public/public.module.ts:5:import { PrismaModule } from '../prisma/prisma.module';
+./api/src/public/public.controller.ts:22:import { PrismaService } from "../prisma/prisma.service";
+./api/src/public/public.controller.ts:40:    const record = await db.publicJobToken.findUnique({
+./api/src/public/public.controller.ts:57:    const settings = await db.tenantSetting.findUnique({ where: { tenantId: record.job.companyId } });
+./api/src/public/public.controller.ts:141:    const settings = await db.tenantSetting.findUnique({ where: { tenantId: record.job.companyId } });
+./api/src/public/public.controller.ts:164:    const updated = await db.job.update({
+./api/src/public/public.controller.ts:182:    const updated = await db.job.update({
+./api/src/public/public.controller.ts:204:    const updated = await db.job.update({
+./api/src/public/public.controller.ts:214:      await db.jobAsset.create({
+./api/src/public/public.controller.ts:253:    const settings = await db.tenantSetting.findUnique({ where: { tenantId: record.job.companyId } });
+./api/src/public/public.controller.ts:314:    const demoUser = await db.user.findFirst({
+./api/src/me/me.controller.ts:8:import { PrismaService } from '../prisma/prisma.service';
+./api/src/me/me.controller.ts:27:      ? await db.location.findMany({
+./api/src/me/me.controller.ts:32:    const me = await db.user.findFirst({
+./api/src/me/me.controller.ts:49:      const location = await db.location.findFirst({ where: { id: selected, companyId: user.companyId, isActive: true } });
+./api/src/me/me.controller.ts:54:    await db.user.update({
+./api/src/common/feature.guard.ts:3:import { PrismaService } from '../prisma/prisma.service';
+./api/src/common/feature.guard.ts:42:    const subscription = await db.tenantSubscription.findUnique({
+./api/src/common/feature.guard.ts:54:      const plan = await db.plan.findUnique({ where: { id: settings.planId } });
+./api/src/notifications/notifications.module.ts:4:import { PrismaModule } from '../prisma/prisma.module';
+./api/src/notifications/notifications.service.ts:7:import { PrismaService } from '../prisma/prisma.service';
+./api/src/notifications/notifications.service.ts:118:    const tenant = await db.tenantSetting.findUnique({ where: { tenantId: companyId } });
+./api/src/notifications/notifications.service.ts:163:    return db.notificationPreference.update({
+./api/src/notifications/notifications.service.ts:175:    return db.notification.findMany({
+./api/src/notifications/notifications.service.ts:184:    const existing = await db.notification.findFirst({ where: { id, companyId, userId } });
+./api/src/notifications/notifications.service.ts:186:    return db.notification.update({
+./api/src/notifications/notifications.service.ts:219:    const job = await db.job.findFirst({
+./api/src/notifications/notifications.service.ts:225:    const owners = await db.user.findMany({
+./api/src/notifications/notifications.service.ts:244:    const prefs = await db.notificationPreference.findMany({ where: { companyId, userId: { in: recipientIds } } });
+./api/src/notifications/notifications.service.ts:275:    const job = await db.job.findFirst({
+./api/src/notifications/notifications.service.ts:281:    const owners = await db.user.findMany({
+./api/src/notifications/notifications.service.ts:304:    const prefs = await db.notificationPreference.findMany({ where: { companyId, userId: { in: recipientIds } } });
+./api/src/notifications/notifications.service.ts:324:    const rows = await db.notification.findMany({
+./api/src/notifications/notifications.service.ts:349:    const row = await db.notification.findFirst({
+./api/src/notifications/notifications.service.ts:381:    const rows = await db.notification.findMany({
+./api/src/notifications/notifications.service.ts:486:      created = await db.notification.create({
+./api/src/email-templates/email-templates.controller.ts:30:    return this.emailTemplatesService.create(user.companyId, user.sub, dto);
+./api/src/email-templates/email-templates.controller.ts:36:    return this.emailTemplatesService.update(user.companyId, user.sub, id, dto);
+./api/src/email-templates/email-templates.service.ts:3:import { PrismaService } from '../prisma/prisma.service';
+./api/src/email-templates/email-templates.service.ts:15:    return db.emailTemplate.findMany({
+./api/src/email-templates/email-templates.service.ts:23:    const template = await db.emailTemplate.findFirst({ where: { id, tenantId } });
+./api/src/email-templates/email-templates.service.ts:32:    const existing = await db.emailTemplate.findFirst({
+./api/src/email-templates/email-templates.service.ts:38:    const created = await db.emailTemplate.create({
+./api/src/email-templates/email-templates.service.ts:53:    const existing = await db.emailTemplate.findFirst({ where: { id, tenantId } });
+./api/src/email-templates/email-templates.service.ts:57:    const updated = await db.emailTemplate.update({
+./api/src/email-templates/email-templates.service.ts:72:    const existing = await db.emailTemplate.findFirst({ where: { id, tenantId } });
+./api/src/email-templates/email-templates.service.ts:77:    await db.emailTemplate.delete({ where: { id } });
+./api/src/audit/audit.controller.ts:7:import { PrismaService } from '../prisma/prisma.service';
+./api/src/audit/audit.controller.ts:39:      db.auditEvent.findMany({
+./api/src/audit/audit.service.ts:2:import { PrismaService } from '../prisma/prisma.service';
+./api/src/audit/audit.service.ts:12:      await db.auditEvent.create({
+./api/src/audit/audit.service.ts:22:      await db.auditEvent.create({
+./api/src/inventory/inventory.service.ts:4:import { PrismaService } from '../prisma/prisma.service';
+./api/src/inventory/inventory.service.ts:22:    return db.stockItem.findMany({ where, orderBy: { createdAt: 'desc' } });
+./api/src/inventory/inventory.service.ts:27:    const item = await db.stockItem.create({
+./api/src/inventory/inventory.service.ts:45:    const item = await db.stockItem.findFirst({ where: { id, tenantId: companyId } });
+./api/src/inventory/inventory.service.ts:47:    const updated = await db.stockItem.update({
+./api/src/inventory/inventory.service.ts:65:    const items = await db.stockItem.findMany({
+./api/src/inventory/inventory.service.ts:98:    const item = await db.stockItem.findFirst({ where: { id: dto.stockItemId, tenantId: companyId } });
+./api/src/inventory/inventory.service.ts:100:    const movement = await db.stockMovement.create({
+./api/src/inventory/inventory.service.ts:117:    return db.stockMovement.findMany({
+./api/src/inventory/inventory.service.ts:127:    return db.stockPurchaseOrder.findMany({
+./api/src/inventory/inventory.service.ts:136:    const po = await db.stockPurchaseOrder.create({
+./api/src/inventory/inventory.service.ts:160:    const po = await db.stockPurchaseOrder.findFirst({ where: { id, tenantId: companyId } });
+./api/src/inventory/inventory.service.ts:162:    const updated = await db.stockPurchaseOrder.update({
+./api/src/inventory/inventory.service.ts:181:    return db.stockPurchaseOrder.findFirst({ where: { id }, include: { lines: true } });
+./api/src/inventory/inventory.service.ts:186:    const po = await db.stockPurchaseOrder.findFirst({
+./api/src/inventory/inventory.service.ts:192:      await tx.stockPurchaseOrder.update({ where: { id }, data: { status: 'RECEIVED' } });
+./api/src/inventory/inventory.service.ts:194:        await tx.stockItem.update({
+./api/src/inventory/inventory.service.ts:198:        await tx.stockMovement.create({
+./api/src/inventory/inventory.service.ts:216:    const item = await db.stockItem.findFirst({ where: { id: itemId, tenantId: companyId } });
+./api/src/inventory/inventory.service.ts:218:    const job = await db.job.findFirst({ where: { id: dto.jobId, companyId } });
+./api/src/inventory/inventory.service.ts:221:    const movement = await db.stockMovement.create({
+./api/src/inventory/inventory.service.ts:236:      await db.jobLineItem.create({
+./api/src/inventory/inventory.service.ts:278:    const item = await db.stockItem.findFirst({ where: { id: itemId, tenantId: companyId } });
+./api/src/inventory/inventory.service.ts:280:    const po = await db.stockPurchaseOrder.create({
+./api/src/trade-accounts/trade-accounts.service.ts:4:import { PrismaService } from '../prisma/prisma.service';
+./api/src/trade-accounts/trade-accounts.service.ts:50:      const existing = await db.tradeAccount.findFirst({ where: { id: dto.id, companyId } });
+./api/src/trade-accounts/trade-accounts.service.ts:55:      account = await db.tradeAccount.update({
+./api/src/trade-accounts/trade-accounts.service.ts:64:    account = await db.tradeAccount.create({
+./api/src/trade-accounts/trade-accounts.service.ts:91:    const accounts = await db.tradeAccount.findMany({
+./api/src/trade-accounts/trade-accounts.service.ts:100:        const unpaid = await db.job.findMany({
+./api/src/trade-accounts/trade-accounts.service.ts:118:    const account = await db.tradeAccount.findFirst({ where: { companyId, id } });
+./api/src/trade-accounts/trade-accounts.service.ts:120:    const recentJobs = await db.job.findMany({
+./api/src/trade-accounts/trade-accounts.service.ts:125:    const recentBookings = await db.booking.findMany({
+./api/src/trade-accounts/trade-accounts.service.ts:130:    const notes = await db.tradeAccountNote.findMany({
+./api/src/trade-accounts/trade-accounts.service.ts:171:    const account = await db.tradeAccount.findFirst({ where: { companyId, id: accountId } });
+./api/src/trade-accounts/trade-accounts.service.ts:174:    const note = await db.tradeAccountNote.create({
+./api/src/trade-accounts/trade-accounts.service.ts:190:    const account = await db.tradeAccount.findFirst({ where: { companyId, id: accountId } });
+./api/src/trade-accounts/trade-accounts.service.ts:192:    const updated = await db.tradeAccount.update({
+./api/src/trade-accounts/trade-accounts.service.ts:206:    const account = await db.tradeAccount.findFirst({ where: { companyId, id: accountId } });
+./api/src/trade-accounts/trade-accounts.service.ts:211:      db.job.findMany({
+./api/src/trade-accounts/trade-accounts.service.ts:216:      db.booking.findMany({
+./api/src/trade-accounts/trade-accounts.service.ts:221:      db.tradeAccountNote.findMany({
+./api/src/trade-accounts/trade-accounts.service.ts:226:      db.job.findMany({
+./api/src/trade-accounts/trade-accounts.service.ts:232:      db.auditLog.findMany({
+./api/src/trade-accounts/trade-accounts.service.ts:264:    const accounts = await db.tradeAccount.findMany({
+./api/src/trade-accounts/trade-accounts.service.ts:273:    const segment = await db.customerSegment.findFirst({ where: { id: query.segmentId, companyId } });
+./api/src/trade-accounts/trade-accounts.service.ts:282:    const account = await db.tradeAccount.findFirst({
+./api/src/trade-accounts/trade-accounts.service.ts:288:      db.job.findMany({ where: { companyId, tradeAccountId: accountId }, orderBy: { createdAt: 'desc' }, take: 20 }),
+./api/src/trade-accounts/trade-accounts.service.ts:289:      db.booking.findMany({ where: { companyId, tradeAccountId: accountId }, orderBy: { startsAt: 'desc' }, take: 20 }),
+./api/src/trade-accounts/trade-accounts.service.ts:290:      db.cRMNote.findMany({ where: { companyId, tradeAccountId: accountId }, orderBy: { createdAt: 'desc' }, take: 100 }),
+./api/src/trade-accounts/trade-accounts.service.ts:291:      db.cRMTask.findMany({ where: { companyId, tradeAccountId: accountId }, orderBy: [{ status: 'asc' }, { dueAt: 'asc' }] }),
+./api/src/trade-accounts/trade-accounts.service.ts:328:    const account = await db.tradeAccount.findFirst({ where: { companyId, id: accountId } });
+./api/src/trade-accounts/trade-accounts.service.ts:330:    const note = await db.cRMNote.create({
+./api/src/trade-accounts/trade-accounts.service.ts:339:    await db.tradeAccount.update({
+./api/src/trade-accounts/trade-accounts.service.ts:349:    const account = await db.tradeAccount.findFirst({ where: { companyId, id: accountId } });
+./api/src/trade-accounts/trade-accounts.service.ts:351:    const task = await db.cRMTask.create({
+./api/src/trade-accounts/trade-accounts.service.ts:368:    const account = await db.tradeAccount.findFirst({ where: { companyId, id: accountId } });
+./api/src/trade-accounts/trade-accounts.service.ts:370:    const updated = await db.tradeAccount.update({
+./api/src/prisma/prisma.module.ts:2:import { PrismaService } from './prisma.service';
+./api/src/templates/templates.service.ts:2:import { PrismaService } from "../prisma/prisma.service";
+./api/src/templates/templates.service.ts:79:    const settings = await db.tenantSetting.findUnique({ where: { tenantId } });
+./api/src/templates/templates.service.ts:85:    const fields = await db.formField.findMany({
+./api/src/guided-setup/guided-setup.service.ts:4:import { PrismaService } from "../prisma/prisma.service";
+./api/src/guided-setup/guided-setup.service.ts:47:    const services = await db.serviceCatalogItem.findMany({
+./api/src/guided-setup/guided-setup.service.ts:128:      const existing = await db.serviceCatalogItem.findFirst({
+./api/src/guided-setup/guided-setup.service.ts:135:        await db.serviceCatalogItem.update({
+./api/src/guided-setup/guided-setup.service.ts:147:      await db.serviceCatalogItem.create({
+./api/src/guided-setup/guided-setup.service.ts:175:      const existing = await db.serviceCatalogItem.findFirst({
+./api/src/guided-setup/guided-setup.service.ts:182:        await db.serviceCatalogItem.update({
+./api/src/guided-setup/guided-setup.service.ts:196:      await db.serviceCatalogItem.create({
+./api/src/guided-setup/guided-setup.module.ts:4:import { PrismaModule } from "../prisma/prisma.module";
+./api/src/integrations/integrations.crypto.ts:9:  return crypto.createHash('sha256').update(secret).digest();
+./api/src/integrations/integrations.crypto.ts:16:  const ciphertext = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
+./api/src/integrations/integrations.crypto.ts:32:  const plaintext = Buffer.concat([decipher.update(data), decipher.final()]);
+./api/src/integrations/integrations.controller.ts:9:import { PrismaService } from '../prisma/prisma.service';
+./api/src/integrations/integrations.controller.ts:21:    const fullUser = await db.user.findFirst({ where: { id: user.sub, companyId: user.companyId } });
+./api/src/integrations/integrations.service.ts:5:import { PrismaService } from '../prisma/prisma.service';
+./api/src/integrations/integrations.service.ts:82:    const subscription = await db.tenantSubscription.findUnique({
+./api/src/integrations/integrations.service.ts:86:    const plan = subscription?.plan ?? (await db.plan.findFirst({ where: { code: DEFAULT_PLAN_CODE } }));
+./api/src/integrations/integrations.service.ts:102:    const connection = await db.integrationConnection.findUnique({
+./api/src/integrations/integrations.service.ts:133:    await db.integrationAuthState.create({
+./api/src/integrations/integrations.service.ts:197:    const authState = await db.integrationAuthState.findUnique({ where: { state } });
+./api/src/integrations/integrations.service.ts:204:    await db.integrationAuthState.delete({ where: { state } });
+./api/src/integrations/integrations.module.ts:3:import { PrismaModule } from '../prisma/prisma.module';
+./api/src/calendar/calendar.service.ts.20260225.bak:2:import { PrismaService } from '../prisma/prisma.service';
+./api/src/calendar/calendar.service.ts.20260225.bak:36:      db.user.findMany({
+./api/src/calendar/calendar.service.ts.20260225.bak:44:      db.booking.findMany({
+./api/src/calendar/calendar.service.ts.20260225.bak:133:    const existing = await db.booking.findFirst({ where: { id: bookingId, companyId: tenantId } });
+./api/src/calendar/calendar.service.ts.20260225.bak:138:    const updated = await db.booking.update({
+./api/src/calendar/calendar.service.ts.20260225.bak:162:      ? await db.booking.findMany({
+./api/src/calendar/calendar.service.ts:2:import { PrismaService } from '../prisma/prisma.service';
+./api/src/calendar/calendar.service.ts:155:      db.user.findMany({
+./api/src/calendar/calendar.service.ts:163:      db.booking.findMany({
+./api/src/calendar/calendar.service.ts:249:      db.user.findMany({
+./api/src/calendar/calendar.service.ts:257:      db.techScheduleSetting.findMany({
+./api/src/calendar/calendar.service.ts:267:      db.techScheduleException.findMany({
+./api/src/calendar/calendar.service.ts:332:      db.user.findMany({
+./api/src/calendar/calendar.service.ts:340:      db.techScheduleSetting.findMany({
+./api/src/calendar/calendar.service.ts:353:          db.techScheduleException.findMany({
+./api/src/calendar/calendar.service.ts:366:          db.booking.findMany({
+./api/src/calendar/calendar.service.ts:474:    const booking = await db.booking.findFirst({
+./api/src/calendar/calendar.service.ts:519:      db.user.findMany({
+./api/src/calendar/calendar.service.ts:527:      db.techScheduleSetting.findMany({
+./api/src/calendar/calendar.service.ts:552:      bookings = await db.booking.findMany({
+./api/src/calendar/calendar.service.ts:560:      exceptions = await db.techScheduleException.findMany({
+./api/src/calendar/calendar.service.ts:706:    const technician = await db.user.findFirst({
+./api/src/calendar/calendar.service.ts:747:    const technician = await db.user.findFirst({
+./api/src/calendar/calendar.service.ts:758:    const created = await db.techScheduleException.create({
+./api/src/calendar/calendar.service.ts:781:    const existing = await db.techScheduleException.findUnique({ where: { id: exceptionId } });
+./api/src/calendar/calendar.service.ts:785:    await db.techScheduleException.delete({ where: { id: exceptionId } });
+./api/src/calendar/calendar.service.ts:803:    const existing = await db.booking.findFirst({ where: { id: bookingId, companyId: tenantId } });
+./api/src/calendar/calendar.service.ts:809:      ? await db.booking.findMany({
+./api/src/calendar/calendar.service.ts:830:    const updated = await db.booking.update({
+./api/src/calendar/calendar.service.ts:1128:    const setting = await db.techScheduleSetting.findFirst({
+./api/src/calendar/calendar.service.ts:1153:    const bookings = await db.booking.findMany({
+./api/src/calendar/calendar.service.ts:1165:    const exceptions = await db.techScheduleException.findMany({
+./api/src/calendar/calendar.service.ts.20260225.v2.bak:2:import { PrismaService } from '../prisma/prisma.service';
+./api/src/calendar/calendar.service.ts.20260225.v2.bak:36:      db.user.findMany({
+./api/src/calendar/calendar.service.ts.20260225.v2.bak:44:      db.booking.findMany({
+./api/src/calendar/calendar.service.ts.20260225.v2.bak:134:    const existing = await db.booking.findFirst({ where: { id: bookingId, companyId: tenantId } });
+./api/src/calendar/calendar.service.ts.20260225.v2.bak:139:    const updated = await db.booking.update({
+./api/src/calendar/calendar.service.ts.20260225.v2.bak:163:      ? await db.booking.findMany({
+./api/src/metrics/metrics.service.ts:2:import { PrismaService } from '../prisma/prisma.service';
+./api/src/metrics/metrics.service.ts:41:      db.usageMeter.findUnique({
+./api/src/metrics/metrics.module.ts:2:import { PrismaModule } from '../prisma/prisma.module';
+./api/src/auth/auth.module.ts:4:import { PrismaModule } from '../prisma/prisma.module';
+./api/src/auth/jwt.strategy.ts:5:import { PrismaService } from '../prisma/prisma.service';
+./api/src/auth/jwt.strategy.ts:20:    const user = await db.user.findFirst({
+./api/src/auth/auth.service.ts:9:import { PrismaService } from '../prisma/prisma.service';
+./api/src/auth/auth.service.ts:24:    return crypto.createHash('sha256').update(token).digest('hex');
+./api/src/auth/auth.service.ts:147:    await db.emailVerificationToken.create({
+./api/src/auth/auth.service.ts:160:    const existing = await db.user.findFirst({ where: { email } });
+./api/src/auth/auth.service.ts:169:        company = await tx.company.create({
+./api/src/auth/auth.service.ts:177:        company = await tx.company.create({ data: { name: dto.companyName.trim() } });
+./api/src/auth/auth.service.ts:180:      const user = await tx.user.create({
+./api/src/auth/auth.service.ts:193:        await tx.invoiceCounter.create({
+./api/src/auth/auth.service.ts:209:        const defaultPlan = await tx.plan.findFirst({ where: { code: DEFAULT_PLAN_CODE } });
+./api/src/auth/auth.service.ts:210:        await tx.tenantSetting.create({
+./api/src/auth/auth.service.ts:220:        const defaultPlan = await tx.plan.findFirst({ where: { code: DEFAULT_PLAN_CODE } });
+./api/src/auth/auth.service.ts:272:    const user = await db.user.findFirst({ where: { email } });
+./api/src/auth/auth.service.ts:282:    await db.user.update({
+./api/src/auth/auth.service.ts:316:    const user = await db.user.findFirst({ where: { email } });
+./api/src/auth/auth.service.ts:322:    await db.passwordResetToken.create({
+./api/src/auth/auth.service.ts:341:    const token = await db.passwordResetToken.findFirst({
+./api/src/auth/auth.service.ts:350:      db.user.update({ where: { id: token.userId }, data: { passwordHash, tokenVersion: { increment: 1 } } }),
+./api/src/auth/auth.service.ts:351:      db.passwordResetToken.update({ where: { id: token.id }, data: { consumedAt: new Date() } }),
+./api/src/auth/auth.service.ts:360:    const token = await db.emailVerificationToken.findFirst({
+./api/src/auth/auth.service.ts:367:      db.user.update({ where: { id: token.userId }, data: { emailVerified: true } }),
+./api/src/auth/auth.service.ts:368:      db.emailVerificationToken.update({ where: { id: token.id }, data: { consumedAt: new Date() } }),
+./api/src/auth/auth.service.ts:379:    const user = await db.user.findFirst({ where });
+./api/src/auth/auth.service.ts:388:    await db.user.update({
+./api/src/main.ts:9:  const app = await NestFactory.create(AppModule, { bodyParser: false });
+./api/src/catalog/catalog.controller.ts:30:    return this.catalogService.create(user.companyId, user.sub, dto);
+./api/src/catalog/catalog.controller.ts:36:    return this.catalogService.update(user.companyId, user.sub, id, dto);
+./api/src/catalog/catalog.service.ts:3:import { PrismaService } from '../prisma/prisma.service';
+./api/src/catalog/catalog.service.ts:15:    return db.serviceCatalogItem.findMany({
+./api/src/catalog/catalog.service.ts:23:    const item = await db.serviceCatalogItem.findFirst({ where: { id, tenantId } });
+./api/src/catalog/catalog.service.ts:32:    const created = await db.serviceCatalogItem.create({
+./api/src/catalog/catalog.service.ts:50:    const existing = await db.serviceCatalogItem.findFirst({ where: { id, tenantId } });
+./api/src/catalog/catalog.service.ts:54:    const updated = await db.serviceCatalogItem.update({
+./api/src/catalog/catalog.service.ts:71:    const existing = await db.serviceCatalogItem.findFirst({ where: { id, tenantId } });
+./api/src/catalog/catalog.service.ts:76:    await db.serviceCatalogItem.delete({ where: { id } });
+./api/src/app.module.ts:21:import { PrismaModule } from './prisma/prisma.module';
+./api/src/billing/billing.service.ts:8:import { PrismaService } from '../prisma/prisma.service';
+./api/src/billing/billing.service.ts:39:    const recent = await db.notification.findFirst({
+./api/src/billing/billing.service.ts:48:    const owner = await db.user.findFirst({ where: { companyId, role: 'OWNER' }, select: { id: true } });
+./api/src/billing/billing.service.ts:126:    const user = await db.user.findUnique({ where: { id: userId } });
+./api/src/billing/billing.service.ts:127:    const subscription = await db.tenantSubscription.findUnique({ where: { tenantId } });
+./api/src/billing/billing.service.ts:131:      const customer = await stripe.customers.create({
+./api/src/billing/billing.service.ts:138:    const plan = await db.plan.findUnique({ where: { code: planCode } });
+./api/src/billing/billing.service.ts:143:    const session = await stripe.checkout.sessions.create({
+./api/src/billing/billing.service.ts:188:    const subscription = await db.tenantSubscription.findUnique({ where: { tenantId } });
+./api/src/billing/billing.service.ts:193:    const portal = await stripe.billingPortal.sessions.create({
+./api/src/billing/billing.service.ts:205:    const job = await db.job.findFirst({ where: { id: jobId, companyId: tenantId } });
+./api/src/billing/billing.service.ts:212:    const settings = await db.tenantSetting.findUnique({ where: { tenantId } });
+./api/src/billing/billing.service.ts:220:    const session = await stripe.checkout.sessions.create({
+./api/src/billing/billing.service.ts:246:    await db.job.update({
+./api/src/billing/billing.service.ts:259:    const job = await db.job.findFirst({ where: { id: jobId, companyId: tenantId } });
+./api/src/billing/billing.service.ts:280:      await db.job.update({
+./api/src/billing/billing.service.ts:303:    const settings = await db.tenantSetting.findUnique({ where: { tenantId } });
+./api/src/billing/billing.service.ts:304:    const subscription = await db.tenantSubscription.findUnique({
+./api/src/billing/billing.service.ts:310:      plan = await db.plan.findUnique({ where: { code: DEFAULT_PLAN_CODE } });
+./api/src/billing/billing.service.ts:314:    const usage = await db.usageMeter.findUnique({
+./api/src/billing/billing.service.ts:352:      return await db.webhookEvent.create({
+./api/src/billing/billing.service.ts:363:        return db.webhookEvent.findUnique({ where: { provider_eventId: { provider: 'stripe', eventId } } });
+./api/src/billing/billing.service.ts:436:        const job = await db.job.findFirst({
+./api/src/billing/billing.service.ts:453:        await db.job.update({
+./api/src/billing/billing.service.ts:476:        ? await db.plan.findUnique({ where: { code: planCode } })
+./api/src/billing/billing.service.ts:477:        : await db.plan.findUnique({ where: { code: DEFAULT_PLAN_CODE } });
+./api/src/billing/billing.service.ts:515:          ? await db.plan.findFirst({
+./api/src/billing/billing.service.ts:525:          ? await db.plan.findUnique({ where: { code: subscription.metadata.planCode } })
+./api/src/billing/billing.service.ts:527:        (await db.plan.findUnique({ where: { code: DEFAULT_PLAN_CODE } }));
+./api/src/billing/billing.service.ts:579:          const subs = await db.tenantSubscription.findMany({ where: { stripeCustomerId: customerId }, select: { tenantId: true } });
+./api/src/billing/billing.service.ts:581:            const owners = await db.user.findMany({
+./api/src/billing/billing.controller.ts:11:import { PrismaService } from '../prisma/prisma.service';
+./api/src/billing/billing.controller.ts:28:    const fullUser = await db.user.findFirst({ where: { id: user.sub, companyId: user.companyId } });
+./api/src/pricing-presets/pricing-presets.service.ts:3:import { PrismaService } from '../prisma/prisma.service';
+./api/src/pricing-presets/pricing-presets.service.ts:13:    const presets = await db.templatePreset.findMany({
+./api/src/onboarding/onboarding.module.ts:3:import { PrismaModule } from '../prisma/prisma.module';
+./api/src/onboarding/onboarding.controller.ts:14:import { PrismaService } from '../prisma/prisma.service';
+./api/src/onboarding/onboarding.controller.ts:99:        await db.serviceCatalogItem.create({
+./api/src/onboarding/onboarding.service.ts:5:import { PrismaService } from '../prisma/prisma.service';
+./api/src/onboarding/onboarding.service.ts:113:    const settings = await db.tenantSetting.findUnique({ where: { tenantId } });
+./api/src/onboarding/onboarding.service.ts:115:      const plan = await db.plan.findUnique({ where: { id: settings.planId } });
+./api/src/onboarding/onboarding.service.ts:123:    const settings = await db.tenantSetting.findUnique({ where: { tenantId } });
+./api/src/onboarding/onboarding.service.ts:206:    const settings = await db.tenantSetting.findUnique({ where: { tenantId } });
+./api/src/onboarding/onboarding.service.ts:250:    const settings = await db.tenantSetting.findUnique({ where: { tenantId } });
+./api/src/onboarding/onboarding.service.ts:264:    const settings = await db.tenantSetting.findUnique({ where: { tenantId } });
+./api/src/onboarding/onboarding.service.ts:358:    const settings = await db.tenantSetting.findUnique({ where: { tenantId } });
+./api/src/trade-packs/trade-packs.service.ts:4:import { PrismaService } from '../prisma/prisma.service';
+./api/src/trade-packs/trade-packs.service.ts:56:    const settings = await db.tenantSetting.findUnique({ where: { tenantId } });
+./api/src/trade-packs/trade-packs.service.ts:58:      const plan = await db.plan.findUnique({ where: { id: settings.planId } });
+./api/src/trade-packs/trade-packs.service.ts:62:    const subscription = await db.tenantSubscription.findUnique({
+./api/src/trade-packs/trade-packs.service.ts:90:    const installs = await db.tradePackInstall.findMany({
+./api/src/trade-packs/trade-packs.service.ts:128:      const existing = await db.serviceCatalogItem.findFirst({
+./api/src/trade-packs/trade-packs.service.ts:137:      await db.serviceCatalogItem.create({
+./api/src/trade-packs/trade-packs.service.ts:217:      const existing = await db.emailTemplate.findFirst({ where: { tenantId, type: tpl.type } });
+./api/src/trade-packs/trade-packs.service.ts:219:      await db.emailTemplate.create({
+./api/src/trade-packs/trade-packs.service.ts:233:    const settings = await db.tenantSetting.findUnique({ where: { tenantId } });
+./api/src/trade-packs/trade-packs.service.ts:252:    const settings = await db.tenantSetting.findUnique({ where: { tenantId } });
+./api/src/trade-packs/trade-packs.service.ts:310:    const existing = await db.tradePackInstall.findUnique({
+./api/src/trade-packs/trade-packs.service.ts:317:    await db.tradePackInstall.update({
+./api/src/trade-packs/trade-packs.module.ts:3:import { PrismaModule } from '../prisma/prisma.module';
+./api/src/drafts/drafts.controller.ts:7:import { PrismaService } from '../prisma/prisma.service';
+./api/src/drafts/drafts.controller.ts:19:      db.jobDraft.findMany({
+./api/src/drafts/drafts.controller.ts:24:      db.crmDraft.findMany({
+./api/src/drafts/drafts.controller.ts:56:      const item = await db.jobDraft.findFirst({
+./api/src/drafts/drafts.controller.ts:65:    const item = await db.crmDraft.findFirst({
+./api/src/drafts/drafts.controller.ts:84:    const item = await db.jobDraft.findUnique({
+./api/src/drafts/drafts.controller.ts:111:    const existing = await db.crmDraft.findFirst({
+./api/src/drafts/drafts.controller.ts:115:      return db.crmDraft.create({
+./api/src/drafts/drafts.controller.ts:124:    return db.crmDraft.update({
+./api/src/drafts/drafts.controller.ts:134:    return db.jobDraft.findMany({
+./api/src/drafts/drafts.controller.ts:165:    return db.crmDraft.findMany({
+./api/src/drafts/drafts.module.ts:2:import { PrismaModule } from '../prisma/prisma.module';
+./api/src/usage/usage.service.ts:3:import { PrismaService } from '../prisma/prisma.service';
+./api/src/usage/usage.service.ts:13:    const usage = await db.usageMeter.findUnique({
+./api/src/usage/usage.service.ts:17:    const subscription = await db.tenantSubscription.findUnique({
+./api/src/usage/usage.service.ts:21:    const plan = subscription?.plan ?? (await db.plan.findFirst({ where: { code: DEFAULT_PLAN_CODE } }));
+./api/src/bookings/bookings.controller.ts:22:    return this.bookingsService.create(user.companyId, user.sub, dto);
+./api/src/bookings/bookings.service.ts:7:import { PrismaService } from '../prisma/prisma.service';
+./api/src/bookings/bookings.service.ts:30:    const owner = await db.user.findFirst({ where: { companyId, role: 'OWNER' }, select: { id: true } });
+./api/src/bookings/bookings.service.ts:37:    const recent = await db.notification.findFirst({
+./api/src/bookings/bookings.service.ts:95:      const job = await db.job.findFirst({ where: { id: dto.jobId, companyId } });
+./api/src/bookings/bookings.service.ts:102:      const location = await db.location.findFirst({ where: { id: dto.locationId, companyId } });
+./api/src/bookings/bookings.service.ts:109:      const assignee = await db.user.findFirst({ where: { id: dto.assignedUserId, companyId } });
+./api/src/bookings/bookings.service.ts:115:    const booking = await db.booking.create({
+./api/src/bookings/bookings.service.ts:155:    return db.booking.findMany({
+./api/src/bookings/bookings.service.ts:166:    const existing = await db.bookingBusinessHour.findMany({ where: { tenantId } });
+./api/src/bookings/bookings.service.ts:179:    return db.bookingBusinessHour.findMany({ where: { tenantId } });
+./api/src/bookings/bookings.service.ts:184:    const settings = await db.tenantSetting.findUnique({ where: { tenantId } });
+./api/src/bookings/bookings.service.ts:194:      return db.tenantSetting.update({ where: { tenantId }, data: update });
+./api/src/bookings/bookings.service.ts:203:    const blackouts = await db.bookingBlackoutDate.findMany({ where: { tenantId }, orderBy: { date: 'asc' } });
+./api/src/bookings/bookings.service.ts:219:      await db.tenantSetting.update({
+./api/src/bookings/bookings.service.ts:255:    const settings = await db.tenantSetting.findFirst({ where: { bookingPublicToken: token } });
+./api/src/bookings/bookings.service.ts:260:    const tenant = await db.company.findUnique({ where: { id: settings.tenantId } });
+./api/src/bookings/bookings.service.ts:262:    const blackouts = await db.bookingBlackoutDate.findMany({ where: { tenantId: settings.tenantId } });
+./api/src/bookings/bookings.service.ts:265:      ? await db.service.findMany({
+./api/src/bookings/bookings.service.ts:281:      : await db.serviceCatalogItem.findMany({
+./api/src/bookings/bookings.service.ts:285:    const locations = await db.location.findMany({
+./api/src/bookings/bookings.service.ts:291:      ? await db.user.findMany({
+./api/src/bookings/bookings.service.ts:298:      ? await db.bookingQuestion.findMany({
+./api/src/bookings/bookings.service.ts:322:    const settings = await db.tenantSetting.findFirst({ where: { bookingPublicToken: token } });
+./api/src/bookings/bookings.service.ts:334:    const blackout = await db.bookingBlackoutDate.findFirst({
+./api/src/bookings/bookings.service.ts:342:      const proService = await db.service.findFirst({
+./api/src/bookings/bookings.service.ts:354:    const service = await db.serviceCatalogItem.findFirst({
+./api/src/bookings/bookings.service.ts:363:      ? await db.location.findFirst({ where: { id: locationId, companyId: settings.tenantId, isActive: true } })
+./api/src/bookings/bookings.service.ts:370:      const locationHours = await db.locationBusinessHour.findFirst({
+./api/src/bookings/bookings.service.ts:398:    const bookings = await db.booking.findMany({
+./api/src/bookings/bookings.service.ts:431:    const settings = await db.tenantSetting.findFirst({ where: { bookingPublicToken: token } });
+./api/src/bookings/bookings.service.ts:441:      ? await db.service.findFirst({ where: { id: dto.serviceId, companyId: settings.tenantId, isActive: true } })
+./api/src/bookings/bookings.service.ts:445:      : await db.serviceCatalogItem.findFirst({
+./api/src/bookings/bookings.service.ts:458:      ? await db.location.findFirst({ where: { id: dto.locationId, companyId: settings.tenantId, isActive: true }, select: { id: true, defaultAssigneeId: true } })
+./api/src/bookings/bookings.service.ts:461:    const booking = await db.booking.create({
+./api/src/bookings/bookings.service.ts:505:    const settings = await db.tenantSetting.findFirst({ where: { bookingIcsToken: token } });
+./api/src/bookings/bookings.service.ts:510:    const bookings = await db.booking.findMany({
+./api/src/bookings/bookings.service.ts:535:    return db.service.findMany({
+./api/src/bookings/bookings.service.ts:547:    const service = await db.service.create({
+./api/src/bookings/bookings.service.ts:566:    const service = await db.service.findFirst({
+./api/src/bookings/bookings.service.ts:577:    const blackout = await db.blackoutDate.findFirst({
+./api/src/bookings/bookings.service.ts:586:      ? await db.location.findFirst({ where: { id: query.locationId, companyId, isActive: true } })
+./api/src/bookings/bookings.service.ts:591:      const locHours = await db.locationBusinessHour.findFirst({ where: { companyId, locationId: location.id, weekday } });
+./api/src/bookings/bookings.service.ts:600:      const staff = await db.staffAvailability.findFirst({
+./api/src/bookings/bookings.service.ts:618:    const existing = await db.booking.findMany({
+./api/src/bookings/bookings.service.ts:658:    const service = await db.service.findFirst({ where: { id: dto.serviceId, companyId, isActive: true } });
+./api/src/bookings/bookings.service.ts:675:    const booking = await db.booking.create({
+./api/src/bookings/bookings.service.ts:713:      db.tenantSetting.findUnique({ where: { tenantId: companyId } }),
+./api/src/bookings/bookings.service.ts:714:      db.staffAvailability.findMany({ where: { companyId }, orderBy: [{ locationId: 'asc' }, { userId: 'asc' }, { weekday: 'asc' }] }),
+./api/src/bookings/bookings.service.ts:715:      db.blackoutDate.findMany({ where: { companyId }, orderBy: { date: 'asc' } }),
+./api/src/bookings/bookings.service.ts:716:      db.bookingQuestion.findMany({ where: { companyId, isActive: true }, orderBy: { createdAt: 'asc' } }),
+./api/src/bookings/bookings.service.ts:729:      await db.tenantSetting.update({
+./api/src/bookings/bookings.service.ts:771:          await db.bookingQuestion.update({
+./api/src/bookings/bookings.service.ts:785:        await db.bookingQuestion.create({
+./api/src/ai/ai.service.ts:11:import { PrismaService } from '../prisma/prisma.service';
+./api/src/ai/ai.service.ts:97:    const subscription = await db.tenantSubscription.findUnique({
+./api/src/ai/ai.service.ts:103:      (await db.plan.findFirst({ where: { code: DEFAULT_PLAN_CODE } }));
+./api/src/ai/ai.service.ts:129:    await db.usageMeter.update({
+./api/src/ai/ai.service.ts:156:      await db.aiChatAudit.create({
+./api/src/ai/ai.service.ts:171:    const response = await this.openai.responses.create({
+./api/src/ai/ai.service.ts:182:    await db.aiChatAudit.create({
+./api/src/ai/ai.service.ts:198:      await db.usageMeter.update({
+./api/src/users/users.service.ts:5:import { PrismaService } from '../prisma/prisma.service';
+./api/src/users/users.service.ts:17:    const users = await db.user.findMany({
+./api/src/users/users.service.ts:37:    const existing = await db.user.findFirst({ where: { companyId: tenantId, email } });
+./api/src/users/users.service.ts:44:    const invite = await db.inviteToken.create({
+./api/src/users/users.service.ts:61:    const invite = await db.inviteToken.findUnique({ where: { token: dto.token } });
+./api/src/users/users.service.ts:72:    const existing = await db.user.findFirst({ where: { companyId: invite.tenantId, email: invite.email } });
+./api/src/users/users.service.ts:78:    const user = await db.user.create({
+./api/src/users/users.service.ts:87:    await db.inviteToken.update({
+./api/src/users/users.service.ts:99:    const user = await db.user.findFirst({ where: { id: userId, companyId: tenantId } });
+./api/src/users/users.service.ts:108:    const updated = await db.user.update({
+./api/src/users/users.controller.ts:10:import { PrismaService } from '../prisma/prisma.service';
+./api/src/users/users.controller.ts:27:    const fullUser = await db.user.findFirst({ where: { id: user.sub, companyId: user.companyId } });
+./api/src/jobs/jobs.service.ts:8:import { PrismaService } from "../prisma/prisma.service";
+./api/src/jobs/jobs.service.ts:106:    const settings = await db.tenantSetting.findUnique({ where: { tenantId: companyId } });
+./api/src/jobs/jobs.service.ts:116:    await db.userUndoAction.create({
+./api/src/jobs/jobs.service.ts:130:    await db.jobActivity.create({
+./api/src/jobs/jobs.service.ts:144:    const me = await db.user.findFirst({
+./api/src/jobs/jobs.service.ts:260:      await db.jobAsset.create({
+./api/src/jobs/jobs.service.ts:270:        await db.jobMedia.create({
+./api/src/jobs/jobs.service.ts:368:    const existing = await tx.publicJobToken.findFirst({
+./api/src/jobs/jobs.service.ts:376:    return tx.publicJobToken.create({
+./api/src/jobs/jobs.service.ts:387:    const job = await db.job.findFirst({ where: { id: jobId, companyId } });
+./api/src/jobs/jobs.service.ts:390:    const assets = await db.jobAsset.findMany({ where: { jobId }, orderBy: { createdAt: "asc" } });
+./api/src/jobs/jobs.service.ts:392:      ? await db.jobSignature.findMany({ where: { jobId }, orderBy: { updatedAt: "desc" } })
+./api/src/jobs/jobs.service.ts:394:    const settings = await db.tenantSetting.findUnique({ where: { tenantId: companyId } });
+./api/src/jobs/jobs.service.ts:478:    await db.job.update({ where: { id: job.id }, data: { invoicePdfUrl: pdfUrl } });
+./api/src/jobs/jobs.service.ts:489:    const company = await db.company.findUnique({ where: { id: companyId } });
+./api/src/jobs/jobs.service.ts:495:      const location = await db.location.findFirst({ where: { id: dto.locationId, companyId } });
+./api/src/jobs/jobs.service.ts:501:    const settings = await db.tenantSetting.findUnique({ where: { tenantId: companyId } });
+./api/src/jobs/jobs.service.ts:537:      return tx.job.create({
+./api/src/jobs/jobs.service.ts:605:    return db.job.findMany({
+./api/src/jobs/jobs.service.ts:613:    const job = await db.job.findFirst({
+./api/src/jobs/jobs.service.ts:628:    const job = await db.job.findFirst({ where: { id, companyId } });
+./api/src/jobs/jobs.service.ts:637:    const job = await db.job.findFirst({ where: { id, companyId } });
+./api/src/jobs/jobs.service.ts:651:    const updated = await db.job.update({
+./api/src/jobs/jobs.service.ts:668:        const recent = await db.notification.findFirst({
+./api/src/jobs/jobs.service.ts:694:    const job = await db.job.findFirst({ where: { id, companyId } });
+./api/src/jobs/jobs.service.ts:710:    const updated = await db.job.update({
+./api/src/jobs/jobs.service.ts:795:    const jobs = await db.job.findMany({
+./api/src/jobs/jobs.service.ts:831:      const job = await db.job.findFirst({ where: { id, companyId } });
+./api/src/jobs/jobs.service.ts:846:          await db.job.update({
+./api/src/jobs/jobs.service.ts:854:          await db.job.update({ where: { id }, data: { assignedUserId: dto.assignedUserId || null } });
+./api/src/jobs/jobs.service.ts:856:          await db.job.update({ where: { id }, data: { locationId: dto.locationId && dto.locationId !== "all" ? dto.locationId : null } });
+./api/src/jobs/jobs.service.ts:860:          await db.job.update({ where: { id }, data: { tags: next } });
+./api/src/jobs/jobs.service.ts:863:          await db.job.update({ where: { id }, data: { tags: tags.filter((t: string) => t !== dto.tag) } });
+./api/src/jobs/jobs.service.ts:865:          await db.job.update({ where: { id }, data: { invoiceDueAt: dto.dueAt ? new Date(dto.dueAt) : null } });
+./api/src/jobs/jobs.service.ts:867:          await db.job.update({ where: { id }, data: { status: "COMPLETED", completedAt: new Date() } });
+./api/src/jobs/jobs.service.ts:869:          await db.job.update({ where: { id }, data: { status: "COMPLETED", completedAt: new Date() } });
+./api/src/jobs/jobs.service.ts:874:        const after = await db.job.findFirst({
+./api/src/jobs/jobs.service.ts:898:    const action = await db.userUndoAction.findFirst({
+./api/src/jobs/jobs.service.ts:912:      await db.job.update({
+./api/src/jobs/jobs.service.ts:930:    await db.userUndoAction.update({ where: { id: action.id }, data: { consumedAt: new Date() } });
+./api/src/jobs/jobs.service.ts:963:    const jobs = await db.job.findMany({
+./api/src/jobs/jobs.service.ts:996:      const jobs = await tx.job.findMany({ where: { companyId, id: { in: uniqueIds } } });
+./api/src/jobs/jobs.service.ts:1015:          await tx.job.update({
+./api/src/jobs/jobs.service.ts:1023:          await tx.job.update({ where: { id: job.id }, data: { assignedUserId: dto.assignedUserId || null } });
+./api/src/jobs/jobs.service.ts:1025:          await tx.job.update({ where: { id: job.id }, data: { locationId: dto.locationId && dto.locationId !== "all" ? dto.locationId : null } });
+./api/src/jobs/jobs.service.ts:1028:          await tx.job.update({ where: { id: job.id }, data: { tags: next } });
+./api/src/jobs/jobs.service.ts:1031:          await tx.job.update({ where: { id: job.id }, data: { tags: tags.filter((t: string) => t !== dto.tag) } });
+./api/src/jobs/jobs.service.ts:1033:          await tx.job.update({ where: { id: job.id }, data: { invoiceDueAt: dto.dueAt ? new Date(dto.dueAt) : null } });
+./api/src/jobs/jobs.service.ts:1035:          await tx.job.update({ where: { id: job.id }, data: { status: "COMPLETED", completedAt: new Date() } });
+./api/src/jobs/jobs.service.ts:1037:          await tx.job.update({ where: { id: job.id }, data: { status: "COMPLETED", completedAt: new Date() } });
+./api/src/jobs/jobs.service.ts:1042:        const after = await tx.job.findUnique({
+./api/src/jobs/jobs.service.ts:1047:        await tx.jobActivity.create({
+./api/src/jobs/jobs.service.ts:1063:      await tx.userUndoAction.create({
+./api/src/jobs/jobs.service.ts:1085:    const job = await db.job.findFirst({ where: { id: dto.jobId, companyId }, select: { id: true, jobRef: true } });
+./api/src/jobs/jobs.service.ts:1087:    const reminder = await db.jobReminder.create({
+./api/src/jobs/jobs.service.ts:1106:    const job = await db.job.findFirst({ where: { id: jobId, companyId }, select: { id: true } });
+./api/src/jobs/jobs.service.ts:1108:    return db.jobActivity.findMany({
+./api/src/jobs/jobs.controller.ts:21:    return this.jobsService.create(user.companyId, user.sub, dto);
+./api/src/tenant/tenant.service.ts:5:import { PrismaService } from '../prisma/prisma.service';
+./api/src/tenant/tenant.service.ts:24:    const company = await db.company.findUnique({ where: { id: tenantId } });
+./api/src/tenant/tenant.service.ts:29:    const defaultPlan = await db.plan.findFirst({ where: { code: DEFAULT_PLAN_CODE } });
+./api/src/tenant/tenant.service.ts:54:      plan = await db.plan.findUnique({ where: { id: settings.planId } });
+./api/src/tenant/tenant.service.ts:56:      plan = await db.plan.findFirst({ where: { code: DEFAULT_PLAN_CODE } });
+./api/src/analytics/analytics.module.ts:2:import { PrismaModule } from '../prisma/prisma.module';
+./api/src/analytics/analytics.service.ts:2:import { PrismaService } from '../prisma/prisma.service';
+./api/src/analytics/analytics.service.ts:148:    const bookings = await db.booking.findMany({
+./api/src/analytics/analytics.service.ts:196:    const jobs = await db.job.findMany({
+./api/src/analytics/analytics.service.ts:326:      db.booking.findMany({
+./api/src/analytics/analytics.service.ts:330:      db.job.findMany({
+./api/src/analytics/analytics.service.ts:334:      db.job.findMany({
+./api/src/command-centre/command-centre.controller.ts:9:import { PrismaService } from '../prisma/prisma.service';
+./api/src/command-centre/command-centre.controller.ts:28:      db.booking.findMany({
+./api/src/command-centre/command-centre.controller.ts:33:      db.job.findMany({
+./api/src/command-centre/command-centre.controller.ts:41:      db.job.findMany({
+./api/src/command-centre/command-centre.controller.ts:46:      db.jobDraft.findMany({ where: { companyId: user.companyId, userId: user.sub }, orderBy: { updatedAt: 'desc' }, take: 20 }),
+./api/src/command-centre/command-centre.controller.ts:47:      db.crmDraft.findMany({ where: { companyId: user.companyId, userId: user.sub }, orderBy: { updatedAt: 'desc' }, take: 20 }),
+./api/src/command-centre/command-centre.controller.ts:48:      db.tenantSubscription.findUnique({ where: { tenantId: user.companyId } }),
+./api/src/command-centre/command-centre.controller.ts:49:      db.tenantSetting.findUnique({ where: { tenantId: user.companyId } }),
+./api/src/command-centre/command-centre.controller.ts:86:    return db.savedCommandView.findMany({
+./api/src/command-centre/command-centre.controller.ts:106:    return db.savedCommandView.create({
+./api/src/command-centre/command-centre.controller.ts:126:    const existing = await db.savedCommandView.findFirst({ where: { id, companyId: user.companyId, userId: user.sub } });
+./api/src/command-centre/command-centre.controller.ts:134:    return db.savedCommandView.update({
+./api/src/command-centre/command-centre.controller.ts:149:    const existing = await db.savedCommandView.findFirst({ where: { id, companyId: user.companyId, userId: user.sub } });
+./api/src/command-centre/command-centre.controller.ts:151:    await db.savedCommandView.delete({ where: { id } });
+./api/src/command-centre/board-views.controller.ts:9:import { PrismaService } from '../prisma/prisma.service';
+./api/src/command-centre/board-views.controller.ts:21:    return db.savedBoardView.findMany({
+./api/src/command-centre/board-views.controller.ts:41:    return db.savedBoardView.create({
+./api/src/command-centre/board-views.controller.ts:62:    const existing = await db.savedBoardView.findFirst({ where: { id, companyId: user.companyId, userId: user.sub } });
+./api/src/command-centre/board-views.controller.ts:70:    return db.savedBoardView.update({
+./api/src/command-centre/board-views.controller.ts:86:    const existing = await db.savedBoardView.findFirst({ where: { id, companyId: user.companyId, userId: user.sub } });
+./api/src/command-centre/board-views.controller.ts:88:    await db.savedBoardView.delete({ where: { id } });
+./api/src/command-centre/command-centre.module.ts:2:import { PrismaModule } from '../prisma/prisma.module';
+./api/src/automations/automations.service.ts:5:import { PrismaService } from "../prisma/prisma.service";
+./api/src/automations/automations.service.ts:31:    const row = await db.automationsSetting.findUnique({ where: { tenantId } });
+./api/src/automations/automations.service.ts:40:    const currentRow = await db.automationsSetting.findUnique({ where: { tenantId } });
+./api/src/automations/automations.service.ts:110:      db.booking.findMany({
+./api/src/automations/automations.service.ts:118:      db.booking.findMany({
+./api/src/automations/automations.service.ts:133:        ? db.notification.findMany({
+./api/src/automations/automations.service.ts:144:        ? db.notification.findMany({
+./api/src/automations/automations.service.ts:178:      db.job.findMany({
+./api/src/automations/automations.service.ts:186:      db.job.findMany({
+./api/src/automations/automations.service.ts:200:        ? db.notification.findMany({
+./api/src/automations/automations.service.ts:211:        ? db.notification.findMany({
+./api/tools/export-openapi.ts:7:  const app = await NestFactory.create(AppModule, { logger: false });
+./api/scripts/seed-demo.js:93:    await prisma.tradePack.upsert({
+./api/scripts/seed-demo.js:114:  let company = await prisma.company.findFirst({
+./api/scripts/seed-demo.js:120:    company = await prisma.company.create({
+./api/scripts/seed-demo.js:129:  const defaultPlan = await prisma.plan.findFirst({
+./api/scripts/seed-demo.js:133:  await prisma.tenantSetting.upsert({
+./api/scripts/seed-demo.js:167:  const existing = await prisma.location.findFirst({
+./api/scripts/seed-demo.js:171:  return prisma.location.create({
+./api/scripts/seed-demo.js:205:    const row = await prisma.serviceCatalogItem.upsert({
+./api/scripts/seed-demo.js:231:  await prisma.templatePreset.upsert({
+./api/scripts/seed-demo.js:273:    const existing = await prisma.tradeAccount.findFirst({ where: { companyId, name: sample.name } });
+./api/scripts/seed-demo.js:275:      await prisma.tradeAccount.update({
+./api/scripts/seed-demo.js:287:    await prisma.tradeAccount.create({
+./api/scripts/seed-demo.js:393:    const job = await prisma.job.upsert({
+./api/scripts/seed-demo.js:451:    await prisma.jobAsset.upsert({
+./api/scripts/seed-demo.js:465:    await prisma.jobAsset.upsert({
+./api/scripts/seed-demo.js:480:      await prisma.jobActivity.upsert({
+./api/scripts/seed-demo.js:496:      await prisma.jobActivity.upsert({
+./api/scripts/seed-demo.js:515:      await prisma.jobActivity.upsert({
+./api/scripts/seed-demo.js:539:      await prisma.notification.upsert({
+./api/scripts/seed-demo.js:570:    await prisma.booking.upsert({
+./api/scripts/seed-demo.js:605:    await prisma.notification.upsert({
+./api/scripts/seed-demo.js:637:  const existing = await prisma.tradePackInstall.findUnique({
+./api/scripts/seed-demo.js:647:    await prisma.tradePackInstall.update({
+./api/scripts/seed-demo.js:665:  await prisma.tradePackInstall.create({
+./api/scripts/seed-demo.js:677:  const existing = await prisma.user.findFirst({
+./api/scripts/seed-demo.js:683:      await prisma.user.update({
+./api/scripts/seed-demo.js:697:  await prisma.user.create({
+./api/scripts/seed-demo.js:710:  const user = await prisma.user.findFirst({
+./api/scripts/seed-demo.js:717:  await prisma.user.update({
+./api/scripts/seed-demo.js:729:    await prisma.techScheduleSetting.upsert({
+./api/scripts/seed-demo.js:783:    await prisma.techScheduleException.upsert({
+./api/scripts/seed-demo.js:827:  const demoUser = await prisma.user.findFirst({ where: { companyId: company.id, email: DEMO_EMAIL } });
+./api/scripts/seed-demo.js:828:  const supportUser = await prisma.user.findFirst({ where: { companyId: company.id, email: SUPPORT_EMAIL } });
+./api/scripts/seed-demo.js:866:    await prisma.$disconnect();
+./api/scripts/seed-tenant-settings.js:13:  const companies = await prisma.company.findMany({
+./api/scripts/seed-tenant-settings.js:20:    const exists = await prisma.tenantSetting.findUnique({ where: { tenantId: company.id } });
+./api/scripts/seed-tenant-settings.js:23:    const defaultPlan = await prisma.plan.findFirst({ where: { code: DEFAULT_PLAN_CODE } });
+./api/scripts/seed-tenant-settings.js:24:    await prisma.tenantSetting.create({
+./api/scripts/seed-tenant-settings.js:45:    await prisma.$disconnect();
+./api/scripts/seed-demo.js.20260223105354.bak:13:  let company = await prisma.company.findFirst({
+./api/scripts/seed-demo.js.20260223105354.bak:19:    company = await prisma.company.create({
+./api/scripts/seed-demo.js.20260223105354.bak:28:  const defaultPlan = await prisma.plan.findFirst({
+./api/scripts/seed-demo.js.20260223105354.bak:32:  await prisma.tenantSetting.upsert({
+./api/scripts/seed-demo.js.20260223105354.bak:54:  const existing = await prisma.user.findFirst({
+./api/scripts/seed-demo.js.20260223105354.bak:63:  await prisma.user.create({
+./api/scripts/seed-demo.js.20260223105354.bak:94:    await prisma.$disconnect();
+./api/scripts/webhook-idempotency-check.js:5:const { PrismaService } = require('../dist/prisma/prisma.service');
+./api/scripts/webhook-idempotency-check.js:24:  await prisma.$connect();
+./api/scripts/webhook-idempotency-check.js:44:    const row = await prisma.webhookEvent.findUnique({
+./api/scripts/webhook-idempotency-check.js:60:    await prisma.$disconnect();
+./backups/calendar.service.ts.20260225225710.bak:2:import { PrismaService } from '../prisma/prisma.service';
+./backups/calendar.service.ts.20260225225710.bak:36:      db.user.findMany({
+./backups/calendar.service.ts.20260225225710.bak:44:      db.booking.findMany({
+./backups/calendar.service.ts.20260225225710.bak:134:    const existing = await db.booking.findFirst({ where: { id: bookingId, companyId: tenantId } });
+./backups/calendar.service.ts.20260225225710.bak:140:      ? await db.booking.findMany({
+./backups/calendar.service.ts.20260225225710.bak:161:    const updated = await db.booking.update({
+./backups/calendar.service.ts.20260226073010.bak:2:import { PrismaService } from '../prisma/prisma.service';
+./backups/calendar.service.ts.20260226073010.bak:67:      db.user.findMany({
+./backups/calendar.service.ts.20260226073010.bak:75:      db.booking.findMany({
+./backups/calendar.service.ts.20260226073010.bak:161:      db.user.findMany({
+./backups/calendar.service.ts.20260226073010.bak:169:      db.techScheduleSetting.findMany({
+./backups/calendar.service.ts.20260226073010.bak:223:    const existing = await db.booking.findFirst({ where: { id: bookingId, companyId: tenantId } });
+./backups/calendar.service.ts.20260226073010.bak:229:      ? await db.booking.findMany({
+./backups/calendar.service.ts.20260226073010.bak:250:    const updated = await db.booking.update({
+./backups/calendar.service.ts.20260226073010.bak:375:    const setting = await db.techScheduleSetting.findFirst({
+./backups/calendar.service.ts.20260226073010.bak:400:    const bookings = await db.booking.findMany({
+./backups/calendar.service.ts.20260226080838.bak:2:import { PrismaService } from '../prisma/prisma.service';
+./backups/calendar.service.ts.20260226080838.bak:78:      db.user.findMany({
+./backups/calendar.service.ts.20260226080838.bak:86:      db.booking.findMany({
+./backups/calendar.service.ts.20260226080838.bak:172:      db.user.findMany({
+./backups/calendar.service.ts.20260226080838.bak:180:      db.techScheduleSetting.findMany({
+./backups/calendar.service.ts.20260226080838.bak:222:    const booking = await db.booking.findFirst({
+./backups/calendar.service.ts.20260226080838.bak:237:      db.user.findMany({
+./backups/calendar.service.ts.20260226080838.bak:245:      db.techScheduleSetting.findMany({
+./backups/calendar.service.ts.20260226080838.bak:259:      ? await db.booking.findMany({
+./backups/calendar.service.ts.20260226080838.bak:365:    const existing = await db.booking.findFirst({ where: { id: bookingId, companyId: tenantId } });
+./backups/calendar.service.ts.20260226080838.bak:371:      ? await db.booking.findMany({
+./backups/calendar.service.ts.20260226080838.bak:392:    const updated = await db.booking.update({
+./backups/calendar.service.ts.20260226080838.bak:582:    const setting = await db.techScheduleSetting.findFirst({
+./backups/calendar.service.ts.20260226080838.bak:607:    const bookings = await db.booking.findMany({

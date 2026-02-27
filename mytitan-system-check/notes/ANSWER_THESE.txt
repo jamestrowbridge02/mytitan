@@ -1,0 +1,6 @@
+1) Tenancy model: what is the tenant table/model name? key fields?
+2) Auth: JWT/session? where is tenant derived from (claim/header/subdomain)?
+3) Conflict mode: when hard conflicts OFF, what is intended behavior?
+4) Suggested slots: inputs + rule order + any caching/precompute?
+5) Drag+undo: event log vs snapshot vs optimistic concurrency?
+6) Background jobs: queue tech + list of workers/cron tasks?

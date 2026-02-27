@@ -1,0 +1,54 @@
+import type { EntityTimelineItem } from '../components/entity/EntityTimeline';
+
+function safeTimestamp(value?: string | number | Date | null) {
+  if (!value) return undefined;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return undefined;
+  return date.toISOString();
+}
+
+function sortByNewest(items: EntityTimelineItem[]) {
+  return [...items].sort((a, b) => {
+    const ta = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+    const tb = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+    return tb - ta;
+  });
+}
+
+export function toTimelineItemsFromJobActivity(activity: Array<{ eventType?: string; message?: string; createdAt?: string }> = []): EntityTimelineItem[] {
+  const items = activity.map((entry) => ({
+    label: (entry.eventType || 'Activity').toString().replace(/_/g, ' '),
+    description: entry.message || 'Update recorded',
+    timestamp: safeTimestamp(entry.createdAt),
+  }));
+  return sortByNewest(items);
+}
+
+export function toTimelineItemsFromBookingActivity(activity: Array<{ label?: string; message?: string; createdAt?: string; href?: string }> = []): EntityTimelineItem[] {
+  const items = activity.map((entry) => ({
+    label: entry.label || 'Booking update',
+    description: entry.message,
+    timestamp: safeTimestamp(entry.createdAt),
+    href: entry.href,
+  }));
+  return sortByNewest(items);
+}
+
+export function toTimelineItemsFromCrmNotes(activity: Array<{ type?: string; createdAt?: string; data?: any }> = []): EntityTimelineItem[] {
+  const items = activity.map((entry) => {
+    const jobId = entry?.data?.id || entry?.data?.jobId;
+    const bookingId = entry?.data?.id || entry?.data?.bookingId;
+    const href =
+      entry?.type === 'job' && jobId ? `/dashboard/jobs/${jobId}` :
+      entry?.type === 'booking' && bookingId ? `/dashboard/bookings/${bookingId}` :
+      undefined;
+
+    return {
+      label: (entry.type || 'activity').toString().replace(/_/g, ' '),
+      description: entry.data?.body || entry.data?.jobRef || entry.data?.customerName || entry.data?.message || 'Activity logged',
+      timestamp: safeTimestamp(entry.createdAt),
+      href,
+    };
+  });
+  return sortByNewest(items);
+}

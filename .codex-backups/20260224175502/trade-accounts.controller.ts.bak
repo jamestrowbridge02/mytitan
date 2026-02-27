@@ -1,0 +1,26 @@
+import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { JwtAuthGuard } from '../auth/auth.guard';
+import { CurrentUser } from '../auth/current-user.decorator';
+import { JwtPayload } from '../auth/auth.types';
+import { Roles } from '../common/roles.decorator';
+import { RolesGuard } from '../common/roles.guard';
+import { UpsertTradeAccountDto } from './dto';
+import { TradeAccountsService } from './trade-accounts.service';
+
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Controller('trade-accounts')
+export class TradeAccountsController {
+  constructor(private readonly tradeAccountsService: TradeAccountsService) {}
+
+  @Post()
+  @Roles('OWNER', 'ADMIN', 'STAFF')
+  upsert(@CurrentUser() user: JwtPayload, @Body() dto: UpsertTradeAccountDto) {
+    return this.tradeAccountsService.upsert(user.companyId, user.sub, dto);
+  }
+
+  @Get()
+  @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
+  list(@CurrentUser() user: JwtPayload) {
+    return this.tradeAccountsService.list(user.companyId);
+  }
+}

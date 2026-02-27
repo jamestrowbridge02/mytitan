@@ -1,0 +1,1343 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-1.1.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  OWNER
+  ADMIN
+  STAFF
+  READ_ONLY
+}
+
+enum TradeAccountStatus {
+  ACTIVE
+  ON_HOLD
+  CLOSED
+}
+
+enum CRMTaskStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum JobStatus {
+  DRAFT
+  OPEN
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  INVOICED
+  CANCELLED
+}
+
+enum BookingStatus {
+  PENDING
+  PLANNED
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum BookingSource {
+  INTERNAL
+  PUBLIC
+}
+
+enum MediaType {
+  PHOTO
+  VIDEO
+  DOCUMENT
+}
+
+enum WheelPricingMode {
+  PER_WHEEL
+  SET
+}
+
+enum EmailTemplateType {
+  JOB_NOTIFICATION
+  INVOICE
+  BOOKING_CONFIRMATION
+}
+
+enum PlanCode {
+  SOLE_TRADER
+  BUSINESS
+  ENTERPRISE
+}
+
+enum BillingInterval {
+  MONTHLY
+  ANNUAL
+}
+
+enum IntegrationProvider {
+  XERO
+  QBO
+  GOOGLE_CALENDAR
+}
+
+enum NextActionType {
+  CALL
+  EMAIL
+  WHATSAPP
+  FOLLOW_UP
+  MEETING
+}
+
+enum TemplatePresetType {
+  CATALOG_ITEM
+  PRICING_PRESET
+  CHECKLIST
+  EMAIL_TEMPLATE
+  PDF_TEMPLATE
+  BOOKING_DEFAULTS
+  PORTAL_COPY
+}
+
+enum JobAssetKind {
+  BEFORE
+  AFTER
+  TORQUE
+  SIGN_TECH
+  SIGN_CUSTOMER
+}
+
+enum StockPurchaseOrderStatus {
+  DRAFT
+  ORDERED
+  RECEIVED
+  CANCELLED
+}
+
+enum StockMovementType {
+  IN
+  OUT
+  ADJUST
+}
+
+model Company {
+  id                       String                    @id @default(cuid())
+  name                     String
+  timezone                 String
+  currency                 String
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
+  users                    User[]
+  locations                Location[]
+  tradeAccounts            TradeAccount[]
+  jobs                     Job[]
+  bookings                 Booking[]
+  bookingBusinessHours     BookingBusinessHour[]
+  bookingBlackoutDates     BookingBlackoutDate[]
+  auditEvents              AuditEvent[]
+  invoiceCounter           InvoiceCounter[]
+  tenantSetting            TenantSetting?
+  catalogItems             ServiceCatalogItem[]
+  emailTemplates           EmailTemplate[]
+  aiChatAudits             AiChatAudit[]
+  subscriptions            TenantSubscription?
+  usageMeters              UsageMeter[]
+  inviteTokens             InviteToken[]
+  integrationConnections   IntegrationConnection[]
+  integrationAuthStates    IntegrationAuthState[]
+  tradePackInstalls        TradePackInstall[]
+  templatePresets          TemplatePreset[]
+  tradeAccountNotes        TradeAccountNote[]
+  jobDrafts                JobDraft[]
+  crmDrafts                CrmDraft[]
+  passwordResetTokens      PasswordResetToken[]
+  emailVerificationTokens  EmailVerificationToken[]
+  savedCommandViews        SavedCommandView[]
+  userUndoActions          UserUndoAction[]
+  locationBusinessHours    LocationBusinessHour[]
+  locationStaffAssignments LocationStaffAssignment[]
+  jobLineItems             JobLineItem[]
+  stockItems               StockItem[]
+  stockSuppliers           StockSupplier[]
+  stockPurchaseOrders      StockPurchaseOrder[]
+  stockMovements           StockMovement[]
+  jobActivities            JobActivity[]
+  jobTags                  JobTag[]
+  savedBoardViews          SavedBoardView[]
+  jobReminders             JobReminder[]
+  services                 Service[]
+  staffAvailabilities      StaffAvailability[]
+  blackoutDates            BlackoutDate[]
+  bookingQuestions         BookingQuestion[]
+  bookingAnswers           BookingAnswer[]
+  customerTags             CustomerTag[]
+  customerSegments         CustomerSegment[]
+  crmNotes                 CRMNote[]
+  crmTasks                 CRMTask[]
+  notifications            Notification[]
+  notificationPreferences  NotificationPreference[]
+  jobSignatures            JobSignature[]
+  automationsSetting       AutomationsSetting?
+}
+
+model User {
+  id                       String                    @id @default(cuid())
+  companyId                String
+  email                    String
+  emailVerified            Boolean                   @default(false)
+  passwordHash             String
+  role                     UserRole                  @default(STAFF)
+  tokenVersion             Int                       @default(0)
+  onlyMyLocation           Boolean                   @default(false)
+  defaultLocationId        String?
+  createdAt                DateTime                  @default(now())
+  lastActiveAt             DateTime?
+  lastLoginAt              DateTime?
+  company                  Company                   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  defaultLocation          Location?                 @relation("UserDefaultLocation", fields: [defaultLocationId], references: [id], onDelete: SetNull)
+  defaultAssignedLocations Location[]                @relation("LocationDefaultAssignee")
+  locationAssignments      LocationStaffAssignment[]
+  savedCommandViews        SavedCommandView[]
+  savedBoardViews          SavedBoardView[]
+  undoActions              UserUndoAction[]
+  assignedBookings         Booking[]                 @relation("BookingAssignee")
+  assignedJobs             Job[]                     @relation("JobAssignee")
+  auditEvents              AuditEvent[]              @relation("AuditActor")
+  aiChatAudits             AiChatAudit[]             @relation("AiAuditActor")
+  jobDrafts                JobDraft[]
+  crmDrafts                CrmDraft[]
+  passwordResetTokens      PasswordResetToken[]
+  emailVerificationTokens  EmailVerificationToken[]
+  jobActivities            JobActivity[]              @relation("JobActivityActor")
+  crmNotes                 CRMNote[]                  @relation("CRMNoteAuthor")
+  crmTasks                 CRMTask[]                  @relation("CRMTaskAssignee")
+  staffAvailabilities      StaffAvailability[]
+  notifications            Notification[]
+  notificationPreference   NotificationPreference?
+  createdJobs              Job[]                      @relation("JobCreator")
+
+  @@unique([companyId, email])
+}
+
+model Location {
+  id                    String                    @id @default(cuid())
+  companyId             String
+  name                  String
+  addressLine1          String
+  addressLine2          String?
+  city                  String
+  state                 String?
+  postalCode            String?
+  country               String
+  phone                 String?
+  isActive              Boolean                   @default(true)
+  timezone              String?
+  bookingLeadTimeMins   Int                       @default(0)
+  defaultAssigneeId     String?
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+  company               Company                   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  defaultAssignee       User?                     @relation("LocationDefaultAssignee", fields: [defaultAssigneeId], references: [id], onDelete: SetNull)
+  jobs                  Job[]
+  bookings              Booking[]
+  businessHours         LocationBusinessHour[]
+  staffAssignments      LocationStaffAssignment[]
+  defaultUsers          User[]                    @relation("UserDefaultLocation")
+  stockItems            StockItem[]
+  stockPurchaseOrders   StockPurchaseOrder[]
+  stockMovements        StockMovement[]
+  tenantSettingsDefault TenantSetting[]           @relation("TenantDefaultLocation")
+  services              Service[]
+  staffAvailabilities   StaffAvailability[]
+  blackoutDates         BlackoutDate[]
+  bookingQuestions      BookingQuestion[]
+  savedBoardViews       SavedBoardView[]
+
+  @@index([companyId, isActive])
+  @@index([companyId, defaultAssigneeId])
+}
+
+model TradeAccount {
+  id                 String             @id @default(cuid())
+  companyId          String
+  name               String
+  contactName        String?
+  contactEmail       String?
+  contactPhone       String?
+  creditLimit        Decimal            @db.Decimal(14, 2)
+  outstandingBalance Decimal            @default(0) @db.Decimal(14, 2)
+  status             TradeAccountStatus @default(ACTIVE)
+  nextActionType     NextActionType?
+  nextActionDueAt    DateTime?
+  nextActionUserId   String?
+  lastContactedAt    DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  company            Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  notes              TradeAccountNote[]
+  jobs               Job[]
+  bookings           Booking[]
+  customerTags       CustomerTag[]
+  crmNotes           CRMNote[]
+  crmTasks           CRMTask[]
+
+  @@index([companyId, createdAt])
+  @@index([companyId, status])
+}
+
+model Job {
+  id                       String            @id @default(cuid())
+  companyId                String
+  locationId               String?
+  jobRef                   String
+  status                   JobStatus         @default(OPEN)
+  customerName             String
+  customerEmail            String?
+  customerPhone            String?
+  vehicleMake              String?
+  vehicleModel             String?
+  vehicleReg               String?
+  serviceName              String?
+  wheelPricingMode         WheelPricingMode?
+  whatsappTemplate         String?
+  laborCents               Int               @default(0)
+  partsCents               Int               @default(0)
+  miscCents                Int               @default(0)
+  subtotalCents            Int               @default(0)
+  taxRateBps               Int               @default(0)
+  taxCents                 Int               @default(0)
+  totalCents               Int               @default(0)
+  currency                 String
+  invoiceNumber            String?
+  invoicePdfUrl            String?
+  paymentLinkUrl           String?
+  invoiceIssuedAt          DateTime?
+  invoiceDueAt             DateTime?
+  invoicePaidAt            DateTime?
+  approvedAt               DateTime?
+  approvedByName           String?
+  declinedAt               DateTime?
+  declinedReason           String?
+  signedAt                 DateTime?
+  signatureName            String?
+  signatureDataUrl         String?
+  paymentCheckoutSessionId String?
+  paymentReceiptUrl        String?
+  tradeAccountId           String?
+  assignedUserId           String?
+  createdByUserId          String?
+  pricingNotes             String?
+  tags                     String[]          @default([])
+  completedAt              DateTime?
+  createdAt                DateTime          @default(now())
+  updatedAt                DateTime          @updatedAt
+  company                  Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  location                 Location?         @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  tradeAccount             TradeAccount?     @relation(fields: [tradeAccountId], references: [id], onDelete: SetNull)
+  assignedUser             User?             @relation("JobAssignee", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  createdByUser            User?             @relation("JobCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  media                    JobMedia[]
+  bookings                 Booking[]
+  publicTokens             PublicJobToken[]
+  assets                   JobAsset[]
+  pdf                      JobPdf?
+  stockMovements           StockMovement[]
+  lineItems                JobLineItem[]
+  tradeCode                String?
+  jobType                  String?
+  formData                 Json?
+  whatsappCompletionLink   String?
+  activities               JobActivity[]
+  reminders                JobReminder[]
+  signatures               JobSignature[]
+
+  @@unique([companyId, jobRef])
+  @@index([companyId, createdAt])
+  @@index([companyId, status])
+  @@index([companyId, invoiceIssuedAt])
+  @@index([companyId, invoicePaidAt])
+  @@index([companyId, jobType])
+  @@index([companyId, tradeCode])
+  @@index([companyId, tradeAccountId, createdAt])
+  @@index([companyId, status, createdAt])
+  @@index([companyId, locationId, status, createdAt])
+  @@index([companyId, status, invoiceDueAt, locationId])
+  @@index([companyId, completedAt])
+  @@index([companyId, createdByUserId])
+}
+
+model SavedCommandView {
+  id          String   @id @default(cuid())
+  companyId   String
+  userId      String
+  name        String
+  filtersJson Json
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, userId, createdAt])
+  @@index([companyId, userId, isDefault])
+}
+
+model UserUndoAction {
+  id          String    @id @default(cuid())
+  companyId   String
+  userId      String
+  actionType  String
+  payloadJson Json
+  expiresAt   DateTime
+  createdAt   DateTime  @default(now())
+  consumedAt  DateTime?
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, userId, createdAt])
+  @@index([companyId, userId, expiresAt])
+  @@index([companyId, userId, consumedAt])
+}
+
+model LocationBusinessHour {
+  id          String   @id @default(cuid())
+  companyId   String
+  locationId  String
+  weekday     Int
+  startMinute Int?
+  endMinute   Int?
+  isClosed    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  location    Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@unique([locationId, weekday])
+  @@index([companyId, locationId])
+}
+
+model LocationStaffAssignment {
+  id         String   @id @default(cuid())
+  companyId  String
+  locationId String
+  userId     String
+  createdAt  DateTime @default(now())
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([locationId, userId])
+  @@index([companyId, userId])
+  @@index([companyId, locationId])
+}
+
+model JobLineItem {
+  id          String     @id @default(cuid())
+  companyId   String
+  jobId       String
+  stockItemId String?
+  description String
+  qty         Decimal    @db.Decimal(14, 2)
+  unitPrice   Decimal    @default(0) @db.Decimal(14, 2)
+  total       Decimal    @default(0) @db.Decimal(14, 2)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  company     Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  job         Job        @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  stockItem   StockItem? @relation(fields: [stockItemId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, jobId, createdAt])
+  @@index([companyId, stockItemId])
+}
+
+model Booking {
+  id             String              @id @default(cuid())
+  companyId      String
+  locationId     String?
+  jobId          String?
+  serviceId      String?
+  proServiceId   String?
+  customerName   String?
+  customerEmail  String?
+  customerPhone  String?
+  tradeAccountId String?
+  startsAt       DateTime
+  endsAt         DateTime
+  assignedUserId String?
+  status         BookingStatus       @default(PLANNED)
+  source         BookingSource       @default(INTERNAL)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  company        Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  location       Location?           @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  job            Job?                @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  assignedUser   User?               @relation("BookingAssignee", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  service        ServiceCatalogItem? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  tradeAccount   TradeAccount?       @relation(fields: [tradeAccountId], references: [id], onDelete: SetNull)
+  proService     Service?            @relation(fields: [proServiceId], references: [id], onDelete: SetNull)
+  answers        BookingAnswer[]
+
+  @@index([companyId, startsAt])
+  @@index([companyId, tradeAccountId, startsAt])
+  @@index([companyId, locationId, startsAt, endsAt])
+}
+
+model JobActivity {
+  id          String   @id @default(cuid())
+  companyId   String
+  jobId       String
+  actorUserId String?
+  eventType   String
+  message     String?
+  payloadJson Json?
+  createdAt   DateTime @default(now())
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  actorUser   User?    @relation("JobActivityActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, jobId, createdAt])
+  @@index([companyId, createdAt])
+}
+
+model JobTag {
+  id        String   @id @default(cuid())
+  companyId String
+  name      String
+  color     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, name])
+  @@index([companyId, createdAt])
+}
+
+model SavedBoardView {
+  id          String   @id @default(cuid())
+  companyId   String
+  userId      String
+  name        String
+  viewType    String   @default("kanban")
+  filtersJson Json
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  location    Location? @relation(fields: [defaultLocationId], references: [id], onDelete: SetNull)
+  defaultLocationId String?
+
+  @@index([companyId, userId, createdAt])
+  @@index([companyId, userId, isDefault])
+}
+
+model JobReminder {
+  id          String   @id @default(cuid())
+  companyId   String
+  jobId       String
+  remindAt    DateTime
+  channel     String   @default("in_app")
+  note        String?
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, remindAt])
+  @@index([companyId, jobId, remindAt])
+}
+
+model Service {
+  id              String   @id @default(cuid())
+  companyId       String
+  locationId      String?
+  name            String
+  description     String?
+  durationMinutes Int
+  priceCents      Int
+  bufferBefore    Int      @default(0)
+  bufferAfter     Int      @default(0)
+  depositCents    Int      @default(0)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  location        Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  bookings        Booking[]
+
+  @@index([companyId, locationId, isActive])
+  @@index([companyId, createdAt])
+}
+
+model StaffAvailability {
+  id          String   @id @default(cuid())
+  companyId   String
+  locationId  String
+  userId      String
+  weekday     Int
+  startMinute Int?
+  endMinute   Int?
+  isClosed    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  location    Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([locationId, userId, weekday])
+  @@index([companyId, locationId])
+  @@index([companyId, userId])
+}
+
+model BlackoutDate {
+  id         String   @id @default(cuid())
+  companyId  String
+  locationId String?
+  date       DateTime
+  reason     String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  location   Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, locationId, date])
+}
+
+model BookingQuestion {
+  id         String   @id @default(cuid())
+  companyId  String
+  locationId String?
+  label      String
+  questionKey String
+  type       String   @default("text")
+  required   Boolean  @default(false)
+  optionsJson Json?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  location   Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  answers    BookingAnswer[]
+
+  @@unique([companyId, questionKey])
+  @@index([companyId, locationId, isActive])
+}
+
+model BookingAnswer {
+  id         String          @id @default(cuid())
+  companyId  String
+  bookingId  String
+  questionId String
+  valueText  String?
+  valueJson  Json?
+  createdAt  DateTime        @default(now())
+  company    Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  booking    Booking         @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  question   BookingQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, bookingId])
+  @@index([companyId, questionId])
+}
+
+model CustomerTag {
+  id             String       @id @default(cuid())
+  companyId      String
+  tradeAccountId String
+  label          String
+  color          String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  company        Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  tradeAccount   TradeAccount @relation(fields: [tradeAccountId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, tradeAccountId, createdAt])
+  @@unique([companyId, tradeAccountId, label])
+}
+
+model CustomerSegment {
+  id         String   @id @default(cuid())
+  companyId  String
+  name       String
+  rulesJson  Json?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, name])
+  @@index([companyId, createdAt])
+}
+
+model CRMNote {
+  id             String       @id @default(cuid())
+  companyId      String
+  tradeAccountId String
+  authorUserId   String?
+  bodyJson       Json
+  attachmentsJson Json?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  company        Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  tradeAccount   TradeAccount @relation(fields: [tradeAccountId], references: [id], onDelete: Cascade)
+  authorUser     User?        @relation("CRMNoteAuthor", fields: [authorUserId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, tradeAccountId, createdAt])
+}
+
+model CRMTask {
+  id             String       @id @default(cuid())
+  companyId      String
+  tradeAccountId String
+  title          String
+  details        String?
+  dueAt          DateTime?
+  status         CRMTaskStatus @default(OPEN)
+  assigneeUserId String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  completedAt    DateTime?
+  company        Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  tradeAccount   TradeAccount @relation(fields: [tradeAccountId], references: [id], onDelete: Cascade)
+  assigneeUser   User?        @relation("CRMTaskAssignee", fields: [assigneeUserId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, tradeAccountId, status, dueAt])
+  @@index([companyId, assigneeUserId, status])
+}
+
+model JobMedia {
+  id        String    @id @default(cuid())
+  jobId     String
+  type      MediaType
+  url       String
+  mime      String?
+  bytes     Int?
+  fileName  String?
+  createdAt DateTime  @default(now())
+  job       Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId, type, createdAt])
+}
+
+model JobSignature {
+  id         String   @id @default(cuid())
+  companyId  String
+  jobId      String
+  signerType String
+  signerName String?
+  dataUrl    String
+  mime       String?  @default("image/png")
+  bytes      Int?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  job        Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, signerType])
+  @@index([companyId, jobId, signerType])
+}
+
+model Notification {
+  id          String   @id @default(cuid())
+  companyId   String
+  userId      String
+  type        String
+  title       String
+  body        String?
+  entityType  String?
+  entityId    String?
+  metaJson    Json?
+  isRead      Boolean  @default(false)
+  readAt      DateTime?
+  createdAt   DateTime @default(now())
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, userId, createdAt])
+  @@index([companyId, userId, isRead, createdAt])
+}
+
+model NotificationPreference {
+  id              String   @id @default(cuid())
+  companyId       String
+  userId          String   @unique
+  jobComplete     Boolean  @default(true)
+  paymentReceived Boolean  @default(true)
+  emailEnabled    Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, userId])
+}
+
+
+model WebhookEvent {
+  id          String   @id @default(uuid()) @db.Uuid
+  provider    String
+  eventId     String
+  type        String?
+  status      String?
+  receivedAt  DateTime @default(now())
+  processedAt DateTime?
+  requestId   String?
+  error       String?
+
+  @@unique([provider, eventId])
+  @@index([provider, receivedAt])
+}
+
+model AuditEvent {
+  id        String   @id @default(cuid())
+  companyId String
+  userId    String?
+  type      String
+  message   String
+  createdAt DateTime @default(now())
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user      User?    @relation("AuditActor", fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, createdAt])
+}
+
+model InvoiceCounter {
+  id        String  @id @default(cuid())
+  companyId String
+  year      Int
+  current   Int     @default(0)
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, year])
+}
+
+model TenantSetting {
+  id                          String            @id @default(cuid())
+  tenantId                    String            @unique
+  planId                      String?
+  planBillingInterval         BillingInterval   @default(MONTHLY)
+  companyName                 String?
+  defaultLocationId           String?
+  logoUrl                     String?
+  brandPrimaryColor           String            @default("#4fd1c5")
+  brandSecondaryColor         String            @default("#1a1f36")
+  brandAccentColor            String?
+  brandDefaultMode            String            @default("dark")
+  themeMode                   String            @default("light")
+  emailSenderName             String?
+  emailReplyTo                String?
+  emailNotificationRecipients Json?
+  smtpHost                    String?
+  smtpPort                    Int?
+  smtpUsername                String?
+  smtpPasswordEncrypted       String?
+  whatsappTemplateDefault     String?
+  supportPhone                String?
+  vatEnabledDefault           Boolean           @default(false)
+  vatRateBpsDefault           Int               @default(0)
+  defaultTorqueSetting        String?
+  defaultTyrePressure         String?
+  defaultCurrency             String            @default("USD")
+  defaultLocale               String            @default("en-US")
+  defaultTimezone             String            @default("UTC")
+  defaultItems                Json?
+  defaultServiceNamePresets   Json?
+  defaultWheelPricingMode     WheelPricingMode?
+  bookingsEnabled             Boolean           @default(false)
+  accountingEnabled           Boolean           @default(false)
+  paymentsEnabled             Boolean           @default(false)
+  socialEnabled               Boolean           @default(false)
+  aiEnabled                   Boolean           @default(true)
+  onboardingCompleted         Boolean           @default(false)
+  onboardingStep              Int               @default(0)
+  guidedSetupCurrentStep      Int               @default(0)
+  guidedSetupCompletedSteps   String[]          @default([])
+  guidedSetupSkippedSteps     String[]          @default([])
+  guidedSetupCompletedAt      DateTime?
+  primaryTrade                String?
+  featurePayments             Boolean           @default(false)
+  featureAccounting           Boolean           @default(false)
+  featureBookings             Boolean           @default(false)
+  featureSocial               Boolean           @default(false)
+  featureAI                   Boolean           @default(false)
+  featureCustomerPortal       Boolean           @default(false)
+  featureWhatsApp             Boolean           @default(false)
+  bookingPublicEnabled        Boolean           @default(false)
+  bookingPublicToken          String?           @unique
+  bookingIcsToken             String?           @unique
+  aiRequestsLimit             Int?
+  createdAt                   DateTime          @default(now())
+  updatedAt                   DateTime          @updatedAt
+  tenant                      Company           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  defaultLocation             Location?         @relation("TenantDefaultLocation", fields: [defaultLocationId], references: [id], onDelete: SetNull)
+  plan                        Plan?             @relation(fields: [planId], references: [id], onDelete: SetNull)
+
+  @@index([updatedAt])
+  @@index([primaryTrade])
+  @@index([guidedSetupCompletedAt])
+}
+
+model AutomationsSetting {
+  id        String   @id @default(cuid())
+  tenantId  String   @unique
+  configJson Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tenant    Company  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([updatedAt])
+}
+
+model ServiceCatalogItem {
+  id              String    @id @default(cuid())
+  tenantId        String
+  key             String?
+  name            String
+  description     String?
+  unitPrice       Decimal   @db.Decimal(14, 2)
+  defaultQty      Int       @default(1)
+  durationMinutes Int       @default(60)
+  capacity        Int       @default(1)
+  active          Boolean   @default(true)
+  vatEligible     Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  tenant          Company   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bookings        Booking[]
+
+  @@unique([tenantId, key])
+  @@index([tenantId, active])
+  @@index([tenantId, key])
+}
+
+model EmailTemplate {
+  id        String            @id @default(cuid())
+  tenantId  String
+  type      EmailTemplateType
+  subject   String
+  bodyHtml  String?
+  bodyText  String?
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  tenant    Company           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, type])
+}
+
+model AiChatAudit {
+  id           String   @id @default(cuid())
+  tenantId     String
+  userId       String?
+  purpose      String?
+  prompt       String
+  response     String?
+  promptTokens Int?
+  outputTokens Int?
+  totalTokens  Int?
+  createdAt    DateTime @default(now())
+  tenant       Company  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user         User?    @relation("AiAuditActor", fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+}
+
+model Plan {
+  id                     String               @id @default(cuid())
+  code                   PlanCode             @unique
+  name                   String
+  stripePriceMonthlyId   String
+  stripePriceAnnualId    String
+  featuresJson           Json?
+  aiRequestsLimitMonthly Int
+  aiTokensLimitMonthly   Int?
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+  subscriptions          TenantSubscription[]
+  tenantSettings         TenantSetting[]
+}
+
+model TenantSubscription {
+  id                   String    @id @default(cuid())
+  tenantId             String    @unique
+  planId               String
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  status               String?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean   @default(false)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  tenant               Company   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan                 Plan      @relation(fields: [planId], references: [id], onDelete: Restrict)
+}
+
+model UsageMeter {
+  id               String   @id @default(cuid())
+  tenantId         String
+  periodStart      DateTime
+  aiRequestsUsed   Int      @default(0)
+  aiTokensUsed     Int      @default(0)
+  storageBytesUsed Int      @default(0)
+  jobsCreatedCount Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  tenant           Company  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, periodStart])
+  @@index([tenantId, createdAt])
+}
+
+model BookingBusinessHour {
+  id          String   @id @default(cuid())
+  tenantId    String
+  dayOfWeek   Int
+  startMinute Int
+  endMinute   Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  tenant      Company  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, dayOfWeek])
+}
+
+model BookingBlackoutDate {
+  id        String   @id @default(cuid())
+  tenantId  String
+  date      DateTime
+  reason    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tenant    Company  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, date])
+}
+
+model IntegrationConnection {
+  id                    String              @id @default(cuid())
+  tenantId              String
+  provider              IntegrationProvider
+  status                String
+  accessTokenEncrypted  String?
+  refreshTokenEncrypted String?
+  scopes                String?
+  externalTenantId      String?
+  realmId               String?
+  connectedAt           DateTime?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  tenant                Company             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, provider])
+  @@index([tenantId, provider])
+}
+
+model IntegrationAuthState {
+  id        String              @id @default(cuid())
+  tenantId  String
+  provider  IntegrationProvider
+  state     String              @unique
+  expiresAt DateTime
+  createdAt DateTime            @default(now())
+  tenant    Company             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, provider])
+}
+
+model InviteToken {
+  id         String    @id @default(cuid())
+  tenantId   String
+  email      String
+  role       UserRole
+  token      String    @unique
+  expiresAt  DateTime
+  acceptedAt DateTime?
+  createdAt  DateTime  @default(now())
+  tenant     Company   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, email])
+}
+
+model TradePack {
+  code        String             @id
+  name        String
+  description String
+  tags        String[]
+  version     Int                @default(1)
+  isActive    Boolean            @default(true)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  installs    TradePackInstall[]
+  presets     TemplatePreset[]
+}
+
+model TradePackInstall {
+  id                String    @id @default(cuid())
+  tenantId          String
+  packCode          String
+  installedAt       DateTime  @default(now())
+  installedByUserId String?
+  configJson        Json?
+  tenant            Company   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  pack              TradePack @relation(fields: [packCode], references: [code], onDelete: Restrict)
+
+  @@unique([tenantId, packCode])
+  @@index([tenantId, packCode])
+  @@index([tenantId, installedAt])
+}
+
+model TemplatePreset {
+  id        String             @id @default(cuid())
+  tenantId  String
+  packCode  String
+  type      TemplatePresetType
+  key       String
+  name      String
+  dataJson  Json
+  isActive  Boolean            @default(true)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  tenant    Company            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  pack      TradePack          @relation(fields: [packCode], references: [code], onDelete: Restrict)
+
+  @@unique([tenantId, packCode, type, key])
+  @@index([tenantId, packCode])
+  @@index([tenantId, type, isActive])
+  @@index([tenantId, updatedAt])
+}
+
+model FormTemplate {
+  id        String      @id @default(cuid())
+  tradeCode String
+  version   Int
+  name      String
+  isDefault Boolean     @default(false)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  fields    FormField[]
+
+  @@unique([tradeCode, version])
+  @@index([tradeCode, isDefault])
+}
+
+model FormField {
+  id          String       @id @default(cuid())
+  templateId  String
+  key         String
+  label       String
+  type        String
+  required    Boolean      @default(false)
+  optionsJson Json?
+  fieldOrder  Int
+  group       String
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  template    FormTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, key])
+  @@index([templateId, fieldOrder])
+  @@index([group])
+}
+
+model JobAsset {
+  id        String       @id @default(cuid())
+  jobId     String
+  kind      JobAssetKind
+  url       String
+  mime      String?
+  bytes     Int?
+  createdAt DateTime     @default(now())
+  job       Job          @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId, kind])
+}
+
+model JobPdf {
+  id            String   @id @default(cuid())
+  jobId         String   @unique
+  url           String
+  contentBase64 String?
+  generatedAt   DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  job           Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+}
+
+model PublicJobToken {
+  id        String   @id @default(cuid())
+  jobId     String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+}
+
+model TradeAccountNote {
+  id              String       @id @default(cuid())
+  companyId       String
+  tradeAccountId  String
+  authorUserId    String?
+  body            String
+  mentionHandles  String[]     @default([])
+  attachmentsJson Json?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  company         Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  tradeAccount    TradeAccount @relation(fields: [tradeAccountId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, tradeAccountId, createdAt])
+}
+
+model JobDraft {
+  id        String   @id @default(cuid())
+  companyId String
+  userId    String
+  trade     String
+  payload   Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, userId, trade])
+  @@index([companyId, updatedAt])
+}
+
+model CrmDraft {
+  id             String   @id @default(cuid())
+  companyId      String
+  userId         String
+  tradeAccountId String?
+  payload        Json
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  company        Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, updatedAt])
+  @@index([companyId, userId, tradeAccountId])
+}
+
+model StockItem {
+  id           String          @id @default(cuid())
+  tenantId     String
+  locationId   String?
+  sku          String
+  name         String
+  unit         String
+  minLevel     Decimal         @default(0) @db.Decimal(14, 2)
+  avgUnitCost  Decimal         @default(0) @db.Decimal(14, 2)
+  supplierId   String?
+  isActive     Boolean         @default(true)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  tenant       Company         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  location     Location?       @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  supplier     StockSupplier?  @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  poLines      StockPOLine[]
+  movements    StockMovement[]
+  jobLineItems JobLineItem[]
+
+  @@unique([tenantId, sku])
+  @@index([tenantId, locationId])
+  @@index([tenantId, supplierId])
+  @@index([tenantId, createdAt])
+}
+
+model StockSupplier {
+  id             String               @id @default(cuid())
+  tenantId       String
+  name           String
+  email          String?
+  phone          String?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  tenant         Company              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  purchaseOrders StockPurchaseOrder[]
+  stockItems     StockItem[]
+
+  @@index([tenantId, createdAt])
+}
+
+model StockPurchaseOrder {
+  id         String                   @id @default(cuid())
+  tenantId   String
+  locationId String?
+  supplierId String?
+  status     StockPurchaseOrderStatus @default(DRAFT)
+  createdAt  DateTime                 @default(now())
+  updatedAt  DateTime                 @updatedAt
+  tenant     Company                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  location   Location?                @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  supplier   StockSupplier?           @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  lines      StockPOLine[]
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, locationId])
+}
+
+model StockPOLine {
+  id          String             @id @default(cuid())
+  poId        String
+  stockItemId String
+  qtyOrdered  Decimal            @db.Decimal(14, 2)
+  unitCost    Decimal            @default(0) @db.Decimal(14, 2)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  po          StockPurchaseOrder @relation(fields: [poId], references: [id], onDelete: Cascade)
+  stockItem   StockItem          @relation(fields: [stockItemId], references: [id], onDelete: Restrict)
+
+  @@index([poId, createdAt])
+}
+
+model StockMovement {
+  id          String            @id @default(cuid())
+  tenantId    String
+  locationId  String?
+  stockItemId String
+  type        StockMovementType
+  qty         Decimal           @db.Decimal(14, 2)
+  reason      String?
+  jobId       String?
+  createdAt   DateTime          @default(now())
+  tenant      Company           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  location    Location?         @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  stockItem   StockItem         @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+  job         Job?              @relation(fields: [jobId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, stockItemId, createdAt])
+  @@index([tenantId, locationId, createdAt])
+}
+
+model PasswordResetToken {
+  id         String    @id @default(cuid())
+  companyId  String
+  userId     String
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+  company    Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, userId, createdAt])
+  @@index([expiresAt])
+}
+
+model EmailVerificationToken {
+  id         String    @id @default(cuid())
+  companyId  String
+  userId     String
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+  company    Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, userId, createdAt])
+  @@index([expiresAt])
+}

@@ -1,0 +1,172 @@
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+
+@Injectable()
+export class AnalyticsService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  private startOfDay(date: Date) {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  }
+
+  private endOfDay(date: Date) {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
+  }
+
+  async getOpsInsights(companyId: string, windowDays: number) {
+    const now = new Date();
+    const since = new Date(now.getTime() - windowDays * 24 * 60 * 60 * 1000);
+    const todayStart = this.startOfDay(now);
+    const todayEnd = this.endOfDay(now);
+
+    const db = this.prisma as any;
+    const cashAtRiskStatuses = ['COMPLETED', 'INVOICED'];
+
+    const cashAtRiskAgg = await db.job.aggregate({
+      where: {
+        companyId,
+        status: { in: cashAtRiskStatuses },
+        invoicePaidAt: null,
+        totalCents: { gt: 0 },
+      },
+      _sum: { totalCents: true },
+    });
+
+    const revenueCollectedAgg = await db.job.aggregate({
+      where: {
+        companyId,
+        invoicePaidAt: { gte: since },
+        totalCents: { gt: 0 },
+      },
+      _sum: { totalCents: true },
+    });
+
+    const [jobsToday, jobsUnassignedToday, jobsOverdue] = await Promise.all([
+      db.job.count({
+        where: {
+          companyId,
+          createdAt: { gte: todayStart, lt: todayEnd },
+        },
+      }),
+      db.job.count({
+        where: {
+          companyId,
+          createdAt: { gte: todayStart, lt: todayEnd },
+          assignedUserId: null,
+        },
+      }),
+      db.job.count({
+        where: {
+          companyId,
+          invoiceDueAt: { lt: now },
+          invoicePaidAt: null,
+          status: { notIn: ['COMPLETED', 'CANCELLED'] },
+        },
+      }),
+    ]);
+
+    const [bookings7d, jobs7d, invoiced7d, paid7d] = await Promise.all([
+      db.booking.count({
+        where: {
+          companyId,
+          createdAt: { gte: since },
+        },
+      }),
+      db.job.count({
+        where: {
+          companyId,
+          createdAt: { gte: since },
+        },
+      }),
+      db.job.count({
+        where: {
+          companyId,
+          invoiceIssuedAt: { gte: since },
+        },
+      }),
+      db.job.count({
+        where: {
+          companyId,
+          invoicePaidAt: { gte: since },
+        },
+      }),
+    ]);
+
+    return {
+      windowDays,
+      cashAtRisk7d: Number(cashAtRiskAgg?._sum?.totalCents || 0),
+      revenueCollected7d: Number(revenueCollectedAgg?._sum?.totalCents || 0),
+      workloadToday: {
+        jobs: jobsToday,
+        unassigned: jobsUnassignedToday,
+        overdue: jobsOverdue,
+      },
+      funnel7d: {
+        bookings: bookings7d,
+        jobs: jobs7d,
+        invoiced: invoiced7d,
+        paid: paid7d,
+      },
+    };
+  }
+
+  async getUtilization(companyId: string, windowDays: number) {
+    const now = new Date();
+    const since = new Date(now.getTime() - windowDays * 24 * 60 * 60 * 1000);
+    const db = this.prisma as any;
+
+    const bookings = await db.booking.findMany({
+      where: {
+        companyId,
+        assignedUserId: { not: null },
+        status: { not: 'CANCELLED' },
+        startsAt: { gte: since },
+      },
+      select: {
+        id: true,
+        jobId: true,
+        assignedUserId: true,
+        startsAt: true,
+        endsAt: true,
+        assignedUser: {
+          select: { id: true, name: true, email: true },
+        },
+      },
+    });
+
+    const byUser = new Map<string, { user: any; minutes: number; jobs: Set<string>; bookings: number }>();
+    for (const booking of bookings) {
+      const userId = booking.assignedUserId as string;
+      const entry = byUser.get(userId) || {
+        user: booking.assignedUser || { id: userId, name: null, email: null },
+        minutes: 0,
+        jobs: new Set<string>(),
+        bookings: 0,
+      };
+
+      const start = booking.startsAt ? new Date(booking.startsAt) : null;
+      const end = booking.endsAt ? new Date(booking.endsAt) : null;
+      if (start && end && !Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime())) {
+        const diff = Math.max(0, end.getTime() - start.getTime());
+        entry.minutes += Math.round(diff / 60000);
+      }
+
+      if (booking.jobId) {
+        entry.jobs.add(booking.jobId);
+      } else if (booking.id) {
+        entry.jobs.add(booking.id);
+      }
+
+      entry.bookings += 1;
+      byUser.set(userId, entry);
+    }
+
+    return Array.from(byUser.values()).map((entry) => ({
+      userId: entry.user?.id,
+      name: entry.user?.name || entry.user?.email || 'Unassigned',
+      jobsAssigned: entry.jobs.size,
+      minutesScheduled: entry.minutes || 0,
+      bookings: entry.bookings,
+    }));
+  }
+}

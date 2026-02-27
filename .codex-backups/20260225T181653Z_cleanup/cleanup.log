@@ -1,0 +1,68 @@
+[preflight] verifying /opt/mytitan exists
+
+[before] df -h
+Filesystem      Size  Used Avail Use% Mounted on
+tmpfs           795M  1.7M  793M   1% /run
+/dev/sda1        96G   49G   48G  51% /
+tmpfs           3.9G     0  3.9G   0% /dev/shm
+tmpfs           5.0M     0  5.0M   0% /run/lock
+/dev/sda16      881M  132M  688M  17% /boot
+/dev/sda15      105M  6.2M   99M   6% /boot/efi
+overlay          96G   49G   48G  51% /var/lib/docker/rootfs/overlayfs/08ab1137102c8e5256e69849d1991b293c7f9a0866a77d29fd48cd6986e5abb1
+overlay          96G   49G   48G  51% /var/lib/docker/rootfs/overlayfs/fa68df3e52760b5e16cb8628c5fdc00ac0503677b9d810f865645cb8d7ea3932
+tmpfs           795M  112K  794M   1% /run/user/0
+overlay          96G   49G   48G  51% /var/lib/docker/buildkit/executor/k6tr8klr5atxpmqa2h31y0jnh/rootfs
+overlay          96G   49G   48G  51% /var/lib/docker/rootfs/overlayfs/98896004ea01bd87f957079777f5b19f798de595b0bc969d3deb2c4d0b859db6
+overlay          96G   49G   48G  51% /var/lib/docker/rootfs/overlayfs/fa5fd788b9afcc935eac4f898e950e717b051bcbe2aae3ca1d5523e8fcb05a71
+overlay          96G   49G   48G  51% /var/lib/docker/rootfs/overlayfs/885796209e33d675c7be7f227737ee0ec63a5071b6362cc104623f33331f57de
+
+[before] target sizes (if present)
+7.3G	/opt/titan-prod
+1.7G	/opt/titan
+39M	/opt/titan-snapshots
+21G	/root/.pm2
+2.0G	/root/.npm
+119M	/root/.cache
+62M	/root/node_modules
+130M	/root/.codex
+
+[execute] removing targets
+rm -rf /opt/titan-prod
+
+[retry] removing remaining targets
+rm -rf /opt/titan-prod
+rm -rf /opt/titan
+rm -rf /opt/titan-snapshots
+rm -rf /root/.pm2
+rm -rf /root/.npm
+rm -rf /root/.cache
+rm -rf /root/node_modules
+rm -rf /root/.codex
+
+[after-retry] df -h
+Filesystem      Size  Used Avail Use% Mounted on
+tmpfs           795M  1.7M  793M   1% /run
+/dev/sda1        96G   17G   80G  18% /
+tmpfs           3.9G     0  3.9G   0% /dev/shm
+tmpfs           5.0M     0  5.0M   0% /run/lock
+/dev/sda16      881M  132M  688M  17% /boot
+/dev/sda15      105M  6.2M   99M   6% /boot/efi
+overlay          96G   17G   80G  18% /var/lib/docker/rootfs/overlayfs/08ab1137102c8e5256e69849d1991b293c7f9a0866a77d29fd48cd6986e5abb1
+overlay          96G   17G   80G  18% /var/lib/docker/rootfs/overlayfs/fa68df3e52760b5e16cb8628c5fdc00ac0503677b9d810f865645cb8d7ea3932
+tmpfs           795M  112K  794M   1% /run/user/0
+overlay          96G   17G   80G  18% /var/lib/docker/buildkit/executor/k6tr8klr5atxpmqa2h31y0jnh/rootfs
+overlay          96G   17G   80G  18% /var/lib/docker/rootfs/overlayfs/98896004ea01bd87f957079777f5b19f798de595b0bc969d3deb2c4d0b859db6
+overlay          96G   17G   80G  18% /var/lib/docker/rootfs/overlayfs/fa5fd788b9afcc935eac4f898e950e717b051bcbe2aae3ca1d5523e8fcb05a71
+overlay          96G   17G   80G  18% /var/lib/docker/rootfs/overlayfs/885796209e33d675c7be7f227737ee0ec63a5071b6362cc104623f33331f57de
+
+[after-retry] verify targets
+removed: /opt/titan-prod
+removed: /opt/titan
+removed: /opt/titan-snapshots
+removed: /root/.pm2
+removed: /root/.npm
+removed: /root/.cache
+removed: /root/node_modules
+removed: /root/.codex
+
+DONE (retry). Log: /opt/mytitan/.codex-backups/20260225T181653Z_cleanup/cleanup.log

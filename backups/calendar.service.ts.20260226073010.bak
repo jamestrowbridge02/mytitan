@@ -1,0 +1,508 @@
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import {
+  isCalendarV2HardConflictsEnabled,
+  isNotificationsV1Enabled,
+  isSchedulingIntelligenceV1Enabled,
+} from '../common/feature-flags';
+
+type ListCalendarBookingsInput = {
+  from?: string;
+  to?: string;
+  techId?: string;
+  locationId?: string;
+};
+
+type ListCalendarSchedulesInput = {
+  from?: string;
+  to?: string;
+};
+
+type WeeklyScheduleSlot = {
+  start?: string | null;
+  end?: string | null;
+};
+
+type WeeklyScheduleJson = Record<string, WeeklyScheduleSlot[]>;
+
+type TechScheduleSettingRecord = {
+  technicianId: string;
+  weeklyJson: WeeklyScheduleJson;
+  timezone: string | null;
+};
+
+const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const;
+
+type ScheduleWarning = {
+  code: 'OUTSIDE_WORKING_HOURS' | 'OVER_CAPACITY';
+  day: string;
+  bookedMinutes?: number;
+  capacityMinutes?: number;
+};
+
+const MAX_RANGE_DAYS = 14;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+@Injectable()
+export class CalendarService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
+
+  async listBookings(tenantId: string, input: ListCalendarBookingsInput) {
+    const from = this.parseRequiredDate(input.from, 'from');
+    const to = this.parseRequiredDate(input.to, 'to');
+
+    if (to.getTime() <= from.getTime()) {
+      throw new BadRequestException('`to` must be greater than `from`.');
+    }
+
+    const maxTo = new Date(from.getTime() + MAX_RANGE_DAYS * MS_PER_DAY);
+    const effectiveTo = to.getTime() > maxTo.getTime() ? maxTo : to;
+
+    const db = this.prisma as any;
+    const [technicians, bookings] = await Promise.all([
+      db.user.findMany({
+        where: {
+          companyId: tenantId,
+          role: { in: ['OWNER', 'ADMIN', 'STAFF'] },
+        },
+        select: { id: true, email: true },
+        orderBy: { email: 'asc' },
+      }),
+      db.booking.findMany({
+        where: {
+          companyId: tenantId,
+          ...(input.techId ? { assignedUserId: input.techId } : {}),
+          ...(input.locationId ? { locationId: input.locationId } : {}),
+          startsAt: { lt: effectiveTo },
+          endsAt: { gt: from },
+        },
+        include: {
+          assignedUser: { select: { id: true, email: true } },
+          location: { select: { id: true, name: true } },
+          job: {
+            select: {
+              id: true,
+              jobRef: true,
+              status: true,
+              customerName: true,
+              customerEmail: true,
+              customerPhone: true,
+            },
+          },
+        },
+        orderBy: [{ startsAt: 'asc' }, { endsAt: 'asc' }],
+      }),
+    ]);
+
+    const blocks = bookings.map((booking: any) => ({
+      id: booking.id,
+      startsAt: booking.startsAt,
+      endsAt: booking.endsAt,
+      status: booking.status,
+      source: booking.source,
+      customer: {
+        name: booking.customerName || null,
+        email: booking.customerEmail || null,
+        phone: booking.customerPhone || null,
+      },
+      technician: booking.assignedUser
+        ? {
+            id: booking.assignedUser.id,
+            name: booking.assignedUser.email,
+            email: booking.assignedUser.email,
+          }
+        : null,
+      location: booking.location
+        ? {
+            id: booking.location.id,
+            name: booking.location.name,
+          }
+        : null,
+      jobSummary: booking.job
+        ? {
+            id: booking.job.id,
+            jobRef: booking.job.jobRef,
+            status: booking.job.status,
+            customerName: booking.job.customerName,
+            customerEmail: booking.job.customerEmail,
+            customerPhone: booking.job.customerPhone,
+          }
+        : null,
+    }));
+
+    return {
+      from: from.toISOString(),
+      to: to.toISOString(),
+      effectiveTo: effectiveTo.toISOString(),
+      clamped: effectiveTo.getTime() !== to.getTime(),
+      technicians: technicians.map((tech: any) => ({
+        id: tech.id,
+        name: tech.email,
+        email: tech.email,
+      })),
+      blocks,
+    };
+  }
+
+  async listSchedules(tenantId: string, input: ListCalendarSchedulesInput) {
+    const from = this.parseRequiredDate(input.from, 'from');
+    const to = this.parseRequiredDate(input.to, 'to');
+
+    if (to.getTime() <= from.getTime()) {
+      throw new BadRequestException('`to` must be greater than `from`.');
+    }
+
+    const db = this.prisma as any;
+    const [technicians, settings] = await Promise.all([
+      db.user.findMany({
+        where: {
+          companyId: tenantId,
+          role: { in: ['OWNER', 'ADMIN', 'STAFF'] },
+        },
+        select: { id: true, email: true },
+        orderBy: { email: 'asc' },
+      }),
+      db.techScheduleSetting.findMany({
+        where: {
+          companyId: tenantId,
+        },
+        select: {
+          technicianId: true,
+          weeklyJson: true,
+          timezone: true,
+        },
+      }),
+    ]);
+
+    const typedSettings = settings as TechScheduleSettingRecord[];
+    const settingMap = new Map(typedSettings.map((setting) => [setting.technicianId, setting]));
+    const days = this.buildDailyRange(from, to);
+
+    return {
+      from: from.toISOString(),
+      to: to.toISOString(),
+      technicians: technicians.map((tech: any) => ({
+        id: tech.id,
+        name: tech.email,
+        email: tech.email,
+      })),
+      schedules: technicians.map((tech: any) => {
+        const setting = settingMap.get(tech.id);
+        const weeklyJson = this.normalizeWeeklyJson(setting?.weeklyJson);
+        return {
+          technicianId: tech.id,
+          timezone: setting?.timezone ?? null,
+          weeklyJson,
+          dailyAvailability: days.map((day) => ({
+            date: day.toISOString(),
+            minutes: this.sumSlotMinutes(weeklyJson[this.getWeekdayKey(day)]),
+          })),
+        };
+      }),
+    };
+  }
+
+  async rescheduleBooking(
+    tenantId: string,
+    bookingId: string,
+    dto: { startsAt: string; endsAt: string; technicianId?: string | null },
+    actorUserId: string,
+    requestId?: string,
+  ) {
+    const parsedStart = this.parseRequiredDate(dto.startsAt, 'startsAt');
+    const parsedEnd = this.parseRequiredDate(dto.endsAt, 'endsAt');
+    if (parsedEnd.getTime() <= parsedStart.getTime()) {
+      throw new BadRequestException('`endsAt` must be greater than `startsAt`.');
+    }
+
+    const db = this.prisma as any;
+    const existing = await db.booking.findFirst({ where: { id: bookingId, companyId: tenantId } });
+    if (!existing) {
+      throw new NotFoundException('Booking not found.');
+    }
+
+    const overlapping = dto.technicianId
+      ? await db.booking.findMany({
+          where: {
+            companyId: tenantId,
+            id: { not: bookingId },
+            assignedUserId: dto.technicianId,
+            startsAt: { lt: parsedEnd },
+            endsAt: { gt: parsedStart },
+          },
+          select: { id: true, startsAt: true, endsAt: true },
+        })
+      : [];
+
+    if (isCalendarV2HardConflictsEnabled() && overlapping.length > 0) {
+      throw new ConflictException({
+        code: 'CALENDAR_CONFLICT',
+        bookingId,
+        conflicts: overlapping.map((item: any) => item.id),
+        requestId: requestId || undefined,
+      });
+    }
+
+    const updated = await db.booking.update({
+      where: { id: bookingId },
+      data: {
+        startsAt: parsedStart,
+        endsAt: parsedEnd,
+        assignedUserId: dto.technicianId ?? null,
+      },
+      include: {
+        assignedUser: { select: { id: true, email: true } },
+        location: { select: { id: true, name: true } },
+        job: {
+          select: {
+            id: true,
+            jobRef: true,
+            status: true,
+            customerName: true,
+            customerEmail: true,
+            customerPhone: true,
+          },
+        },
+      },
+    });
+
+    const scheduleWarnings = await this.buildSchedulingWarnings(
+      tenantId,
+      updated.assignedUserId,
+      parsedStart,
+      parsedEnd,
+    );
+    const overlapWarnings = overlapping.map((item: any) => ({
+      code: 'OVERLAP' as const,
+      id: item.id,
+      startsAt: item.startsAt,
+      endsAt: item.endsAt,
+    }));
+    const warnings = [...overlapWarnings, ...scheduleWarnings];
+
+    if (isNotificationsV1Enabled()) {
+      const prevTechnicianId = existing.assignedUserId ?? null;
+      const nextTechnicianId = dto.technicianId ?? null;
+      const context = {
+        previousStartsAt: existing.startsAt.toISOString(),
+        previousEndsAt: existing.endsAt.toISOString(),
+        previousTechnicianId: prevTechnicianId,
+        newStartsAt: parsedStart.toISOString(),
+        newEndsAt: parsedEnd.toISOString(),
+        newTechnicianId: nextTechnicianId,
+      };
+      try {
+        await this.notifications.sendEntityUpdate(tenantId, actorUserId, {
+          entityType: 'booking',
+          entityId: bookingId,
+          templateKey: 'calendar_reschedule',
+          context,
+        });
+      } catch (err) {
+        console.warn('Failed to log calendar reschedule activity', {
+          requestId: requestId || 'unknown',
+          error: err instanceof Error ? err.message : 'unknown',
+        });
+      }
+    }
+
+    return {
+      booking: updated,
+      warnings,
+    };
+  }
+
+  private buildDailyRange(from: Date, to: Date) {
+    const days: Date[] = [];
+    for (let cursor = new Date(from); cursor.getTime() < to.getTime(); cursor = new Date(cursor.getTime() + MS_PER_DAY)) {
+      const day = new Date(cursor);
+      day.setHours(0, 0, 0, 0);
+      days.push(day);
+    }
+    return days;
+  }
+
+  private getWeekdayKey(date: Date) {
+    return WEEKDAY_KEYS[date.getDay()];
+  }
+
+  private normalizeWeeklyJson(value: unknown): WeeklyScheduleJson {
+    if (!value || typeof value !== 'object') {
+      return {};
+    }
+    const normalized: WeeklyScheduleJson = {};
+    const source = value as Record<string, unknown>;
+    for (const key of Object.keys(source)) {
+      const normalizedKey = key.toLowerCase();
+      const slotArray = Array.isArray(source[key]) ? source[key] : [];
+      normalized[normalizedKey] = slotArray.map((slot: any) => ({
+        start: typeof slot?.start === 'string' ? slot.start : null,
+        end: typeof slot?.end === 'string' ? slot.end : null,
+      }));
+    }
+    return normalized;
+  }
+
+  private sumSlotMinutes(slots?: WeeklyScheduleSlot[]) {
+    if (!Array.isArray(slots)) {
+      return 0;
+    }
+    return slots.reduce((total, slot) => {
+      const start = this.parseTimeToMinutes(slot.start);
+      const end = this.parseTimeToMinutes(slot.end);
+      if (start === null || end === null || end <= start) {
+        return total;
+      }
+      return total + (end - start);
+    }, 0);
+  }
+
+  private async buildSchedulingWarnings(
+    tenantId: string,
+    technicianId: string | null,
+    bookingStart: Date,
+    bookingEnd: Date,
+  ): Promise<ScheduleWarning[]> {
+    if (!isSchedulingIntelligenceV1Enabled() || !technicianId) {
+      return [];
+    }
+
+    const db = this.prisma as any;
+    const setting = await db.techScheduleSetting.findFirst({
+      where: {
+        companyId: tenantId,
+        technicianId,
+      },
+      select: {
+        weeklyJson: true,
+      },
+    });
+    if (!setting) {
+      return [];
+    }
+
+    const weeklyJson = this.normalizeWeeklyJson(setting.weeklyJson);
+    const days = this.buildDailyRange(bookingStart, bookingEnd);
+    if (!days.length) {
+      return [];
+    }
+
+    const rangeStart = new Date(days[0]);
+    rangeStart.setHours(0, 0, 0, 0);
+    const rangeEnd = new Date(days[days.length - 1]);
+    rangeEnd.setHours(0, 0, 0, 0);
+    rangeEnd.setTime(rangeEnd.getTime() + MS_PER_DAY);
+
+    const bookings = await db.booking.findMany({
+      where: {
+        companyId: tenantId,
+        assignedUserId: technicianId,
+        startsAt: { lt: rangeEnd },
+        endsAt: { gt: rangeStart },
+      },
+      select: {
+        startsAt: true,
+        endsAt: true,
+      },
+    });
+
+    const warnings: ScheduleWarning[] = [];
+    for (const day of days) {
+      const dayStart = new Date(day);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(dayStart.getTime() + MS_PER_DAY);
+      const dayKey = this.formatDayKey(dayStart);
+      const slots = weeklyJson[this.getWeekdayKey(dayStart)] ?? [];
+      const windowStart = Math.max(bookingStart.getTime(), dayStart.getTime());
+      const windowEnd = Math.min(bookingEnd.getTime(), dayEnd.getTime());
+      if (windowEnd <= windowStart) {
+        continue;
+      }
+      const startMin = (windowStart - dayStart.getTime()) / 60000;
+      const endMin = (windowEnd - dayStart.getTime()) / 60000;
+
+      if (!this.isIntervalCovered(startMin, endMin, slots)) {
+        warnings.push({ code: 'OUTSIDE_WORKING_HOURS', day: dayKey });
+      }
+
+      let bookedMinutes = 0;
+      for (const booking of bookings) {
+        const overlapStart = Math.max(booking.startsAt.getTime(), dayStart.getTime());
+        const overlapEnd = Math.min(booking.endsAt.getTime(), dayEnd.getTime());
+        if (overlapEnd <= overlapStart) {
+          continue;
+        }
+        bookedMinutes += Math.round((overlapEnd - overlapStart) / 60000);
+      }
+
+      const capacityMinutes = this.sumSlotMinutes(slots);
+      if (capacityMinutes > 0 && bookedMinutes > capacityMinutes) {
+        warnings.push({
+          code: 'OVER_CAPACITY',
+          day: dayKey,
+          bookedMinutes,
+          capacityMinutes,
+        });
+      }
+    }
+
+    return warnings;
+  }
+
+  private isIntervalCovered(startMin: number, endMin: number, slots: WeeklyScheduleSlot[]) {
+    const ranges = (slots || [])
+      .map((slot) => {
+        const slotStart = this.parseTimeToMinutes(slot.start);
+        const slotEnd = this.parseTimeToMinutes(slot.end);
+        if (slotStart === null || slotEnd === null || slotEnd <= slotStart) return null;
+        return { start: slotStart, end: slotEnd };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.start - b.start) as Array<{ start: number; end: number }>;
+
+    let cursor = startMin;
+    for (const range of ranges) {
+      if (range.start > cursor) {
+        return false;
+      }
+      if (range.end >= endMin) {
+        return true;
+      }
+      cursor = Math.max(cursor, range.end);
+    }
+
+    return false;
+  }
+
+  private formatDayKey(date: Date) {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  }
+
+  private parseTimeToMinutes(value?: string | null) {
+    if (!value) {
+      return null;
+    }
+    const parts = value.split(':').map((part) => Number(part));
+    if (parts.length < 2 || Number.isNaN(parts[0]) || Number.isNaN(parts[1])) {
+      return null;
+    }
+    return parts[0] * 60 + parts[1];
+  }
+
+  private parseRequiredDate(value: string | undefined, key: string) {
+    if (!value) {
+      throw new BadRequestException(`Missing required query parameter: ${key}`);
+    }
+
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new BadRequestException(`Invalid date for query parameter: ${key}`);
+    }
+
+    return parsed;
+  }
+}

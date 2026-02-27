@@ -1,0 +1,99 @@
+import type { ReactNode } from "react";
+import Link from "next/link";
+
+export type EntityTimelineItem = {
+  label: string;
+  description?: ReactNode;
+  timestamp?: string | number | Date;
+  kind?: string;
+  href?: string;
+  linkLabel?: string;
+};
+
+type TimelineAction = {
+  label: string;
+  href?: string;
+  onClick?: () => void;
+};
+
+type EntityTimelineProps = {
+  title?: string;
+  timelineItems: EntityTimelineItem[];
+  emptyTitle?: string;
+  emptyDescription?: string;
+  emptyAction?: TimelineAction;
+};
+
+function formatTimestamp(timestamp?: string | number | Date) {
+  if (!timestamp) return "";
+  const date = timestamp instanceof Date ? timestamp : new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString();
+}
+
+function ActionButton({ action }: { action: TimelineAction }) {
+  if (action.href) {
+    return (
+      <Link className="button" href={action.href}>
+        {action.label}
+      </Link>
+    );
+  }
+
+  return (
+    <button className="button" type="button" onClick={action.onClick}>
+      {action.label}
+    </button>
+  );
+}
+
+export default function EntityTimeline({
+  title = "Timeline",
+  timelineItems,
+  emptyTitle = "No timeline activity yet",
+  emptyDescription = "Activity from jobs, bookings, notes, and payments will appear here.",
+  emptyAction,
+}: EntityTimelineProps) {
+  const items = timelineItems || [];
+
+  return (
+    <div className="card" style={{ marginBottom: 16 }}>
+      <h2 style={{ marginTop: 0 }}>{title}</h2>
+      {items.length === 0 ? (
+        <div>
+          <p className="muted" style={{ marginTop: 0 }}>
+            {emptyTitle}
+          </p>
+          <p className="muted" style={{ marginTop: 0 }}>{emptyDescription}</p>
+          {emptyAction ? (
+            <div style={{ marginTop: 12 }}>
+              <ActionButton action={emptyAction} />
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <div className="list">
+          {items.map((item, index) => (
+            <div key={`${item.label}-${index}`} className="integration-card" style={{ alignItems: "flex-start" }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+                  <strong style={{ textTransform: "capitalize" }}>{item.label}</strong>
+                  {item.kind ? <span className="badge">{item.kind}</span> : null}
+                </div>
+                {item.timestamp ? (
+                  <p className="muted" style={{ margin: "4px 0" }}>{formatTimestamp(item.timestamp)}</p>
+                ) : null}
+                {item.description ? <p style={{ margin: 0 }}>{item.description}</p> : null}
+              </div>
+              {item.href ? (
+                <Link className="button secondary" href={item.href}>
+                  {item.linkLabel || "View"}
+                </Link>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

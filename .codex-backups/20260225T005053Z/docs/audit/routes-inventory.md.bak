@@ -1,0 +1,104 @@
+# Routes Inventory
+
+## API Base
+- API host: `https://api.mytitan.co.uk`
+- Main route sources: `api/src/**/*.controller.ts`
+
+## Public / Unauthenticated Routes
+- `GET /health`
+- `POST /auth/signup`
+- `POST /auth/login`
+- `POST /auth/forgot-password` (always 202 pattern)
+- `POST /auth/reset-password`
+- `POST /auth/verify-email`
+- `POST /users/accept-invite`
+- Public job portal:
+  - `GET /public/job/:token`
+  - `GET /public/job/:token/pdf`
+  - `POST /public/job/:token/approve`
+  - `POST /public/job/:token/decline`
+  - `POST /public/job/:token/sign`
+  - `POST /public/job/:token/checkout`
+  - `GET /public/job/:token/payment-status`
+- Public booking portal:
+  - `GET /public/booking/:token/config`
+  - `GET /public/booking/:token/slots`
+  - `POST /public/booking/:token`
+  - `GET /public/ics/:token`
+- Demo:
+  - `POST /public/demo-login` (404 when flag off)
+- Webhooks:
+  - `POST /stripe/webhook`
+  - `POST /billing/webhook`
+
+## Auth-Guarded Areas (Jwt + roles in most controllers)
+Common guard pattern:
+- `@UseGuards(JwtAuthGuard, RolesGuard)`
+
+Examples:
+- Jobs: `/jobs`, `/jobs/board`, `/jobs/board-v2`, `/jobs/bulk`, `/jobs/bulk-v2`
+- Command centre views: `/board-views`, `/command-centre/*`
+- CRM/trade accounts: `/trade-accounts/*`, `/crm/accounts/*`
+- Booking pro/internal: `/booking/*`, `/bookings/*`
+- Inventory: `/inventory/*`
+- Locations: `/locations/*`, `/me/location`
+- Tenant/admin settings: `/tenant/settings`, `/users/*`, `/integrations/*`, `/billing/*`
+- Notifications: `/notifications`, `/notifications/preferences`
+
+## Guard Behavior Validation (live smoke)
+Ran:
+- `/opt/mytitan/scripts/ops-core-smoke.sh`
+- `/opt/mytitan/scripts/demo-polish-smoke.sh`
+
+Observed:
+- `GET /jobs/board-v2 -> 401`
+- `GET /booking/services -> 401`
+- `GET /crm/accounts/search -> 401`
+- `GET /notifications -> 401`
+- `GET /notifications/preferences -> 401`
+- `PATCH /notifications/preferences -> 401`
+- `POST /jobs/bulk-v2 -> 401`
+
+Conclusion: key guarded surfaces are returning auth challenge (`401`) rather than `404`.
+
+## Stripe Webhook Handling
+Files:
+- `api/src/main.ts` (raw body enabled for webhook routes)
+- `api/src/billing/billing.controller.ts`
+- `api/src/billing/billing.service.ts`
+
+Mechanics:
+- Raw body preserved via Express `raw()` middleware for `/stripe/webhook` and `/billing/webhook`.
+- Signature verification via `stripe.webhooks.constructEvent(payload, signature, secret)`.
+- Event handling for:
+  - `checkout.session.completed`
+  - `customer.subscription.created|updated|deleted`
+  - `invoice.paid|invoice.payment_failed`
+
+Idempotency approach:
+- No explicit processed-event table keyed by Stripe `event.id`.
+- Uses `upsert`/state writes that are mostly naturally idempotent, but duplicate event replay is not explicitly tracked.
+
+## App (Next.js Pages) Route Inventory
+Source: `/opt/mytitan/app/pages`
+
+Public pages:
+- `/`, `/login`, `/signup`, `/forgot-password`, `/reset-password`, `/verify-email`, `/start`, `/onboarding`
+- `/portal/job/:token`
+- `/portal/booking/:token`
+
+Dashboard pages:
+- `/dashboard`
+- `/dashboard/command-centre`, `/dashboard/command-centre-v2`
+- `/dashboard/jobs`, `/dashboard/jobs/new`
+- `/dashboard/bookings`, `/dashboard/booking/calendar`, `/dashboard/booking/settings`
+- `/dashboard/trade-accounts`, `/dashboard/trade-accounts/:id`
+- `/dashboard/inventory`, `/dashboard/locations`, `/dashboard/notifications`
+- `/dashboard/billing`, `/dashboard/integrations`, `/dashboard/settings`
+- `/dashboard/admin`, `/dashboard/setup`, `/dashboard/setup-wizard`
+- `/dashboard/catalog`, `/dashboard/email-templates`, `/dashboard/users`, `/dashboard/audit`, `/dashboard/trade-packs`
+
+## Prioritized Next Actions
+1. Generate this inventory automatically in CI to catch route regressions.
+2. Add explicit OpenAPI docs for public + auth routes.
+3. Add webhook replay protection using stored Stripe `event.id`.

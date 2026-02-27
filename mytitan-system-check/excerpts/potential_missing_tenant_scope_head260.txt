@@ -1,0 +1,60 @@
+./api/src/common/feature.guard.ts:54:      const plan = await db.plan.findUnique({ where: { id: settings.planId } });
+./api/src/email-templates/email-templates.service.ts:77:    await db.emailTemplate.delete({ where: { id } });
+./api/src/inventory/inventory.service.ts:181:    return db.stockPurchaseOrder.findFirst({ where: { id }, include: { lines: true } });
+./api/src/inventory/inventory.service.ts:192:      await tx.stockPurchaseOrder.update({ where: { id }, data: { status: 'RECEIVED' } });
+./api/src/integrations/integrations.service.ts:86:    const plan = subscription?.plan ?? (await db.plan.findFirst({ where: { code: DEFAULT_PLAN_CODE } }));
+./api/src/integrations/integrations.service.ts:197:    const authState = await db.integrationAuthState.findUnique({ where: { state } });
+./api/src/integrations/integrations.service.ts:204:    await db.integrationAuthState.delete({ where: { state } });
+./api/src/calendar/calendar.service.ts:781:    const existing = await db.techScheduleException.findUnique({ where: { id: exceptionId } });
+./api/src/calendar/calendar.service.ts:785:    await db.techScheduleException.delete({ where: { id: exceptionId } });
+./api/src/auth/auth.service.ts:160:    const existing = await db.user.findFirst({ where: { email } });
+./api/src/auth/auth.service.ts:209:        const defaultPlan = await tx.plan.findFirst({ where: { code: DEFAULT_PLAN_CODE } });
+./api/src/auth/auth.service.ts:220:        const defaultPlan = await tx.plan.findFirst({ where: { code: DEFAULT_PLAN_CODE } });
+./api/src/auth/auth.service.ts:272:    const user = await db.user.findFirst({ where: { email } });
+./api/src/auth/auth.service.ts:316:    const user = await db.user.findFirst({ where: { email } });
+./api/src/auth/auth.service.ts:350:      db.user.update({ where: { id: token.userId }, data: { passwordHash, tokenVersion: { increment: 1 } } }),
+./api/src/auth/auth.service.ts:351:      db.passwordResetToken.update({ where: { id: token.id }, data: { consumedAt: new Date() } }),
+./api/src/auth/auth.service.ts:367:      db.user.update({ where: { id: token.userId }, data: { emailVerified: true } }),
+./api/src/auth/auth.service.ts:368:      db.emailVerificationToken.update({ where: { id: token.id }, data: { consumedAt: new Date() } }),
+./api/src/catalog/catalog.service.ts:76:    await db.serviceCatalogItem.delete({ where: { id } });
+./api/src/billing/billing.service.ts:126:    const user = await db.user.findUnique({ where: { id: userId } });
+./api/src/billing/billing.service.ts:138:    const plan = await db.plan.findUnique({ where: { code: planCode } });
+./api/src/billing/billing.service.ts:310:      plan = await db.plan.findUnique({ where: { code: DEFAULT_PLAN_CODE } });
+./api/src/billing/billing.service.ts:363:        return db.webhookEvent.findUnique({ where: { provider_eventId: { provider: 'stripe', eventId } } });
+./api/src/billing/billing.service.ts:476:        ? await db.plan.findUnique({ where: { code: planCode } })
+./api/src/billing/billing.service.ts:477:        : await db.plan.findUnique({ where: { code: DEFAULT_PLAN_CODE } });
+./api/src/billing/billing.service.ts:525:          ? await db.plan.findUnique({ where: { code: subscription.metadata.planCode } })
+./api/src/billing/billing.service.ts:527:        (await db.plan.findUnique({ where: { code: DEFAULT_PLAN_CODE } }));
+./api/src/onboarding/onboarding.service.ts:115:      const plan = await db.plan.findUnique({ where: { id: settings.planId } });
+./api/src/trade-packs/trade-packs.service.ts:58:      const plan = await db.plan.findUnique({ where: { id: settings.planId } });
+./api/src/usage/usage.service.ts:21:    const plan = subscription?.plan ?? (await db.plan.findFirst({ where: { code: DEFAULT_PLAN_CODE } }));
+./api/src/bookings/bookings.service.ts:255:    const settings = await db.tenantSetting.findFirst({ where: { bookingPublicToken: token } });
+./api/src/bookings/bookings.service.ts:322:    const settings = await db.tenantSetting.findFirst({ where: { bookingPublicToken: token } });
+./api/src/bookings/bookings.service.ts:431:    const settings = await db.tenantSetting.findFirst({ where: { bookingPublicToken: token } });
+./api/src/bookings/bookings.service.ts:505:    const settings = await db.tenantSetting.findFirst({ where: { bookingIcsToken: token } });
+./api/src/ai/ai.service.ts:103:      (await db.plan.findFirst({ where: { code: DEFAULT_PLAN_CODE } }));
+./api/src/users/users.service.ts:61:    const invite = await db.inviteToken.findUnique({ where: { token: dto.token } });
+./api/src/jobs/jobs.service.ts:390:    const assets = await db.jobAsset.findMany({ where: { jobId }, orderBy: { createdAt: "asc" } });
+./api/src/jobs/jobs.service.ts:392:      ? await db.jobSignature.findMany({ where: { jobId }, orderBy: { updatedAt: "desc" } })
+./api/src/jobs/jobs.service.ts:478:    await db.job.update({ where: { id: job.id }, data: { invoicePdfUrl: pdfUrl } });
+./api/src/jobs/jobs.service.ts:854:          await db.job.update({ where: { id }, data: { assignedUserId: dto.assignedUserId || null } });
+./api/src/jobs/jobs.service.ts:856:          await db.job.update({ where: { id }, data: { locationId: dto.locationId && dto.locationId !== "all" ? dto.locationId : null } });
+./api/src/jobs/jobs.service.ts:860:          await db.job.update({ where: { id }, data: { tags: next } });
+./api/src/jobs/jobs.service.ts:863:          await db.job.update({ where: { id }, data: { tags: tags.filter((t: string) => t !== dto.tag) } });
+./api/src/jobs/jobs.service.ts:865:          await db.job.update({ where: { id }, data: { invoiceDueAt: dto.dueAt ? new Date(dto.dueAt) : null } });
+./api/src/jobs/jobs.service.ts:867:          await db.job.update({ where: { id }, data: { status: "COMPLETED", completedAt: new Date() } });
+./api/src/jobs/jobs.service.ts:869:          await db.job.update({ where: { id }, data: { status: "COMPLETED", completedAt: new Date() } });
+./api/src/jobs/jobs.service.ts:930:    await db.userUndoAction.update({ where: { id: action.id }, data: { consumedAt: new Date() } });
+./api/src/jobs/jobs.service.ts:1023:          await tx.job.update({ where: { id: job.id }, data: { assignedUserId: dto.assignedUserId || null } });
+./api/src/jobs/jobs.service.ts:1025:          await tx.job.update({ where: { id: job.id }, data: { locationId: dto.locationId && dto.locationId !== "all" ? dto.locationId : null } });
+./api/src/jobs/jobs.service.ts:1028:          await tx.job.update({ where: { id: job.id }, data: { tags: next } });
+./api/src/jobs/jobs.service.ts:1031:          await tx.job.update({ where: { id: job.id }, data: { tags: tags.filter((t: string) => t !== dto.tag) } });
+./api/src/jobs/jobs.service.ts:1033:          await tx.job.update({ where: { id: job.id }, data: { invoiceDueAt: dto.dueAt ? new Date(dto.dueAt) : null } });
+./api/src/jobs/jobs.service.ts:1035:          await tx.job.update({ where: { id: job.id }, data: { status: "COMPLETED", completedAt: new Date() } });
+./api/src/jobs/jobs.service.ts:1037:          await tx.job.update({ where: { id: job.id }, data: { status: "COMPLETED", completedAt: new Date() } });
+./api/src/tenant/tenant.service.ts:29:    const defaultPlan = await db.plan.findFirst({ where: { code: DEFAULT_PLAN_CODE } });
+./api/src/tenant/tenant.service.ts:54:      plan = await db.plan.findUnique({ where: { id: settings.planId } });
+./api/src/tenant/tenant.service.ts:56:      plan = await db.plan.findFirst({ where: { code: DEFAULT_PLAN_CODE } });
+./api/src/command-centre/command-centre.controller.ts:151:    await db.savedCommandView.delete({ where: { id } });
+./api/src/command-centre/board-views.controller.ts:88:    await db.savedBoardView.delete({ where: { id } });
+./api/scripts/seed-tenant-settings.js:23:    const defaultPlan = await prisma.plan.findFirst({ where: { code: DEFAULT_PLAN_CODE } });
