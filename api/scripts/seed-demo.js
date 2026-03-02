@@ -802,6 +802,11 @@ async function ensureDemoScheduleExceptions(companyId, technicianIds) {
 }
 
 async function main() {
+  if (process.env.ENABLE_DEMO_SEED !== '1') {
+    console.log('Demo seed skipped. Set ENABLE_DEMO_SEED=1 to run.');
+    return;
+  }
+
   const args = getArgs();
   const interactiveReset = args.has('--interactive-reset');
 

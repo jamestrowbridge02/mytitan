@@ -8,6 +8,7 @@ import {
 import OpenAI from 'openai';
 import { AuditService } from '../audit/audit.service';
 import { DEFAULT_PLAN_CODE, PLAN_DEFINITIONS } from '../billing/billing.constants';
+import { isBillingEnforced } from '../common/billing-mode';
 import { PrismaService } from '../prisma/prisma.service';
 import { TenantService } from '../tenant/tenant.service';
 
@@ -93,6 +94,7 @@ export class AiService {
   private async enforceUsageLimit(tenantId: string) {
     const db = this.prisma as any;
     const periodStart = this.getPeriodStart(new Date());
+    const billingOff = !isBillingEnforced();
 
     const subscription = await db.tenantSubscription.findUnique({
       where: { tenantId },
@@ -118,11 +120,11 @@ export class AiService {
       },
     });
 
-    if (typeof effectiveRequestsLimit === 'number' && usage.aiRequestsUsed >= effectiveRequestsLimit) {
+    if (!billingOff && typeof effectiveRequestsLimit === 'number' && usage.aiRequestsUsed >= effectiveRequestsLimit) {
       throw new HttpException('AI usage limit exceeded for this billing period.', HttpStatus.PAYMENT_REQUIRED);
     }
 
-    if (typeof planTokensLimit === 'number' && usage.aiTokensUsed >= planTokensLimit) {
+    if (!billingOff && typeof planTokensLimit === 'number' && usage.aiTokensUsed >= planTokensLimit) {
       throw new HttpException('AI token budget exceeded for this billing period.', HttpStatus.PAYMENT_REQUIRED);
     }
 

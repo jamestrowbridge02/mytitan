@@ -9,13 +9,14 @@ export function FeatureGate({
   featureKey: 'bookings_enabled' | 'accounting_enabled' | 'payments_enabled' | 'social_enabled' | 'ai_enabled';
   children: React.ReactNode;
 }) {
+  const billingOff = (process.env.NEXT_PUBLIC_BILLING_MODE || '').toLowerCase() === 'off';
   const { features } = useBilling();
   const { settings } = useTenantSettings();
 
   const planAllows = Boolean(features?.[featureKey]);
   const tenantAllows = Boolean((settings as any)?.[toTenantFlag(featureKey)]);
 
-  if (planAllows && tenantAllows) {
+  if (billingOff || (planAllows && tenantAllows)) {
     return <>{children}</>;
   }
 

@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service';
 import { DEFAULT_PLAN_CODE } from '../billing/billing.constants';
+import { isBillingEnforced } from '../common/billing-mode';
 import { PrismaService } from '../prisma/prisma.service';
 import { TRADE_PACKS, TradePackCode, type TradePackDefinition } from './trade-packs.data';
 
@@ -107,6 +108,11 @@ export class TradePacksService {
   }
 
   private async assertPlanLimit(tenantId: string, nextPackCode?: string) {
+    if (!isBillingEnforced()) {
+      const installed = await this.getInstalled(tenantId);
+      return { planCode: 'FREE_ACCESS', limit: Number.MAX_SAFE_INTEGER, installedCount: installed.count };
+    }
+
     const planCode = await this.getPlanCode(tenantId);
     const limit = PACK_LIMITS[planCode] ?? PACK_LIMITS[DEFAULT_PLAN_CODE];
     const installed = await this.getInstalled(tenantId);

@@ -3,6 +3,7 @@ import { Reflector } from '@nestjs/core';
 import { PrismaService } from '../prisma/prisma.service';
 import { TenantService } from '../tenant/tenant.service';
 import { DEFAULT_PLAN_CODE, PLAN_DEFINITIONS } from '../billing/billing.constants';
+import { isBillingEnforced } from './billing-mode';
 import { FEATURE_KEY } from './feature.decorator';
 
 @Injectable()
@@ -43,6 +44,10 @@ export class FeatureGuard implements CanActivate {
       where: { tenantId },
       include: { plan: true },
     });
+    if (!isBillingEnforced()) {
+      return true;
+    }
+
     if (subscription && subscription.status && !['active', 'trialing'].includes(subscription.status)) {
       throw new HttpException(
         'Subscription is inactive. Please renew or upgrade to access this feature.',

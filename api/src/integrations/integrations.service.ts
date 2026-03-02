@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, ServiceUnavailable
 import crypto from 'crypto';
 import { AuditService } from '../audit/audit.service';
 import { DEFAULT_PLAN_CODE, PLAN_DEFINITIONS } from '../billing/billing.constants';
+import { isBillingEnforced } from '../common/billing-mode';
 import { PrismaService } from '../prisma/prisma.service';
 import { TenantService } from '../tenant/tenant.service';
 import { encryptText } from './integrations.crypto';
@@ -85,6 +86,14 @@ export class IntegrationsService {
     });
     const plan = subscription?.plan ?? (await db.plan.findFirst({ where: { code: DEFAULT_PLAN_CODE } }));
     const features = (plan?.featuresJson ?? PLAN_DEFINITIONS[DEFAULT_PLAN_CODE].features) as Record<string, any>;
+    if (!isBillingEnforced()) {
+      if (provider === 'GOOGLE_CALENDAR') {
+        const enabled = Boolean(settings.featureBookings ?? settings.bookingsEnabled);
+        return { allowed: true, enabled };
+      }
+      const enabled = Boolean(settings.featureAccounting ?? settings.accountingEnabled);
+      return { allowed: true, enabled };
+    }
 
     if (provider === 'GOOGLE_CALENDAR') {
       const enabled = Boolean(settings.featureBookings ?? settings.bookingsEnabled);
