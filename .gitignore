@@ -9,3 +9,11 @@ api/node_modules/@prisma/
 
 # Prisma generated client (if your repo includes it somewhere unexpected)
 api/src/**/generated/
+
+# local scratch
+/tmp/
+api/tmp/
+tmp/
+backups/
+api/prisma/migrations/**/.DS_Store
+.DS_Store
