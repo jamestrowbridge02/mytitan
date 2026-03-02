@@ -36,6 +36,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
 
 @Module({
   imports: [
+    ThrottlerModule.forRoot([{ ttl: 60, limit: 120 }]),
     ConfigModule.forRoot({ isGlobal: true }),
     JwtModule.registerAsync({
       global: true,
