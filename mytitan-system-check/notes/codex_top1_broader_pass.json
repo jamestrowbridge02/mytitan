@@ -8,7 +8,11 @@
     "dbEvidence": "/opt/mytitan/tmp/top1_db_evidence_clean_20260302_120914.txt"
   },
   "verification": {
-    "dockerStack": ["postgres", "redis", "api"],
+    "dockerStack": [
+      "postgres",
+      "redis",
+      "api"
+    ],
     "dbEvidenceCaptured": true,
     "migrateDeploy": true,
     "prismaGenerate": true,
