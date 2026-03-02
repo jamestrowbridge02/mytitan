@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { TenantService } from '../tenant/tenant.service';
 import { DEFAULT_PLAN_CODE, PLAN_DEFINITIONS } from '../billing/billing.constants';
 import { isBillingEnforced } from './billing-mode';
+import { isBillingAllowlisted } from './billing-allowlist';
 import { FEATURE_KEY } from './feature.decorator';
 
 @Injectable()
@@ -22,6 +23,9 @@ export class FeatureGuard implements CanActivate {
     const tenantId = req?.user?.companyId;
     if (!tenantId) {
       throw new ForbiddenException('Tenant not found');
+    }
+    if (isBillingAllowlisted(req?.user)) {
+      return true;
     }
 
     const settings = await this.tenantService.ensureTenantSettings(tenantId);

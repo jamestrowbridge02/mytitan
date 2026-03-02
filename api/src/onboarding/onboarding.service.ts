@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/com
 import { AuditService } from '../audit/audit.service';
 import { DEFAULT_PLAN_CODE } from '../billing/billing.constants';
 import { isBillingEnforced } from '../common/billing-mode';
+import { isBillingAllowlisted } from '../common/billing-allowlist';
 import { isTradePacksEnabled } from '../common/feature-flags';
 import { PrismaService } from '../prisma/prisma.service';
 import { TradePacksService } from '../trade-packs/trade-packs.service';
@@ -124,7 +125,7 @@ export class OnboardingService {
     const settings = await db.tenantSetting.findUnique({ where: { tenantId } });
     const planCode = await this.getPlanCode(tenantId);
     const plan = PLAN_INTEGRATIONS[planCode] ?? PLAN_INTEGRATIONS[DEFAULT_PLAN_CODE];
-    const billingOff = !isBillingEnforced();
+    const billingBypass = !isBillingEnforced() || isBillingAllowlisted({ companyId: tenantId });
 
     const enabledMap: Record<IntegrationKey, boolean> = {
       payments: Boolean(settings?.featurePayments),
@@ -142,7 +143,7 @@ export class OnboardingService {
       description: INTEGRATION_META[key].description,
       configureUrl: INTEGRATION_META[key].configureUrl,
       enabled: enabledMap[key],
-      allowed: billingOff ? true : Boolean(plan[key]),
+      allowed: billingBypass ? true : Boolean(plan[key]),
     }));
   }
 
@@ -153,7 +154,7 @@ export class OnboardingService {
 
     const planCode = await this.getPlanCode(tenantId);
     const plan = PLAN_INTEGRATIONS[planCode] ?? PLAN_INTEGRATIONS[DEFAULT_PLAN_CODE];
-    if (isBillingEnforced() && enabled && !plan[key]) {
+    if (isBillingEnforced() && !isBillingAllowlisted({ companyId: tenantId }) && enabled && !plan[key]) {
       throw new ForbiddenException('Upgrade required to enable this integration.');
     }
 

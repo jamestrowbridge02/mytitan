@@ -5,7 +5,6 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { AuditService } from '../audit/audit.service';
 import { JwtPayload } from '../auth/auth.types';
 import { isAuthSecurityV1Enabled } from '../common/feature-flags';
-import { isBillingEnforced } from '../common/billing-mode';
 import { assertPermission } from '../common/permissions';
 import { Roles } from '../common/roles.decorator';
 import { RolesGuard } from '../common/roles.guard';
@@ -39,12 +38,6 @@ export class BillingController {
     @Body() dto: CheckoutSessionDto,
     @Req() req: Request & { requestId?: string },
   ) {
-    if (!isBillingEnforced()) {
-      return {
-        disabled: true,
-        reason: 'Billing disabled by MYTITAN_BILLING_MODE=off',
-      };
-    }
     const requestId = String(req.requestId || req.headers['x-request-id'] || '').trim() || undefined;
     await assertPermission({
       user,
@@ -63,12 +56,6 @@ export class BillingController {
     @CurrentUser() user: JwtPayload,
     @Req() req: Request & { requestId?: string },
   ) {
-    if (!isBillingEnforced()) {
-      return {
-        disabled: true,
-        reason: 'Billing disabled by MYTITAN_BILLING_MODE=off',
-      };
-    }
     const requestId = String(req.requestId || req.headers['x-request-id'] || '').trim() || undefined;
     await assertPermission({
       user,

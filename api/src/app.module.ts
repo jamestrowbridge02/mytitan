@@ -34,6 +34,7 @@ import { InventoryModule } from './inventory/inventory.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AutomationsModule } from './automations/automations.module';
 import { AnalyticsModule } from './analytics/analytics.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -79,6 +80,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
     UsageModule,
     PublicModule,
     PricingPresetsModule,
+    AdminModule,
   ],
 })
 export class AppModule {}
