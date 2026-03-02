@@ -1,0 +1,25 @@
+{
+  "generatedAtUtc": "2026-03-02T11:25:14Z",
+  "repo": "/opt/mytitan",
+  "branch": "top1-broader-pass",
+  "head": "31b6b3f89bbfaf64a661d94090837d88e401a4a2",
+  "artifacts": {
+    "verifyLog": "/opt/mytitan/tmp/top1_full_verify_20260302_112403.log",
+    "dbEvidence": "/opt/mytitan/tmp/top1_db_evidence_20260302_112403.txt"
+  },
+  "verification": {
+    "dockerStack": [
+      "postgres",
+      "redis",
+      "api"
+    ],
+    "dbEvidenceCaptured": true,
+    "migrateDeploy": true,
+    "prismaGenerate": true,
+    "testScheduling": true,
+    "dockerBuildApi": true
+  },
+  "notes": [
+    "API build is verified via docker compose build api (container runtime may not include nest/devDependencies)."
+  ]
+}

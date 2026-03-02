@@ -17,3 +17,5 @@ tmp/
 backups/
 api/prisma/migrations/**/.DS_Store
 .DS_Store
+*.log
+*.csv
