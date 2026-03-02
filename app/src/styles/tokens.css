@@ -1,7 +1,42 @@
-:root{
-  --radius-xl: 18px;
-  --shadow-soft: 0 10px 30px rgba(0,0,0,.08);
-  --shadow-card: 0 6px 22px rgba(0,0,0,.10);
-  --border-subtle: rgba(0,0,0,.08);
-  --text-muted: rgba(0,0,0,.62);
+/* Top-1% baseline design tokens (neutral, modern, SaaS-grade) */
+:root {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+
+  --radius-xs: 8px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.06), 0 1px 1px rgba(0,0,0,.04);
+  --shadow-md: 0 10px 30px rgba(0,0,0,.10), 0 2px 6px rgba(0,0,0,.06);
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 40px;
+
+  --surface: #ffffff;
+  --surface-2: #f7f8fb;
+  --text: #0b1220;
+  --muted: #5d667a;
+  --border: rgba(17,24,39,.12);
+
+  --primary: #2563eb;
+  --primary-2: #1d4ed8;
+
+  --ring: rgba(37,99,235,.35);
+}
+
+[data-theme="dark"] {
+  --surface: #0b0f19;
+  --surface-2: #0f1526;
+  --text: #eef2ff;
+  --muted: rgba(238,242,255,.72);
+  --border: rgba(238,242,255,.12);
+  --ring: rgba(99,102,241,.35);
 }
