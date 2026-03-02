@@ -1,4 +1,5 @@
 import React from "react";
+import CommandPalette from "../command/command-palette";
 
 export function PageShell(props: {
   title: string;
@@ -8,6 +9,7 @@ export function PageShell(props: {
 }) {
   return (
     <div className="min-h-screen bg-[color:var(--surface-0)]">
+      <CommandPalette />
       <div className="mx-auto w-full max-w-[1400px] px-6 py-6">
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>

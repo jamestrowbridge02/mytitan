@@ -4,10 +4,6 @@ import { Shell } from "../components/layout/Shell";
 import MarketingShell from "../components/layout/MarketingShell";
 import { useMemo, useState } from 'react';
 
-const demoEnabled =
-  (process.env.NEXT_PUBLIC_MYTITAN_FEATURE_PUBLIC_DEMO || '').trim().toLowerCase() === 'on' ||
-  (process.env.NEXT_PUBLIC_MYTITAN_FEATURE_PUBLIC_DEMO || '').trim().toLowerCase() === 'true' ||
-  (process.env.NEXT_PUBLIC_MYTITAN_FEATURE_PUBLIC_DEMO || '').trim().toLowerCase() === '1';
 const marketingPolishEnabled =
   (process.env.NEXT_PUBLIC_MYTITAN_FEATURE_MARKETING_POLISH_V1 || '').trim().toLowerCase() === 'on' ||
   (process.env.NEXT_PUBLIC_MYTITAN_FEATURE_MARKETING_POLISH_V1 || '').trim().toLowerCase() === 'true' ||
@@ -15,9 +11,7 @@ const marketingPolishEnabled =
 
 export default function MarketingHome() {
   const [annual, setAnnual] = useState(false);
-  const demoHref = demoEnabled
-    ? 'https://app.mytitan.co.uk/login?demo=1'
-    : 'https://app.mytitan.co.uk/login';
+  const signInHref = 'https://app.mytitan.co.uk/login';
   const billingHref = 'https://app.mytitan.co.uk/dashboard/billing';
   const pricing = useMemo(
     () => ({
@@ -55,7 +49,7 @@ export default function MarketingHome() {
         </p>
         <div className="actions">
           <a className="button" href="https://app.mytitan.co.uk/login">Sign in</a>
-          <a className="button ghost" href={demoHref}>Try the demo</a>
+          <a className="button ghost" href={signInHref}>Get started</a>
           <a className="button ghost" href={billingHref}>Start subscription</a>
         </div>
         {marketingPolishEnabled ? <p className="muted-line">Built for wheels, bodyshop, garage, and mobile operators.</p> : null}
@@ -110,8 +104,8 @@ export default function MarketingHome() {
         <h2>FAQ + Trust</h2>
         <div className="grid two">
           <article className="card">
-            <h3>Can I run a demo first?</h3>
-            <p>Yes. Use “Try the demo” for a safe read/write demo tenant.</p>
+            <h3>Can I try it first?</h3>
+            <p>Yes. Start with your account and explore the platform immediately.</p>
           </article>
           <article className="card">
             <h3>Is setup technical?</h3>
