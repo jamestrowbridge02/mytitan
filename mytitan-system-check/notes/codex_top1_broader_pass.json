@@ -1,18 +1,14 @@
 {
-  "generatedAtUtc": "20260302_131316",
+  "generatedAtUtc": "20260302_131924",
   "repo": "/opt/mytitan",
   "branch": "top1-broader-pass",
-  "head": "31b6b3f89bbfaf64a661d94090837d88e401a4a2",
+  "head": "53a87a6736fc5137e60883bccd617d7d1889f043",
   "artifacts": {
-    "verifyLog": "/opt/mytitan/tmp/top1_full_verify_20260302_112403.log",
-    "dbEvidence": "/opt/mytitan/tmp/top1_db_evidence_20260302_112403.txt"
+    "verifyLog": "/opt/mytitan/tmp/top1_full_verify_20260302_113733.log",
+    "dbEvidence": "/opt/mytitan/tmp/top1_db_evidence_clean_20260302_120914.txt"
   },
   "verification": {
-    "dockerStack": [
-      "postgres",
-      "redis",
-      "api"
-    ],
+    "dockerStack": ["postgres", "redis", "api"],
     "dbEvidenceCaptured": true,
     "migrateDeploy": true,
     "prismaGenerate": true,
