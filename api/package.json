@@ -8,7 +8,7 @@
     "start": "node dist/main.js",
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main.js",
-    "test:scheduling": "node --loader ts-node/esm scripts/test-calendar-scheduling.ts",
+    "test:scheduling": "node scripts/test-calendar-scheduling.smoke.mjs",
     "prisma": "prisma",
     "prisma:generate": "prisma generate",
     "migration:init": "prisma migrate dev --name init",
