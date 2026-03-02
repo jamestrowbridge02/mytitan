@@ -321,3 +321,18 @@ a { color: var(--tenant-accent); text-decoration: none; }
     flex-wrap: wrap;
   }
 }
+
+@import "./tokens.css";
+/* Top-1% baseline polish (safe, minimal) */
+html,body{height:100%;}
+body{
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+*{outline-color: rgba(0,0,0,.25);}
+.card{
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-card);
+}
+.muted{color: var(--text-muted);}

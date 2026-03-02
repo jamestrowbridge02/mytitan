@@ -1,0 +1,7 @@
+:root{
+  --radius-xl: 18px;
+  --shadow-soft: 0 10px 30px rgba(0,0,0,.08);
+  --shadow-card: 0 6px 22px rgba(0,0,0,.10);
+  --border-subtle: rgba(0,0,0,.08);
+  --text-muted: rgba(0,0,0,.62);
+}
