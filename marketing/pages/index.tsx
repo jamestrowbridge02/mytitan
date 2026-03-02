@@ -1,6 +1,7 @@
 import { Button } from "../components/ui/Button";
 import { Card, CardHeader, CardContent } from "../components/ui/Card";
 import { Shell } from "../components/layout/Shell";
+import MarketingShell from "../components/layout/MarketingShell";
 import { useMemo, useState } from 'react';
 
 const demoEnabled =
@@ -28,7 +29,8 @@ export default function MarketingHome() {
   );
 
   return (
-    <Shell>
+    <MarketingShell>
+      <Shell>
       <Card style={{ marginBottom: 16 }}>
         <CardHeader>
           <div style={{ fontSize: "var(--text-xl)", fontWeight: 800 }}>Welcome</div>
@@ -123,5 +125,6 @@ export default function MarketingHome() {
       </section>
     </main>
       </Shell>
+    </MarketingShell>
   );
 }
