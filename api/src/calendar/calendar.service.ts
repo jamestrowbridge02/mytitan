@@ -1,12 +1,9 @@
 import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import {
-  isCalendarV2HardConflictsEnabled,
-  isNotificationsV1Enabled,
-  isSchedulingIntelligenceV1Enabled,
-} from '../common/feature-flags';
+import { isNotificationsV1Enabled, isSchedulingIntelligenceV1Enabled } from '../common/feature-flags';
 import { acquireTechnicianLock } from '../common/advisory-lock';
+import { withCompanyId } from '../common/tenant-scope';
 
 type ListCalendarBookingsInput = {
   from?: string;
@@ -155,21 +152,19 @@ export class CalendarService {
     const db = this.prisma as any;
     const [technicians, bookings] = await Promise.all([
       db.user.findMany({
-        where: {
-          companyId: tenantId,
+        where: withCompanyId(tenantId, {
           role: { in: ['OWNER', 'ADMIN', 'STAFF'] },
-        },
+        }),
         select: { id: true, email: true },
         orderBy: { email: 'asc' },
       }),
       db.booking.findMany({
-        where: {
-          companyId: tenantId,
+        where: withCompanyId(tenantId, {
           ...(input.techId ? { assignedUserId: input.techId } : {}),
           ...(input.locationId ? { locationId: input.locationId } : {}),
           startsAt: { lt: effectiveTo },
           endsAt: { gt: from },
-        },
+        }),
         include: {
           assignedUser: { select: { id: true, email: true } },
           location: { select: { id: true, name: true } },
@@ -247,19 +242,19 @@ export class CalendarService {
     }
 
     const db = this.prisma as any;
-    const [technicians, settings, exceptions] = await Promise.all([
-      db.user.findMany({
-        where: {
-          companyId: tenantId,
-          role: { in: ['OWNER', 'ADMIN', 'STAFF'] },
-        },
-        select: { id: true, email: true },
-        orderBy: { email: 'asc' },
+    const technicians = await db.user.findMany({
+      where: withCompanyId(tenantId, {
+        role: { in: ['OWNER', 'ADMIN', 'STAFF'] },
       }),
+      select: { id: true, email: true },
+      orderBy: { email: 'asc' },
+    });
+    const technicianIds = technicians.map((tech: any) => tech.id);
+    const [settings, exceptions] = await Promise.all([
       db.techScheduleSetting.findMany({
-        where: {
-          companyId: tenantId,
-        },
+        where: withCompanyId(tenantId, {
+          technicianId: { in: technicianIds },
+        }),
         select: {
           technicianId: true,
           weeklyJson: true,
@@ -267,11 +262,11 @@ export class CalendarService {
         },
       }),
       db.techScheduleException.findMany({
-        where: {
-          companyId: tenantId,
+        where: withCompanyId(tenantId, {
+          technicianId: { in: technicianIds },
           startsAt: { lt: to },
           endsAt: { gt: from },
-        },
+        }),
         select: {
           id: true,
           technicianId: true,
@@ -330,19 +325,18 @@ export class CalendarService {
     const days = this.buildDailyRange(range.from, range.to);
     const dayKeys = days.map((day) => this.formatDayKey(day));
     const db = this.prisma as any;
-    const [technicians, settings] = await Promise.all([
-      db.user.findMany({
-        where: {
-          companyId: tenantId,
-          role: { in: ['OWNER', 'ADMIN', 'STAFF'] },
-        },
-        select: { id: true, email: true },
-        orderBy: { email: 'asc' },
+    const technicians = await db.user.findMany({
+      where: withCompanyId(tenantId, {
+        role: { in: ['OWNER', 'ADMIN', 'STAFF'] },
       }),
+      select: { id: true, email: true },
+      orderBy: { email: 'asc' },
+    });
+    const [settings] = await Promise.all([
       db.techScheduleSetting.findMany({
-        where: {
-          companyId: tenantId,
-        },
+        where: withCompanyId(tenantId, {
+          technicianId: { in: technicians.map((tech: any) => tech.id) },
+        }),
         select: {
           technicianId: true,
           weeklyJson: true,
@@ -353,12 +347,11 @@ export class CalendarService {
     const [exceptions, bookings] = techIds.length
       ? await Promise.all([
           db.techScheduleException.findMany({
-            where: {
-              companyId: tenantId,
+            where: withCompanyId(tenantId, {
               technicianId: { in: techIds },
               startsAt: { lt: range.to },
               endsAt: { gt: range.from },
-            },
+            }),
             select: {
               technicianId: true,
               startsAt: true,
@@ -366,13 +359,12 @@ export class CalendarService {
             },
           }),
           db.booking.findMany({
-            where: {
-              companyId: tenantId,
+            where: withCompanyId(tenantId, {
               assignedUserId: { in: techIds },
               status: { not: 'CANCELLED' },
               startsAt: { lt: range.to },
               endsAt: { gt: range.from },
-            },
+            }),
             select: {
               assignedUserId: true,
               startsAt: true,
@@ -474,7 +466,7 @@ export class CalendarService {
   async suggestSlots(tenantId: string, bookingId: string, windowDays: number, limit: number) {
     const db = this.prisma as any;
     const booking = await db.booking.findFirst({
-      where: { id: bookingId, companyId: tenantId },
+      where: withCompanyId(tenantId, { id: bookingId }),
       select: { id: true, startsAt: true, endsAt: true },
     });
     if (!booking) {
@@ -517,33 +509,28 @@ export class CalendarService {
     excludeBookingId?: string,
   ): Promise<SuggestionContext> {
     const db = this.prisma as any;
-    const [technicians, settings] = await Promise.all([
-      db.user.findMany({
-        where: {
-          companyId: tenantId,
-          role: { in: ['OWNER', 'ADMIN', 'STAFF'] },
-        },
-        select: { id: true, email: true },
-        orderBy: { email: 'asc' },
+    const technicians = await db.user.findMany({
+      where: withCompanyId(tenantId, {
+        role: { in: ['OWNER', 'ADMIN', 'STAFF'] },
       }),
-      db.techScheduleSetting.findMany({
-        where: {
-          companyId: tenantId,
-        },
-        select: {
-          technicianId: true,
-          weeklyJson: true,
-          timezone: true,
-        },
-      }),
-    ]);
-
+      select: { id: true, email: true },
+      orderBy: { email: 'asc' },
+    });
     const techIds = technicians.map((tech: any) => tech.id);
+    const settings = await db.techScheduleSetting.findMany({
+      where: withCompanyId(tenantId, {
+        technicianId: { in: techIds },
+      }),
+      select: {
+        technicianId: true,
+        weeklyJson: true,
+        timezone: true,
+      },
+    });
     let bookings: Array<{ assignedUserId: string | null; startsAt: Date | string; endsAt: Date | string }> = [];
     let exceptions: Array<{ technicianId: string; startsAt: Date | string; endsAt: Date | string }> = [];
     if (techIds.length) {
       const bookingWheres: any = {
-        companyId: tenantId,
         assignedUserId: { in: techIds },
         startsAt: { lt: windowEnd },
         endsAt: { gt: windowStart },
@@ -552,20 +539,19 @@ export class CalendarService {
         bookingWheres.id = { not: excludeBookingId };
       }
       bookings = await db.booking.findMany({
-        where: {
+        where: withCompanyId(tenantId, {
           ...bookingWheres,
           status: { not: 'CANCELLED' },
-        },
-        select: { assignedUserId: true, startsAt: true, endsAt: true },
-        orderBy: [{ startsAt: 'asc' }, { endsAt: 'asc' }],
-      });
-      exceptions = await db.techScheduleException.findMany({
-        where: {
-          companyId: tenantId,
+        }),
+       select: { assignedUserId: true, startsAt: true, endsAt: true },
+       orderBy: [{ startsAt: 'asc' }, { endsAt: 'asc' }],
+     });
+     exceptions = await db.techScheduleException.findMany({
+        where: withCompanyId(tenantId, {
           technicianId: { in: techIds },
           startsAt: { lt: windowEnd },
           endsAt: { gt: windowStart },
-        },
+        }),
         select: { technicianId: true, startsAt: true, endsAt: true },
         orderBy: { startsAt: 'asc' },
       });
@@ -706,10 +692,7 @@ export class CalendarService {
   ): Promise<TechScheduleUpdateResult> {
     const db = this.prisma as any;
     const technician = await db.user.findFirst({
-      where: {
-        companyId: tenantId,
-        id: technicianId,
-      },
+      where: withCompanyId(tenantId, { id: technicianId }),
     });
     if (!technician) {
       throw new NotFoundException('Technician not found.');
@@ -747,10 +730,7 @@ export class CalendarService {
   ): Promise<ScheduleException> {
     const db = this.prisma as any;
     const technician = await db.user.findFirst({
-      where: {
-        companyId: tenantId,
-        id: technicianId,
-      },
+      where: withCompanyId(tenantId, { id: technicianId }),
     });
     if (!technician) {
       throw new NotFoundException('Technician not found.');
@@ -780,8 +760,10 @@ export class CalendarService {
 
   async deleteScheduleException(tenantId: string, exceptionId: string) {
     const db = this.prisma as any;
-    const existing = await db.techScheduleException.findUnique({ where: { id: exceptionId } });
-    if (!existing || existing.companyId !== tenantId) {
+    const existing = await db.techScheduleException.findFirst({
+      where: withCompanyId(tenantId, { id: exceptionId }),
+    });
+    if (!existing) {
       throw new NotFoundException('Exception not found.');
     }
     await db.techScheduleException.delete({ where: { id: exceptionId } });
@@ -809,7 +791,7 @@ export class CalendarService {
     });
 
     const { existing, updated, overlapping } = await db.$transaction(async (tx: any) => {
-      const existing = await tx.booking.findFirst({ where: { id: bookingId, companyId: tenantId } });
+      const existing = await tx.booking.findFirst({ where: withCompanyId(tenantId, { id: bookingId }) });
       if (!existing) {
         throw new NotFoundException('Booking not found.');
       }
@@ -820,34 +802,33 @@ export class CalendarService {
         await acquireTechnicianLock(tx, tenantId, techId);
       }
 
-      let overlapping: Array<{ id: string; startsAt: Date; endsAt: Date }> = [];
-      if (targetTechnicianId) {
-        overlapping = await tx.booking.findMany({
-          where: {
-            companyId: tenantId,
-            id: { not: bookingId },
-            assignedUserId: targetTechnicianId,
-            startsAt: { lt: parsedEnd },
-            endsAt: { gt: parsedStart },
-          },
-          select: { id: true, startsAt: true, endsAt: true },
-        });
-        if (isCalendarV2HardConflictsEnabled() && overlapping.length > 0) {
-          this.logger.warn('Calendar conflict prevented during reschedule', {
-            bookingId,
-            tenantId,
-            technicianId: targetTechnicianId,
-            conflicts: overlapping.map((item) => item.id),
-            requestId: requestId || null,
+        let overlapping: Array<{ id: string; startsAt: Date; endsAt: Date }> = [];
+        if (targetTechnicianId) {
+          overlapping = await tx.booking.findMany({
+            where: withCompanyId(tenantId, {
+              id: { not: bookingId },
+              assignedUserId: targetTechnicianId,
+              startsAt: { lt: parsedEnd },
+              endsAt: { gt: parsedStart },
+            }),
+            select: { id: true, startsAt: true, endsAt: true },
           });
-          throw new ConflictException({
-            code: 'CALENDAR_CONFLICT',
-            bookingId,
-            conflicts: overlapping.map((item: any) => item.id),
-            requestId: requestId || undefined,
-          });
+          if (overlapping.length > 0) {
+            this.logger.warn('Calendar conflict prevented during reschedule', {
+              bookingId,
+              tenantId,
+              technicianId: targetTechnicianId,
+              conflicts: overlapping.map((item) => item.id),
+              requestId: requestId || null,
+            });
+            throw new ConflictException({
+              code: 'CALENDAR_CONFLICT',
+              bookingId,
+              conflicts: overlapping.map((item: any) => item.id),
+              requestId: requestId || undefined,
+            });
+          }
         }
-      }
 
       const updated = await tx.booking.update({
         where: { id: bookingId },
@@ -1168,10 +1149,7 @@ export class CalendarService {
 
     const db = this.prisma as any;
     const setting = await db.techScheduleSetting.findFirst({
-      where: {
-        companyId: tenantId,
-        technicianId,
-      },
+      where: withCompanyId(tenantId, { technicianId }),
       select: {
         weeklyJson: true,
       },
@@ -1193,24 +1171,22 @@ export class CalendarService {
     rangeEnd.setTime(rangeEnd.getTime() + MS_PER_DAY);
 
     const bookings = await db.booking.findMany({
-      where: {
-        companyId: tenantId,
+      where: withCompanyId(tenantId, {
         assignedUserId: technicianId,
         startsAt: { lt: rangeEnd },
         endsAt: { gt: rangeStart },
-      },
+      }),
       select: {
         startsAt: true,
         endsAt: true,
       },
     });
     const exceptions = await db.techScheduleException.findMany({
-      where: {
-        companyId: tenantId,
+      where: withCompanyId(tenantId, {
         technicianId,
         startsAt: { lt: rangeEnd },
         endsAt: { gt: rangeStart },
-      },
+      }),
       select: {
         id: true,
         startsAt: true,
