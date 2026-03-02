@@ -1,4 +1,4 @@
--- Demo polish + media/signature + notifications
+--  polish + media/signature + notifications
 
 ALTER TABLE "Job"
 ADD COLUMN IF NOT EXISTS "completedAt" TIMESTAMP(3),

@@ -291,7 +291,7 @@ export class AuthService {
       email: user.email,
       tokenVersion: Number(user.tokenVersion ?? 0),
       emailVerified: Boolean(user.emailVerified),
-      demoUser: user.email === 'demo@mytitan.co.uk',
+      demoUser: user.email === '@mytitan.co.uk',
     };
 
     await this.audit.log(user.companyId, 'login', 'User logged in', user.id);

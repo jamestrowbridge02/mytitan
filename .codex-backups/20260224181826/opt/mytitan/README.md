@@ -20,7 +20,7 @@ Set these before starting services.
 - `MYTITAN_FEATURE_MARKETPLACE=off` (feature flag for onboarding/marketplace/portal upgrades)
 - `MYTITAN_FEATURE_START_HERE=off` (feature flag for Start Here routing + onboarding trade selection APIs)
 - `MYTITAN_FEATURE_GUIDED_SETUP_V2=off` (feature flag for Guided Setup V2 APIs)
-- `MYTITAN_FEATURE_PUBLIC_DEMO=off` (feature flag for `POST /public/demo-login`)
+- `MYTITAN_FEATURE_PUBLIC_DEMO=off` (feature flag for `POST /public/-login`)
 - `REDIS_URL=redis://HOST:6379` (optional but supported)
 - `OPENAI_API_KEY=...` (required for `POST /ai/chat`; server-side only)
 - `OPENAI_MODEL=gpt-4o-mini` (optional; defaults to `gpt-4o-mini`)
@@ -97,12 +97,12 @@ Health check:
 curl http://localhost:3000/health
 ```
 
-### Demo seed (safe/idempotent)
+###  seed (safe/idempotent)
 
 ```bash
 cd /opt/mytitan/api
-node scripts/seed-demo.js
-node scripts/seed-demo.js --interactive-reset
+node scripts/seed-.js
+node scripts/seed-.js --interactive-reset
 ```
 
 ## Troubleshooting host curl
@@ -540,28 +540,28 @@ API_TOKEN=... /opt/mytitan/scripts/guided-setup-smoke.sh
   - Theme is applied globally using the `dark` class on `document.documentElement`
   - If unset/unknown, app falls back to light mode
 
-## Public Demo Mode (Feature-flagged)
+## Public  Mode (Feature-flagged)
 
-Enable demo mode:
+Enable  mode:
 - `MYTITAN_FEATURE_PUBLIC_DEMO=on`
 - `NEXT_PUBLIC_MYTITAN_FEATURE_PUBLIC_DEMO=on`
 
-Demo flow:
-1. Marketing CTA “Try the demo” goes to `https://app.mytitan.co.uk/login?demo=1`
-2. App login page calls `POST /public/demo-login`
-3. API returns a short-lived JWT (30 minutes) for `demo@mytitan.co.uk`
+ flow:
+1. Marketing CTA “Try the ” goes to `https://app.mytitan.co.uk/login?=1`
+2. App login page calls `POST /public/-login`
+3. API returns a short-lived JWT (30 minutes) for `@mytitan.co.uk`
 4. Token is stored in browser local storage (`mytitan_token`) and user is redirected to dashboard
 
 Flag behavior:
-- OFF: `POST /public/demo-login` returns `404`
-- ON: `POST /public/demo-login` returns `200` JSON token payload
+- OFF: `POST /public/-login` returns `404`
+- ON: `POST /public/-login` returns `200` JSON token payload
 
-Seed demo data (idempotent):
+Seed  data (idempotent):
 ```bash
 cd /opt/mytitan/api
-node scripts/seed-demo.js
+node scripts/seed-.js
 ```
-Seed includes demo tenant users, service catalog, pricing preset, trade accounts, 10 demo customers, 10 demo jobs (with Wheels formData/assets), and bookings.
+Seed includes  tenant users, service catalog, pricing preset, trade accounts, 10  customers, 10  jobs (with Wheels formData/assets), and bookings.
 
 
 ## Wheels Job Form v1 (Feature-flagged)

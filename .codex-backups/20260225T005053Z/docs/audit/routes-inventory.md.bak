@@ -25,8 +25,8 @@
   - `GET /public/booking/:token/slots`
   - `POST /public/booking/:token`
   - `GET /public/ics/:token`
-- Demo:
-  - `POST /public/demo-login` (404 when flag off)
+- :
+  - `POST /public/-login` (404 when flag off)
 - Webhooks:
   - `POST /stripe/webhook`
   - `POST /billing/webhook`
@@ -48,7 +48,7 @@ Examples:
 ## Guard Behavior Validation (live smoke)
 Ran:
 - `/opt/mytitan/scripts/ops-core-smoke.sh`
-- `/opt/mytitan/scripts/demo-polish-smoke.sh`
+- `/opt/mytitan/scripts/-polish-smoke.sh`
 
 Observed:
 - `GET /jobs/board-v2 -> 401`

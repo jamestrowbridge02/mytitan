@@ -4,10 +4,10 @@ const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 
 const prisma = new PrismaClient();
-const DEMO_COMPANY_NAME = 'DEMO';
+const DEMO_COMPANY_NAME = '';
 const TEMP_PASSWORD = 'ChangeMeNow!234';
 const ADMIN_EMAIL = 'admin@mytitan.co.uk';
-const DEMO_EMAIL = 'demo@mytitan.co.uk';
+const DEMO_EMAIL = '@mytitan.co.uk';
 
 async function ensureDemoCompany() {
   let company = await prisma.company.findFirst({

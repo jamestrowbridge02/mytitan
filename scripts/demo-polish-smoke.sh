@@ -5,11 +5,11 @@ base="${API_BASE_URL:-https://api.mytitan.co.uk}"
 app_base="${APP_BASE_URL:-https://app.mytitan.co.uk}"
 pass=1
 
-# Demo flag source is dotenv to avoid false warnings from unset shell env.
+#  flag source is dotenv to avoid false warnings from unset shell env.
 demo_flag_source="dotenv"
 demo_flag_value="unknown"
 
-echo "== DEMO POLISH SMOKE =="
+echo "==  POLISH SMOKE =="
 echo "api=${base} app=${app_base}"
 
 check_code() {
@@ -28,7 +28,7 @@ app_health=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "${app_base}" 
 check_code "GET /health" "$api_health" "200"
 check_code "GET app /" "$app_health" "200" "301"
 
-# Read demo flags from /opt/mytitan/.env (same operational source used by release smoke).
+# Read  flags from /opt/mytitan/.env (same operational source used by release smoke).
 # We evaluate both API and NEXT_PUBLIC variants; on if either is on/true/1.
 demo_api_flag=$(grep -E ^MYTITAN_FEATURE_PUBLIC_DEMO= /opt/mytitan/.env 2>/dev/null | head -n1 | cut -d= -f2- | tr [:upper:] [:lower:] || true)
 demo_app_flag=$(grep -E ^NEXT_PUBLIC_MYTITAN_FEATURE_PUBLIC_DEMO= /opt/mytitan/.env 2>/dev/null | head -n1 | cut -d= -f2- | tr [:upper:] [:lower:] || true)
@@ -50,14 +50,14 @@ else
   fi
 fi
 
-demo_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 -X POST "${base}/public/demo-login" || true)
+demo_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 -X POST "${base}/public/-login" || true)
 
 if [ "$demo_flag_value" = "on" ]; then
-  check_code "POST /public/demo-login" "$demo_code" "200" "429"
+  check_code "POST /public/-login" "$demo_code" "200" "429"
 else
   # Warning only when dotenv indicates off/unknown but endpoint is still reachable.
   if [ "$demo_code" = "200" ] || [ "$demo_code" = "429" ]; then
-    echo "WARN: demo flag appears ${demo_flag_value}; endpoint reachable (code=${demo_code})"
+    echo "WARN:  flag appears ${demo_flag_value}; endpoint reachable (code=${demo_code})"
   fi
 fi
 

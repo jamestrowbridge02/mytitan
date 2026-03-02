@@ -6,9 +6,9 @@ const readline = require('readline');
 const crypto = require('crypto');
 
 const prisma = new PrismaClient();
-const DEMO_COMPANY_NAME = 'DEMO';
+const DEMO_COMPANY_NAME = '';
 const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || 'admin@mytitan.co.uk';
-const DEMO_EMAIL = 'demo@mytitan.co.uk';
+const DEMO_EMAIL = '@mytitan.co.uk';
 const OWNER_ROLE = 'OWNER';
 const STAFF_ROLE = 'STAFF';
 const DEFAULT_TRADE_PACK = 'WHEELS';
@@ -165,13 +165,13 @@ async function ensureDemoCompany() {
 
 async function ensureDemoLocation(companyId) {
   const existing = await prisma.location.findFirst({
-    where: { companyId, name: 'Demo HQ' },
+    where: { companyId, name: ' HQ' },
   });
   if (existing) return existing;
   return prisma.location.create({
     data: {
       companyId,
-      name: 'Demo HQ',
+      name: ' HQ',
       addressLine1: '1 Titan Way',
       city: 'London',
       postalCode: 'EC1A 1AA',
@@ -224,15 +224,15 @@ async function ensurePricingPresets(companyId) {
         tenantId: companyId,
         packCode: DEFAULT_TRADE_PACK,
         type: 'PRICING_PRESET',
-        key: 'demo-default',
+        key: '-default',
       },
     },
     create: {
       tenantId: companyId,
       packCode: DEFAULT_TRADE_PACK,
       type: 'PRICING_PRESET',
-      key: 'demo-default',
-      name: 'Demo Default Pricing',
+      key: '-default',
+      name: ' Default Pricing',
       dataJson: {
         currency: 'GBP',
         vatRateBps: 2000,
@@ -241,7 +241,7 @@ async function ensurePricingPresets(companyId) {
       isActive: true,
     },
     update: {
-      name: 'Demo Default Pricing',
+      name: ' Default Pricing',
       dataJson: {
         currency: 'GBP',
         vatRateBps: 2000,
@@ -314,7 +314,7 @@ function demoJobFormData(index) {
     services: ['Diamond Cut', 'Smart Repair'],
     paymentStatus: index % 4 === 0 ? 'paid' : 'pending',
     paymentMethod: index % 4 === 0 ? 'Card' : null,
-    notes: 'Demo seeded job',
+    notes: ' seeded job',
   };
 }
 
@@ -327,9 +327,9 @@ async function ensureJobsAndBookings(companyId, locationId, serviceItems, demoUs
 
   for (let i = 0; i < customers.length; i += 1) {
     const customer = customers[i];
-    const jobRef = `DEMO-${String(i + 1).padStart(4, '0')}`;
+    const jobRef = `-${String(i + 1).padStart(4, '0')}`;
     const totalCents = 52000 + i * 1500;
-    const reg = `DEMO${100 + i}`;
+    const reg = `${100 + i}`;
     const job = await prisma.job.upsert({
       where: { companyId_jobRef: { companyId, jobRef } },
       create: {
@@ -371,30 +371,30 @@ async function ensureJobsAndBookings(companyId, locationId, serviceItems, demoUs
     });
 
     await prisma.jobAsset.upsert({
-      where: { id: `demo-before-${job.id}` },
+      where: { id: `-before-${job.id}` },
       create: {
-        id: `demo-before-${job.id}`,
+        id: `-before-${job.id}`,
         jobId: job.id,
         kind: 'BEFORE',
-        url: `https://cdn.mytitan.demo/assets/${job.id}/before.jpg`,
+        url: `https://cdn.mytitan./assets/${job.id}/before.jpg`,
         mime: 'image/jpeg',
       },
       update: {
-        url: `https://cdn.mytitan.demo/assets/${job.id}/before.jpg`,
+        url: `https://cdn.mytitan./assets/${job.id}/before.jpg`,
       },
     });
 
     await prisma.jobAsset.upsert({
-      where: { id: `demo-after-${job.id}` },
+      where: { id: `-after-${job.id}` },
       create: {
-        id: `demo-after-${job.id}`,
+        id: `-after-${job.id}`,
         jobId: job.id,
         kind: 'AFTER',
-        url: `https://cdn.mytitan.demo/assets/${job.id}/after.jpg`,
+        url: `https://cdn.mytitan./assets/${job.id}/after.jpg`,
         mime: 'image/jpeg',
       },
       update: {
-        url: `https://cdn.mytitan.demo/assets/${job.id}/after.jpg`,
+        url: `https://cdn.mytitan./assets/${job.id}/after.jpg`,
       },
     });
 
@@ -451,7 +451,7 @@ async function ensureDemoTradePack(companyId) {
         },
       },
       data: {
-        configJson: { active: true, seededBy: 'seed-demo' },
+        configJson: { active: true, seededBy: 'seed-' },
       },
     });
     return 'reactivated';
@@ -465,7 +465,7 @@ async function ensureDemoTradePack(companyId) {
     data: {
       tenantId: companyId,
       packCode: DEFAULT_TRADE_PACK,
-      configJson: { active: true, seededBy: 'seed-demo' },
+      configJson: { active: true, seededBy: 'seed-' },
     },
   });
   return 'created';

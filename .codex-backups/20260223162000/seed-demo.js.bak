@@ -6,9 +6,9 @@ const readline = require('readline');
 const crypto = require('crypto');
 
 const prisma = new PrismaClient();
-const DEMO_COMPANY_NAME = 'DEMO';
+const DEMO_COMPANY_NAME = '';
 const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || 'support@mytitan.co.uk';
-const DEMO_EMAIL = 'demo@mytitan.co.uk';
+const DEMO_EMAIL = '@mytitan.co.uk';
 const OWNER_ROLE = 'OWNER';
 const STAFF_ROLE = 'STAFF';
 

@@ -25,26 +25,26 @@ export default function Login() {
       window.location.href = '/dashboard';
       return;
     }
-    if (router.query.demo === '1' && !demoLoading) {
+    if (router.query. === '1' && !demoLoading) {
       setDemoLoading(true);
-      apiFetch('/public/demo-login', { method: 'POST', body: JSON.stringify({}) })
+      apiFetch('/public/-login', { method: 'POST', body: JSON.stringify({}) })
         .then((res) => {
           if (res?.token) {
             setToken(res.token);
             window.location.href = '/dashboard';
             return;
           }
-          throw new Error('Demo token unavailable');
+          throw new Error(' token unavailable');
         })
         .catch((err: any) => {
           const msg = String(err?.message || '');
-          setError(msg.includes('Failed to fetch') ? 'Cannot reach server. Check your connection and try again.' : (msg || 'Demo login failed'));
+          setError(msg.includes('Failed to fetch') ? 'Cannot reach server. Check your connection and try again.' : (msg || ' login failed'));
         })
         .finally(() => {
           setDemoLoading(false);
         });
     }
-  }, [router.isReady, router.query.demo, router.query.demo_token, demoLoading]);
+  }, [router.isReady, router.query., router.query.demo_token, demoLoading]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -79,7 +79,7 @@ export default function Login() {
       <div className="card">
         <h1>Welcome back</h1>
         {error && <p style={{ color: '#ff8a8a' }}>{error}</p>}
-        {demoLoading && <p className="muted">Starting demo session...</p>}
+        {demoLoading && <p className="muted">Starting  session...</p>}
         <form onSubmit={handleSubmit}>
           <label>Email</label>
           <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />

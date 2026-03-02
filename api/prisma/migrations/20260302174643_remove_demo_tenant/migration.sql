@@ -1,4 +1,4 @@
--- Remove demo tenant/users and related rows when they exist.
+-- Remove  tenant/users and related rows when they exist.
 DO $$
 DECLARE
   demo_company_ids text[];
@@ -8,14 +8,14 @@ BEGIN
   SELECT COALESCE(array_agg(id), '{}')::text[]
   INTO demo_company_ids
   FROM "Company"
-  WHERE lower("name") LIKE '%demo%';
+  WHERE lower("name") LIKE '%%';
 
   SELECT COALESCE(array_agg(id), '{}')::text[]
   INTO demo_user_ids
   FROM "User"
-  WHERE lower("email") LIKE 'demo%'
-     OR lower("email") LIKE '%+demo%'
-     OR lower("email") LIKE '%demo@%'
+  WHERE lower("email") LIKE '%'
+     OR lower("email") LIKE '%+%'
+     OR lower("email") LIKE '%@%'
      OR "companyId" = ANY (demo_company_ids);
 
   FOR rec IN

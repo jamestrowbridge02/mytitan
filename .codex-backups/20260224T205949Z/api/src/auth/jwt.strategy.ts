@@ -33,7 +33,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       role: user.role,
       emailVerified: Boolean(user.emailVerified),
       tokenVersion: Number(user.tokenVersion ?? 0),
-      demoUser: payload.demoUser || user.email === 'demo@mytitan.co.uk',
+      demoUser: payload.demoUser || user.email === '@mytitan.co.uk',
     };
   }
 }

@@ -33,7 +33,7 @@ let BillingController = class BillingController {
     async assertEmailVerified(user) {
         if (!(0, feature_flags_1.isAuthSecurityV1Enabled)())
             return;
-        if (user.demoUser || user.email === 'demo@mytitan.co.uk')
+        if (user.demoUser || user.email === '@mytitan.co.uk')
             return;
         const db = this.prisma;
         const fullUser = await db.user.findFirst({ where: { id: user.sub, companyId: user.companyId } });

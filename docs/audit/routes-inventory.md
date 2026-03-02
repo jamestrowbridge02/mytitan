@@ -138,7 +138,7 @@ Limitations: best-effort static decorator parsing. Dynamic/computed decorator ar
 | `POST` | `/public/booking/:token` | `public-booking` | `public/public-booking.controller.ts:35` |
 | `GET` | `/public/booking/:token/config` | `public-booking` | `public/public-booking.controller.ts:11` |
 | `GET` | `/public/booking/:token/slots` | `public-booking` | `public/public-booking.controller.ts:19` |
-| `POST` | `/public/demo-login` | `public` | `public/public.controller.ts:294` |
+| `POST` | `/public/-login` | `public` | `public/public.controller.ts:294` |
 | `GET` | `/public/ics/:token` | `public-booking` | `public/public-booking.controller.ts:43` |
 | `GET` | `/public/job/:token` | `public` | `public/public.controller.ts:53` |
 | `POST` | `/public/job/:token/approve` | `public` | `public/public.controller.ts:160` |

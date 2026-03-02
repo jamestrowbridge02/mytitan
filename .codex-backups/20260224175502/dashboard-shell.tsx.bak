@@ -36,7 +36,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       try {
         const me = await apiFetch('/me');
         if (me?.role) {
-          if (me?.email === 'demo@mytitan.co.uk') return;
+          if (me?.email === '@mytitan.co.uk') return;
           const status = await apiFetch('/onboarding/status');
           if (status && status.onboardingCompleted === false) {
             window.location.href = '/onboarding';

@@ -52,12 +52,12 @@ Source: `/opt/mytitan/api/prisma/schema.prisma`
 - `Location -> Job[]/Booking[]/Service[]/Stock*`
 
 ## Seed Logic & Idempotency
-Source: `/opt/mytitan/api/scripts/seed-demo.js`
+Source: `/opt/mytitan/api/scripts/seed-.js`
 
 - Idempotent strategy used heavily:
   - `upsert` on entities with stable unique keys
   - `findFirst` + create/update fallback
-- Demo user/company setup is repeatable.
+-  user/company setup is repeatable.
 - Passwords are **not overwritten by default**; overwritten only in `--interactive-reset` mode.
 
 ## Schema Risk Notes

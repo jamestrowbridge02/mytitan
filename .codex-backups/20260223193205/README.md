@@ -91,12 +91,12 @@ Health check:
 curl http://localhost:3000/health
 ```
 
-### Demo seed (safe/idempotent)
+###  seed (safe/idempotent)
 
 ```bash
 cd /opt/mytitan/api
-node scripts/seed-demo.js
-node scripts/seed-demo.js --interactive-reset
+node scripts/seed-.js
+node scripts/seed-.js --interactive-reset
 ```
 
 ## Troubleshooting host curl

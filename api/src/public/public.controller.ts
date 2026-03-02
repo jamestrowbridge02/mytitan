@@ -18,15 +18,11 @@ import type { Request, Response } from "express";
 import { JwtService } from "@nestjs/jwt";
 import { AuditService } from "../audit/audit.service";
 import { BillingService } from "../billing/billing.service";
-import { isMarketplaceEnabled, isMediaSignatureV1Enabled, isPublicDemoEnabled, requireMarketplaceEnabled } from "../common/feature-flags";
 import { PrismaService } from "../prisma/prisma.service";
 import { ApproveJobDto, DeclineJobDto, SignJobDto } from "./public.dto";
 
 @Controller("public")
 export class PublicController {
-  private readonly demoBuckets = new Map<string, { count: number; resetAt: number }>();
-  private readonly demoWindowMs = 60 * 1000;
-  private readonly demoMaxRequests = 10;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -291,55 +287,31 @@ export class PublicController {
     };
   }
 
-  @Post("demo-login")
   @HttpCode(200)
-  async demoLogin(@Req() req: Request, @Body() _body: Record<string, never>) {
-    if (!isPublicDemoEnabled()) {
       throw new NotFoundException("Not found");
     }
     const ip = String(req.ip || "unknown").trim();
     const now = Date.now();
-    const bucket = this.demoBuckets.get(ip);
     if (!bucket || bucket.resetAt <= now) {
-      this.demoBuckets.set(ip, { count: 1, resetAt: now + this.demoWindowMs });
     } else {
-      if (bucket.count >= this.demoMaxRequests) {
-        throw new HttpException("Too many demo login attempts. Please wait.", HttpStatus.TOO_MANY_REQUESTS);
       }
       bucket.count += 1;
-      this.demoBuckets.set(ip, bucket);
     }
 
     const db = this.prisma as any;
-    const demoUser = await db.user.findFirst({
-      where: { email: "demo@mytitan.co.uk", company: { name: "DEMO" } },
       include: { company: true },
     });
-    if (!demoUser) {
-      throw new NotFoundException("Demo account is not available");
     }
 
     const payload = {
-      sub: demoUser.id,
-      companyId: demoUser.companyId,
-      role: demoUser.role,
-      email: demoUser.email,
-      emailVerified: Boolean(demoUser.emailVerified),
-      demoUser: true,
     };
     const token = await this.jwtService.signAsync(payload, { expiresIn: "30m" });
-    await this.audit.log(demoUser.companyId, "public.demo-login", "Public demo login issued", demoUser.id);
     return {
       token,
       expiresInSeconds: 1800,
       user: {
-        id: demoUser.id,
-        email: demoUser.email,
-        role: demoUser.role,
       },
       company: {
-        id: demoUser.companyId,
-        name: demoUser.company?.name || "DEMO",
       },
     };
   }

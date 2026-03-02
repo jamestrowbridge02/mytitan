@@ -10,7 +10,7 @@ import {
   type DemoCoachAction,
   type DemoCoachProgress,
   type DemoCoachStepKey,
-} from '../../lib/demo-coach';
+} from '../../lib/-coach';
 
 type DemoCoachProps = {
   actions?: Partial<Record<DemoCoachStepKey, DemoCoachAction[]>>;
@@ -31,7 +31,7 @@ export default function DemoCoach({ actions = {} }: DemoCoachProps) {
     apiFetch('/me')
       .then((me) => {
         if (!active) return;
-        setIsDemoUser(Boolean(me?.demoUser || me?.email === 'demo@mytitan.co.uk'));
+        setIsDemoUser(Boolean(me?.demoUser || me?.email === '@mytitan.co.uk'));
       })
       .catch(() => {
         if (!active) return;
@@ -47,10 +47,10 @@ export default function DemoCoach({ actions = {} }: DemoCoachProps) {
     const load = () => setProgress(getDemoProgress());
     load();
     const handler = () => load();
-    window.addEventListener('demo-coach:update', handler);
+    window.addEventListener('-coach:update', handler);
     window.addEventListener('storage', handler);
     return () => {
-      window.removeEventListener('demo-coach:update', handler);
+      window.removeEventListener('-coach:update', handler);
       window.removeEventListener('storage', handler);
     };
   }, [demoPolishEnabled, isDemoUser]);
@@ -69,7 +69,7 @@ export default function DemoCoach({ actions = {} }: DemoCoachProps) {
     <div className="card" style={{ borderColor: '#8cc8ff', marginBottom: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <div>
-          <p className="muted" style={{ margin: 0 }}>Demo Coach</p>
+          <p className="muted" style={{ margin: 0 }}> Coach</p>
           <h3 style={{ marginTop: 4, marginBottom: 6 }}>{nextStep.title}</h3>
           <p className="muted" style={{ marginTop: 0 }}>Step {Math.max(1, stepIndex + 1)} of {steps.length}</p>
           <p style={{ marginTop: 6 }}>{nextStep.description}</p>

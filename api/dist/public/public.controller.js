@@ -275,18 +275,18 @@ let PublicController = class PublicController {
         }
         else {
             if (bucket.count >= this.demoMaxRequests) {
-                throw new common_1.HttpException("Too many demo login attempts. Please wait.", common_1.HttpStatus.TOO_MANY_REQUESTS);
+                throw new common_1.HttpException("Too many  login attempts. Please wait.", common_1.HttpStatus.TOO_MANY_REQUESTS);
             }
             bucket.count += 1;
             this.demoBuckets.set(ip, bucket);
         }
         const db = this.prisma;
         const demoUser = await db.user.findFirst({
-            where: { email: "demo@mytitan.co.uk", company: { name: "DEMO" } },
+            where: { email: "@mytitan.co.uk", company: { name: "" } },
             include: { company: true },
         });
         if (!demoUser) {
-            throw new common_1.NotFoundException("Demo account is not available");
+            throw new common_1.NotFoundException("account is not available");
         }
         const payload = {
             sub: demoUser.id,
@@ -297,7 +297,7 @@ let PublicController = class PublicController {
             demoUser: true,
         };
         const token = await this.jwtService.signAsync(payload, { expiresIn: "30m" });
-        await this.audit.log(demoUser.companyId, "public.demo-login", "Public demo login issued", demoUser.id);
+        await this.audit.log(demoUser.companyId, "public.-login", "Public  login issued", demoUser.id);
         return {
             token,
             expiresInSeconds: 1800,
@@ -308,7 +308,7 @@ let PublicController = class PublicController {
             },
             company: {
                 id: demoUser.companyId,
-                name: demoUser.company?.name || "DEMO",
+                name: demoUser.company?.name || "",
             },
         };
     }
@@ -369,7 +369,7 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], PublicController.prototype, "paymentStatus", null);
 __decorate([
-    (0, common_1.Post)("demo-login"),
+    (0, common_1.Post)("-login"),
     (0, common_1.HttpCode)(200),
     __param(0, (0, common_1.Req)()),
     __param(1, (0, common_1.Body)()),

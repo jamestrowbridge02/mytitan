@@ -5,7 +5,7 @@ base="${API_BASE_URL:-https://api.mytitan.co.uk}"
 app_base="${APP_BASE_URL:-https://app.mytitan.co.uk}"
 pass=1
 
-echo "== DEMO POLISH SMOKE =="
+echo "==  POLISH SMOKE =="
 echo "api=${base} app=${app_base}"
 
 check_code() {
@@ -25,11 +25,11 @@ check_code "GET /health" "$api_health" "200"
 check_code "GET app /" "$app_health" "200" "301"
 
 if [ "${MYTITAN_FEATURE_PUBLIC_DEMO:-off}" = "on" ] || [ "${NEXT_PUBLIC_MYTITAN_FEATURE_PUBLIC_DEMO:-off}" = "on" ]; then
-  demo_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 -X POST "${base}/public/demo-login" || true)
-  check_code "POST /public/demo-login" "$demo_code" "200"
+  demo_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 -X POST "${base}/public/-login" || true)
+  check_code "POST /public/-login" "$demo_code" "200"
 else
-  demo_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 -X POST "${base}/public/demo-login" || true)
-  echo "WARN: demo flag appears off; observed code=${demo_code}"
+  demo_code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 -X POST "${base}/public/-login" || true)
+  echo "WARN:  flag appears off; observed code=${demo_code}"
 fi
 
 check_auth_route() {

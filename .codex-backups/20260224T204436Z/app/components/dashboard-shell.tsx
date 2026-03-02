@@ -79,7 +79,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       try {
         const currentMe = await apiFetch('/me');
         if (currentMe?.role) {
-          if (currentMe?.email === 'demo@mytitan.co.uk') return;
+          if (currentMe?.email === '@mytitan.co.uk') return;
           const status = await apiFetch('/onboarding/status');
           if (status && status.onboardingCompleted === false) {
             window.location.href = '/onboarding';
@@ -92,7 +92,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     check();
   }, [marketplaceEnabled, startHereEnabled]);
 
-  const isDemoUser = useMemo(() => Boolean(me?.demoUser || me?.email === 'demo@mytitan.co.uk'), [me]);
+  const isDemoUser = useMemo(() => Boolean(me?.demoUser || me?.email === '@mytitan.co.uk'), [me]);
 
   async function updateLocationContext(nextId: string) {
     setLocationCtx((prev) => ({ ...prev, activeLocationId: nextId }));
@@ -137,9 +137,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     <div className="container">
       {isDemoUser ? (
         <div className="card" style={{ marginBottom: 12, borderColor: '#8cc8ff' }}>
-          <strong>Demo Mode</strong>
-          <p className="muted" style={{ margin: '6px 0 10px 0' }}>You are in a demo workspace. Changes are safe and temporary.</p>
-          <button className="button secondary" onClick={signOut}>Exit demo</button>
+          <strong> Mode</strong>
+          <p className="muted" style={{ margin: '6px 0 10px 0' }}>You are in a  workspace. Changes are safe and temporary.</p>
+          <button className="button secondary" onClick={signOut}>Exit </button>
         </div>
       ) : null}
 

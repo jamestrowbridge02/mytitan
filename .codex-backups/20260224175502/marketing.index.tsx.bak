@@ -5,7 +5,7 @@ const demoEnabled =
 
 export default function MarketingHome() {
   const demoHref = demoEnabled
-    ? 'https://app.mytitan.co.uk/login?demo=1'
+    ? 'https://app.mytitan.co.uk/login?=1'
     : 'https://app.mytitan.co.uk/login';
 
   return (
@@ -18,7 +18,7 @@ export default function MarketingHome() {
         </p>
         <div className="actions">
           <a className="button" href="https://app.mytitan.co.uk/login">Sign in</a>
-          <a className="button ghost" href={demoHref}>Try the demo</a>
+          <a className="button ghost" href={demoHref}>Try the </a>
         </div>
       </header>
 
@@ -55,8 +55,8 @@ export default function MarketingHome() {
         <h2>FAQ + Trust</h2>
         <div className="grid two">
           <article className="card">
-            <h3>Can I run a demo first?</h3>
-            <p>Yes. Use “Try the demo” for a safe read/write demo tenant.</p>
+            <h3>Can I run a  first?</h3>
+            <p>Yes. Use “Try the ” for a safe read/write  tenant.</p>
           </article>
           <article className="card">
             <h3>Is setup technical?</h3>

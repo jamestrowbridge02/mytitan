@@ -123,7 +123,7 @@ export default function SettingsPage() {
   function restartDemoTour() {
     if (typeof window === 'undefined') return;
     window.localStorage.removeItem('mytitan_demo_tour_seen_v1');
-    setStatus('Demo tour reset. Open dashboard to start again.');
+    setStatus(' tour reset. Open dashboard to start again.');
   }
 
   return (
@@ -152,7 +152,7 @@ export default function SettingsPage() {
           </div>
           <div style={{ marginTop: 10 }}>
             <button type="button" className="button secondary" onClick={restartDemoTour}>
-              Restart demo tour
+              Restart  tour
             </button>
           </div>
         </div>

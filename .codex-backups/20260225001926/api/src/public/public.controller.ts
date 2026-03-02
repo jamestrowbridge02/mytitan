@@ -270,7 +270,7 @@ export class PublicController {
     };
   }
 
-  @Post("demo-login")
+  @Post("-login")
   @HttpCode(200)
   async demoLogin(@Req() req: Request, @Body() _body: Record<string, never>) {
     if (!isPublicDemoEnabled()) {
@@ -283,7 +283,7 @@ export class PublicController {
       this.demoBuckets.set(ip, { count: 1, resetAt: now + this.demoWindowMs });
     } else {
       if (bucket.count >= this.demoMaxRequests) {
-        throw new HttpException("Too many demo login attempts. Please wait.", HttpStatus.TOO_MANY_REQUESTS);
+        throw new HttpException("Too many  login attempts. Please wait.", HttpStatus.TOO_MANY_REQUESTS);
       }
       bucket.count += 1;
       this.demoBuckets.set(ip, bucket);
@@ -291,11 +291,11 @@ export class PublicController {
 
     const db = this.prisma as any;
     const demoUser = await db.user.findFirst({
-      where: { email: "demo@mytitan.co.uk", company: { name: "DEMO" } },
+      where: { email: "@mytitan.co.uk", company: { name: "" } },
       include: { company: true },
     });
     if (!demoUser) {
-      throw new NotFoundException("Demo account is not available");
+      throw new NotFoundException("account is not available");
     }
 
     const payload = {
@@ -307,7 +307,7 @@ export class PublicController {
       demoUser: true,
     };
     const token = await this.jwtService.signAsync(payload, { expiresIn: "30m" });
-    await this.audit.log(demoUser.companyId, "public.demo-login", "Public demo login issued", demoUser.id);
+    await this.audit.log(demoUser.companyId, "public.-login", "Public  login issued", demoUser.id);
     return {
       token,
       expiresInSeconds: 1800,
@@ -318,7 +318,7 @@ export class PublicController {
       },
       company: {
         id: demoUser.companyId,
-        name: demoUser.company?.name || "DEMO",
+        name: demoUser.company?.name || "",
       },
     };
   }

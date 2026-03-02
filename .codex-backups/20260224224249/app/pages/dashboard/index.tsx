@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import { DashboardShell } from '../../components/dashboard-shell';
-import { DemoTourOverlay } from '../../components/demo-tour-overlay';
+import { DemoTourOverlay } from '../../components/-tour-overlay';
 import { GuidedSetupProgress } from '../../components/guided-setup-progress';
 import { apiFetch, setToken } from '../../lib/api';
 import { isCommandCentreEnabled, isCommandCentreV1Enabled, isDemoTourV1Enabled, isGuidedEverywhereV1Enabled, isGuidedSetupV2Enabled } from '../../lib/feature-flags';
@@ -84,7 +84,7 @@ export default function Dashboard() {
 
   return (
     <DashboardShell>
-      <DemoTourOverlay enabled={demoTourEnabled} isDemoUser={Boolean(me?.demoUser || me?.email === 'demo@mytitan.co.uk')} />
+      <DemoTourOverlay enabled={demoTourEnabled} isDemoUser={Boolean(me?.demoUser || me?.email === '@mytitan.co.uk')} />
       <GuidedSetupProgress enabled={guidedSetupEnabled} incomplete={!settings?.guidedSetupCompletedAt} />
 
       <div className="card" style={{ marginBottom: 16 }}>

@@ -478,52 +478,52 @@
 ./api/src/automations/automations.service.ts:200:        ? db.notification.findMany({
 ./api/src/automations/automations.service.ts:211:        ? db.notification.findMany({
 ./api/tools/export-openapi.ts:7:  const app = await NestFactory.create(AppModule, { logger: false });
-./api/scripts/seed-demo.js:93:    await prisma.tradePack.upsert({
-./api/scripts/seed-demo.js:114:  let company = await prisma.company.findFirst({
-./api/scripts/seed-demo.js:120:    company = await prisma.company.create({
-./api/scripts/seed-demo.js:129:  const defaultPlan = await prisma.plan.findFirst({
-./api/scripts/seed-demo.js:133:  await prisma.tenantSetting.upsert({
-./api/scripts/seed-demo.js:167:  const existing = await prisma.location.findFirst({
-./api/scripts/seed-demo.js:171:  return prisma.location.create({
-./api/scripts/seed-demo.js:205:    const row = await prisma.serviceCatalogItem.upsert({
-./api/scripts/seed-demo.js:231:  await prisma.templatePreset.upsert({
-./api/scripts/seed-demo.js:273:    const existing = await prisma.tradeAccount.findFirst({ where: { companyId, name: sample.name } });
-./api/scripts/seed-demo.js:275:      await prisma.tradeAccount.update({
-./api/scripts/seed-demo.js:287:    await prisma.tradeAccount.create({
-./api/scripts/seed-demo.js:393:    const job = await prisma.job.upsert({
-./api/scripts/seed-demo.js:451:    await prisma.jobAsset.upsert({
-./api/scripts/seed-demo.js:465:    await prisma.jobAsset.upsert({
-./api/scripts/seed-demo.js:480:      await prisma.jobActivity.upsert({
-./api/scripts/seed-demo.js:496:      await prisma.jobActivity.upsert({
-./api/scripts/seed-demo.js:515:      await prisma.jobActivity.upsert({
-./api/scripts/seed-demo.js:539:      await prisma.notification.upsert({
-./api/scripts/seed-demo.js:570:    await prisma.booking.upsert({
-./api/scripts/seed-demo.js:605:    await prisma.notification.upsert({
-./api/scripts/seed-demo.js:637:  const existing = await prisma.tradePackInstall.findUnique({
-./api/scripts/seed-demo.js:647:    await prisma.tradePackInstall.update({
-./api/scripts/seed-demo.js:665:  await prisma.tradePackInstall.create({
-./api/scripts/seed-demo.js:677:  const existing = await prisma.user.findFirst({
-./api/scripts/seed-demo.js:683:      await prisma.user.update({
-./api/scripts/seed-demo.js:697:  await prisma.user.create({
-./api/scripts/seed-demo.js:710:  const user = await prisma.user.findFirst({
-./api/scripts/seed-demo.js:717:  await prisma.user.update({
-./api/scripts/seed-demo.js:729:    await prisma.techScheduleSetting.upsert({
-./api/scripts/seed-demo.js:783:    await prisma.techScheduleException.upsert({
-./api/scripts/seed-demo.js:827:  const demoUser = await prisma.user.findFirst({ where: { companyId: company.id, email: DEMO_EMAIL } });
-./api/scripts/seed-demo.js:828:  const supportUser = await prisma.user.findFirst({ where: { companyId: company.id, email: SUPPORT_EMAIL } });
-./api/scripts/seed-demo.js:866:    await prisma.$disconnect();
+./api/scripts/seed-.js:93:    await prisma.tradePack.upsert({
+./api/scripts/seed-.js:114:  let company = await prisma.company.findFirst({
+./api/scripts/seed-.js:120:    company = await prisma.company.create({
+./api/scripts/seed-.js:129:  const defaultPlan = await prisma.plan.findFirst({
+./api/scripts/seed-.js:133:  await prisma.tenantSetting.upsert({
+./api/scripts/seed-.js:167:  const existing = await prisma.location.findFirst({
+./api/scripts/seed-.js:171:  return prisma.location.create({
+./api/scripts/seed-.js:205:    const row = await prisma.serviceCatalogItem.upsert({
+./api/scripts/seed-.js:231:  await prisma.templatePreset.upsert({
+./api/scripts/seed-.js:273:    const existing = await prisma.tradeAccount.findFirst({ where: { companyId, name: sample.name } });
+./api/scripts/seed-.js:275:      await prisma.tradeAccount.update({
+./api/scripts/seed-.js:287:    await prisma.tradeAccount.create({
+./api/scripts/seed-.js:393:    const job = await prisma.job.upsert({
+./api/scripts/seed-.js:451:    await prisma.jobAsset.upsert({
+./api/scripts/seed-.js:465:    await prisma.jobAsset.upsert({
+./api/scripts/seed-.js:480:      await prisma.jobActivity.upsert({
+./api/scripts/seed-.js:496:      await prisma.jobActivity.upsert({
+./api/scripts/seed-.js:515:      await prisma.jobActivity.upsert({
+./api/scripts/seed-.js:539:      await prisma.notification.upsert({
+./api/scripts/seed-.js:570:    await prisma.booking.upsert({
+./api/scripts/seed-.js:605:    await prisma.notification.upsert({
+./api/scripts/seed-.js:637:  const existing = await prisma.tradePackInstall.findUnique({
+./api/scripts/seed-.js:647:    await prisma.tradePackInstall.update({
+./api/scripts/seed-.js:665:  await prisma.tradePackInstall.create({
+./api/scripts/seed-.js:677:  const existing = await prisma.user.findFirst({
+./api/scripts/seed-.js:683:      await prisma.user.update({
+./api/scripts/seed-.js:697:  await prisma.user.create({
+./api/scripts/seed-.js:710:  const user = await prisma.user.findFirst({
+./api/scripts/seed-.js:717:  await prisma.user.update({
+./api/scripts/seed-.js:729:    await prisma.techScheduleSetting.upsert({
+./api/scripts/seed-.js:783:    await prisma.techScheduleException.upsert({
+./api/scripts/seed-.js:827:  const demoUser = await prisma.user.findFirst({ where: { companyId: company.id, email: DEMO_EMAIL } });
+./api/scripts/seed-.js:828:  const supportUser = await prisma.user.findFirst({ where: { companyId: company.id, email: SUPPORT_EMAIL } });
+./api/scripts/seed-.js:866:    await prisma.$disconnect();
 ./api/scripts/seed-tenant-settings.js:13:  const companies = await prisma.company.findMany({
 ./api/scripts/seed-tenant-settings.js:20:    const exists = await prisma.tenantSetting.findUnique({ where: { tenantId: company.id } });
 ./api/scripts/seed-tenant-settings.js:23:    const defaultPlan = await prisma.plan.findFirst({ where: { code: DEFAULT_PLAN_CODE } });
 ./api/scripts/seed-tenant-settings.js:24:    await prisma.tenantSetting.create({
 ./api/scripts/seed-tenant-settings.js:45:    await prisma.$disconnect();
-./api/scripts/seed-demo.js.20260223105354.bak:13:  let company = await prisma.company.findFirst({
-./api/scripts/seed-demo.js.20260223105354.bak:19:    company = await prisma.company.create({
-./api/scripts/seed-demo.js.20260223105354.bak:28:  const defaultPlan = await prisma.plan.findFirst({
-./api/scripts/seed-demo.js.20260223105354.bak:32:  await prisma.tenantSetting.upsert({
-./api/scripts/seed-demo.js.20260223105354.bak:54:  const existing = await prisma.user.findFirst({
-./api/scripts/seed-demo.js.20260223105354.bak:63:  await prisma.user.create({
-./api/scripts/seed-demo.js.20260223105354.bak:94:    await prisma.$disconnect();
+./api/scripts/seed-.js.20260223105354.bak:13:  let company = await prisma.company.findFirst({
+./api/scripts/seed-.js.20260223105354.bak:19:    company = await prisma.company.create({
+./api/scripts/seed-.js.20260223105354.bak:28:  const defaultPlan = await prisma.plan.findFirst({
+./api/scripts/seed-.js.20260223105354.bak:32:  await prisma.tenantSetting.upsert({
+./api/scripts/seed-.js.20260223105354.bak:54:  const existing = await prisma.user.findFirst({
+./api/scripts/seed-.js.20260223105354.bak:63:  await prisma.user.create({
+./api/scripts/seed-.js.20260223105354.bak:94:    await prisma.$disconnect();
 ./api/scripts/webhook-idempotency-check.js:5:const { PrismaService } = require('../dist/prisma/prisma.service');
 ./api/scripts/webhook-idempotency-check.js:24:  await prisma.$connect();
 ./api/scripts/webhook-idempotency-check.js:44:    const row = await prisma.webhookEvent.findUnique({

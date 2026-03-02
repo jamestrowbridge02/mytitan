@@ -13,7 +13,7 @@
   - `/opt/mytitan/scripts/release-smoke.sh`
   - `/opt/mytitan/scripts/ops-smoke.sh`
   - `/opt/mytitan/scripts/ops-core-smoke.sh`
-  - `/opt/mytitan/scripts/demo-polish-smoke.sh`
+  - `/opt/mytitan/scripts/-polish-smoke.sh`
   - `/opt/mytitan/scripts/healthcheck.sh`
 
 ## 2) Docker Compose Services

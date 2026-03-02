@@ -54,16 +54,16 @@ fi
 
 demo_flag=$(grep -E '^MYTITAN_FEATURE_PUBLIC_DEMO=' /opt/mytitan/.env 2>/dev/null | head -n1 | cut -d= -f2- | tr '[:upper:]' '[:lower:]' || true)
 if [ "$demo_flag" = "on" ] || [ "$demo_flag" = "true" ] || [ "$demo_flag" = "1" ]; then
-  echo "[check] Demo login endpoint"
-  demo_code=$(curl -s -o /dev/null -w "%{http_code}" -X POST https://api.mytitan.co.uk/public/demo-login || true)
+  echo "[check]  login endpoint"
+  demo_code=$(curl -s -o /dev/null -w "%{http_code}" -X POST https://api.mytitan.co.uk/public/-login || true)
   if [ "$demo_code" = "200" ] || [ "$demo_code" = "429" ]; then
-    echo "PASS: demo-login code=$demo_code"
+    echo "PASS: -login code=$demo_code"
   else
-    echo "FAIL: demo-login code=$demo_code"
+    echo "FAIL: -login code=$demo_code"
     fail=1
   fi
 else
-  echo "WARN: demo flag OFF, skipping demo-login check"
+  echo "WARN:  flag OFF, skipping -login check"
   warn=1
 fi
 

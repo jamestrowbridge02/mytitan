@@ -16,7 +16,7 @@ export class UsersController {
 
   private async assertCanInvite(user: JwtPayload) {
     if (!isAuthSecurityV1Enabled()) return;
-    if (user.demoUser || user.email === 'demo@mytitan.co.uk') return;
+    if (user.demoUser || user.email === '@mytitan.co.uk') return;
     const db = this.prisma as any;
     const fullUser = await db.user.findFirst({ where: { id: user.sub, companyId: user.companyId } });
     if (!fullUser?.emailVerified) {

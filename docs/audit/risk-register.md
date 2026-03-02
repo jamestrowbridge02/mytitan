@@ -31,9 +31,9 @@
 
 ## Medium
 
-### R3: Smoke script false warning on demo flag
+### R3: Smoke script false warning on  flag
 - Area: ops validation
-- File: `scripts/demo-polish-smoke.sh`
+- File: `scripts/-polish-smoke.sh`
 - Observation:
   - Reads shell env, not `.env`, causing mismatch warnings.
 - Risk:
@@ -80,9 +80,9 @@
 - Tenant scoping is pervasive across core entities.
 - Auth + roles are consistently applied to most controllers.
 - Smoke scripts are present and actively used.
-- Demo/login/public flows are implemented and testable.
+- /login/public flows are implemented and testable.
 
 ## Prioritized Next Actions (30/60/90)
-1. 30 days: webhook idempotency table + demo smoke script fix.
+1. 30 days: webhook idempotency table +  smoke script fix.
 2. 60 days: flag gating normalization + request-id logging.
 3. 90 days: route contract docs + UX state component standardization.

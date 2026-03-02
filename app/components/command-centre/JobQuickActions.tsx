@@ -2,7 +2,7 @@ import type { CSSProperties } from "react";
 import Link from "next/link";
 import { getJobNextAction } from "../../lib/next-action";
 import { getJobSignals } from "../../lib/ops-signals";
-import { markDemoStepComplete } from "../../lib/demo-coach";
+import { markDemoStepComplete } from "../../lib/-coach";
 
 type JobQuickActionsProps = {
   job: any;

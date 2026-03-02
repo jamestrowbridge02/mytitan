@@ -6,9 +6,9 @@ const readline = require('readline');
 const crypto = require('crypto');
 
 const prisma = new PrismaClient();
-const DEMO_COMPANY_NAME = 'DEMO';
+const DEMO_COMPANY_NAME = '';
 const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || 'admin@mytitan.co.uk';
-const DEMO_EMAIL = 'demo@mytitan.co.uk';
+const DEMO_EMAIL = '@mytitan.co.uk';
 const OWNER_ROLE = 'OWNER';
 const STAFF_ROLE = 'STAFF';
 const DEFAULT_TRADE_PACK = 'WHEELS';
@@ -165,13 +165,13 @@ async function ensureDemoCompany() {
 
 async function ensureDemoLocation(companyId) {
   const existing = await prisma.location.findFirst({
-    where: { companyId, name: 'Demo HQ' },
+    where: { companyId, name: ' HQ' },
   });
   if (existing) return existing;
   return prisma.location.create({
     data: {
       companyId,
-      name: 'Demo HQ',
+      name: ' HQ',
       addressLine1: '1 Titan Way',
       city: 'London',
       postalCode: 'EC1A 1AA',
@@ -224,15 +224,15 @@ async function ensurePricingPresets(companyId) {
         tenantId: companyId,
         packCode: DEFAULT_TRADE_PACK,
         type: 'PRICING_PRESET',
-        key: 'demo-default',
+        key: '-default',
       },
     },
     create: {
       tenantId: companyId,
       packCode: DEFAULT_TRADE_PACK,
       type: 'PRICING_PRESET',
-      key: 'demo-default',
-      name: 'Demo Default Pricing',
+      key: '-default',
+      name: ' Default Pricing',
       dataJson: {
         currency: 'GBP',
         vatRateBps: 2000,
@@ -241,7 +241,7 @@ async function ensurePricingPresets(companyId) {
       isActive: true,
     },
     update: {
-      name: 'Demo Default Pricing',
+      name: ' Default Pricing',
       dataJson: {
         currency: 'GBP',
         vatRateBps: 2000,
@@ -310,7 +310,7 @@ function demoJobFormData(index) {
     services: ['Diamond Cut', 'Smart Repair'],
     paymentStatus: index % 4 === 0 ? 'paid' : 'pending',
     paymentMethod: index % 4 === 0 ? 'Card' : null,
-    notes: 'Demo seeded job',
+    notes: ' seeded job',
   };
 }
 
@@ -326,25 +326,25 @@ function addMinutes(date, minutes) {
 
 async function ensureJobsAndBookings(companyId, locationId, serviceItems, demoUserId) {
   const customers = buildDemoCustomers();
-  // Demo seed uses relative timestamps so bookings/jobs stay fresh on each run.
+  //  seed uses relative timestamps so bookings/jobs stay fresh on each run.
   const now = new Date();
   const today = startOfToday(now);
-  // Curated demo set (about 6 jobs, 6 bookings) with stable identifiers.
+  // Curated  set (about 6 jobs, 6 bookings) with stable identifiers.
   const jobSeeds = [
-    { id: 'demo-job-1', jobRef: 'DEMO-0001', customerIndex: 0, scenario: 'in_progress' },
-    { id: 'demo-job-2', jobRef: 'DEMO-0002', customerIndex: 1, scenario: 'completed_unpaid' },
-    { id: 'demo-job-3', jobRef: 'DEMO-0003', customerIndex: 2, scenario: 'completed_paid' },
-    { id: 'demo-job-4', jobRef: 'DEMO-0004', customerIndex: 3, scenario: 'awaiting_approval' },
-    { id: 'demo-job-5', jobRef: 'DEMO-0005', customerIndex: 4, scenario: 'unassigned_starting_soon' },
-    { id: 'demo-job-6', jobRef: 'DEMO-0006', customerIndex: 5, scenario: 'open' },
+    { id: '-job-1', jobRef: '-0001', customerIndex: 0, scenario: 'in_progress' },
+    { id: '-job-2', jobRef: '-0002', customerIndex: 1, scenario: 'completed_unpaid' },
+    { id: '-job-3', jobRef: '-0003', customerIndex: 2, scenario: 'completed_paid' },
+    { id: '-job-4', jobRef: '-0004', customerIndex: 3, scenario: 'awaiting_approval' },
+    { id: '-job-5', jobRef: '-0005', customerIndex: 4, scenario: 'unassigned_starting_soon' },
+    { id: '-job-6', jobRef: '-0006', customerIndex: 5, scenario: 'open' },
   ];
   const bookingSlots = [
-    { id: 'demo-booking-1', customerIndex: 0, start: addMinutes(today, 9 * 60), durationMins: 90, status: 'CONFIRMED', jobRef: 'DEMO-0001' },
-    { id: 'demo-booking-2', customerIndex: 1, start: addMinutes(today, 11 * 60), durationMins: 60, status: 'PLANNED', jobRef: 'DEMO-0002' },
-    { id: 'demo-booking-3', customerIndex: 2, start: addMinutes(today, 13 * 60 + 30), durationMins: 90, status: 'CONFIRMED', jobRef: 'DEMO-0003' },
-    { id: 'demo-booking-4', customerIndex: 3, start: addMinutes(today, 15 * 60), durationMins: 60, status: 'CONFIRMED', jobRef: 'DEMO-0004' },
-    { id: 'demo-booking-5', customerIndex: 4, start: addMinutes(now, -20), durationMins: 75, status: 'PLANNED', jobRef: null },
-    { id: 'demo-booking-6', customerIndex: 5, start: addMinutes(now, 45), durationMins: 60, status: 'CONFIRMED', jobRef: 'DEMO-0005' },
+    { id: '-booking-1', customerIndex: 0, start: addMinutes(today, 9 * 60), durationMins: 90, status: 'CONFIRMED', jobRef: '-0001' },
+    { id: '-booking-2', customerIndex: 1, start: addMinutes(today, 11 * 60), durationMins: 60, status: 'PLANNED', jobRef: '-0002' },
+    { id: '-booking-3', customerIndex: 2, start: addMinutes(today, 13 * 60 + 30), durationMins: 90, status: 'CONFIRMED', jobRef: '-0003' },
+    { id: '-booking-4', customerIndex: 3, start: addMinutes(today, 15 * 60), durationMins: 60, status: 'CONFIRMED', jobRef: '-0004' },
+    { id: '-booking-5', customerIndex: 4, start: addMinutes(now, -20), durationMins: 75, status: 'PLANNED', jobRef: null },
+    { id: '-booking-6', customerIndex: 5, start: addMinutes(now, 45), durationMins: 60, status: 'CONFIRMED', jobRef: '-0005' },
   ];
   let jobsCount = 0;
   let bookingsCount = 0;
@@ -353,7 +353,7 @@ async function ensureJobsAndBookings(companyId, locationId, serviceItems, demoUs
   for (const seed of jobSeeds) {
     const customer = customers[seed.customerIndex];
     const totalCents = 52000 + seed.customerIndex * 1500;
-    const reg = `DEMO${100 + seed.customerIndex}`;
+    const reg = `${100 + seed.customerIndex}`;
     const isInProgress = seed.scenario === 'in_progress';
     const isCompletedUnpaid = seed.scenario === 'completed_unpaid';
     const isCompletedPaid = seed.scenario === 'completed_paid';
@@ -395,7 +395,7 @@ async function ensureJobsAndBookings(companyId, locationId, serviceItems, demoUs
         tradeCode: 'WHEELS',
         jobType: seed.customerIndex % 2 === 0 ? 'Diamond Cut' : 'Painted',
         formData: demoJobFormData(seed.customerIndex),
-        paymentLinkUrl: isCompletedUnpaid ? `https://pay.mytitan.demo/invoice/${seed.jobRef}` : null,
+        paymentLinkUrl: isCompletedUnpaid ? `https://pay.mytitan./invoice/${seed.jobRef}` : null,
         assignedUserId: isInProgress ? demoUserId || null : null,
         completedAt: status === 'COMPLETED' ? addMinutes(now, -6 * 60) : null,
         invoiceIssuedAt,
@@ -414,7 +414,7 @@ async function ensureJobsAndBookings(companyId, locationId, serviceItems, demoUs
         formData: demoJobFormData(seed.customerIndex),
         tradeCode: 'WHEELS',
         jobType: seed.customerIndex % 2 === 0 ? 'Diamond Cut' : 'Painted',
-        paymentLinkUrl: isCompletedUnpaid ? `https://pay.mytitan.demo/invoice/${seed.jobRef}` : null,
+        paymentLinkUrl: isCompletedUnpaid ? `https://pay.mytitan./invoice/${seed.jobRef}` : null,
         assignedUserId: isInProgress ? demoUserId || null : null,
         completedAt: status === 'COMPLETED' ? addMinutes(now, -6 * 60) : null,
         invoiceIssuedAt,
@@ -426,38 +426,38 @@ async function ensureJobsAndBookings(companyId, locationId, serviceItems, demoUs
     seededJobs[seed.jobRef] = job;
 
     await prisma.jobAsset.upsert({
-      where: { id: `demo-before-${job.id}` },
+      where: { id: `-before-${job.id}` },
       create: {
-        id: `demo-before-${job.id}`,
+        id: `-before-${job.id}`,
         jobId: job.id,
         kind: 'BEFORE',
-        url: `https://cdn.mytitan.demo/assets/${job.id}/before.jpg`,
+        url: `https://cdn.mytitan./assets/${job.id}/before.jpg`,
         mime: 'image/jpeg',
       },
       update: {
-        url: `https://cdn.mytitan.demo/assets/${job.id}/before.jpg`,
+        url: `https://cdn.mytitan./assets/${job.id}/before.jpg`,
       },
     });
 
     await prisma.jobAsset.upsert({
-      where: { id: `demo-after-${job.id}` },
+      where: { id: `-after-${job.id}` },
       create: {
-        id: `demo-after-${job.id}`,
+        id: `-after-${job.id}`,
         jobId: job.id,
         kind: 'AFTER',
-        url: `https://cdn.mytitan.demo/assets/${job.id}/after.jpg`,
+        url: `https://cdn.mytitan./assets/${job.id}/after.jpg`,
         mime: 'image/jpeg',
       },
       update: {
-        url: `https://cdn.mytitan.demo/assets/${job.id}/after.jpg`,
+        url: `https://cdn.mytitan./assets/${job.id}/after.jpg`,
       },
     });
 
     if (isInProgress) {
       await prisma.jobActivity.upsert({
-        where: { id: `demo-activity-${job.id}-status` },
+        where: { id: `-activity-${job.id}-status` },
         create: {
-          id: `demo-activity-${job.id}-status`,
+          id: `-activity-${job.id}-status`,
           companyId,
           jobId: job.id,
           actorUserId: demoUserId || null,
@@ -471,9 +471,9 @@ async function ensureJobsAndBookings(companyId, locationId, serviceItems, demoUs
         },
       });
       await prisma.jobActivity.upsert({
-        where: { id: `demo-activity-${job.id}-note` },
+        where: { id: `-activity-${job.id}-note` },
         create: {
-          id: `demo-activity-${job.id}-note`,
+          id: `-activity-${job.id}-note`,
           companyId,
           jobId: job.id,
           actorUserId: demoUserId || null,
@@ -490,9 +490,9 @@ async function ensureJobsAndBookings(companyId, locationId, serviceItems, demoUs
 
     if (isCompletedUnpaid) {
       await prisma.jobActivity.upsert({
-        where: { id: `demo-activity-${job.id}-invoice` },
+        where: { id: `-activity-${job.id}-invoice` },
         create: {
-          id: `demo-activity-${job.id}-invoice`,
+          id: `-activity-${job.id}-invoice`,
           companyId,
           jobId: job.id,
           actorUserId: demoUserId || null,
@@ -511,12 +511,12 @@ async function ensureJobsAndBookings(companyId, locationId, serviceItems, demoUs
   }
 
   if (demoUserId) {
-    const commsJob = seededJobs['DEMO-0004'] || seededJobs['DEMO-0002'] || seededJobs['DEMO-0001'];
+    const commsJob = seededJobs['-0004'] || seededJobs['-0002'] || seededJobs['-0001'];
     if (commsJob) {
       await prisma.notification.upsert({
-        where: { id: 'demo-notification-job-1' },
+        where: { id: '-notification-job-1' },
         create: {
-          id: 'demo-notification-job-1',
+          id: '-notification-job-1',
           companyId,
           userId: demoUserId,
           type: 'job.approval.request',
@@ -578,11 +578,11 @@ async function ensureJobsAndBookings(companyId, locationId, serviceItems, demoUs
   }
 
   if (demoUserId) {
-    const commsBookingId = bookingSlots[0]?.id || 'demo-booking-1';
+    const commsBookingId = bookingSlots[0]?.id || '-booking-1';
     await prisma.notification.upsert({
-      where: { id: 'demo-notification-booking-1' },
+      where: { id: '-notification-booking-1' },
       create: {
-        id: 'demo-notification-booking-1',
+        id: '-notification-booking-1',
         companyId,
         userId: demoUserId,
         type: 'booking.reminder',
@@ -604,7 +604,7 @@ async function ensureJobsAndBookings(companyId, locationId, serviceItems, demoUs
     });
   }
 
-  // Note: no safe archive field for Job/Booking in schema, so legacy demo records remain.
+  // Note: no safe archive field for Job/Booking in schema, so legacy  records remain.
   // Curated records are refreshed with recent timestamps to appear at the top of lists.
   bookingsCount = bookingSlots.length;
   return { jobsCount, bookingsCount };
@@ -629,7 +629,7 @@ async function ensureDemoTradePack(companyId) {
         },
       },
       data: {
-        configJson: { active: true, seededBy: 'seed-demo' },
+        configJson: { active: true, seededBy: 'seed-' },
       },
     });
     return 'reactivated';
@@ -643,7 +643,7 @@ async function ensureDemoTradePack(companyId) {
     data: {
       tenantId: companyId,
       packCode: DEFAULT_TRADE_PACK,
-      configJson: { active: true, seededBy: 'seed-demo' },
+      configJson: { active: true, seededBy: 'seed-' },
     },
   });
   return 'created';

@@ -57,7 +57,7 @@ function readProgress(): DemoCoachProgress {
 function writeProgress(progress: DemoCoachProgress) {
   if (typeof window === 'undefined') return;
   window.localStorage.setItem(DEMO_COACH_STORAGE_KEY, JSON.stringify(progress));
-  window.dispatchEvent(new CustomEvent('demo-coach:update'));
+  window.dispatchEvent(new CustomEvent('-coach:update'));
 }
 
 export function getDemoCoachSteps(): DemoCoachStep[] {

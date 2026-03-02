@@ -45,8 +45,8 @@ Impact:
 - Payment fallback messaging exists, but style/wording differs across pages.
 
 ## Positive Notes
-- `DashboardShell` centralizes tenant branding, location context, notifications access, and demo banners.
-- Demo and guided setup overlays/checklists are in place and linked to real screens.
+- `DashboardShell` centralizes tenant branding, location context, notifications access, and  banners.
+-  and guided setup overlays/checklists are in place and linked to real screens.
 - Job form includes media + signature capture with practical controls.
 
 ## Prioritized Next Actions

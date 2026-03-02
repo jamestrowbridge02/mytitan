@@ -8,7 +8,7 @@ docs/audit/ux-friction.md
 docs/audit/flags-inventory.md
 docs/audit/routes-inventory.md
 docs/audit/risk-register.md
-docs/audit/demo-mode-findings.md
+docs/audit/-mode-findings.md
 .env.stripefix.20260222214947.bak
 marketing
 marketing/public
@@ -27,8 +27,8 @@ app/components
 app/components/SuggestedSlotReasons.tsx
 app/components/notifications
 app/components/notifications/SendUpdatePanel.tsx
-app/components/demo
-app/components/demo/DemoCoach.tsx
+app/components/
+app/components//DemoCoach.tsx
 app/components/entity
 app/components/entity/EntitySection.tsx
 app/components/entity/EntityHeader.tsx
@@ -41,7 +41,7 @@ app/components/states/LoadingState.tsx
 app/components/states/ErrorState.tsx
 app/components/states/EmptyState.tsx
 app/components/dashboard-shell.tsx
-app/components/demo-tour-overlay.tsx
+app/components/-tour-overlay.tsx
 app/components/command-centre
 app/components/command-centre/JobQuickActions.tsx
 app/components/ai-assistant.tsx
@@ -53,7 +53,7 @@ app/styles/globals.css
 app/lib
 app/lib/timeline-adapter.ts
 app/lib/theme-mode.ts
-app/lib/demo-coach.ts
+app/lib/-coach.ts
 app/lib/api.ts
 app/lib/ops-signals.ts
 app/lib/guided-mode.ts
@@ -1151,10 +1151,10 @@ api/prisma/schema.prisma
 api/tools
 api/tools/export-openapi.ts
 api/scripts
-api/scripts/seed-demo.js
+api/scripts/seed-.js
 api/scripts/seed-tenant-settings.js
 api/scripts/shadow-migrate-check.sh
-api/scripts/seed-demo.js.20260223105354.bak
+api/scripts/seed-.js.20260223105354.bak
 api/scripts/webhook-idempotency-check.js
 api/scripts/start-api.sh
 api/node_modules
@@ -8740,7 +8740,7 @@ README.md.20260223105354.bak
 scripts
 scripts/guided-setup-smoke.sh
 scripts/ops-smoke.sh
-scripts/demo-polish-smoke.sh
+scripts/-polish-smoke.sh
 scripts/restore-test.sh
 scripts/top1-smoke.sh
 scripts/release-smoke.sh
