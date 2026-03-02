@@ -12,7 +12,8 @@
     "prisma": "prisma",
     "prisma:generate": "prisma generate",
     "migration:init": "prisma migrate dev --name init",
-    "seed:tenant-settings": "node scripts/seed-tenant-settings.js"
+    "seed:tenant-settings": "node scripts/seed-tenant-settings.js",
+    "audit:top1": "node scripts/top1-audit.mjs"
   },
   "dependencies": {
     "@nestjs/common": "^10.3.10",
