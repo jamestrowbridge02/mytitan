@@ -34,7 +34,7 @@ jobs:
       - name: Migrate + generate + scheduling smoke suite
         run: |
           docker exec -w /app mytitan_api /bin/sh -lc "
-            set -euo pipefail
+            set -eu
             npx prisma migrate deploy
             npx prisma generate
             npm run test:scheduling
