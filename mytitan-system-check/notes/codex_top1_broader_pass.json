@@ -1,5 +1,5 @@
 {
-  "generatedAtUtc": "2026-03-02T11:25:14Z",
+  "generatedAtUtc": "20260302_131200",
   "repo": "/opt/mytitan",
   "branch": "top1-broader-pass",
   "head": "31b6b3f89bbfaf64a661d94090837d88e401a4a2",
@@ -21,5 +21,6 @@
   },
   "notes": [
     "API build is verified via docker compose build api (container runtime may not include nest/devDependencies)."
-  ]
+  ],
+  "dbEvidencePath": "/opt/mytitan/tmp/top1_db_evidence_clean_20260302_120914.txt"
 }
