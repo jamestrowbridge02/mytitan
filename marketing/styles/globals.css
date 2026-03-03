@@ -590,3 +590,16 @@ a { color: inherit; text-decoration: none; }
     scroll-behavior: auto;
   }
 }
+
+/* --- Top-1 contrast fallbacks (safe) ---------------------------------------
+   Ensures readable text even if page-specific styles drift.
+---------------------------------------------------------------------------- */
+:root{
+  --mkt-fg: var(--mkt-fg, rgba(255,255,255,.92));
+  --mkt-muted: var(--mkt-muted, rgba(255,255,255,.70));
+  --mkt-border: var(--mkt-border, rgba(255,255,255,.10));
+}
+
+.text-foreground{ color: var(--mkt-fg) !important; }
+.text-muted-foreground{ color: var(--mkt-muted) !important; }
+.border-border{ border-color: var(--mkt-border) !important; }

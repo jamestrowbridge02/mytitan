@@ -570,3 +570,24 @@ input:focus, select:focus, textarea:focus {
   [data-ui-perf="true"] .mt-toploader,
   [data-ui-perf="1"] .mt-toploader{ display: none; }
 }
+
+/* --- Top-1 contrast fallbacks (safe) ---------------------------------------
+   Ensures common utility classnames always map to readable colors even if
+   Tailwind theme tokens drift. Does not change layout/logic.
+---------------------------------------------------------------------------- */
+:root{
+  /* hard fallbacks if not defined elsewhere */
+  --bg: var(--bg, #0b0f17);
+  --fg: var(--fg, rgba(255,255,255,.92));
+  --muted-fg: var(--muted-fg, rgba(255,255,255,.68));
+  --border: var(--border, rgba(255,255,255,.10));
+}
+
+/* Shadcn-ish classnames used across the app */
+.text-foreground{ color: var(--fg) !important; }
+.text-muted-foreground{ color: var(--muted-fg) !important; }
+.border-border{ border-color: var(--border) !important; }
+
+/* Ensure links/buttons never inherit invisible color accidentally */
+[data-shell="app"] a{ color: inherit; }
+[data-shell="app"] a:hover{ color: var(--fg); }
