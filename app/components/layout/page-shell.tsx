@@ -1,6 +1,20 @@
 import React from "react";
+import { useRouter } from "next/router";
 import CommandPalette from "../command/command-palette";
 import Sidebar from "../nav/sidebar";
+import { NAV_GROUPS } from "../nav/nav-config";
+
+function resolveTitleFromNav(pathname: string): string | undefined {
+  for (const group of NAV_GROUPS as any[]) {
+    for (const item of (group.items || [])) {
+      if (item?.href && (pathname === item.href || pathname.startsWith(item.href + "/"))) return item.title;
+      for (const child of (item?.children || [])) {
+        if (child?.href && (pathname === child.href || pathname.startsWith(child.href + "/"))) return child.title;
+      }
+    }
+  }
+  return undefined;
+}
 
 export function PageShell(props: {
   title?: string;
@@ -9,6 +23,11 @@ export function PageShell(props: {
   children: React.ReactNode;
 }) {
   const showHeader = Boolean(props.title || props.subtitle || props.actions);
+
+  const router = useRouter();
+  const navTitle = resolveTitleFromNav(router.pathname);
+  const title = props.title ?? navTitle;
+  const showHeader = Boolean(title || props.subtitle || props.actions);
 
   return (
     <div data-shell="app" className="min-h-screen bg-[var(--bg)] text-[var(--fg)]">
@@ -21,7 +40,7 @@ export function PageShell(props: {
               {showHeader ? (
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    {props.title ? <h1 className="text-xl font-semibold tracking-tight">{props.title}</h1> : null}
+                    {title ? <h1 className="text-xl font-semibold tracking-tight">{title}</h1> : null}
                     {props.subtitle ? <p className="mt-1 text-sm text-muted-foreground">{props.subtitle}</p> : null}
                   </div>
                   {props.actions ? <div className="flex items-center gap-2">{props.actions}</div> : null}
@@ -34,7 +53,7 @@ export function PageShell(props: {
             {showHeader ? (
               <div className="mb-5 flex items-start justify-between gap-4">
                 <div>
-                  {props.title ? <h1 className="text-xl font-semibold tracking-tight">{props.title}</h1> : null}
+                  {title ? <h1 className="text-xl font-semibold tracking-tight">{title}</h1> : null}
                   {props.subtitle ? <p className="mt-1 text-sm text-muted-foreground">{props.subtitle}</p> : null}
                 </div>
                 {props.actions ? <div className="flex items-center gap-2">{props.actions}</div> : null}
