@@ -18,6 +18,7 @@ import type { Request, Response } from "express";
 import { JwtService } from "@nestjs/jwt";
 import { AuditService } from "../audit/audit.service";
 import { BillingService } from "../billing/billing.service";
+import { isMarketplaceEnabled, isMediaSignatureV1Enabled, requireMarketplaceEnabled } from "../common/feature-flags";
 import { PrismaService } from "../prisma/prisma.service";
 import { ApproveJobDto, DeclineJobDto, SignJobDto } from "./public.dto";
 
@@ -290,3 +291,4 @@ export class PublicController {
     };
   }
 
+}
