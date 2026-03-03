@@ -408,3 +408,42 @@ input:focus, select:focus, textarea:focus {
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* --- Top-1 luxury UI (flagged) -------------------------------------------
+   Enabled when app root has:
+     data-ui-luxury="on" | "true" | "1"
+   Non-breaking: default styles unchanged unless flag is enabled.
+--------------------------------------------------------------------------- */
+[data-ui-luxury="on"], [data-ui-luxury="true"], [data-ui-luxury="1"]{
+  /* Luxury tone: slightly deeper contrast + smoother typography */
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+[data-ui-luxury="on"] *:focus-visible,
+[data-ui-luxury="true"] *:focus-visible,
+[data-ui-luxury="1"] *:focus-visible{
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(14,165,164,0.25);
+  border-radius: 12px;
+}
+
+[data-ui-luxury="on"] a, [data-ui-luxury="true"] a, [data-ui-luxury="1"] a{
+  text-decoration: none;
+}
+
+[data-ui-luxury="on"] .shadow-sm,
+[data-ui-luxury="true"] .shadow-sm,
+[data-ui-luxury="1"] .shadow-sm{
+  box-shadow: 0 10px 30px rgba(15,23,42,0.10) !important;
+}
+
+@media (prefers-reduced-motion: no-preference){
+  [data-ui-luxury="on"] .transition,
+  [data-ui-luxury="true"] .transition,
+  [data-ui-luxury="1"] .transition{
+    transition-duration: 160ms !important;
+    transition-timing-function: cubic-bezier(.2,.8,.2,1) !important;
+  }
+}

@@ -6,12 +6,14 @@ import '../styles/globals.css';
 
 export default function App({ Component, pageProps }: AppProps) {
   return (
-    <TenantSettingsProvider>
-      <BillingProvider>
-        <PageShell>
-      <Component {...pageProps}  />
-    </PageShell>
-      </BillingProvider>
-    </TenantSettingsProvider>
-  );
+  <div data-ui-luxury={String(process.env.NEXT_PUBLIC_MYTITAN_UI_LUXURY_V1 || '').toLowerCase()}>
+  <TenantSettingsProvider>
+        <BillingProvider>
+          <PageShell>
+        <Component {...pageProps}  />
+      </PageShell>
+        </BillingProvider>
+      </TenantSettingsProvider>
+  </div>
+);
 }

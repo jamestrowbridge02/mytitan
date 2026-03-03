@@ -464,3 +464,72 @@ a { color: inherit; text-decoration: none; }
     transition: none !important;
   }
 }
+
+/* --- Top-1 luxury marketing (flagged) ------------------------------------
+   Enabled when MarketingShell root has:
+     data-mkt-luxury="on" | "true" | "1"
+   Non-breaking: default marketing styles unchanged unless flag enabled.
+--------------------------------------------------------------------------- */
+[data-mkt-luxury="on"], [data-mkt-luxury="true"], [data-mkt-luxury="1"]{
+  color-scheme: dark;
+}
+
+[data-mkt-luxury="on"] body,
+[data-mkt-luxury="true"] body,
+[data-mkt-luxury="1"] body{
+  background: radial-gradient(1200px 600px at 15% 10%, rgba(14,165,164,0.18) 0%, rgba(0,0,0,0) 55%),
+              radial-gradient(900px 500px at 80% 20%, rgba(99,102,241,0.18) 0%, rgba(0,0,0,0) 50%),
+              #0b0f17 !important;
+  color: rgba(255,255,255,0.92) !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+[data-mkt-luxury="on"] .hero,
+[data-mkt-luxury="true"] .hero,
+[data-mkt-luxury="1"] .hero{
+  background: rgba(255,255,255,0.04) !important;
+  border-color: rgba(255,255,255,0.10) !important;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.45) !important;
+}
+
+[data-mkt-luxury="on"] .card,
+[data-mkt-luxury="true"] .card,
+[data-mkt-luxury="1"] .card{
+  background: rgba(255,255,255,0.04) !important;
+  border-color: rgba(255,255,255,0.10) !important;
+}
+
+[data-mkt-luxury="on"] .pill,
+[data-mkt-luxury="true"] .pill,
+[data-mkt-luxury="1"] .pill{
+  background: rgba(255,255,255,0.06) !important;
+  border-color: rgba(255,255,255,0.14) !important;
+  color: rgba(255,255,255,0.86) !important;
+}
+
+[data-mkt-luxury="on"] .button.ghost,
+[data-mkt-luxury="true"] .button.ghost,
+[data-mkt-luxury="1"] .button.ghost{
+  background: rgba(255,255,255,0.06) !important;
+  border-color: rgba(255,255,255,0.14) !important;
+  color: rgba(255,255,255,0.92) !important;
+}
+
+@media (prefers-reduced-motion: no-preference){
+  [data-mkt-luxury="on"] a, [data-mkt-luxury="on"] button,
+  [data-mkt-luxury="true"] a, [data-mkt-luxury="true"] button,
+  [data-mkt-luxury="1"] a, [data-mkt-luxury="1"] button{
+    transition: transform 160ms cubic-bezier(.2,.8,.2,1), opacity 160ms cubic-bezier(.2,.8,.2,1);
+  }
+  [data-mkt-luxury="on"] a:hover,
+  [data-mkt-luxury="true"] a:hover,
+  [data-mkt-luxury="1"] a:hover{
+    opacity: .95;
+  }
+  [data-mkt-luxury="on"] .button:hover,
+  [data-mkt-luxury="true"] .button:hover,
+  [data-mkt-luxury="1"] .button:hover{
+    transform: translateY(-1px);
+  }
+}
