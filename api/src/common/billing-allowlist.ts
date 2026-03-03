@@ -1,4 +1,4 @@
-export type BillingUserLike = { email?: string | null; companyId?: string | null };
+export type BillingUserLike = { email?: string | null };
 
 function parseCsvEnv(name: string): string[] {
   const raw = (process.env[name] || "").trim();
@@ -10,26 +10,19 @@ function parseCsvEnv(name: string): string[] {
 }
 
 /**
- * Allowlist ONLY for internal owner/dev accounts to bypass billing checks.
- * This keeps production billing enforced for everyone else.
+ * Owner billing allowlist: bypass billing enforcement ONLY for internal owner/dev emails.
  *
  * Configure:
  *   MYTITAN_BILLING_ALLOWLIST_EMAILS="you@domain.com,other@domain.com"
  *
- * Optional future extension:
- *   MYTITAN_BILLING_ALLOWLIST_COMPANY_IDS="cuid1,cuid2"
+ * Notes:
+ * - Email-only by design to prevent tenant/companyId-based bypass.
+ * - Must be checked using the authenticated user payload (not user input).
  */
 export function isBillingAllowlisted(user?: BillingUserLike | null): boolean {
   if (!user) return false;
-
   const emails = parseCsvEnv("MYTITAN_BILLING_ALLOWLIST_EMAILS");
-  const companyIds = parseCsvEnv("MYTITAN_BILLING_ALLOWLIST_COMPANY_IDS");
-
+  if (emails.length === 0) return false;
   const email = (user.email || "").trim().toLowerCase();
-  const companyId = (user.companyId || "").trim().toLowerCase();
-
-  if (email && emails.includes(email)) return true;
-  if (companyId && companyIds.includes(companyId)) return true;
-
-  return false;
+  return Boolean(email) && emails.includes(email);
 }
