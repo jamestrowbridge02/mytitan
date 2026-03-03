@@ -22,8 +22,6 @@ export function PageShell(props: {
   actions?: React.ReactNode;
   children: React.ReactNode;
 }) {
-  const showHeader = Boolean(props.title || props.subtitle || props.actions);
-
   const router = useRouter();
   const navTitle = resolveTitleFromNav(router.pathname);
   const title = props.title ?? navTitle;
