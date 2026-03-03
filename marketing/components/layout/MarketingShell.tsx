@@ -10,7 +10,7 @@ export default function MarketingShell({
 }: {
   children: React.ReactNode;
 }) {
-  const polish = flagOn('MYTITAN_FEATURE_MARKETING_POLISH_V1');
+  const polish = flagOn("MYTITAN_FEATURE_MARKETING_POLISH_V1") || flagOn("NEXT_PUBLIC_MYTITAN_FEATURE_MARKETING_POLISH_V1");
   const [open, setOpen] = React.useState(false);
 
   if (!polish) {
