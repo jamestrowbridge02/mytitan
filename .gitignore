@@ -25,3 +25,6 @@ api/prisma/migrations/**/.DS_Store
 *.bak.*
 *.v2.bak
 *.backup
+
+# Local editor/Codex backups
+*.localbak.*
