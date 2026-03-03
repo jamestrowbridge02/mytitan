@@ -204,7 +204,7 @@ export default function DevAdminPage() {
   const showForbidden = err?.status === 403 && !showDisabled;
 
   return (
-    <main style={{ padding: 24, maxWidth: 1120, margin: '0 auto' }}>
+    <main className="mx-auto max-w-[1120px] px-6 py-6">
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
         <div>
           <h1 style={{ margin: 0, fontSize: 20, letterSpacing: 0.2 }}>Developer Admin</h1>

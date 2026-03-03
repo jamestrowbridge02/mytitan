@@ -1,4 +1,5 @@
 import React from "react";
+import { Sidebar } from '../nav/sidebar';
 import CommandPalette from "../command/command-palette";
 
 export function PageShell(props: {
@@ -8,7 +9,15 @@ export function PageShell(props: {
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-[color:var(--surface-0)]">
+    <div data-shell="app" className="min-h-screen bg-[var(--bg)] text-[var(--fg)]">
+      <div className="flex min-h-screen">
+        <Sidebar />
+        <div className="flex-1 min-w-0">
+          <div className="px-6 py-5 border-b border-white/10">
+            {/* Page header slot: title/actions handled per-page */}
+          </div>
+          <div className="px-6 py-6">
+<div className="min-h-screen bg-[color:var(--surface-0)]">
       <CommandPalette />
       <div className="mx-auto w-full max-w-[1400px] px-6 py-6">
         <div className="mb-5 flex items-start justify-between gap-4">
@@ -26,5 +35,10 @@ export function PageShell(props: {
         </div>
       </div>
     </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
+
 }
