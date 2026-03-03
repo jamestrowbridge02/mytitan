@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { DashboardShell } from '../../components/dashboard-shell';
-import { DemoTourOverlay } from '../../components/-tour-overlay';
+import { DemoTourOverlay } from '../../components/demo-tour-overlay';
 import { GuidedSetupProgress } from '../../components/guided-setup-progress';
 import { EmptyState } from '../../components/states/EmptyState';
 import { ErrorState } from '../../components/states/ErrorState';
