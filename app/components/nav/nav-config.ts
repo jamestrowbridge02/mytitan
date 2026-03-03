@@ -1,9 +1,8 @@
 export type NavItem = {
   title: string;
   href?: string;
-  icon?: string;
   children?: NavItem[];
-  /** Hide unless user is developer/admin */
+  /** Hide unless developer/admin UI is enabled (client-visible flag only). */
   devOnly?: boolean;
   /** Feature gate via env (NEXT_PUBLIC_FEATURE_...) */
   featureFlag?: string;
@@ -16,90 +15,68 @@ export type NavGroup = {
 
 export const NAV_GROUPS: NavGroup[] = [
   {
-    title: "Overview",
+    title: 'Dashboard',
+    items: [{ title: 'Overview', href: '/dashboard' }],
+  },
+  {
+    title: 'Jobs',
     items: [
-      { title: "Dashboard", href: "/dashboard", icon: "LayoutDashboard" },
-      { title: "Inbox", href: "/inbox", icon: "Inbox" },
+      { title: 'Jobs', href: '/dashboard/jobs' },
+      { title: 'Boards', href: '/dashboard/jobs/boards' },
+      { title: 'Drafts', href: '/dashboard/jobs/drafts' },
+      { title: 'Tags', href: '/dashboard/jobs/tags' },
     ],
   },
   {
-    title: "Work",
+    title: 'Scheduling',
     items: [
-      {
-        title: "Jobs",
-        icon: "Briefcase",
-        children: [
-          { title: "All jobs", href: "/jobs" },
-          { title: "Boards", href: "/jobs/boards" },
-          { title: "Drafts", href: "/jobs/drafts" },
-          { title: "Tags", href: "/jobs/tags" },
-        ],
-      },
-      {
-        title: "Calendar",
-        icon: "Calendar",
-        children: [
-          { title: "Schedule", href: "/calendar" },
-          { title: "Bookings", href: "/bookings" },
-          { title: "Team availability", href: "/calendar/team" },
-          { title: "Settings", href: "/calendar/settings" },
-        ],
-      },
-      {
-        title: "Customers",
-        icon: "Users",
-        children: [
-          { title: "Customers", href: "/customers" },
-          { title: "Segments", href: "/customers/segments" },
-          { title: "Notes", href: "/customers/notes" },
-        ],
-      },
+      { title: 'Calendar', href: '/dashboard/calendar' },
+      { title: 'Bookings', href: '/dashboard/bookings' },
+      { title: 'Technicians', href: '/dashboard/technicians' },
+      { title: 'Time off', href: '/dashboard/time-off' },
     ],
   },
   {
-    title: "Money",
+    title: 'Customers',
     items: [
-      {
-        title: "Billing",
-        icon: "CreditCard",
-        children: [
-          { title: "Invoices", href: "/billing/invoices" },
-          { title: "Payments", href: "/billing/payments" },
-          { title: "Plans", href: "/billing/plans" },
-        ],
-      },
-      {
-        title: "Reports",
-        icon: "BarChart3",
-        children: [
-          { title: "Revenue", href: "/reports/revenue" },
-          { title: "Utilization", href: "/reports/utilization" },
-          { title: "Customer growth", href: "/reports/customers" },
-        ],
-      },
+      { title: 'CRM', href: '/dashboard/customers' },
+      { title: 'Segments', href: '/dashboard/customers/segments' },
+      { title: 'Notes', href: '/dashboard/customers/notes' },
     ],
   },
   {
-    title: "Setup",
+    title: 'Services',
     items: [
-      {
-        title: "Settings",
-        icon: "Settings",
-        children: [
-          { title: "Company", href: "/settings/company" },
-          { title: "Team", href: "/settings/team" },
-          { title: "Locations", href: "/settings/locations" },
-          { title: "Services", href: "/settings/services" },
-          { title: "Integrations", href: "/settings/integrations" },
-          { title: "Notifications", href: "/settings/notifications" },
-        ],
-      },
-      {
-        title: "Developer Admin",
-        icon: "Shield",
-        href: "/dev-admin",
-        devOnly: true,
-      },
+      { title: 'Catalog', href: '/dashboard/services' },
+      { title: 'Pricing', href: '/dashboard/pricing' },
     ],
+  },
+  {
+    title: 'Automations',
+    items: [{ title: 'Automations', href: '/dashboard/automations' }],
+  },
+  {
+    title: 'Billing',
+    items: [
+      { title: 'Billing', href: '/dashboard/billing' },
+      { title: 'Invoices', href: '/dashboard/billing/invoices' },
+      { title: 'Payments', href: '/dashboard/billing/payments' },
+      { title: 'Plans', href: '/dashboard/billing/plans' },
+    ],
+  },
+  {
+    title: 'Settings',
+    items: [
+      { title: 'Company', href: '/dashboard/settings/company' },
+      { title: 'Team', href: '/dashboard/settings/team' },
+      { title: 'Locations', href: '/dashboard/settings/locations' },
+      { title: 'Services', href: '/dashboard/settings/services' },
+      { title: 'Integrations', href: '/dashboard/settings/integrations' },
+      { title: 'Notifications', href: '/dashboard/settings/notifications' },
+    ],
+  },
+  {
+    title: 'Admin',
+    items: [{ title: 'Developer Admin', href: '/dev-admin', devOnly: true }],
   },
 ];
