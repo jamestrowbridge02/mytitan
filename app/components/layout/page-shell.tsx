@@ -1,5 +1,5 @@
 import React from "react";
-import { Sidebar } from '../nav/sidebar';
+import Sidebar from "../nav/sidebar";
 import CommandPalette from "../command/command-palette";
 
 export function PageShell(props: {
