@@ -17,7 +17,9 @@ export const isGuidedSetupV2Enabled = () => isFlagOn(process.env.MYTITAN_FEATURE
 export const isCommandCentreEnabled = () => isFlagOn(process.env.MYTITAN_FEATURE_COMMAND_CENTRE);
 export const isCrmV1Enabled = () => isFlagOn(process.env.MYTITAN_FEATURE_CRM_V1);
 export const isDraftsV1Enabled = () => isFlagOn(process.env.MYTITAN_FEATURE_DRAFTS_V1);
-export const isDemoTourV1Enabled = () => isFlagOn(process.env.MYTITAN_FEATURE_DEMO_TOUR_V1);
+
+export const isOnboardingTourV1Enabled = () => isFlagOn(process.env.MYTITAN_FEATURE_DEMO_TOUR_V1);
+export const isDemoTourV1Enabled = () => isOnboardingTourV1Enabled();
 export const isAuthPolishV1Enabled = () => isFlagOn(process.env.MYTITAN_FEATURE_AUTH_POLISH_V1);
 export const isMarketingPolishV1Enabled = () => isFlagOn(process.env.MYTITAN_FEATURE_MARKETING_POLISH_V1);
 export const isCommandCentreV1Enabled = () => isFlagOn(process.env.MYTITAN_FEATURE_COMMAND_CENTRE_V1);
@@ -32,7 +34,9 @@ export const isInventoryProV1Enabled = () => isFlagOn(process.env.MYTITAN_FEATUR
 export const isCommandCentreV2Enabled = () => isFlagOn(process.env.MYTITAN_FEATURE_COMMAND_CENTRE_V2);
 export const isBookingProV1Enabled = () => isFlagOn(process.env.MYTITAN_FEATURE_BOOKING_PRO_V1);
 export const isCrmProV1Enabled = () => isFlagOn(process.env.MYTITAN_FEATURE_CRM_PRO_V1);
-export const isDemoPolishV1Enabled = () => isFlagOn(process.env.MYTITAN_FEATURE_DEMO_POLISH_V1);
+
+export const isOnboardingPolishV1Enabled = () => isFlagOn(process.env.MYTITAN_FEATURE_DEMO_POLISH_V1);
+export const isDemoPolishV1Enabled = () => isOnboardingPolishV1Enabled();
 export const isMediaSignatureV1Enabled = () => isFlagOn(process.env.MYTITAN_FEATURE_MEDIA_SIGNATURE_V1);
 export const isNotificationsV1Enabled = () => isFlagOn(process.env.MYTITAN_FEATURE_NOTIFICATIONS_V1);
 export const isAutomationsV1Enabled = () => isFlagOn(process.env.MYTITAN_FEATURE_AUTOMATIONS_V1);
