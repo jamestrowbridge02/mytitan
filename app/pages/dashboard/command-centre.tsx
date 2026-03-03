@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import DemoCoach from '../../components/demo/DemoCoach';
+import OnboardingCoach from '../../components/coach/OnboardingCoach';
 import { DashboardShell } from '../../components/dashboard-shell';
 import JobQuickActions from '../../components/command-centre/JobQuickActions';
 import { ApiError, apiFetch } from '../../lib/api';
@@ -290,7 +290,7 @@ export default function CommandCentrePage() {
         {toast ? <p style={{ color: '#5eead4' }}>{toast} {premiumEnabled ? <button className="button secondary" type="button" onClick={undoLastChange}>Undo</button> : null}</p> : null}
       </div>
 
-      <DemoCoach
+      <OnboardingCoach
         actions={{
           booking_to_job: [{ label: 'Open bookings', href: '/dashboard/bookings' }],
           start_job: [{ label: 'Open jobs', href: '/dashboard/jobs' }],

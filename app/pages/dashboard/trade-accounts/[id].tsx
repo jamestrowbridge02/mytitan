@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { DashboardShell } from "../../../components/dashboard-shell";
-import DemoCoach from "../../../components/demo/DemoCoach";
+import OnboardingCoach from "../../../components/coach/OnboardingCoach";
 import EntityHeader from "../../../components/entity/EntityHeader";
 import RelatedLinks from "../../../components/entity/RelatedLinks";
 import EntitySection from "../../../components/entity/EntitySection";
@@ -423,7 +423,7 @@ export default function TradeAccountProfilePage() {
           </EntitySection>
         </div>
         <div className="entity-rail">
-          <DemoCoach
+          <OnboardingCoach
             actions={{
               booking_to_job: [{ label: "Create booking", href: bookingHref }],
             }}

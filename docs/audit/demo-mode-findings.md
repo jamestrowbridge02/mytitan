@@ -3,7 +3,7 @@
 ## Current Design
 -  auth endpoint: `POST /public/-login`
   - File: `/opt/mytitan/api/src/public/public.controller.ts`
-  - Gated by `isPublicDemoEnabled()`
+  - Gated by `legacy public demo gate`
   - Returns 404 when flag off
   - Rate-limited per IP in memory
   - Issues short-lived JWT (`30m`) with `demoUser: true`
