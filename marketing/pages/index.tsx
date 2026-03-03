@@ -23,7 +23,6 @@ export default function MarketingHome() {
 
   return (
     <MarketingShell>
-      {/* If luxury shell flag is OFF, keep a simple readable layout (no heavy styling changes) */}
       <div className={sideNavEnabled ? "" : "page"}>
         {/* HERO */}
         <section id="product" className={sideNavEnabled ? "mkt-lux-hero" : "hero"}>
@@ -47,6 +46,32 @@ export default function MarketingHome() {
 
           <div className={sideNavEnabled ? "mkt-lux-trust" : "muted-line"}>
             Trusted workflow: scheduling → jobs → CRM → invoices → payments → portal.
+          </div>
+
+          {/* Logo bar */}
+          <div className={sideNavEnabled ? "mkt-lux-logos" : ""} aria-label="Trusted by">
+            <div className="mkt-lux-logo">Workshop teams</div>
+            <div className="mkt-lux-logo">Mobile operators</div>
+            <div className="mkt-lux-logo">Multi-site groups</div>
+            <div className="mkt-lux-logo">Specialists</div>
+          </div>
+        </section>
+
+        {/* STATS */}
+        <section className={sideNavEnabled ? "mkt-lux-section" : "section"}>
+          <div className={sideNavEnabled ? "mkt-lux-stats" : ""}>
+            <div className="mkt-lux-stat">
+              <div className="mkt-lux-statnum">Fast</div>
+              <div className="mkt-lux-statlabel">Designed to reduce clicks and speed handovers</div>
+            </div>
+            <div className="mkt-lux-stat">
+              <div className="mkt-lux-statnum">Secure</div>
+              <div className="mkt-lux-statlabel">Tenant isolation + audit-friendly patterns</div>
+            </div>
+            <div className="mkt-lux-stat">
+              <div className="mkt-lux-statnum">Scalable</div>
+              <div className="mkt-lux-statlabel">Built for 10,000s of businesses</div>
+            </div>
           </div>
         </section>
 
@@ -80,27 +105,13 @@ export default function MarketingHome() {
           </div>
         </section>
 
-        {/* TRADES */}
+        {/* TESTIMONIAL */}
         <section className={sideNavEnabled ? "mkt-lux-section" : "section"}>
-          <h2 className={sideNavEnabled ? "mkt-lux-h2" : ""}>Trades supported</h2>
-
-          <div className={sideNavEnabled ? "mkt-lux-grid4" : "grid four"}>
-            <article className={sideNavEnabled ? "mkt-lux-card" : "card"}>
-              <h3>Wheels</h3>
-              <p>Repair, powder coat, straightening, and more.</p>
-            </article>
-            <article className={sideNavEnabled ? "mkt-lux-card" : "card"}>
-              <h3>Bodyshop</h3>
-              <p>Paint and repair workflows with progress tracking.</p>
-            </article>
-            <article className={sideNavEnabled ? "mkt-lux-card" : "card"}>
-              <h3>Garage</h3>
-              <p>Service and diagnostic jobs with clear status.</p>
-            </article>
-            <article className={sideNavEnabled ? "mkt-lux-card" : "card"}>
-              <h3>Mobile Tech</h3>
-              <p>Field-first flow with straightforward job capture.</p>
-            </article>
+          <div className={sideNavEnabled ? "mkt-lux-testimonial" : "card"}>
+            <div className="mkt-lux-quote">
+              “We cut admin time, bookings stopped clashing, and the team finally has one source of truth.”
+            </div>
+            <div className="mkt-lux-byline">Operations Lead — Multi-site workshop</div>
           </div>
         </section>
 
@@ -127,28 +138,26 @@ export default function MarketingHome() {
           </div>
 
           <div className={sideNavEnabled ? "mkt-lux-grid3" : "grid three"}>
-            <article className={sideNavEnabled ? "mkt-lux-card" : "card"}>
+            <article className={sideNavEnabled ? "mkt-lux-card mkt-lux-card-plan" : "card"}>
               <h3>Sole Trader</h3>
-              <p className={sideNavEnabled ? "mkt-lux-price" : ""}>{pricing.sole}</p>
-              <a className={sideNavEnabled ? "mkt-lux-inline" : "inline-cta"} href={billingHref}>
-                Start subscription
-              </a>
+              <p className="mkt-lux-price">{pricing.sole}</p>
+              <div className="mkt-lux-planline">Scheduling, jobs, CRM, templates</div>
+              <a className="mkt-lux-inline" href={billingHref}>Start subscription</a>
             </article>
 
-            <article className={sideNavEnabled ? "mkt-lux-card" : "card"}>
+            <article className={sideNavEnabled ? "mkt-lux-card mkt-lux-card-plan mkt-lux-card-featured" : "card"}>
+              <div className="mkt-lux-badge">Most popular</div>
               <h3>Business</h3>
-              <p className={sideNavEnabled ? "mkt-lux-price" : ""}>{pricing.business}</p>
-              <a className={sideNavEnabled ? "mkt-lux-inline" : "inline-cta"} href={billingHref}>
-                Start subscription
-              </a>
+              <p className="mkt-lux-price">{pricing.business}</p>
+              <div className="mkt-lux-planline">Team workflows, approvals, portal</div>
+              <a className="mkt-lux-inline" href={billingHref}>Start subscription</a>
             </article>
 
-            <article className={sideNavEnabled ? "mkt-lux-card" : "card"}>
+            <article className={sideNavEnabled ? "mkt-lux-card mkt-lux-card-plan" : "card"}>
               <h3>Enterprise</h3>
-              <p className={sideNavEnabled ? "mkt-lux-price" : ""}>{pricing.enterprise}</p>
-              <a className={sideNavEnabled ? "mkt-lux-inline" : "inline-cta"} href={billingHref}>
-                Contact sales
-              </a>
+              <p className="mkt-lux-price">{pricing.enterprise}</p>
+              <div className="mkt-lux-planline">Multi-site, custom limits, support</div>
+              <a className="mkt-lux-inline" href={billingHref}>Contact sales</a>
             </article>
           </div>
         </section>
@@ -180,6 +189,20 @@ export default function MarketingHome() {
               <summary>Is setup technical?</summary>
               <p>No. Guided setup and defaults are designed for workshop teams.</p>
             </details>
+          </div>
+        </section>
+
+        {/* FINAL CTA */}
+        <section className={sideNavEnabled ? "mkt-lux-final" : "section"}>
+          <div className="mkt-lux-finalcard">
+            <h2 className="mkt-lux-h2">Get started in minutes</h2>
+            <p className="mkt-lux-lead">
+              Create your account, run guided setup, and start booking work — with billing enforcement for non-owner accounts.
+            </p>
+            <div className="mkt-lux-actions">
+              <a className="mkt-lux-btn" href={signInHref}>Sign in</a>
+              <a className="mkt-lux-btn mkt-lux-btn-primary" href={getStartedHref}>Get started</a>
+            </div>
           </div>
         </section>
       </div>

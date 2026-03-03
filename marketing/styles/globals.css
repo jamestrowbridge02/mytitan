@@ -291,3 +291,124 @@ a { color: inherit; text-decoration: none; }
   [data-mkt-lux="1"] .mkt-lux-grid3,
   [data-mkt-lux="1"] .mkt-lux-grid2{ grid-template-columns: 1fr; }
 }
+
+/* --- Luxury interaction + composition polish (scoped) --- */
+[data-mkt-lux="1"]{ -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision; }
+[data-mkt-lux="1"] .mkt-lux-link-btn{
+  width: 100%;
+  text-align: left;
+  display:flex;
+  gap:10px;
+  align-items:center;
+}
+[data-mkt-lux="1"] .mkt-lux-dot{
+  width: 8px; height: 8px; border-radius: 999px;
+  background: rgba(15,23,42,0.18);
+  box-shadow: inset 0 0 0 1px rgba(15,23,42,0.10);
+}
+[data-mkt-lux="1"] .mkt-lux-link-btn.is-active{
+  color: var(--lux-fg);
+  background: rgba(14,165,164,0.08);
+  border-color: rgba(14,165,164,0.18);
+}
+[data-mkt-lux="1"] .mkt-lux-link-btn.is-active .mkt-lux-dot{
+  background: rgba(14,165,164,0.55);
+  box-shadow: inset 0 0 0 1px rgba(14,165,164,0.22);
+}
+[data-mkt-lux="1"] .mkt-lux-mini{
+  padding: 12px 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(15,23,42,0.10);
+  background: rgba(255,255,255,0.55);
+}
+[data-mkt-lux="1"] .mkt-lux-logos{
+  margin-top: 18px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0,1fr));
+  gap: 10px;
+}
+[data-mkt-lux="1"] .mkt-lux-logo{
+  border: 1px solid rgba(15,23,42,0.10);
+  background: rgba(255,255,255,0.55);
+  border-radius: 16px;
+  padding: 10px 12px;
+  font-size: 12px;
+  color: rgba(15,23,42,0.62);
+  text-align:center;
+}
+[data-mkt-lux="1"] .mkt-lux-stats{
+  display:grid;
+  grid-template-columns: repeat(3, minmax(0,1fr));
+  gap: 12px;
+}
+[data-mkt-lux="1"] .mkt-lux-stat{
+  border: 1px solid rgba(15,23,42,0.10);
+  background: rgba(255,255,255,0.55);
+  border-radius: 18px;
+  padding: 16px 18px;
+}
+[data-mkt-lux="1"] .mkt-lux-statnum{
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+[data-mkt-lux="1"] .mkt-lux-statlabel{
+  margin-top: 6px;
+  font-size: 13px;
+  color: rgba(15,23,42,0.64);
+}
+[data-mkt-lux="1"] .mkt-lux-testimonial{
+  border: 1px solid rgba(15,23,42,0.10);
+  background: linear-gradient(120deg, rgba(255,255,255,0.70), rgba(14,165,164,0.06));
+  border-radius: 22px;
+  padding: 22px;
+}
+[data-mkt-lux="1"] .mkt-lux-quote{
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  font-size: 18px;
+  line-height: 1.25;
+}
+[data-mkt-lux="1"] .mkt-lux-byline{
+  margin-top: 10px;
+  color: rgba(15,23,42,0.65);
+  font-size: 13px;
+}
+[data-mkt-lux="1"] .mkt-lux-card-plan{
+  position: relative;
+}
+[data-mkt-lux="1"] .mkt-lux-card-featured{
+  border-color: rgba(14,165,164,0.22);
+  box-shadow: 0 18px 50px rgba(15,23,42,0.08);
+}
+[data-mkt-lux="1"] .mkt-lux-badge{
+  position:absolute;
+  top: 14px;
+  right: 14px;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(14,165,164,0.25);
+  background: rgba(14,165,164,0.10);
+}
+[data-mkt-lux="1"] .mkt-lux-planline{
+  margin-top: 10px;
+  color: rgba(15,23,42,0.64);
+  font-size: 13px;
+}
+[data-mkt-lux="1"] .mkt-lux-final{
+  margin-top: 34px;
+}
+[data-mkt-lux="1"] .mkt-lux-finalcard{
+  border: 1px solid rgba(15,23,42,0.10);
+  background: rgba(15,23,42,0.02);
+  border-radius: 22px;
+  padding: 26px;
+}
+
+@media (max-width: 980px){
+  [data-mkt-lux="1"] .mkt-lux-logos{ grid-template-columns: repeat(2, minmax(0,1fr)); }
+  [data-mkt-lux="1"] .mkt-lux-stats{ grid-template-columns: 1fr; }
+}
