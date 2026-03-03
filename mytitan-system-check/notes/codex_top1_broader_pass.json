@@ -22,5 +22,19 @@
   "notes": [
     "API build is verified via docker compose build api (container runtime may not include nest/devDependencies)."
   ],
-  "dbEvidencePath": "/opt/mytitan/tmp/top1_db_evidence_clean_20260302_120914.txt"
+  "dbEvidencePath": "/opt/mytitan/tmp/top1_db_evidence_clean_20260302_120914.txt",
+  "top1": {
+    "system_check_log": "/opt/mytitan/tmp/top1_system_check_20260303_161925.log",
+    "db_evidence_file": "/opt/mytitan/tmp/top1_db_evidence_20260303_161925.txt",
+    "verification": {
+      "docker_builds": {
+        "api": true,
+        "app": true,
+        "marketing": true
+      },
+      "scheduling_smoke": true,
+      "dev_admin_unauth_401": true
+    },
+    "summary": "Repo clean. All core containers up. Prisma migrate/generate OK. Scheduling smoke OK. audit:top1 OK. docker compose build api/app/marketing OK. DB exclusion constraint booking_no_overlap_company_technician present and overlap scan clean (0). Dev admin mounted at /admin/dev/me and returns 401 unauthenticated. Demo references absent in live source scan."
+  }
 }
