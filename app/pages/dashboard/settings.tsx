@@ -60,6 +60,7 @@ const TENANT_SETTINGS_ALLOWED_KEYS = [
   'vatEnabledDefault',
   'vatRateBpsDefault',
   'whatsappTemplateDefault',
+  'primaryTrade',
 ] as const;
 
 function pickSettingsPayload(input: Record<string, any>) {

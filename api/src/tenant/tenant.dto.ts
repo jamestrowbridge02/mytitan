@@ -14,6 +14,8 @@ import {
 import { WHEEL_PRICING_MODES } from '../common/constants';
 
 export class UpdateTenantSettingsDto {
+  // Primary trade (feature-flagged)
+  primaryTrade?: string;
   @IsOptional()
   @IsString()
   companyName?: string;

@@ -1,3 +1,4 @@
+import { isSettingsPrimaryTradeV1Enabled } from '../common/feature-flags';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import crypto from 'crypto';
 import { AuditService } from '../audit/audit.service';

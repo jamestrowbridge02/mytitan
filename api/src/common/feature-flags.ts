@@ -132,3 +132,5 @@ export const requireSchedulingIntelligenceV1Enabled = () => {
     throw new ServiceUnavailableException('Scheduling Intelligence v1 is not enabled.');
   }
 };
+
+export const isSettingsPrimaryTradeV1Enabled = () => isFlagOn(process.env.MYTITAN_SETTINGS_PRIMARY_TRADE_V1);
