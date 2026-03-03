@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Skeleton } from "app/components/ui/Skeleton";
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { DashboardShell } from '../../components/dashboard-shell';
