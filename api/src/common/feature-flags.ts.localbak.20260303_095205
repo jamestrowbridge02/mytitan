@@ -36,6 +36,14 @@ export const isCrmProV1Enabled = () => isFlagOn(process.env.MYTITAN_FEATURE_CRM_
 export const isDemoPolishV1Enabled = () => isFlagOn(process.env.MYTITAN_FEATURE_DEMO_POLISH_V1);
 export const isMediaSignatureV1Enabled = () => isFlagOn(process.env.MYTITAN_FEATURE_MEDIA_SIGNATURE_V1);
 export const isNotificationsV1Enabled = () => isFlagOn(process.env.MYTITAN_FEATURE_NOTIFICATIONS_V1);
+export const isAutomationsV1Enabled = () => isFlagOn(process.env.MYTITAN_FEATURE_AUTOMATIONS_V1);
+export const isAnalyticsV1Enabled = () => isFlagOn(process.env.MYTITAN_FEATURE_ANALYTICS_V1);
+export const isCalendarV1Enabled = () => isFlagOn(process.env.MYTITAN_FEATURE_CALENDAR_V1);
+export const isCalendarV2DragEnabled = () => isFlagOn(process.env.MYTITAN_FEATURE_CALENDAR_V2_DRAG);
+export const isCalendarV2HardConflictsEnabled = () =>
+  isFlagOn(process.env.MYTITAN_FEATURE_CALENDAR_V2_HARD_CONFLICTS);
+export const isSchedulingIntelligenceV1Enabled = () =>
+  isFlagOn(process.env.MYTITAN_FEATURE_SCHEDULING_INTELLIGENCE_V1);
 
 export const requireMarketplaceEnabled = () => {
   if (!isMarketplaceEnabled()) {
@@ -89,5 +97,35 @@ export const requireCrmProV1Enabled = () => {
 export const requireNotificationsV1Enabled = () => {
   if (!isNotificationsV1Enabled()) {
     throw new ServiceUnavailableException('Notifications v1 is not enabled.');
+  }
+};
+
+export const requireAutomationsV1Enabled = () => {
+  if (!isAutomationsV1Enabled()) {
+    throw new ServiceUnavailableException('Automations v1 is not enabled.');
+  }
+};
+
+export const requireAnalyticsV1Enabled = () => {
+  if (!isAnalyticsV1Enabled()) {
+    throw new ServiceUnavailableException('Analytics v1 is not enabled.');
+  }
+};
+
+export const requireCalendarV1Enabled = () => {
+  if (!isCalendarV1Enabled()) {
+    throw new ServiceUnavailableException('Calendar v1 is not enabled.');
+  }
+};
+
+export const requireCalendarV2DragEnabled = () => {
+  if (!isCalendarV2DragEnabled()) {
+    throw new ServiceUnavailableException('Calendar drag rescheduling is not enabled.');
+  }
+};
+
+export const requireSchedulingIntelligenceV1Enabled = () => {
+  if (!isSchedulingIntelligenceV1Enabled()) {
+    throw new ServiceUnavailableException('Scheduling Intelligence v1 is not enabled.');
   }
 };

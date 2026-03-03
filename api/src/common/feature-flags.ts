@@ -14,7 +14,6 @@ export const isWheelsFormV1Enabled = () => isFlagOn(process.env.MYTITAN_FEATURE_
 export const isWheelsAutomationV1Enabled = () => isFlagOn(process.env.MYTITAN_FEATURE_WHEELS_AUTOMATION_V1);
 export const isPortalPolishV1Enabled = () => isFlagOn(process.env.MYTITAN_FEATURE_PORTAL_POLISH_V1);
 export const isGuidedSetupV2Enabled = () => isFlagOn(process.env.MYTITAN_FEATURE_GUIDED_SETUP_V2);
-export const isPublicDemoEnabled = () => isFlagOn(process.env.MYTITAN_FEATURE_PUBLIC_DEMO);
 export const isCommandCentreEnabled = () => isFlagOn(process.env.MYTITAN_FEATURE_COMMAND_CENTRE);
 export const isCrmV1Enabled = () => isFlagOn(process.env.MYTITAN_FEATURE_CRM_V1);
 export const isDraftsV1Enabled = () => isFlagOn(process.env.MYTITAN_FEATURE_DRAFTS_V1);

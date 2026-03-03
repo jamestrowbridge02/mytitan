@@ -1,9 +1,0 @@
-import { Module } from '@nestjs/common';
-import { TenantModule } from '../tenant/tenant.module';
-import { OnboardingController } from './onboarding.controller';
-
-@Module({
-  imports: [TenantModule],
-  controllers: [OnboardingController],
-})
-export class OnboardingModule {}
