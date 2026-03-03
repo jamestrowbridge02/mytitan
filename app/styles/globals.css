@@ -326,7 +326,6 @@ a { color: var(--tenant-accent); text-decoration: none; }
   }
 }
 
-@import "./tokens.css";
 /* Top-1% baseline polish (safe, minimal) */
 html,body{height:100%;}
 body{
