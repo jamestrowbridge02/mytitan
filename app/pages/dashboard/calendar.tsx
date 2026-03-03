@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { useRouter } from 'next/router';
 import { DashboardShell } from '../../components/dashboard-shell';
+import { Skeleton } from '../../components/ui/Skeleton';
 import { ErrorState } from '../../components/states/ErrorState';
 import { LoadingState } from '../../components/states/LoadingState';
 import { ApiError, apiFetch } from '../../lib/api';
@@ -1702,7 +1703,7 @@ export default function CalendarPage() {
                                             Apply best
                                           </button>
                                           {suggestState?.loading && !applyingBest ? (
-                                            <span className="muted" style={{ fontSize: 10 }}>Loading…</span>
+                                            <Skeleton className="h-3 w-14" />
                                           ) : null}
                                           {applyingBest ? (
                                             <span className="muted" style={{ fontSize: 10 }}>Applying…</span>

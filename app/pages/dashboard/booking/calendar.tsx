@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { DashboardShell } from '../../../components/dashboard-shell';
+import { Skeleton } from '../../../components/ui/Skeleton';
 import { ApiError, apiFetch } from '../../../lib/api';
 import { SuggestedSlotReasons } from '../../../components/SuggestedSlotReasons';
 import { ErrorState } from '../../../components/states/ErrorState';
@@ -288,9 +289,11 @@ export default function BookingProCalendarPage() {
             {suggestionsOpen ? (
               <div style={{ display: 'grid', gap: 8 }}>
                 {draftLoading ? (
-                  <p className="muted" style={{ fontSize: 12, margin: 0 }}>
-                    Loading suggested slots…
-                  </p>
+                  <div className="space-y-2" style={{ margin: 0 }}>
+                    <Skeleton className="h-4 w-40" />
+                    <Skeleton className="h-12 w-full" />
+                    <Skeleton className="h-12 w-full" />
+                  </div>
                 ) : draftError ? (
                   <ErrorState
                     title="Could not load suggested slots"

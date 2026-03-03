@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { DashboardShell } from '../../components/dashboard-shell';
+import { EmptyState } from '../../components/ui/EmptyState';
 import { apiFetch } from '../../lib/api';
 
 const ROLES = ['OWNER', 'ADMIN', 'STAFF', 'READ_ONLY'];
@@ -82,35 +83,39 @@ export default function UsersPage() {
           <p className="muted">Invite tokens are displayed once. Send them securely.</p>
         </div>
 
-        <div className="list">
-          {users.map((user) => (
-            <div key={user.id} className="card" style={{ padding: 16 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                <strong>{user.email}</strong>
-                <span className="badge">{user.role}</span>
-              </div>
-              <p className="muted">
-                Last active: {user.lastActiveAt ? new Date(user.lastActiveAt).toLocaleString() : '—'}
-              </p>
-              {meRole === 'OWNER' ? (
+        {users.length === 0 ? (
+          <EmptyState title="No team members yet" subtitle="Invite your first user to get started." />
+        ) : (
+          <div className="list">
+            {users.map((user) => (
+              <div key={user.id} className="card" style={{ padding: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                  <strong>{user.email}</strong>
+                  <span className="badge">{user.role}</span>
+                </div>
                 <p className="muted">
-                  Last login: {user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString() : '—'} • Email verified: {user.emailVerified ? 'Yes' : 'No'}
+                  Last active: {user.lastActiveAt ? new Date(user.lastActiveAt).toLocaleString() : '—'}
                 </p>
-              ) : null}
-              {meRole === 'OWNER' && user.role !== 'OWNER' && (
-                <select
-                  className="input"
-                  value={user.role}
-                  onChange={(e) => updateRole(user.id, e.target.value)}
-                >
-                  {ROLES.filter((r) => r !== 'OWNER').map((role) => (
-                    <option key={role} value={role}>{role}</option>
-                  ))}
-                </select>
-              )}
-            </div>
-          ))}
-        </div>
+                {meRole === 'OWNER' ? (
+                  <p className="muted">
+                    Last login: {user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString() : '—'} • Email verified: {user.emailVerified ? 'Yes' : 'No'}
+                  </p>
+                ) : null}
+                {meRole === 'OWNER' && user.role !== 'OWNER' && (
+                  <select
+                    className="input"
+                    value={user.role}
+                    onChange={(e) => updateRole(user.id, e.target.value)}
+                  >
+                    {ROLES.filter((r) => r !== 'OWNER').map((role) => (
+                      <option key={role} value={role}>{role}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </DashboardShell>
   );

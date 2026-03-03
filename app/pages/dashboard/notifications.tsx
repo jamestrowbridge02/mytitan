@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { DashboardShell } from '../../components/dashboard-shell';
+import { EmptyState } from '../../components/ui/EmptyState';
 import { apiFetch } from '../../lib/api';
 import { isNotificationsV1Enabled } from '../../lib/feature-flags';
 
@@ -103,7 +104,9 @@ export default function NotificationsPage() {
               </div>
             </div>
           ))}
-          {items.length === 0 ? <p className="muted">No notifications yet.</p> : null}
+          {items.length === 0 ? (
+            <EmptyState title="No notifications yet" subtitle="When events occur, updates will appear here." />
+          ) : null}
         </div>
       </div>
     </DashboardShell>
