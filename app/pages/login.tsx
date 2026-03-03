@@ -9,7 +9,6 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [demoLoading, setDemoLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const authPolish = isAuthPolishV1Enabled();
 
@@ -24,28 +23,8 @@ export default function Login() {
     if (typeof demoTokenParam === 'string' && demoTokenParam.trim()) {
       setToken(demoTokenParam.trim());
       router.replace('/dashboard');
-      return;
     }
-    if (router.query. === '1' && !demoLoading) {
-      setDemoLoading(true);
-      apiFetch('/public/-login', { method: 'POST', body: JSON.stringify({}) })
-        .then((res) => {
-          if (res?.token) {
-            setToken(res.token);
-            router.replace('/dashboard');
-            return;
-          }
-          throw new Error(' token unavailable');
-        })
-        .catch((err: any) => {
-          const msg = String(err?.message || '');
-          setError(msg.includes('Failed to fetch') ? 'Cannot reach server. Check your connection and try again.' : (msg || ' login failed'));
-        })
-        .finally(() => {
-          setDemoLoading(false);
-        });
-    }
-  }, [router.isReady, router.query., router.query.demo_token, demoLoading]);
+  }, [router.isReady, router.query.demo_token]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -80,7 +59,6 @@ export default function Login() {
       <div className="card">
         <h1>Welcome back</h1>
         {error && <p style={{ color: '#ff8a8a' }}>{error}</p>}
-        {demoLoading && <p className="muted">Starting  session...</p>}
         <form onSubmit={handleSubmit}>
           <label>Email</label>
           <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
