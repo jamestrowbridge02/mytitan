@@ -17,6 +17,59 @@ const TABS: Array<{ key: TabKey; label: string }> = [
   { key: 'ai', label: 'AI' },
 ];
 
+const TENANT_SETTINGS_ALLOWED_KEYS = [
+  'accountingEnabled',
+  'aiEnabled',
+  'aiRequestsLimit',
+  'bookingsEnabled',
+  'bookingPublicEnabled',
+  'brandAccentColor',
+  'brandDefaultMode',
+  'brandPrimaryColor',
+  'brandSecondaryColor',
+  'companyName',
+  'defaultCurrency',
+  'defaultItems',
+  'defaultLocale',
+  'defaultServiceNamePresets',
+  'defaultTimezone',
+  'defaultTorqueSetting',
+  'defaultTyrePressure',
+  'defaultWheelPricingMode',
+  'emailNotificationRecipients',
+  'emailReplyTo',
+  'emailSenderName',
+  'featureAI',
+  'featureAccounting',
+  'featureBookings',
+  'featureCustomerPortal',
+  'featurePayments',
+  'featureSocial',
+  'featureWhatsApp',
+  'logoUrl',
+  'onboardingCompleted',
+  'onboardingStep',
+  'paymentsEnabled',
+  'smtpHost',
+  'smtpPasswordEncrypted',
+  'smtpPort',
+  'smtpUsername',
+  'socialEnabled',
+  'supportPhone',
+  'themeMode',
+  'vatEnabledDefault',
+  'vatRateBpsDefault',
+  'whatsappTemplateDefault',
+] as const;
+
+function pickSettingsPayload(input: Record<string, any>) {
+  const out: Record<string, any> = {};
+  for (const key of TENANT_SETTINGS_ALLOWED_KEYS) {
+    if (Object.prototype.hasOwnProperty.call(input, key)) out[key] = input[key];
+  }
+  return out;
+}
+
 export default function SettingsPage() {
   const { settings, refresh, setLocalSettings } = useTenantSettings();
   const { features, plan } = useBilling();
@@ -70,7 +123,7 @@ export default function SettingsPage() {
       };
       const updated = await apiFetch('/tenant/settings', {
         method: 'PUT',
-        body: JSON.stringify(payload),
+        body: JSON.stringify(pickSettingsPayload(payload)),
       });
       setLocalSettings(updated as TenantSettings);
       setStatus('Settings saved');

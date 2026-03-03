@@ -11,9 +11,8 @@ function isActive(pathname: string, href?: string) {
 
 function canShow(item: NavItem) {
   // Client-visible gate only. Real auth is enforced server-side.
-  const devEnabled =
-    typeof window !== 'undefined' &&
-    (process.env.NEXT_PUBLIC_DEV_ADMIN === 'on' || process.env.NEXT_PUBLIC_DEV_ADMIN === 'true');
+  const devFlag = (process.env.NEXT_PUBLIC_DEV_ADMIN || '').trim().toLowerCase();
+  const devEnabled = typeof window !== 'undefined' && (devFlag === 'on' || devFlag === 'true' || devFlag === '1');
 
   if (item.devOnly && !devEnabled) return false;
 
