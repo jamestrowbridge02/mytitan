@@ -27,7 +27,7 @@ function canShow(item: NavItem) {
   return true;
 }
 
-export default function Sidebar() {
+Sidebar() {
   const router = useRouter();
   const [open, setOpen] = React.useState<Record<string, boolean>>({});
 
@@ -144,3 +144,82 @@ export default function Sidebar() {
     </aside>
   );
 }
+
+
+function useCollapsedGroups(key: string) {
+  const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({});
+  React.useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(key);
+      if (raw) setCollapsed(JSON.parse(raw));
+    } catch {}
+  }, [key]);
+  React.useEffect(() => {
+    try {
+      window.localStorage.setItem(key, JSON.stringify(collapsed));
+    } catch {}
+  }, [key, collapsed]);
+  return { collapsed, setCollapsed };
+}
+
+export function SidebarV2() {
+  const router = useRouter();
+  const path = router.asPath || '';
+  const { collapsed, setCollapsed } = useCollapsedGroups('mytitan_sidebar_groups');
+
+  const toggle = (label: string) =>
+    setCollapsed((prev) => ({ ...prev, [label]: !prev[label] }));
+
+  return (
+    <aside className="hidden md:flex w-[280px] shrink-0 border-r border-white/10 bg-[rgba(255,255,255,0.02)]">
+      <div className="w-full px-4 py-5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="text-[13px] font-semibold tracking-[0.3px] opacity-90">MyTitan</div>
+          <div className="text-[11px] opacity-50">v2</div>
+        </div>
+
+        <nav className="mt-5 flex flex-col gap-4">
+          {NAV_GROUPS.map((g) => {
+            const isCollapsed = Boolean(collapsed[g.label]);
+            return (
+              <div key={g.label}>
+                <button
+                  type="button"
+                  onClick={() => toggle(g.label)}
+                  className="w-full text-left text-[11px] uppercase tracking-[0.14em] opacity-60 hover:opacity-90 transition flex items-center justify-between"
+                >
+                  <span>{g.label}</span>
+                  <span className="opacity-60">{isCollapsed ? '+' : '–'}</span>
+                </button>
+
+                {!isCollapsed ? (
+                  <div className="mt-2 flex flex-col gap-1">
+                    {g.items.map((it) => {
+                      const active = path === it.href || path.startsWith(it.href + '/');
+                      return (
+                        <a
+                          key={it.href}
+                          href={it.href}
+                          className={
+                            'px-3 py-2 rounded-xl text-[13px] border transition ' +
+                            (active
+                              ? 'bg-white/8 border-white/15 opacity-100'
+                              : 'bg-transparent border-transparent opacity-80 hover:opacity-100 hover:bg-white/5 hover:border-white/10')
+                          }
+                        >
+                          {it.label}
+                        </a>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+        </nav>
+      </div>
+    </aside>
+  );
+}
+
+export default SidebarV2;

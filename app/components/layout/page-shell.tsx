@@ -1,4 +1,5 @@
 import React from "react";
+import { SectionHeader } from '../ui/SectionHeader';
 import CommandPalette from "../command/command-palette";
 import Sidebar from "../nav/sidebar";
 
