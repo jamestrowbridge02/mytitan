@@ -8,6 +8,18 @@ import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bodyParser: false });
+
+  const sec = (process.env.MYTITAN_SECURITY_HEADERS || '').trim().toLowerCase();
+  const securityOn = sec === 'on' || sec === 'true' || sec === '1';
+  if (securityOn) {
+    // CSP can break embedded/portal flows; start with safe defaults.
+    app.use(
+      helmet({
+        contentSecurityPolicy: false,
+        crossOriginEmbedderPolicy: false,
+      }),
+    );
+  }
   const originEnv = process.env.CORS_ALLOWED_ORIGINS ?? '';
   const origins = originEnv
     .split(',')
