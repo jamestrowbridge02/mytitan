@@ -27,7 +27,7 @@ function canShow(item: NavItem) {
   return true;
 }
 
-Sidebar() {
+function Sidebar() {
   const router = useRouter();
   const [open, setOpen] = React.useState<Record<string, boolean>>({});
 
@@ -167,8 +167,7 @@ export function SidebarV2() {
   const path = router.asPath || '';
   const { collapsed, setCollapsed } = useCollapsedGroups('mytitan_sidebar_groups');
 
-  const toggle = (label: string) =>
-    setCollapsed((prev) => ({ ...prev, [label]: !prev[label] }));
+  const toggle = (label: string) => setCollapsed((prev) => ({ ...prev, [label]: !prev[label] }));
 
   return (
     <aside className="hidden md:flex w-[280px] shrink-0 border-r border-white/10 bg-[rgba(255,255,255,0.02)]">
@@ -179,27 +178,29 @@ export function SidebarV2() {
         </div>
 
         <nav className="mt-5 flex flex-col gap-4">
-          {NAV_GROUPS.map((g) => {
-            const isCollapsed = Boolean(collapsed[g.label]);
+          {NAV_GROUPS.map((g, groupIndex) => {
+            const groupLabel = (g as any).label ?? g.title;
+            const isCollapsed = Boolean(collapsed[groupLabel]);
             return (
-              <div key={g.label}>
+              <div key={`${groupLabel}-${groupIndex}`}>
                 <button
                   type="button"
-                  onClick={() => toggle(g.label)}
+                  onClick={() => toggle(groupLabel)}
                   className="w-full text-left text-[11px] uppercase tracking-[0.14em] opacity-60 hover:opacity-90 transition flex items-center justify-between"
                 >
-                  <span>{g.label}</span>
+                  <span>{groupLabel}</span>
                   <span className="opacity-60">{isCollapsed ? '+' : '–'}</span>
                 </button>
 
                 {!isCollapsed ? (
                   <div className="mt-2 flex flex-col gap-1">
-                    {g.items.map((it) => {
-                      const active = path === it.href || path.startsWith(it.href + '/');
+                    {g.items.map((it, itemIndex) => {
+                      const href = it.href || '#';
+                      const active = it.href ? path === it.href || path.startsWith(it.href + '/') : false;
                       return (
                         <a
-                          key={it.href}
-                          href={it.href}
+                          key={`${it.title}-${itemIndex}`}
+                          href={href}
                           className={
                             'px-3 py-2 rounded-xl text-[13px] border transition ' +
                             (active
@@ -207,7 +208,7 @@ export function SidebarV2() {
                               : 'bg-transparent border-transparent opacity-80 hover:opacity-100 hover:bg-white/5 hover:border-white/10')
                           }
                         >
-                          {it.label}
+                          {(it as any).label ?? it.title}
                         </a>
                       );
                     })}
