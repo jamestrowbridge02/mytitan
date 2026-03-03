@@ -1,6 +1,3 @@
-import { Button } from "../components/ui/Button";
-import { Card, CardHeader, CardContent } from "../components/ui/Card";
-import { Shell } from "../components/layout/Shell";
 import MarketingShell from "../components/layout/MarketingShell";
 import { useMemo, useState } from 'react';
 
@@ -23,24 +20,7 @@ export default function MarketingHome() {
   );
 
   return (
-    <MarketingShell>
-      <Shell>
-      <Card style={{ marginBottom: 16 }}>
-        <CardHeader>
-          <div style={{ fontSize: "var(--text-xl)", fontWeight: 800 }}>Welcome</div>
-          <div style={{ color: "var(--muted-fg)", marginTop: 6 }}>Everything looks consistent, fast, and polished.</div>
-        </CardHeader>
-        <CardContent>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <Button variant="primary">Primary action</Button>
-            <Button>Secondary</Button>
-            <Button variant="danger">Danger</Button>
-          </div>
-        </CardContent>
-      </Card>
-
-
-    <main className="page">
+    <MarketingShell><main className="page">
       <header className="hero section">
         <div className="pill">MyTitan</div>
         <h1>MyTitan — Jobs, bookings, payments, and customer comms for garages, wheels, bodyshops & mobile techs.</h1>
@@ -118,7 +98,6 @@ export default function MarketingHome() {
         </div>
       </section>
     </main>
-      </Shell>
-    </MarketingShell>
+</MarketingShell>
   );
 }
