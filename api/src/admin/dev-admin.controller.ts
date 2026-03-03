@@ -67,7 +67,9 @@ export class DevAdminController {
     const now = new Date().toISOString();
 
     // DB ping: lightweight
-    let db = { ok: false as boolean };
+    type HealthCheck = { ok: boolean; error?: string };
+
+    let db: HealthCheck = { ok: false };
     try {
       await (this.prisma as any).$queryRaw`SELECT 1`;
       db = { ok: true };
@@ -76,7 +78,7 @@ export class DevAdminController {
     }
 
     // Redis ping
-    let redis = { ok: false as boolean };
+        let redis: HealthCheck = { ok: false };
     try {
       const client: any = (this.redis as any)?.client || (this.redis as any)?.getClient?.();
       if (client?.ping) {
