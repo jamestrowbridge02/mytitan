@@ -1,4 +1,8 @@
-export type BillingUserLike = { email?: string | null };
+export type BillingUserLike = {
+  email?: string | null;
+  // Kept for compile compatibility while bypass logic remains email-only.
+  companyId?: string | null;
+};
 
 function parseCsvEnv(name: string): string[] {
   const raw = (process.env[name] || "").trim();
