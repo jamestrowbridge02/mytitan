@@ -5,6 +5,13 @@ import type { JwtPayload } from '../auth/auth.types';
 import { isBillingAllowlisted } from '../common/billing-allowlist';
 import { PrismaService } from '../prisma/prisma.service';
 
+function isDevAdminEnabled() {
+  const enabled = (process.env.MYTITAN_DEV_ADMIN_ENABLED || '').trim().toLowerCase();
+  if (process.env.NODE_ENV === 'production') return enabled === 'on' || enabled === 'true' || enabled === '1';
+  if (!enabled) return true;
+  return enabled === 'on' || enabled === 'true' || enabled === '1';
+}
+
 @Controller('admin/dev')
 export class DevAdminController {
   constructor(private readonly prisma: PrismaService) {}
@@ -12,6 +19,9 @@ export class DevAdminController {
   @UseGuards(JwtAuthGuard)
   @Get('me')
   async me(@CurrentUser() user: JwtPayload) {
+    if (!isDevAdminEnabled()) {
+      throw new ForbiddenException('DEV_ADMIN_DISABLED');
+    }
     if (!isBillingAllowlisted(user)) {
       throw new ForbiddenException('DEV_ADMIN_FORBIDDEN');
     }
@@ -51,10 +61,6 @@ export class DevAdminController {
       subscription,
       billing: {
         mode: process.env.MYTITAN_BILLING_MODE || 'enforce',
-        allowlistEmails: (process.env.MYTITAN_BILLING_ALLOWLIST_EMAILS || '')
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean),
       },
     };
   }
