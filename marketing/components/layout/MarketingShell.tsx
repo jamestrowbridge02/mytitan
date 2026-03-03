@@ -51,7 +51,7 @@ export default function MarketingShell(props: { children: React.ReactNode }) {
   };
 
   return (
-    <div data-mkt-lux="1" className="min-h-screen">
+    <div data-mkt-luxury={String(process.env.NEXT_PUBLIC_MYTITAN_MARKETING_LUXURY_V1 || "").toLowerCase()} data-mkt-motion={String(process.env.NEXT_PUBLIC_MYTITAN_MARKETING_MOTION_V1 || "").toLowerCase()} data-mkt-coherence={String(process.env.NEXT_PUBLIC_MYTITAN_MARKETING_COHERENCE_V1 || "").toLowerCase()} data-mkt-perf={String(process.env.NEXT_PUBLIC_MYTITAN_MARKETING_PERF_V1 || "").toLowerCase()} data-mkt-motion={String(process.env.NEXT_PUBLIC_MYTITAN_MARKETING_MOTION_V1 || "").toLowerCase()} data-mkt-coherence={String(process.env.NEXT_PUBLIC_MYTITAN_MARKETING_COHERENCE_V1 || "").toLowerCase()} data-mkt-perf={String(process.env.NEXT_PUBLIC_MYTITAN_MARKETING_PERF_V1 || "").toLowerCase()} data-mkt-lux="1" className="min-h-screen">
       {/* Mobile top bar */}
       <div className="md:hidden sticky top-0 z-40 mkt-lux-top">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
