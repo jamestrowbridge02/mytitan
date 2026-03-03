@@ -23,6 +23,9 @@ import { ApproveJobDto, DeclineJobDto, SignJobDto } from "./public.dto";
 
 @Controller("public")
 export class PublicController {
+  private readonly demoBuckets = new Map<string, { count: number; resetAt: number }>();
+  private readonly demoWindowMs = 60 * 1000;
+  private readonly demoMaxRequests = 10;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -287,32 +290,3 @@ export class PublicController {
     };
   }
 
-  @HttpCode(200)
-      throw new NotFoundException("Not found");
-    }
-    const ip = String(req.ip || "unknown").trim();
-    const now = Date.now();
-    if (!bucket || bucket.resetAt <= now) {
-    } else {
-      }
-      bucket.count += 1;
-    }
-
-    const db = this.prisma as any;
-      include: { company: true },
-    });
-    }
-
-    const payload = {
-    };
-    const token = await this.jwtService.signAsync(payload, { expiresIn: "30m" });
-    return {
-      token,
-      expiresInSeconds: 1800,
-      user: {
-      },
-      company: {
-      },
-    };
-  }
-}
