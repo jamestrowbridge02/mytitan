@@ -51,6 +51,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const demoPolishEnabled = isDemoPolishV1Enabled();
   const notificationsEnabled = isNotificationsV1Enabled();
   const wheelsFormEnabled = isWheelsFormV1Enabled() && settings?.primaryTrade === 'WHEELS';
+  const coherenceFlag = String(process.env.NEXT_PUBLIC_MYTITAN_UI_COHERENCE_V1 || '').trim().toLowerCase();
+  const coherenceOn = coherenceFlag === 'on' || coherenceFlag === 'true' || coherenceFlag === '1';
   const aiFlag = settings?.featureAI ?? settings?.aiEnabled;
   const bookingsFlag = settings?.featureBookings ?? settings?.bookingsEnabled;
   const aiAllowed = Boolean(features?.ai_enabled) && Boolean(aiFlag);
@@ -272,6 +274,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         </div>
       </div>
 
+      {!coherenceOn ? (
       <div className="nav">
         {startHereEnabled ? <Link href="/start">Start Here</Link> : null}
         <Link href="/dashboard">Overview</Link>
@@ -301,6 +304,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         <Link href="/dashboard/billing">Billing</Link>
         <Link href="/dashboard/audit">Audit</Link>
       </div>
+      ) : null}
 
       {children}
 
