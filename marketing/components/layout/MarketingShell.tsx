@@ -1,73 +1,88 @@
-import Link from "next/link";
-import React from "react";
+import React from 'react';
 
-export default function MarketingShell(props: { children: React.ReactNode }) {
+function flagOn(name: string) {
+  const v = (process.env[name] || '').trim().toLowerCase();
+  return v === 'on' || v === 'true' || v === '1';
+}
+
+export default function MarketingShell({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const polish = flagOn('MYTITAN_FEATURE_MARKETING_POLISH_V1');
+  const [open, setOpen] = React.useState(false);
+
+  if (!polish) {
+    // Fallback: keep existing behavior minimal.
+    return <>{children}</>;
+  }
+
   return (
-    <div className="min-h-screen bg-[color:var(--surface-0)] text-foreground">
-      <header className="sticky top-0 z-30 border-b border-border/60 bg-[color:var(--surface-0)]/85 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="h-9 w-9 rounded-xl bg-[color:var(--brand-600)] shadow-sm" />
-            <div className="leading-tight">
-              <div className="text-sm font-semibold">MyTitan</div>
-              <div className="text-xs text-muted-foreground">Business OS</div>
-            </div>
-          </Link>
+    <div className="min-h-screen">
+      <header className="mkt-nav sticky top-0 z-50">
+        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
+          <a href="/" className="mkt-link" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ width: 34, height: 34, borderRadius: 12, background: 'rgba(255,255,255,0.10)', display: 'inline-block' }} />
+            <span style={{ fontWeight: 700, letterSpacing: 0.2, color: 'var(--mkt-fg)' }}>MyTitan</span>
+          </a>
 
-          <nav className="hidden items-center gap-6 text-sm text-muted-foreground md:flex">
-            <a href="#product" className="hover:text-foreground">Product</a>
-            <a href="#pricing" className="hover:text-foreground">Pricing</a>
-            <a href="#security" className="hover:text-foreground">Security</a>
-            <a href="#faq" className="hover:text-foreground">FAQ</a>
+          <nav style={{ marginLeft: 12, display: 'none', gap: 16 }} className="md:flex">
+            <a className="mkt-link" href="#product">Product</a>
+            <a className="mkt-link" href="#pricing">Pricing</a>
+            <a className="mkt-link" href="#security">Security</a>
           </nav>
 
-          <div className="flex items-center gap-2">
-            <Link
-              href="https://app.mytitan.co.uk"
-              className="rounded-xl border border-border/60 px-3 py-2 text-sm hover:bg-[color:var(--surface-1)]"
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 10, alignItems: 'center' }}>
+            <a className="mkt-link hidden md:inline" href="/login">Sign in</a>
+            <a className="mkt-btn px-4 py-2 text-sm" href="/signup">Get started</a>
+            <button
+              type="button"
+              aria-label="Open menu"
+              className="mkt-btn px-3 py-2 text-sm md:hidden"
+              onClick={() => setOpen(true)}
             >
-              Sign in
-            </Link>
-            <Link
-              href="https://app.mytitan.co.uk/signup"
-              className="rounded-xl bg-[color:var(--brand-600)] px-3 py-2 text-sm text-white shadow-sm hover:opacity-95"
-            >
-              Start free
-            </Link>
+              Menu
+            </button>
           </div>
         </div>
       </header>
 
-      <main>{props.children}</main>
+      {open ? (
+        <div className="md:hidden fixed inset-0 z-50">
+          <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.55)' }} onClick={() => setOpen(false)} />
+          <div
+            className="absolute right-0 top-0 h-full"
+            style={{
+              width: 'min(86vw, 360px)',
+              background: 'rgba(11,15,23,0.98)',
+              borderLeft: '1px solid var(--mkt-border)',
+              padding: 18,
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontWeight: 700 }}>Menu</div>
+              <button className="mkt-btn px-3 py-2 text-sm" onClick={() => setOpen(false)}>Close</button>
+            </div>
 
-      <footer className="border-t border-border/60 bg-[color:var(--surface-0)]">
-        <div className="mx-auto max-w-6xl px-6 py-10">
-          <div className="grid gap-8 md:grid-cols-3">
-            <div>
-              <div className="text-sm font-semibold">MyTitan</div>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Scheduling, jobs, customers, billing — one system, built for scale.
-              </p>
+            <div style={{ marginTop: 14, display: 'grid', gap: 10 }}>
+              <a className="mkt-link" href="#product" onClick={() => setOpen(false)}>Product</a>
+              <a className="mkt-link" href="#pricing" onClick={() => setOpen(false)}>Pricing</a>
+              <a className="mkt-link" href="#security" onClick={() => setOpen(false)}>Security</a>
+              <hr style={{ borderColor: 'var(--mkt-border)', margin: '10px 0' }} />
+              <a className="mkt-link" href="/login" onClick={() => setOpen(false)}>Sign in</a>
+              <a className="mkt-btn px-4 py-2 text-sm" href="/signup" onClick={() => setOpen(false)}>Get started</a>
             </div>
-            <div className="text-sm text-muted-foreground">
-              <div className="font-semibold text-foreground">Product</div>
-              <div className="mt-2 space-y-2">
-                <a className="block hover:text-foreground" href="#product">Overview</a>
-                <a className="block hover:text-foreground" href="#security">Security</a>
-              </div>
-            </div>
-            <div className="text-sm text-muted-foreground">
-              <div className="font-semibold text-foreground">Company</div>
-              <div className="mt-2 space-y-2">
-                <a className="block hover:text-foreground" href="#faq">FAQ</a>
-                <a className="block hover:text-foreground" href="#pricing">Pricing</a>
-              </div>
-            </div>
-          </div>
-          <div className="mt-10 text-xs text-muted-foreground">
-            © {new Date().getFullYear()} MyTitan. All rights reserved.
           </div>
         </div>
+      ) : null}
+
+      <main style={{ maxWidth: 1200, margin: '0 auto', padding: '34px 20px' }}>
+        {children}
+      </main>
+
+      <footer style={{ maxWidth: 1200, margin: '0 auto', padding: '28px 20px', opacity: 0.75, fontSize: 12 }}>
+        © {new Date().getFullYear()} MyTitan
       </footer>
     </div>
   );

@@ -46,3 +46,43 @@ a { color: inherit; text-decoration: none; }
   .hero { padding: 18px; }
   .grid.four, .grid.three, .grid.two { grid-template-columns: 1fr; }
 }
+
+/* --- Top-1 marketing baseline (safe) --- */
+:root{
+  --mkt-bg: #0b0f17;
+  --mkt-surface: rgba(255,255,255,0.04);
+  --mkt-border: rgba(255,255,255,0.10);
+  --mkt-fg: rgba(255,255,255,0.92);
+  --mkt-muted: rgba(255,255,255,0.68);
+}
+
+body {
+  background: var(--mkt-bg);
+  color: var(--mkt-fg);
+}
+
+.mkt-nav {
+  background: rgba(11,15,23,0.72);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--mkt-border);
+}
+
+.mkt-link { color: var(--mkt-muted); text-decoration: none; }
+.mkt-link:hover { color: var(--mkt-fg); }
+
+.mkt-card {
+  background: var(--mkt-surface);
+  border: 1px solid var(--mkt-border);
+  border-radius: 18px;
+}
+
+.mkt-btn {
+  border-radius: 14px;
+  border: 1px solid var(--mkt-border);
+  background: rgba(255,255,255,0.06);
+  color: var(--mkt-fg);
+}
+
+.mkt-btn:hover {
+  background: rgba(255,255,255,0.10);
+}
