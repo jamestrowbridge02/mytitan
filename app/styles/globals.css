@@ -447,3 +447,126 @@ input:focus, select:focus, textarea:focus {
     transition-timing-function: cubic-bezier(.2,.8,.2,1) !important;
   }
 }
+
+/* --- Top-1 motion system (flagged) ----------------------------------------
+   Enabled when app root has data-ui-motion="on|true|1"
+---------------------------------------------------------------------------- */
+[data-ui-motion="on"], [data-ui-motion="true"], [data-ui-motion="1"]{
+  --mt-ease: cubic-bezier(.2,.8,.2,1);
+  --mt-ease-out: cubic-bezier(.16,1,.3,1);
+  --mt-dur-fast: 140ms;
+  --mt-dur: 180ms;
+  --mt-dur-slow: 240ms;
+}
+
+@media (prefers-reduced-motion: no-preference){
+  [data-ui-motion="on"] .mt-motion,
+  [data-ui-motion="true"] .mt-motion,
+  [data-ui-motion="1"] .mt-motion{
+    transition: transform var(--mt-dur) var(--mt-ease),
+                opacity var(--mt-dur) var(--mt-ease),
+                background-color var(--mt-dur) var(--mt-ease),
+                border-color var(--mt-dur) var(--mt-ease),
+                box-shadow var(--mt-dur) var(--mt-ease);
+    will-change: transform, opacity;
+  }
+
+  [data-ui-motion="on"] a:hover,
+  [data-ui-motion="true"] a:hover,
+  [data-ui-motion="1"] a:hover{
+    opacity: .96;
+  }
+}
+
+/* --- Top-1 visual coherence (flagged) -------------------------------------
+   Enabled when app root has data-ui-coherence="on|true|1"
+---------------------------------------------------------------------------- */
+[data-ui-coherence="on"], [data-ui-coherence="true"], [data-ui-coherence="1"]{
+  --mt-font: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  --mt-text-xs: 12px;
+  --mt-text-sm: 13px;
+  --mt-text-base: 14px;
+  --mt-text-lg: 16px;
+  --mt-text-xl: 18px;
+  --mt-text-2xl: 22px;
+
+  --mt-r-sm: 12px;
+  --mt-r-md: 16px;
+  --mt-r-lg: 20px;
+
+  --mt-shadow-1: 0 10px 30px rgba(15,23,42,.10);
+  --mt-shadow-2: 0 18px 60px rgba(0,0,0,.12);
+}
+
+[data-ui-coherence="on"] body,
+[data-ui-coherence="true"] body,
+[data-ui-coherence="1"] body{
+  font-family: var(--mt-font);
+  letter-spacing: -0.01em;
+}
+
+[data-ui-coherence="on"] h1,
+[data-ui-coherence="true"] h1,
+[data-ui-coherence="1"] h1{
+  letter-spacing: -0.02em;
+}
+
+[data-ui-coherence="on"] [data-shell="app"] .rounded-2xl,
+[data-ui-coherence="true"] [data-shell="app"] .rounded-2xl,
+[data-ui-coherence="1"] [data-shell="app"] .rounded-2xl{
+  border-radius: var(--mt-r-lg) !important;
+}
+
+[data-ui-coherence="on"] [data-shell="app"] .shadow-sm,
+[data-ui-coherence="true"] [data-shell="app"] .shadow-sm,
+[data-ui-coherence="1"] [data-shell="app"] .shadow-sm{
+  box-shadow: var(--mt-shadow-1) !important;
+}
+
+/* --- Top-1 perceived performance (flagged) --------------------------------
+   Enabled when app root has data-ui-perf="on|true|1"
+---------------------------------------------------------------------------- */
+[data-ui-perf="on"] .mt-toploader,
+[data-ui-perf="true"] .mt-toploader,
+[data-ui-perf="1"] .mt-toploader{
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3px;
+  width: 100%;
+  z-index: 9999;
+  background: transparent;
+  pointer-events: none;
+}
+
+[data-ui-perf="on"] .mt-toploader::before,
+[data-ui-perf="true"] .mt-toploader::before,
+[data-ui-perf="1"] .mt-toploader::before{
+  content: "";
+  display: block;
+  height: 100%;
+  width: 28%;
+  transform: translateX(-110%);
+  background: rgba(14,165,164,.9);
+  box-shadow: 0 0 18px rgba(14,165,164,.30);
+}
+
+@media (prefers-reduced-motion: no-preference){
+  [data-ui-perf="on"] .mt-toploader[data-toploader="on"]::before,
+  [data-ui-perf="true"] .mt-toploader[data-toploader="on"]::before,
+  [data-ui-perf="1"] .mt-toploader[data-toploader="on"]::before{
+    animation: mt-topload 900ms var(--mt-ease-out, cubic-bezier(.16,1,.3,1)) infinite;
+  }
+}
+
+@keyframes mt-topload{
+  0%{ transform: translateX(-110%); opacity: .9; }
+  60%{ transform: translateX(320%); opacity: .9; }
+  100%{ transform: translateX(420%); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce){
+  [data-ui-perf="on"] .mt-toploader,
+  [data-ui-perf="true"] .mt-toploader,
+  [data-ui-perf="1"] .mt-toploader{ display: none; }
+}

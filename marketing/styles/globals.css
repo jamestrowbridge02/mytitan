@@ -533,3 +533,60 @@ a { color: inherit; text-decoration: none; }
     transform: translateY(-1px);
   }
 }
+
+/* --- Top-1 marketing motion/coherence/perf (flagged) ----------------------
+   Enabled when MarketingShell root has:
+     data-mkt-motion / data-mkt-coherence / data-mkt-perf = "on|true|1"
+---------------------------------------------------------------------------- */
+
+[data-mkt-coherence="on"], [data-mkt-coherence="true"], [data-mkt-coherence="1"]{
+  --mkt-font: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  --mkt-r: 18px;
+  --mkt-shadow: 0 18px 60px rgba(0,0,0,.45);
+}
+
+[data-mkt-coherence="on"] body,
+[data-mkt-coherence="true"] body,
+[data-mkt-coherence="1"] body{
+  font-family: var(--mkt-font) !important;
+  letter-spacing: -0.01em;
+}
+
+[data-mkt-coherence="on"] .hero,
+[data-mkt-coherence="true"] .hero,
+[data-mkt-coherence="1"] .hero{
+  border-radius: var(--mkt-r) !important;
+}
+
+[data-mkt-motion="on"], [data-mkt-motion="true"], [data-mkt-motion="1"]{
+  --mkt-ease: cubic-bezier(.2,.8,.2,1);
+  --mkt-ease-out: cubic-bezier(.16,1,.3,1);
+}
+
+@media (prefers-reduced-motion: no-preference){
+  [data-mkt-motion="on"] a, [data-mkt-motion="on"] button,
+  [data-mkt-motion="true"] a, [data-mkt-motion="true"] button,
+  [data-mkt-motion="1"] a, [data-mkt-motion="1"] button{
+    transition: transform 160ms var(--mkt-ease), opacity 160ms var(--mkt-ease);
+  }
+  [data-mkt-motion="on"] .button:hover,
+  [data-mkt-motion="true"] .button:hover,
+  [data-mkt-motion="1"] .button:hover{
+    transform: translateY(-1px);
+    opacity: .97;
+  }
+}
+
+[data-mkt-perf="on"] html,
+[data-mkt-perf="true"] html,
+[data-mkt-perf="1"] html{
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce){
+  [data-mkt-perf="on"] html,
+  [data-mkt-perf="true"] html,
+  [data-mkt-perf="1"] html{
+    scroll-behavior: auto;
+  }
+}
