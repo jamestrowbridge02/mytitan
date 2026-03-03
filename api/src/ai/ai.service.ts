@@ -9,6 +9,7 @@ import OpenAI from 'openai';
 import { AuditService } from '../audit/audit.service';
 import { DEFAULT_PLAN_CODE, PLAN_DEFINITIONS } from '../billing/billing.constants';
 import { isBillingEnforced } from '../common/billing-mode';
+import { isTenantOwnerAllowlisted } from '../common/billing-entitlement';
 import { isBillingAllowlisted } from '../common/billing-allowlist';
 import { PrismaService } from '../prisma/prisma.service';
 import { TenantService } from '../tenant/tenant.service';
@@ -95,7 +96,7 @@ export class AiService {
   private async enforceUsageLimit(tenantId: string) {
     const db = this.prisma as any;
     const periodStart = this.getPeriodStart(new Date());
-    const billingOff = !isBillingEnforced() || isBillingAllowlisted({ companyId: tenantId });
+    const billingOff = !isBillingEnforced() || await isTenantOwnerAllowlisted(this.prisma, tenantId);
 
     const subscription = await db.tenantSubscription.findUnique({
       where: { tenantId },

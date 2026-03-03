@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { AuditService } from '../audit/audit.service';
 import { DEFAULT_PLAN_CODE, PLAN_DEFINITIONS } from '../billing/billing.constants';
 import { isBillingEnforced } from '../common/billing-mode';
+import { isTenantOwnerAllowlisted } from '../common/billing-entitlement';
 import { isBillingAllowlisted } from '../common/billing-allowlist';
 import { PrismaService } from '../prisma/prisma.service';
 import { TenantService } from '../tenant/tenant.service';
@@ -87,7 +88,7 @@ export class IntegrationsService {
     });
     const plan = subscription?.plan ?? (await db.plan.findFirst({ where: { code: DEFAULT_PLAN_CODE } }));
     const features = (plan?.featuresJson ?? PLAN_DEFINITIONS[DEFAULT_PLAN_CODE].features) as Record<string, any>;
-    if (!isBillingEnforced() || isBillingAllowlisted({ companyId: tenantId })) {
+    if (!isBillingEnforced() || await isTenantOwnerAllowlisted(this.prisma, tenantId)) {
       if (provider === 'GOOGLE_CALENDAR') {
         const enabled = Boolean(settings.featureBookings ?? settings.bookingsEnabled);
         return { allowed: true, enabled };
