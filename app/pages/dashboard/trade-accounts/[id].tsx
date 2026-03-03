@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { DashboardShell } from "../../../components/dashboard-shell";
-import DemoCoach from "../../../components//DemoCoach";
+import DemoCoach from "../../../components/demo/DemoCoach";
 import EntityHeader from "../../../components/entity/EntityHeader";
 import RelatedLinks from "../../../components/entity/RelatedLinks";
 import EntitySection from "../../../components/entity/EntitySection";

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import DemoCoach from '../../components//DemoCoach';
+import DemoCoach from '../../components/demo/DemoCoach';
 import { DashboardShell } from '../../components/dashboard-shell';
 import JobQuickActions from '../../components/command-centre/JobQuickActions';
 import { ApiError, apiFetch } from '../../lib/api';
