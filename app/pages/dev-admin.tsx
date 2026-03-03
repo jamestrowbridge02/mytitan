@@ -1,4 +1,6 @@
 import React from 'react';
+import { PageShell } from '../components/layout/page-shell';
+import { Skeleton } from '../components/ui/Skeleton';
 import { apiFetch, ApiError } from '../lib/api';
 
 type DevMe = {
@@ -204,7 +206,7 @@ export default function DevAdminPage() {
   const showForbidden = err?.status === 403 && !showDisabled;
 
   return (
-    <main className="mx-auto max-w-[1120px] px-6 py-6">
+    <PageShell title="Developer Admin" subtitle="Read-only diagnostics: tenants, flags, billing state, and health.">
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
         <div>
           <h1 style={{ margin: 0, fontSize: 20, letterSpacing: 0.2 }}>Developer Admin</h1>
@@ -218,7 +220,7 @@ export default function DevAdminPage() {
       </div>
 
       {loading ? (
-        <div style={{ marginTop: 18, opacity: 0.8 }}>Loading…</div>
+        <div style={{ marginTop: 18, opacity: 0.8 }}>Loading</div>
       ) : null}
 
       {err ? (
@@ -338,7 +340,7 @@ export default function DevAdminPage() {
 
         <Panel
           title="Tenant detail"
-          right={tenantLoading ? <span style={{ fontSize: 12, opacity: 0.75 }}>Loading…</span> : null}
+          right={tenantLoading ? <span style={{ fontSize: 12, opacity: 0.75 }}>Loading</span> : null}
         >
           {!selectedTenantId ? (
             <div style={{ opacity: 0.7, fontSize: 13 }}>Select a tenant from lookup to view details.</div>
@@ -441,6 +443,7 @@ export default function DevAdminPage() {
           </div>
         </Panel>
       </div>
-    </main>
+    </PageShell>
   );
+
 }
