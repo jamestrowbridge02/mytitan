@@ -19,7 +19,7 @@ export default function MarketingShell({
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen" data-mkt-polish="1">
       <header className="mkt-nav sticky top-0 z-50">
         <div style={{ maxWidth: 1200, margin: '0 auto', padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
           <a href="/" className="mkt-link" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
