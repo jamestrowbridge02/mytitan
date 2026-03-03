@@ -79,7 +79,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                         key={item.title}
                         href={item.href || '#'}
                         onClick={onNavigate}
-                        className={[
+                        className={[ "text-foreground", 
                           'flex items-center justify-between rounded-xl px-3 py-2 text-sm border transition',
                           active
                             ? 'bg-[color:var(--surface-1)] text-foreground border-white/15 shadow-sm'
