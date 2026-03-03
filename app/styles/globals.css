@@ -591,3 +591,15 @@ input:focus, select:focus, textarea:focus {
 /* Ensure links/buttons never inherit invisible color accidentally */
 [data-shell="app"] a{ color: inherit; }
 [data-shell="app"] a:hover{ color: var(--fg); }
+
+/* --- Hide legacy dashboard nav when top-1 coherence is enabled ----
+   The app currently renders a second, old mega-nav inside dashboard
+   content (.dashboard-header + .nav). This duplicates the new sidebar.
+   We keep it for backwards compatibility but hide it when coherence is on.
+------------------------------------------------------------------- */
+[data-ui-coherence="on"] .dashboard-header + .nav,
+[data-ui-coherence="on"] .dashboard-header ~ .nav,
+[data-ui-coherence="on"] .dashboard-header .nav,
+[data-ui-coherence="on"] .dashboard-header + .nav.nav {
+  display: none !important;
+}
