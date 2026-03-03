@@ -17,7 +17,7 @@ import {
   isGuidedSetupV2Enabled,
 } from '../../lib/feature-flags';
 import { useTenantSettings } from '../../lib/tenant-settings';
-import { Skeleton } from "components/ui/Skeleton";
+import { Skeleton } from '../../components/ui/Skeleton';
 
 const coherenceOn =
   String(process.env.NEXT_PUBLIC_MYTITAN_UI_COHERENCE_V1 || "").trim().toLowerCase() === "on" ||
@@ -116,20 +116,22 @@ export default function Dashboard() {
   if (loading && !summary) {
     return (
       <DashboardShell>
-        <LoadingState title="{coherenceOn ? (
-  <div className="rounded-2xl border border-border/60 bg-[color:var(--surface-1)] p-5 shadow-sm" role="status" aria-live="polite">
-    <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <Skeleton className="h-10 w-10 rounded-xl" />
-        <div className="space-y-2">
-          <Skeleton className="h-4 w-48" />
-          <Skeleton className="h-3 w-72" />
-        </div>
-      </div>
-      <Skeleton className="h-24 w-full rounded-2xl" />
-    </div>
-  </div>
-) : ("Loading command centre")}" description="Fetching today's activity and quick actions." />
+        {coherenceOn ? (
+          <div className="rounded-2xl border border-border/60 bg-[color:var(--surface-1)] p-5 shadow-sm" role="status" aria-live="polite">
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-10 w-10 rounded-xl" />
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-48" />
+                  <Skeleton className="h-3 w-72" />
+                </div>
+              </div>
+              <Skeleton className="h-24 w-full rounded-2xl" />
+            </div>
+          </div>
+        ) : (
+          <LoadingState title="Loading command centre" description="Fetching today's activity and quick actions." />
+        )}
       </DashboardShell>
     );
   }
