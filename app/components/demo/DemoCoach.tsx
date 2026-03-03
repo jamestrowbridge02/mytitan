@@ -10,7 +10,7 @@ import {
   type DemoCoachAction,
   type DemoCoachProgress,
   type DemoCoachStepKey,
-} from '../../lib/-coach';
+} from '../../lib/onboarding-coach';
 
 type DemoCoachProps = {
   actions?: Partial<Record<DemoCoachStepKey, DemoCoachAction[]>>;

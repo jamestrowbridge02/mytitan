@@ -12,7 +12,7 @@ import SendUpdatePanel from "../../../components/notifications/SendUpdatePanel";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { ApiError, apiFetch } from "../../../lib/api";
-import { markDemoStepComplete } from "../../../lib/-coach";
+import { markDemoStepComplete } from "../../../lib/onboarding-coach";
 import { isCommandCentreV2Enabled, isNotificationsV1Enabled } from "../../../lib/feature-flags";
 import { getJobNextAction } from "../../../lib/next-action";
 import { getJobSignals } from "../../../lib/ops-signals";

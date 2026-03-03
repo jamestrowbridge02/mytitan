@@ -12,7 +12,7 @@ import { EmptyState } from "../../../components/states/EmptyState";
 import { ErrorState } from "../../../components/states/ErrorState";
 import { LoadingState } from "../../../components/states/LoadingState";
 import { ApiError, apiFetch } from "../../../lib/api";
-import { markDemoStepComplete } from "../../../lib/-coach";
+import { markDemoStepComplete } from "../../../lib/onboarding-coach";
 import { isNotificationsV1Enabled, isSchedulingIntelligenceV1Enabled } from "../../../lib/feature-flags";
 import { getBookingNextAction } from "../../../lib/next-action";
 import { sortTimelineItems, toTimelineItemsFromBookingActivity, toTimelineItemsFromCommsEvents } from "../../../lib/timeline-adapter";
