@@ -40,45 +40,42 @@ APP_CODE="$(curl -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:3001/dashbo
 echo "APP /dashboard http=$APP_CODE"
 [[ "$APP_CODE" == "200" ]] || { echo "FATAL: app not reachable"; exit 2; }
 
-DB_USER="$(docker exec mytitan_api /bin/sh -lc 'echo "${DATABASE_USER:-}"' | tr -d "\r")"
-DB_NAME="$(docker exec mytitan_api /bin/sh -lc 'echo "${DATABASE_NAME:-}"' | tr -d "\r")"
-DB_USER="${DB_USER:-mytitan}"
-DB_NAME="${DB_NAME:-mytitan}"
+echo "==> DB overlap check (deterministic count; hard-fail on SQL errors)"
+psql_in_pg() {
+  docker exec -i mytitan_postgres psql -v ON_ERROR_STOP=1 -U mytitan -d mytitan -At -c "$1"
+}
 
-cat > "$TMP_DIR/_top1_overlap.sql" <<'SQL'
-WITH b AS (
-  SELECT id, "companyId" AS company_id, "assignedUserId" AS user_id,
-         tsrange("startAt","endAt",'[)') AS r
+overlap_rows="$(psql_in_pg $'WITH b AS (
+  SELECT
+    id,
+    "companyId" AS company_id,
+    "assignedUserId" AS user_id,
+    tsrange("startAt","endAt",\'[)\') AS r
   FROM "Booking"
-  WHERE status = 'PLANNED' AND "assignedUserId" IS NOT NULL
+  WHERE status = \'PLANNED\'
+    AND "assignedUserId" IS NOT NULL
 ),
 pairs AS (
-  SELECT COUNT(*)::int AS overlaps
-  FROM b a
-  JOIN b c
-    ON a.company_id = c.company_id
-   AND a.user_id = c.user_id
-   AND a.id < c.id
-   AND a.r && c.r
+  SELECT 1 AS overlap
+  FROM b b1
+  JOIN b b2
+    ON b1.company_id = b2.company_id
+   AND b1.user_id = b2.user_id
+   AND b1.id < b2.id
+   AND b1.r && b2.r
 )
-SELECT COALESCE(SUM(overlaps),0)::int AS overlap_rows FROM pairs;
-SQL
+SELECT COUNT(*) FROM pairs;')"
 
-docker cp "$TMP_DIR/_top1_overlap.sql" mytitan_postgres:/tmp/_top1_overlap.sql >/dev/null
+if ! [[ "$overlap_rows" =~ ^[0-9]+$ ]]; then
+  echo "FATAL: overlap_rows is not numeric: '$overlap_rows'"
+  exit 80
+fi
 
-{
-  echo "==> Booking constraint:"
-  docker exec mytitan_postgres /bin/sh -lc \
-    "psql -U $DB_USER -d $DB_NAME -Atc \"SELECT conname FROM pg_constraint WHERE conname='booking_no_overlap_company_technician';\""
-  echo
-  echo "==> Overlap rows:"
-  docker exec mytitan_postgres /bin/sh -lc \
-    "psql -U $DB_USER -d $DB_NAME -Atf /tmp/_top1_overlap.sql"
-} | tee "$DBE"
-
-OVERLAP="$(docker exec mytitan_postgres /bin/sh -lc "psql -U $DB_USER -d $DB_NAME -Atf /tmp/_top1_overlap.sql" | tr -d "\r" | tail -n 1)"
-echo "overlap_rows=$OVERLAP"
-[[ "${OVERLAP:-0}" == "0" ]] || { echo "FATAL: overlaps exist: $OVERLAP"; exit 3; }
+echo "OK: overlap_rows=$overlap_rows"
+if [ "$overlap_rows" -ne 0 ]; then
+  echo "FATAL: overlaps exist (overlap_rows=$overlap_rows)"
+  exit 81
+fi
 
 DEV_CODE="$(curl -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:3000/admin/dev/me || true)"
 echo "/admin/dev/me http=$DEV_CODE"
