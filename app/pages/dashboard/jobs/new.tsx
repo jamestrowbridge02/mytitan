@@ -1499,16 +1499,18 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
         {__mtDebugTenantSettings ? (
   <div
     data-debug-tenant-settings="on"
-    style={{
-      position: "absolute",
-      left: -99999,
-      top: -99999,
-      width: 1,
-      height: 1,
-      overflow: "hidden",
-    }}
+    style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}
   >
     DEBUG_MARKER__TENANT_SETTINGS__ON
+    {"
+"}
+    settingsPrimaryTrade={String((settings as any)?.primaryTrade ?? "")}
+    {"
+"}
+    settingsTenantId={String((settings as any)?.tenantId ?? "")}
+    {"
+"}
+    settingsPlanId={String((settings as any)?.planId ?? "")}
   </div>
 ) : null}
 <div className="card">
