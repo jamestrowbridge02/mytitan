@@ -115,7 +115,7 @@ cat > "$EXPL" <<MD
 - API health: 200
 - App dashboard: 200
 - Dev admin: /admin/dev/me -> 401
-- DB overlaps (planned): $OVERLAP
+- DB overlaps (planned): $overlap_rows
 - Wheels gate: auth_http=$TENANT_HTTP (strict only when 200)
 ## Artifacts
 - LOG: $LOG
