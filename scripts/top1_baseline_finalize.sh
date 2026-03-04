@@ -257,7 +257,7 @@ git commit -m "chore(top1): add multi-tenant baseline seed + finalize v2 runner"
 
 echo "==> Seeding baseline via API container"
 docker exec -w /app -e "TOP1_OWNER_EMAIL=$EMAIL" -e "TOP1_OWNER_PASSWORD=$PASSWORD" mytitan_api /bin/sh -lc \
-  "node api/scripts/seed-top1-baseline.mjs | tee $TMP_DIR/top1_seed_${TS}.log"
+  "node scripts/seed-top1-baseline.mjs | tee /tmp/top1_seed_${TS}.log"
 
 echo
 echo "==> Tenant IDs (copy/paste)"
