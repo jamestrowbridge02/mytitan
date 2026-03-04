@@ -259,7 +259,7 @@ docker exec -w /app -e "TOP1_OWNER_EMAIL=$EMAIL" -e "TOP1_OWNER_PASSWORD=$PASSWO
 echo
 echo "==> Tenant IDs (copy/paste)"
 docker exec mytitan_postgres /bin/sh -lc \
-  "psql -U mytitan -d mytitan -c \"SELECT \\\"tenantId\\\" AS \\\"tenantId\\\", c.name AS name, \\\"primaryTrade\\\" FROM \\\"TenantSetting\\\" ts JOIN \\\"Company\\\" c ON c.id = ts.\\\"tenantId\\\" ORDER BY c.createdAt ASC;\"" \
+  "psql -U mytitan -d mytitan -c \"SELECT \\\"tenantId\\\" AS \\\"tenantId\\\", c.name AS name, \\\"primaryTrade\\\" FROM \\\"TenantSetting\\\" ts JOIN \\\"Company\\\" c ON c.id = ts.\\\"tenantId\\\" ORDER BY c.\"createdAt\" ASC;\"" \
   || true
 
 echo
