@@ -51,6 +51,7 @@ export async function apiFetch(path: string, init: RequestInit = {}) {
   let response: Response;
   try {
     response = await fetch(`${API_BASE}${path}`, {
+      credentials: 'include',
       ...init,
       headers,
     });
