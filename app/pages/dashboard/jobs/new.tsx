@@ -302,7 +302,7 @@ export default function NewJobPage() {
   const [partsQuery, setPartsQuery] = useState('');
   const [partsUsed, setPartsUsed] = useState<Array<{ stockItemId: string; sku: string; name: string; qty: number }>>([]);
 
-  const wheelsFeature = isWheelsFormV1Enabled() && settings?.primaryTrade === "WHEELS";
+  const wheelsFeature = isWheelsFormV1Enabled() && ((settings?.primaryTrade || "").trim().toUpperCase() === "WHEELS");
   
   const debugTenantSettings = ((process.env.NEXT_PUBLIC_DEBUG_TENANT_SETTINGS || "").trim().toLowerCase() === "on" || (process.env.NEXT_PUBLIC_DEBUG_TENANT_SETTINGS || "").trim().toLowerCase() === "true" || (process.env.NEXT_PUBLIC_DEBUG_TENANT_SETTINGS || "").trim().toLowerCase() === "1");
 const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
@@ -1476,23 +1476,6 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
       </>
     ));
   }
-  {debugTenantSettings ? (
-    <div className="card" style={{ padding: 12, marginBottom: 12, border: "1px solid #ef4444" }}>
-      <div style={{ fontWeight: 800, marginBottom: 6 }}>DEBUG: Tenant settings</div>
-      <pre style={{ whiteSpace: "pre-wrap", margin: 0, fontSize: 12 }}>
-        {JSON.stringify({
-          wheelsFlag: isWheelsFormV1Enabled(),
-          wheelsFeature,
-          tenantId: (typeof window !== "undefined" ? window.localStorage.getItem("mytitan_tenantId") : null),
-          settingsPrimaryTrade: (settings as any)?.primaryTrade ?? null,
-          settingsTenantId: (settings as any)?.tenantId ?? null,
-          settingsKeys: settings ? Object.keys(settings as any) : null,
-        }, null, 2)}
-      </pre>
-    </div>
-  ) : null}
-
-
   if (!wheelsFeature) {
     return (
       <DashboardShell>

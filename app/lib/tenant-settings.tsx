@@ -133,7 +133,9 @@ export function TenantSettingsProvider({ children }: { children: React.ReactNode
     setError('');
     try {
       const data = await apiFetch('/tenant/settings');
-      const merged = { ...defaultSettings, ...(data || {}) } as TenantSettings;
+      
+      // TENANT_SETTINGS_UNAUTH: marker used for HTML sanity checks when settings cannot load.
+const merged = { ...defaultSettings, ...(data || {}) } as TenantSettings;
       setSettings(merged);
       applyTheme(merged);
     } catch (err: any) {
