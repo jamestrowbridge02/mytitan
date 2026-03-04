@@ -50,7 +50,7 @@ overlap_rows="$(psql_in_pg $'WITH b AS (
     id,
     "companyId" AS company_id,
     "assignedUserId" AS user_id,
-    tsrange("startAt","endAt",\'[)\') AS r
+    tsrange("startsAt","endsAt",\'[)\') AS r
   FROM "Booking"
   WHERE status = \'PLANNED\'
     AND "assignedUserId" IS NOT NULL
