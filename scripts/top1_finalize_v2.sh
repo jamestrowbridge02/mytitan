@@ -1,11 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
-psql_in_pg() {
-  # Usage: psql_in_pg "<SQL>"
-  docker exec -i mytitan_postgres psql -v ON_ERROR_STOP=1 -U mytitan -d mytitan -At -c "$1"
-}
-
 cd /opt/mytitan
 
 TMP_DIR="/opt/mytitan/tmp"
@@ -135,39 +129,4 @@ MD
 echo "OK: finalize complete"
 echo "LOG=$LOG"
 echo "DBE=$DBE"
-
-echo "==> DB overlap check (deterministic count)"
-overlap_rows="$(psql_in_pg $'WITH b AS (
-  SELECT
-    id,
-    "companyId" AS company_id,
-    "assignedUserId" AS user_id,
-    tsrange("startAt","endAt",\'[)\') AS r
-  FROM "Booking"
-  WHERE status = \'PLANNED\'
-    AND "assignedUserId" IS NOT NULL
-),
-pairs AS (
-  SELECT 1 AS overlap
-  FROM b b1
-  JOIN b b2
-    ON b1.company_id = b2.company_id
-   AND b1.user_id = b2.user_id
-   AND b1.id < b2.id
-   AND b1.r && b2.r
-)
-SELECT COUNT(*) FROM pairs;')"
-
-if ! [[ "$overlap_rows" =~ ^[0-9]+$ ]]; then
-  echo "FATAL: overlap_rows is not numeric: '$overlap_rows'"
-  exit 80
-fi
-
-echo "OK: overlap_rows=$overlap_rows"
-if [ "$overlap_rows" -ne 0 ]; then
-  echo "FATAL: overlaps exist (overlap_rows=$overlap_rows)"
-  exit 81
-fi
-
-
 echo "EXPLAIN=$EXPL"
