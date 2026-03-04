@@ -7,6 +7,11 @@ import { isInventoryV1Enabled, isMediaSignatureV1Enabled, isWheelsAutomationV1En
 import { resolveGuidedMode, setGuidedMode } from "../../../lib/guided-mode";
 import { useTenantSettings } from "../../../lib/tenant-settings";
 import { applyPricingPreset, buildWhatsAppMessage, computeTotals, computeWheelCount } from "../../../lib/wheels-automation";
+const __mtIsOn = (v: any) => {
+  const x = String(v ?? "").trim().toLowerCase();
+  return x === "on" || x === "true" || x === "1";
+};
+
 
 type TemplateField = {
   key: string;
@@ -165,6 +170,7 @@ function SignaturePad({
   );
 }
 
+const __mtDebugTenantSettings = __mtIsOn(process.env.NEXT_PUBLIC_DEBUG_TENANT_SETTINGS);
 const wheelKeys = ["wheel_nsf", "wheel_nsr", "wheel_osf", "wheel_osr", "wheel_spare"];
 const DRAFT_STORAGE_KEY = "mytitan_wheels_draft_v1";
 
@@ -1490,7 +1496,22 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
   if (!wheelsFeature) {
     return (
       <DashboardShell>
-        <div className="card">
+        {__mtDebugTenantSettings ? (
+  <div
+    data-debug-tenant-settings="on"
+    style={{
+      position: "absolute",
+      left: -99999,
+      top: -99999,
+      width: 1,
+      height: 1,
+      overflow: "hidden",
+    }}
+  >
+    DEBUG_MARKER__TENANT_SETTINGS__ON
+  </div>
+) : null}
+<div className="card">
           <h1>New Job</h1>
           {error && <p style={{ color: "#ff8a8a" }}>{error}</p>}
           <p className="muted" style={{ marginBottom: 12 }}>
