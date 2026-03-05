@@ -232,7 +232,6 @@ export default function Sidebar() {
         </nav>
 
         <div className="mt-sidebar__footer px-2 py-2 text-[11px]">
-          Tip: set <code>localStorage.MYTITAN_DEV=1</code> to reveal Dev Admin when enabled.
         </div>
       </div>
     </aside>

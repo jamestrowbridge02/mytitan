@@ -34,7 +34,7 @@ export function PageShell(props: {
         <Sidebar />
         <div className="min-w-0 flex-1">
           <div className="sticky top-0 z-20 hidden border-b border-border/60 bg-[color:var(--surface-0)]/90 backdrop-blur md:block">
-            <div className="mx-auto w-full max-w-[1400px] px-6 py-5">
+            <div className="mx-auto w-full max-w-[1400px] px-6 py-3">
               {showHeader ? (
                 <div className="flex items-start justify-between gap-4">
                   <div>
@@ -47,7 +47,7 @@ export function PageShell(props: {
             </div>
           </div>
 
-          <div className="mx-auto w-full max-w-[1400px] px-6 pt-6 md:hidden">
+          <div className="mx-auto w-full max-w-[1400px] px-6 pt-4 md:hidden">
             {showHeader ? (
               <div className="mb-5 flex items-start justify-between gap-4">
                 <div>
@@ -60,7 +60,7 @@ export function PageShell(props: {
           </div>
 
           {!showHeader ? <div className="h-4" /> : null}
-          <div className="mx-auto w-full max-w-[1400px] px-6 pb-10 pt-2">{props.children}</div>
+          <div className="mx-auto w-full max-w-[1400px] px-6 pb-8 pt-2">{props.children}</div>
         </div>
       </div>
     </div>
