@@ -603,3 +603,98 @@ input:focus, select:focus, textarea:focus {
 [data-ui-coherence="on"] .dashboard-header + .nav.nav {
   display: none !important;
 }
+
+/* --- Luxury Sidebar Polish (scoped; safe) --- */
+:root{
+  --sb-bg: rgba(255,255,255,0.03);
+  --sb-border: rgba(255,255,255,0.10);
+  --sb-muted: rgba(255,255,255,0.62);
+  --sb-fg: rgba(255,255,255,0.90);
+  --sb-fg-strong: rgba(255,255,255,0.96);
+  --sb-hover: rgba(255,255,255,0.06);
+  --sb-active: rgba(255,255,255,0.10);
+  --sb-active-border: rgba(255,255,255,0.18);
+  --sb-ring: rgba(255,255,255,0.14);
+}
+
+[data-shell="app"] .mt-sidebar{
+  background: var(--sb-bg);
+  border-right: 1px solid var(--sb-border);
+}
+
+[data-shell="app"] .mt-sidebar *{
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+[data-shell="app"] .mt-sidebar__brand{
+  border: 1px solid var(--sb-border);
+  background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+}
+
+[data-shell="app"] .mt-sidebar__kicker{
+  color: var(--sb-muted);
+}
+
+[data-shell="app"] .mt-sidebar__groupTitle{
+  color: var(--sb-muted);
+  letter-spacing: 0.14em;
+}
+
+[data-shell="app"] .mt-sidebar__item{
+  color: var(--sb-muted);
+  border: 1px solid transparent;
+  background: transparent;
+  transition: transform 120ms ease, background 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease;
+}
+
+[data-shell="app"] .mt-sidebar__item:hover{
+  color: var(--sb-fg);
+  background: var(--sb-hover);
+  border-color: rgba(255,255,255,0.08);
+}
+
+[data-shell="app"] .mt-sidebar__item:active{
+  transform: translateY(0.5px);
+}
+
+[data-shell="app"] .mt-sidebar__item[aria-current="page"]{
+  color: var(--sb-fg-strong);
+  background: var(--sb-active);
+  border-color: var(--sb-active-border);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.06) inset, 0 10px 30px rgba(0,0,0,0.22);
+}
+
+[data-shell="app"] .mt-sidebar__dot{
+  box-shadow: 0 0 0 4px rgba(0,0,0,0.12);
+  opacity: 0.65;
+}
+
+[data-shell="app"] .mt-sidebar__item:hover .mt-sidebar__dot{
+  opacity: 0.85;
+}
+
+[data-shell="app"] .mt-sidebar__item[aria-current="page"] .mt-sidebar__dot{
+  opacity: 1;
+}
+
+[data-shell="app"] .mt-sidebar__search{
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.04);
+  color: var(--sb-fg);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.06) inset;
+}
+
+[data-shell="app"] .mt-sidebar__search::placeholder{
+  color: rgba(255,255,255,0.45);
+}
+
+[data-shell="app"] .mt-sidebar__search:focus{
+  outline: none;
+  box-shadow: 0 0 0 3px var(--sb-ring);
+  border-color: rgba(255,255,255,0.18);
+}
+
+[data-shell="app"] .mt-sidebar__footer{
+  color: rgba(255,255,255,0.45);
+}

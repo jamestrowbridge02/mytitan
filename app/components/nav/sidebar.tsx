@@ -1,12 +1,7 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
 import React from "react";
-import { NAV_GROUPS, NavItem, NavGroup } from "./nav-config";
-
-function isTruthyEnv(v: any) {
-  const s = String(v ?? "").trim().toLowerCase();
-  return s === "1" || s === "true" || s === "on" || s === "yes";
-}
+import { NAV_GROUPS, NavItem } from "./nav-config";
 
 function isActive(pathname: string, href?: string) {
   if (!href) return false;
@@ -15,165 +10,230 @@ function isActive(pathname: string, href?: string) {
 }
 
 function canShow(item: NavItem) {
-  const devAllowed =
+  const raw = (process.env.NEXT_PUBLIC_DEV_ADMIN || "").trim().toLowerCase();
+  const isDev =
     typeof window !== "undefined" &&
-    (isTruthyEnv(process.env.NEXT_PUBLIC_DEV_ADMIN) ||
-      window.localStorage.getItem("MYTITAN_DEV") === "1");
+    (window.localStorage.getItem("MYTITAN_DEV") === "1" ||
+      raw === "on" ||
+      raw === "true" ||
+      raw === "1");
 
-  if (item.devOnly && !devAllowed) return false;
+  if (item.devOnly && !isDev) return false;
 
   if (item.featureFlag) {
-    const v = (process.env as any)[item.featureFlag];
-    if (!isTruthyEnv(v)) return false;
+    const v = String((process.env as any)[item.featureFlag] ?? "").trim().toLowerCase();
+    if (v === "off" || v === "false" || v === "") return false;
   }
 
   return true;
 }
 
-function useCollapsedGroups(key: string) {
-  const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({});
-  React.useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(key);
-      if (raw) setCollapsed(JSON.parse(raw));
-    } catch {}
-  }, [key]);
-  React.useEffect(() => {
-    try {
-      window.localStorage.setItem(key, JSON.stringify(collapsed));
-    } catch {}
-  }, [key, collapsed]);
-  return { collapsed, setCollapsed };
-}
-
-function SidebarGroup({
-  group,
-  pathname,
-}: {
-  group: NavGroup;
-  pathname: string;
-}) {
-  const { collapsed, setCollapsed } = useCollapsedGroups("mytitan_sidebar_groups");
-  const label = group.title;
-  const isCollapsed = Boolean(collapsed[label]);
-
-  const toggle = () => setCollapsed((p) => ({ ...p, [label]: !p[label] }));
-
-  return (
-    <div className="mb-5">
-      <button
-        type="button"
-        onClick={toggle}
-        className="w-full px-3 pb-2 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground/80"
-      >
-        {label}
-      </button>
-
-      {isCollapsed ? null : (
-        <div className="space-y-1">
-          {group.items.filter(canShow).map((item) => (
-            <SidebarItem key={item.title} item={item} pathname={pathname} depth={0} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function SidebarItem({
-  item,
-  pathname,
-  depth,
-}: {
-  item: NavItem;
-  pathname: string;
-  depth: number;
-}) {
-  const [open, setOpen] = React.useState(false);
-  const hasChildren = Boolean(item.children?.length);
-
-  React.useEffect(() => {
-    // auto-open if any child matches current route
-    if (hasChildren && item.children!.some((c) => isActive(pathname, c.href))) {
-      setOpen(true);
+function flatten(items: NavItem[]) {
+  const out: Array<{ group: string; parent?: string; item: NavItem }> = [];
+  for (const g of NAV_GROUPS) {
+    for (const it of g.items) {
+      if (!canShow(it)) continue;
+      if (it.children?.length) {
+        for (const c of it.children.filter(canShow)) {
+          out.push({ group: g.title, parent: it.title, item: c });
+        }
+      } else {
+        out.push({ group: g.title, item: it });
+      }
     }
-  }, [pathname, hasChildren, item.children]);
-
-  if (hasChildren) {
-    const anyChildActive = item.children!.some((c) => isActive(pathname, c.href));
-    return (
-      <div className="rounded-xl">
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          className={[
-            "flex w-full items-center justify-between rounded-xl px-3 py-2 text-sm border transition",
-            depth > 0 ? "ml-3" : "",
-            anyChildActive
-              ? "bg-[color:var(--surface-1)] text-foreground border-white/15 shadow-sm"
-              : "text-foreground/80 border-transparent hover:bg-[color:var(--surface-1)] hover:text-foreground hover:border-white/10",
-          ].join(" ")}
-        >
-          <span className="truncate">{item.title}</span>
-          <span className="text-xs text-muted-foreground">{open ? "–" : "+"}</span>
-        </button>
-
-        {open ? (
-          <div className="mt-1 space-y-1 pl-4">
-            {item.children!.filter(canShow).map((c) => (
-              <SidebarLeaf key={c.title} item={c} pathname={pathname} />
-            ))}
-          </div>
-        ) : null}
-      </div>
-    );
   }
-
-  return <SidebarLeaf item={item} pathname={pathname} />;
+  return out;
 }
 
-function SidebarLeaf({ item, pathname }: { item: NavItem; pathname: string }) {
-  const active = isActive(pathname, item.href);
-  const href = item.href || "/dashboard"; // never '#'
-
-  return (
-    <Link
-      href={href}
-      className={[
-        "flex items-center justify-between rounded-xl px-3 py-2 text-sm border transition",
-        active
-          ? "bg-[color:var(--surface-1)] text-foreground border-white/15 shadow-sm"
-          : "text-foreground/80 border-transparent hover:bg-[color:var(--surface-1)] hover:text-foreground hover:border-white/10",
-      ].join(" ")}
-    >
-      <span className="truncate">{item.title}</span>
-      {active ? <span className="h-2 w-2 rounded-full bg-[color:var(--brand-600)]" /> : null}
-    </Link>
-  );
+function cx(...xs: Array<string | false | null | undefined>) {
+  return xs.filter(Boolean).join(" ");
 }
 
 export default function Sidebar() {
   const router = useRouter();
-  const pathname = router.pathname;
+  const path = router.asPath || router.pathname || "";
+  const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({});
+  const [q, setQ] = React.useState("");
+
+  React.useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem("mytitan_sidebar_groups");
+      if (raw) setCollapsed(JSON.parse(raw));
+    } catch {}
+  }, []);
+
+  React.useEffect(() => {
+    try {
+      window.localStorage.setItem("mytitan_sidebar_groups", JSON.stringify(collapsed));
+    } catch {}
+  }, [collapsed]);
+
+  React.useEffect(() => {
+    // auto-expand groups containing current route
+    const next: Record<string, boolean> = {};
+    for (const g of NAV_GROUPS) {
+      for (const it of g.items) {
+        if (it.children?.some((c) => isActive(path, c.href))) next[g.title] = false;
+      }
+    }
+    setCollapsed((prev) => ({ ...next, ...prev }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [path]);
+
+  const normalized = q.trim().toLowerCase();
+  const isSearching = normalized.length >= 2;
+
+  const searchHits = React.useMemo(() => {
+    if (!isSearching) return [];
+    const all = flatten(NAV_GROUPS.flatMap((g) => g.items));
+    return all
+      .filter(({ item, parent, group }) => {
+        const hay = `${group} ${parent ?? ""} ${item.title} ${item.href ?? ""}`.toLowerCase();
+        return hay.includes(normalized);
+      })
+      .slice(0, 10);
+  }, [isSearching, normalized]);
+
+  const toggleGroup = (title: string) =>
+    setCollapsed((prev) => ({ ...prev, [title]: !prev[title] }));
 
   return (
-    <aside className="hidden md:block h-screen w-[280px] shrink-0 border-r border-border/60 bg-[color:var(--surface-0)]">
-      <div className="flex h-full flex-col">
-        <div className="px-4 py-4">
+    <aside className="mt-sidebar hidden md:block h-screen w-[292px] shrink-0">
+      <div className="flex h-full flex-col px-3 py-3">
+        <div className="mt-sidebar__brand rounded-2xl px-3 py-3">
           <Link href="/dashboard" className="flex items-center gap-3">
             <div className="h-9 w-9 rounded-xl bg-[color:var(--brand-600)] shadow-sm" />
             <div className="leading-tight">
-              <div className="text-sm font-semibold">MyTitan</div>
-              <div className="text-xs text-muted-foreground">Business OS</div>
+              <div className="text-[13px] font-semibold tracking-[0.2px] text-foreground">
+                MyTitan
+              </div>
+              <div className="mt-sidebar__kicker text-[11px]">
+                Business OS
+              </div>
             </div>
           </Link>
+
+          <div className="mt-3">
+            <input
+              className="mt-sidebar__search w-full rounded-xl px-3 py-2 text-[13px]"
+              placeholder="Search…"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              aria-label="Search navigation"
+            />
+            {isSearching ? (
+              <div className="mt-2 rounded-xl border border-white/10 bg-white/3 p-1">
+                {searchHits.length ? (
+                  searchHits.map((h, idx) => {
+                    const href = h.item.href || "#";
+                    const active = isActive(path, href);
+                    return (
+                      <Link
+                        key={`${href}-${idx}`}
+                        href={href}
+                        aria-current={active ? "page" : undefined}
+                        className={cx(
+                          "mt-sidebar__item flex items-center justify-between rounded-xl px-3 py-2 text-[13px]",
+                          active && "shadow-sm"
+                        )}
+                      >
+                        <span className="truncate">
+                          {h.parent ? `${h.parent} · ${h.item.title}` : h.item.title}
+                        </span>
+                        <span className="mt-sidebar__dot h-2 w-2 rounded-full bg-[color:var(--brand-600)]" />
+                      </Link>
+                    );
+                  })
+                ) : (
+                  <div className="px-3 py-2 text-[12px] text-white/55">
+                    No matches.
+                  </div>
+                )}
+              </div>
+            ) : null}
+          </div>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-2 pb-6">
-          {NAV_GROUPS.map((g) => (
-            <SidebarGroup key={g.title} group={g} pathname={pathname} />
-          ))}
+        <nav className="mt-3 flex-1 overflow-y-auto px-1 pb-2">
+          {NAV_GROUPS.map((g) => {
+            const groupTitle = g.title;
+            const isCollapsed = Boolean(collapsed[groupTitle]);
+            const visibleItems = g.items.filter(canShow);
+
+            if (!visibleItems.length) return null;
+
+            return (
+              <div key={groupTitle} className="mb-4">
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(groupTitle)}
+                  className="mt-sidebar__groupTitle w-full px-2 pb-2 text-left text-[11px] font-semibold uppercase"
+                >
+                  <span className="flex items-center justify-between">
+                    <span>{groupTitle}</span>
+                    <span className="text-[12px] opacity-70">{isCollapsed ? "+" : "–"}</span>
+                  </span>
+                </button>
+
+                {isCollapsed ? null : (
+                  <div className="space-y-1">
+                    {visibleItems.map((it) => {
+                      if (it.children?.length) {
+                        const anyChildActive = it.children.some((c) => isActive(path, c.href));
+                        return (
+                          <div key={it.title} className="rounded-xl">
+                            <div className="px-2 py-1 text-[11px] text-white/45">
+                              {it.title}
+                            </div>
+                            <div className="space-y-1">
+                              {it.children.filter(canShow).map((c) => {
+                                const href = c.href || "#";
+                                const active = isActive(path, href);
+                                return (
+                                  <Link
+                                    key={c.title}
+                                    href={href}
+                                    aria-current={active ? "page" : undefined}
+                                    className={cx(
+                                      "mt-sidebar__item flex items-center justify-between rounded-xl px-3 py-2 text-[13px]",
+                                      (active || anyChildActive) && active && "shadow-sm"
+                                    )}
+                                  >
+                                    <span className="truncate">{c.title}</span>
+                                    <span className="mt-sidebar__dot h-2 w-2 rounded-full bg-[color:var(--brand-600)]" />
+                                  </Link>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      const href = it.href || "#";
+                      const active = isActive(path, href);
+
+                      return (
+                        <Link
+                          key={it.title}
+                          href={href}
+                          aria-current={active ? "page" : undefined}
+                          className="mt-sidebar__item flex items-center justify-between rounded-xl px-3 py-2 text-[13px]"
+                        >
+                          <span className="truncate">{it.title}</span>
+                          <span className="mt-sidebar__dot h-2 w-2 rounded-full bg-[color:var(--brand-600)]" />
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </nav>
+
+        <div className="mt-sidebar__footer px-2 py-2 text-[11px]">
+          Tip: set <code>localStorage.MYTITAN_DEV=1</code> to reveal Dev Admin when enabled.
+        </div>
       </div>
     </aside>
   );
