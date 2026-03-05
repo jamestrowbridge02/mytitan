@@ -274,38 +274,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         </div>
       </div>
 
-      {!coherenceOn ? (
-      <div className="nav">
-        {startHereEnabled ? <Link href="/start">Start Here</Link> : null}
-        <Link href="/dashboard">Overview</Link>
-        <Link href={commandCentreV2Enabled ? "/dashboard/command-centre-v2" : "/dashboard/command-centre"}>Command Centre</Link>
-        <Link href="/dashboard/jobs">Jobs</Link>
-        <Link href="/dashboard/jobs/new">New Job</Link>
-        {wheelsFormEnabled ? <Link href="/dashboard/templates/wheels">Wheels Template</Link> : null}
-        {bookingsAllowed ? <Link href={bookingProEnabled ? "/dashboard/booking/calendar" : "/dashboard/bookings"}>Bookings</Link> : <Link href="/dashboard/billing">Bookings (Upgrade)</Link>}
-        {calendarV1Enabled ? <Link href="/dashboard/calendar">Calendar</Link> : null}
-        {bookingProEnabled ? <Link href="/dashboard/booking/settings">Booking Settings</Link> : null}
-        <Link href="/dashboard/trade-accounts">Trade Accounts</Link>
-        {crmProEnabled ? <Link href="/dashboard/trade-accounts?view=segments">CRM Segments</Link> : null}
-        {locationsEnabled ? <Link href="/dashboard/locations">Locations</Link> : null}
-        {inventoryEnabled ? <Link href="/dashboard/inventory">Inventory</Link> : null}
-        <Link href="/dashboard/users">Team</Link>
-        <Link href="/dashboard/admin">Admin</Link>
-        {marketplaceEnabled ? <Link href="/dashboard/setup">Setup</Link> : null}
-        {tradePacksEnabled ? <Link href="/dashboard/trade-packs">Trade Packs</Link> : null}
-        {marketplaceEnabled ? <Link href="/dashboard/integrations">Integrations</Link> : null}
-        {notificationsEnabled ? <Link href="/dashboard/notifications">Notifications</Link> : null}
-        {analyticsEnabled ? <Link href="/dashboard/insights">Insights</Link> : null}
-        <Link href="/dashboard/settings">Settings</Link>
-        {automationsEnabled ? <Link href="/dashboard/settings/automations">Automations</Link> : null}
-        {schedulingEnabled ? <Link href="/dashboard/settings/schedules">Schedules</Link> : null}
-        <Link href="/dashboard/catalog">Catalog</Link>
-        <Link href="/dashboard/email-templates">Email Templates</Link>
-        <Link href="/dashboard/billing">Billing</Link>
-        <Link href="/dashboard/audit">Audit</Link>
-      </div>
-      ) : null}
-
       {children}
 
       {marketplaceEnabled && aiAllowed ? <AiAssistant /> : null}
