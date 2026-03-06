@@ -52,6 +52,12 @@ function cx(...xs: Array<string | false | null | undefined>) {
 export default function Sidebar() {
   const router = useRouter();
   const path = router.asPath || router.pathname || "";
+
+  const showSidebar =
+    path.startsWith("/dashboard") ||
+    path === "/dashboard";
+
+  if (!showSidebar) return null;
   const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({});
   const [q, setQ] = React.useState("");
 

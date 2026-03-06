@@ -1696,3 +1696,70 @@ main {
   to { opacity: 1; transform: translateY(0); }
 }
 
+
+/* --- Integrated top-end SaaS shell/sidebar --- */
+[data-shell="app"] {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 20% 10%, rgba(255,255,255,0.05), transparent 28%),
+    radial-gradient(circle at 85% 0%, rgba(120,160,255,0.08), transparent 24%),
+    linear-gradient(180deg, #0f1117 0%, #0b0d12 100%);
+}
+
+[data-shell="app"] > .flex,
+[data-shell="app"] .flex.min-h-screen {
+  align-items: stretch;
+}
+
+.mt-sidebar {
+  position: sticky;
+  top: 0;
+  align-self: stretch;
+  height: 100vh !important;
+  min-height: 100vh !important;
+  border-right: 1px solid rgba(255,255,255,0.06) !important;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.015)) !important;
+  box-shadow:
+    inset -1px 0 0 rgba(255,255,255,0.03),
+    18px 0 40px rgba(0,0,0,0.18);
+}
+
+.mt-sidebar > div,
+.mt-sidebar .flex.h-full,
+.mt-sidebar .flex.flex-col {
+  height: 100%;
+  min-height: 100%;
+}
+
+.mt-sidebar nav {
+  padding-top: 6px;
+}
+
+.mt-sidebar__brand {
+  margin-bottom: 8px;
+}
+
+.mt-sidebar__groupTitle {
+  margin-top: 4px;
+}
+
+.mt-sidebar__item {
+  min-height: 40px;
+}
+
+/* Main content should feel attached to shell, not floating away from it */
+[data-shell="app"] .min-w-0.flex-1,
+[data-shell="app"] .flex-1 {
+  min-width: 0;
+}
+
+[data-shell="app"] .mx-auto.w-full.max-w-\\[1400px\\] {
+  max-width: 1320px !important;
+}
+
+/* Login/auth/public pages: no sidebar chrome should leak in */
+body:has(form[action*="login"]),
+body:has(input[type="password"]) .mt-sidebar {
+  display: none !important;
+}
