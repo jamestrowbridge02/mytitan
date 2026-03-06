@@ -215,14 +215,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       ) : null}
-
-      <div className="dashboard-header dashboard-header--premium">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'space-between', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            {settings?.logoUrl ? (
-              <img src={settings.logoUrl} alt="Tenant logo" className="tenant-logo" />
-            ) : (
-              <div className="tenant-logo fallback">{(settings?.companyName || 'M').slice(0, 1).toUpperCase()}</div>
             )}
             <div>
               <strong>{settings?.companyName || 'MyTitan Tenant'}</strong>

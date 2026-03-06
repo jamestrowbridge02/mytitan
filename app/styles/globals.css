@@ -777,3 +777,15 @@ input:focus, select:focus, textarea:focus {
 [data-ui-coherence="on"] .dashboard-header--premium ~ .nav {
   display: none !important;
 }
+
+/* --- Remove old dashboard-shell chrome spacing after header extraction --- */
+.dashboard-header,
+.dashboard-header--compact,
+.dashboard-header--premium,
+.nav--internal {
+  display: none !important;
+}
+
+.container > .card:first-child {
+  margin-top: 0 !important;
+}
