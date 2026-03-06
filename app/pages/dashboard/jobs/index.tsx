@@ -24,12 +24,13 @@ export default function Jobs() {
 
   return (
     <DashboardShell>
-      <div className="card">
-        <h1>Jobs</h1>
+<div className="jobs-premium-shell">
+      <div className="card jobs-premium-card">
+        <h1 className="jobs-premium-title">Jobs</h1>
         {error && <p style={{ color: '#ff8a8a' }}>{error}</p>}
         <div className="list">
           {jobs.map((job) => (
-            <div key={job.id} className="card" style={{ padding: 16 }}>
+            <div key={job.id} className="card jobs-premium-card" style={{ padding: 16 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                 <strong>
                   <Link href={`/dashboard/jobs/${job.id}`}>{job.jobRef || job.id}</Link>
@@ -49,6 +50,7 @@ export default function Jobs() {
           {jobs.length === 0 && !error && <p>No jobs yet.</p>}
         </div>
       </div>
-    </DashboardShell>
+    </div>
+</DashboardShell>
   );
 }

@@ -1420,3 +1420,81 @@ input:focus, select:focus, textarea:focus {
     border-radius: 16px !important;
   }
 }
+
+/* --- Premium Jobs List --- */
+
+.jobs-premium-shell {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.jobs-premium-shell > * + * {
+  margin-top: 18px;
+}
+
+.jobs-premium-title {
+  font-size: clamp(1.4rem,2vw,1.8rem);
+  letter-spacing: -0.03em;
+  font-weight: 700;
+}
+
+.jobs-premium-card {
+  border-radius: 20px !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  background: linear-gradient(
+    180deg,
+    rgba(255,255,255,0.05),
+    rgba(255,255,255,0.02)
+  ) !important;
+  box-shadow: 0 18px 42px rgba(0,0,0,0.18);
+}
+
+.jobs-premium-input {
+  border-radius: 14px !important;
+  border: 1px solid rgba(255,255,255,0.10) !important;
+  background: rgba(255,255,255,0.04) !important;
+  min-height: 42px;
+}
+
+.jobs-premium-input:focus {
+  border-color: rgba(255,255,255,0.20) !important;
+  box-shadow: 0 0 0 3px rgba(255,255,255,0.08);
+}
+
+.jobs-premium-button {
+  border-radius: 14px !important;
+  min-height: 42px;
+}
+
+.jobs-premium-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.jobs-premium-table thead {
+  background: rgba(255,255,255,0.04);
+}
+
+.jobs-premium-table th {
+  text-align: left;
+  padding: 12px 14px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.8);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.jobs-premium-table td {
+  padding: 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.jobs-premium-table tbody tr:hover {
+  background: rgba(255,255,255,0.04);
+}
+
+@media (max-width: 900px) {
+  .jobs-premium-shell {
+    padding: 0 10px;
+  }
+}
