@@ -1498,3 +1498,54 @@ input:focus, select:focus, textarea:focus {
     padding: 0 10px;
   }
 }
+
+/* ===== Premium Jobs Layout ===== */
+
+.jobs-premium-shell .card {
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+
+.jobs-premium-shell .card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 22px 48px rgba(0,0,0,0.22);
+}
+
+/* Job rows */
+.jobs-premium-shell .job-row,
+.jobs-premium-shell .job-card {
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: linear-gradient(
+    180deg,
+    rgba(255,255,255,0.05),
+    rgba(255,255,255,0.02)
+  );
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+/* Job title */
+.jobs-premium-shell h3 {
+  letter-spacing: -0.02em;
+}
+
+/* Status pills */
+.jobs-premium-shell .status-pill {
+  font-size: 12px;
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: rgba(255,255,255,0.08);
+}
+
+/* Better spacing for filter bar */
+.jobs-premium-shell .input,
+.jobs-premium-shell select {
+  margin-bottom: 8px;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .jobs-premium-shell {
+    padding: 0 10px;
+  }
+}
