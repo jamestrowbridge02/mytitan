@@ -1491,13 +1491,13 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
             settingsPlanId={String((settings as any)?.planId ?? "")}
           </div>
         ) : null}
-<div className="card">
+<div className="card jobs-new-card jobs-new-card--legacy">
           <h1 className="jobs-new-title">New Job</h1>
           {error && <p style={{ color: "#ff8a8a" }}>{error}</p>}
           <p className="muted" style={{ marginBottom: 12 }}>
             Wheels Form v1 is off or your primary trade is not WHEELS. Using standard quick job form.
           </p>
-          <form onSubmit={submitLegacy}>
+          <form className="jobs-new-form" onSubmit={submitLegacy}>
             <label className="jobs-new-label">Customer name</label>
             <input className="input jobs-new-input" value={customerName} onChange={(e) => setCustomerName(e.target.value)} required />
             <label className="jobs-new-label">Customer email</label>
@@ -1510,7 +1510,7 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
             <input className="input jobs-new-input" value={vehicleModel} onChange={(e) => setVehicleModel(e.target.value)} />
             <label className="jobs-new-label">Vehicle registration</label>
             <input className="input jobs-new-input" value={vehicleReg} onChange={(e) => setVehicleReg(e.target.value)} />
-            <button className="button" type="submit">Create Job</button>
+            <button className="button jobs-new-submit" type="submit">Create Job</button>
           </form>
         </div>
       </div>
@@ -1520,8 +1520,8 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
 
   return (
     <DashboardShell>
-      <div className="card">
-        <h1>WHEELS Job Form v1</h1>
+      <div className="card jobs-new-card jobs-new-card--wheels">
+        <h1 className="jobs-new-title">WHEELS Job Form</h1>
         <p className="muted">Friendly step-by-step form based on your Wheels template.</p>
 
         {guidedExperienceEnabled ? (
@@ -1545,7 +1545,7 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
 
         {error && <p style={{ color: "#ff8a8a" }}>{error}</p>}
         {success ? (
-          <div className="card" style={{ padding: 16, border: "1px solid #1f8f5a" }}>
+          <div className="card jobs-new-success" style={{ padding: 16, border: "1px solid #1f8f5a" }}>
             <h3>Job created</h3>
             <p>Job ID: {success.jobId}</p>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -1559,9 +1559,9 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
           </div>
         ) : null}
 
-        <form ref={formRef} onSubmit={submitWheels}>
+        <form ref={formRef} className="jobs-new-form jobs-new-form--wheels" onSubmit={submitWheels}>
           {guidedExperienceEnabled ? (
-            <div className="card" style={{ marginBottom: 16, padding: 12 }}>
+            <div className="card jobs-new-step-card" style={{ marginBottom: 16, padding: 12 }}>
               <p className="muted" style={{ marginTop: 0 }}>Step {activeSectionIndex + 1} of {totalSteps}</p>
               <h3 style={{ margin: "0 0 4px 0" }}>{guidedSteps[activeSectionIndex].title}</h3>
               <p className="muted" style={{ margin: 0 }}>{guidedSteps[activeSectionIndex].subtitle}</p>
@@ -1575,7 +1575,7 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
             renderGuidedStep()
           ) : (
             sections.map(([group, fields]) => (
-              <div key={group} className="card" style={{ marginBottom: 16, padding: 16 }}>
+              <div key={group} className="card jobs-new-section-card" style={{ marginBottom: 16, padding: 16 }}>
                 <h3 style={{ marginTop: 0 }}>{group}</h3>
                 {fields.map(renderField)}
                 {group === "Pricing" ? (
