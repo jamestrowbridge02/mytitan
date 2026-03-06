@@ -1763,3 +1763,60 @@ body:has(form[action*="login"]),
 body:has(input[type="password"]) .mt-sidebar {
   display: none !important;
 }
+
+/* --- Final sidebar refinement --- */
+.mt-sidebar__quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mt-sidebar__quickItem {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  color: rgba(255,255,255,0.68);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.06);
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease, transform 120ms ease;
+}
+
+.mt-sidebar__quickItem:hover {
+  color: rgba(255,255,255,0.92);
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.10);
+}
+
+.mt-sidebar__quickItem.is-active,
+.mt-sidebar__quickItem[aria-current="page"] {
+  color: rgba(255,255,255,0.96);
+  background: rgba(255,255,255,0.10);
+  border-color: rgba(255,255,255,0.16);
+}
+
+.mt-sidebar__subhead {
+  color: rgba(255,255,255,0.40);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.mt-sidebar__groupTitle {
+  color: rgba(255,255,255,0.50);
+}
+
+.mt-sidebar__item {
+  color: rgba(255,255,255,0.72);
+}
+
+.mt-sidebar__item[aria-current="page"] {
+  background: rgba(255,255,255,0.11);
+  border: 1px solid rgba(255,255,255,0.14);
+  color: rgba(255,255,255,0.96);
+}
+
+.mt-sidebar nav {
+  padding-right: 2px;
+}

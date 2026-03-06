@@ -11,13 +11,12 @@ export type NavGroup = {
   items: NavItem[];
 };
 
-// IMPORTANT: these must match real pages under /dashboard/* in this repo
 export const NAV_GROUPS: NavGroup[] = [
   {
     title: "Overview",
     items: [
       { title: "Dashboard", href: "/dashboard" },
-      { title: "Command Centre", href: "/dashboard/command-centre" },
+      { title: "Command Centre", href: "/dashboard/command-centre-v2" },
     ],
   },
   {
@@ -35,12 +34,13 @@ export const NAV_GROUPS: NavGroup[] = [
         children: [
           { title: "Calendar", href: "/dashboard/calendar" },
           { title: "Bookings", href: "/dashboard/bookings" },
-          { title: "Team", href: "/dashboard/users" },
         ],
       },
       {
         title: "Customers",
-        children: [{ title: "CRM", href: "/dashboard/customers" }],
+        children: [
+          { title: "CRM", href: "/dashboard/customers" },
+        ],
       },
     ],
   },
@@ -53,7 +53,9 @@ export const NAV_GROUPS: NavGroup[] = [
   },
   {
     title: "Money",
-    items: [{ title: "Billing", href: "/dashboard/billing" }],
+    items: [
+      { title: "Billing", href: "/dashboard/billing" },
+    ],
   },
   {
     title: "Settings",

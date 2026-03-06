@@ -28,23 +28,6 @@ function canShow(item: NavItem) {
   return true;
 }
 
-function flatten(items: NavItem[]) {
-  const out: Array<{ group: string; parent?: string; item: NavItem }> = [];
-  for (const g of NAV_GROUPS) {
-    for (const it of g.items) {
-      if (!canShow(it)) continue;
-      if (it.children?.length) {
-        for (const c of it.children.filter(canShow)) {
-          out.push({ group: g.title, parent: it.title, item: c });
-        }
-      } else {
-        out.push({ group: g.title, item: it });
-      }
-    }
-  }
-  return out;
-}
-
 function cx(...xs: Array<string | false | null | undefined>) {
   return xs.filter(Boolean).join(" ");
 }
@@ -53,37 +36,26 @@ export default function Sidebar() {
   const router = useRouter();
   const path = router.asPath || router.pathname || "";
 
-  const showSidebar =
-    path.startsWith("/dashboard") ||
-    path === "/dashboard";
-
+  const showSidebar = path.startsWith("/dashboard") || path === "/dashboard";
   if (!showSidebar) return null;
-  const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({});
+
+  const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({
+    Operations: true,
+    Money: true,
+    Settings: false,
+    Admin: true,
+  });
+
   const [q, setQ] = React.useState("");
 
   React.useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem("mytitan_sidebar_groups");
-      if (raw) setCollapsed(JSON.parse(raw));
-    } catch {}
-  }, []);
-
-  React.useEffect(() => {
-    try {
-      window.localStorage.setItem("mytitan_sidebar_groups", JSON.stringify(collapsed));
-    } catch {}
-  }, [collapsed]);
-
-  React.useEffect(() => {
-    // auto-expand groups containing current route
-    const next: Record<string, boolean> = {};
     for (const g of NAV_GROUPS) {
       for (const it of g.items) {
-        if (it.children?.some((c) => isActive(path, c.href))) next[g.title] = false;
+        if (it.children?.some((c) => isActive(path, c.href))) {
+          setCollapsed((prev) => ({ ...prev, [g.title]: false }));
+        }
       }
     }
-    setCollapsed((prev) => ({ ...next, ...prev }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path]);
 
   const normalized = q.trim().toLowerCase();
@@ -91,17 +63,32 @@ export default function Sidebar() {
 
   const searchHits = React.useMemo(() => {
     if (!isSearching) return [];
-    const all = flatten(NAV_GROUPS.flatMap((g) => g.items));
-    return all
-      .filter(({ item, parent, group }) => {
-        const hay = `${group} ${parent ?? ""} ${item.title} ${item.href ?? ""}`.toLowerCase();
-        return hay.includes(normalized);
-      })
-      .slice(0, 10);
+    const rows: Array<{ group: string; parent?: string; item: NavItem }> = [];
+    for (const g of NAV_GROUPS) {
+      for (const it of g.items.filter(canShow)) {
+        if (it.children?.length) {
+          for (const c of it.children.filter(canShow)) {
+            rows.push({ group: g.title, parent: it.title, item: c });
+          }
+        } else {
+          rows.push({ group: g.title, item: it });
+        }
+      }
+    }
+    return rows
+      .filter(({ group, parent, item }) =>
+        `${group} ${parent ?? ""} ${item.title} ${item.href ?? ""}`.toLowerCase().includes(normalized)
+      )
+      .slice(0, 8);
   }, [isSearching, normalized]);
 
-  const toggleGroup = (title: string) =>
-    setCollapsed((prev) => ({ ...prev, [title]: !prev[title] }));
+  const primaryQuickLinks = [
+    { title: "Dashboard", href: "/dashboard" },
+    { title: "Command Centre", href: "/dashboard/command-centre-v2" },
+    { title: "Jobs", href: "/dashboard/jobs" },
+    { title: "New job", href: "/dashboard/jobs/new" },
+    { title: "Settings", href: "/dashboard/settings" },
+  ];
 
   return (
     <aside className="mt-sidebar hidden md:block h-screen w-[292px] shrink-0">
@@ -113,9 +100,7 @@ export default function Sidebar() {
               <div className="text-[13px] font-semibold tracking-[0.2px] text-foreground">
                 MyTitan
               </div>
-              <div className="mt-sidebar__kicker text-[11px]">
-                Business OS
-              </div>
+              <div className="mt-sidebar__kicker text-[11px]">Business OS</div>
             </div>
           </Link>
 
@@ -127,56 +112,72 @@ export default function Sidebar() {
               onChange={(e) => setQ(e.target.value)}
               aria-label="Search navigation"
             />
-            {isSearching ? (
-              <div className="mt-2 rounded-xl border border-white/10 bg-white/3 p-1">
-                {searchHits.length ? (
-                  searchHits.map((h, idx) => {
-                    const href = h.item.href || "#";
-                    const active = isActive(path, href);
-                    return (
-                      <Link
-                        key={`${href}-${idx}`}
-                        href={href}
-                        aria-current={active ? "page" : undefined}
-                        className={cx(
-                          "mt-sidebar__item flex items-center justify-between rounded-xl px-3 py-2 text-[13px]",
-                          active && "shadow-sm"
-                        )}
-                      >
-                        <span className="truncate">
-                          {h.parent ? `${h.parent} · ${h.item.title}` : h.item.title}
-                        </span>
-                        <span className="mt-sidebar__dot h-2 w-2 rounded-full bg-[color:var(--brand-600)]" />
-                      </Link>
-                    );
-                  })
-                ) : (
-                  <div className="px-3 py-2 text-[12px] text-white/55">
-                    No matches.
-                  </div>
-                )}
-              </div>
-            ) : null}
           </div>
+
+          <div className="mt-sidebar__quick mt-3">
+            {primaryQuickLinks.map((item) => {
+              const active = isActive(path, item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  aria-current={active ? "page" : undefined}
+                  className={cx(
+                    "mt-sidebar__quickItem",
+                    active && "is-active"
+                  )}
+                >
+                  {item.title}
+                </Link>
+              );
+            })}
+          </div>
+
+          {isSearching ? (
+            <div className="mt-3 rounded-xl border border-white/10 bg-white/3 p-1">
+              {searchHits.length ? (
+                searchHits.map((h, idx) => {
+                  const href = h.item.href || "#";
+                  const active = isActive(path, href);
+                  return (
+                    <Link
+                      key={`${href}-${idx}`}
+                      href={href}
+                      aria-current={active ? "page" : undefined}
+                      className={cx(
+                        "mt-sidebar__item flex items-center justify-between rounded-xl px-3 py-2 text-[13px]",
+                        active && "shadow-sm"
+                      )}
+                    >
+                      <span className="truncate">
+                        {h.parent ? `${h.parent} · ${h.item.title}` : h.item.title}
+                      </span>
+                      <span className="mt-sidebar__dot h-2 w-2 rounded-full bg-[color:var(--brand-600)]" />
+                    </Link>
+                  );
+                })
+              ) : (
+                <div className="px-3 py-2 text-[12px] text-white/55">No matches.</div>
+              )}
+            </div>
+          ) : null}
         </div>
 
         <nav className="mt-3 flex-1 overflow-y-auto px-1 pb-2">
           {NAV_GROUPS.map((g) => {
-            const groupTitle = g.title;
-            const isCollapsed = Boolean(collapsed[groupTitle]);
             const visibleItems = g.items.filter(canShow);
-
             if (!visibleItems.length) return null;
 
+            const isCollapsed = Boolean(collapsed[g.title]);
             return (
-              <div key={groupTitle} className="mb-4">
+              <div key={g.title} className="mb-4">
                 <button
                   type="button"
-                  onClick={() => toggleGroup(groupTitle)}
+                  onClick={() => setCollapsed((prev) => ({ ...prev, [g.title]: !prev[g.title] }))}
                   className="mt-sidebar__groupTitle w-full px-2 pb-2 text-left text-[11px] font-semibold uppercase"
                 >
                   <span className="flex items-center justify-between">
-                    <span>{groupTitle}</span>
+                    <span>{g.title}</span>
                     <span className="text-[12px] opacity-70">{isCollapsed ? "+" : "–"}</span>
                   </span>
                 </button>
@@ -185,10 +186,9 @@ export default function Sidebar() {
                   <div className="space-y-1">
                     {visibleItems.map((it) => {
                       if (it.children?.length) {
-                        const anyChildActive = it.children.some((c) => isActive(path, c.href));
                         return (
                           <div key={it.title} className="rounded-xl">
-                            <div className="px-2 py-1 text-[11px] text-white/45">
+                            <div className="mt-sidebar__subhead px-2 py-1 text-[11px]">
                               {it.title}
                             </div>
                             <div className="space-y-1">
@@ -202,7 +202,7 @@ export default function Sidebar() {
                                     aria-current={active ? "page" : undefined}
                                     className={cx(
                                       "mt-sidebar__item flex items-center justify-between rounded-xl px-3 py-2 text-[13px]",
-                                      (active || anyChildActive) && active && "shadow-sm"
+                                      active && "shadow-sm"
                                     )}
                                   >
                                     <span className="truncate">{c.title}</span>
@@ -236,9 +236,6 @@ export default function Sidebar() {
             );
           })}
         </nav>
-
-        <div className="mt-sidebar__footer px-2 py-2 text-[11px]">
-        </div>
       </div>
     </aside>
   );
