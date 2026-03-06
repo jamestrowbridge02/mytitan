@@ -1042,3 +1042,59 @@ input:focus, select:focus, textarea:focus {
     padding: 14px;
   }
 }
+
+/* --- Premium Dashboard Layout --- */
+
+.dashboard-premium-shell {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.dashboard-premium-container {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.dashboard-premium-hero {
+  border-radius: 18px;
+  padding: 20px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: linear-gradient(
+    180deg,
+    rgba(255,255,255,0.045),
+    rgba(255,255,255,0.02)
+  );
+  box-shadow: 0 14px 36px rgba(0,0,0,0.18);
+}
+
+.dashboard-premium-title {
+  font-size: 1.5rem;
+  letter-spacing: -0.02em;
+}
+
+.dashboard-premium-container .card {
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.03);
+}
+
+.dashboard-premium-container .card h2,
+.dashboard-premium-container .card h3 {
+  letter-spacing: -0.01em;
+}
+
+.dashboard-premium-container .muted {
+  color: rgba(255,255,255,0.68);
+}
+
+@media (max-width: 900px) {
+  .dashboard-premium-shell {
+    padding: 0 8px;
+  }
+
+  .dashboard-premium-hero {
+    padding: 16px;
+  }
+}
+

@@ -108,8 +108,10 @@ export default function Dashboard() {
   if (!commandCentreEnabled) {
     return (
       <DashboardShell>
+<div className="dashboard-premium-shell">
         <EmptyState title="Dashboard" description="Command Centre feature is disabled." />
-      </DashboardShell>
+      </div>
+</DashboardShell>
     );
   }
 
@@ -225,7 +227,7 @@ export default function Dashboard() {
         <div className="list">
           {(summary?.todayBookings || []).slice(0, 5).map((b) => (
             <div key={b.id} className="integration-card">
-              <div><strong>{b.customerName || 'Customer'}</strong><p className="muted">{new Date(b.startsAt).toLocaleTimeString()}</p></div>
+              <div><strong className="dashboard-premium-title">{b.customerName || 'Customer'}</strong><p className="muted">{new Date(b.startsAt).toLocaleTimeString()}</p></div>
               <Link className="button secondary" href="/dashboard/bookings">Open</Link>
             </div>
           ))}
