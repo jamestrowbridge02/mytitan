@@ -233,22 +233,22 @@ export default function CommandCentreV2Page() {
 
   return (
     <DashboardShell>
-      <div className="card" style={{ marginBottom: 14 }}>
-        <h1 style={{ marginTop: 0 }}>Command Centre V2</h1>
-        <p className="muted">Operations brain: board, bulk, reminders, inline updates.</p>
+      <div className="card ccv2-hero" style={{ marginBottom: 14 }}>
+        <h1 className="ccv2-title" style={{ marginTop: 0 }}>Command Centre</h1>
+        <p className="muted ccv2-subtitle">Operations brain: board, bulk actions, reminders, and inline updates.</p>
         {error ? <p style={{ color: '#ff8a8a' }}>{error}</p> : null}
         {toast ? <p style={{ color: '#5eead4' }}>{toast}</p> : null}
       </div>
 
-      <div className="card" style={{ marginBottom: 14 }}>
-        <div className="two-col">
+      <div className="card ccv2-filters" style={{ marginBottom: 14 }}>
+        <div className="two-col ccv2-grid">
           <div>
             <label>Search</label>
-            <input ref={searchRef} className="input" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} />
+            <input ref={searchRef} className="input ccv2-input" placeholder="Search jobs, customer, reg..." value={searchInput} onChange={(e) => setSearchInput(e.target.value)} />
           </div>
           <div>
             <label>Status</label>
-            <select className="input" value={status} onChange={(e) => setStatus(e.target.value)}>
+            <select className="input ccv2-input" value={status} onChange={(e) => setStatus(e.target.value)}>
               <option value="">All</option>
               {STATUS_LABELS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
             </select>
@@ -257,7 +257,7 @@ export default function CommandCentreV2Page() {
             <label>Locations</label>
             <select
               multiple
-              className="input"
+              className="input ccv2-input"
               value={locationIds}
               onChange={(e) => {
                 const values = Array.from(e.target.selectedOptions).map((x) => x.value);
@@ -281,7 +281,7 @@ export default function CommandCentreV2Page() {
             <option value="">Saved views</option>
             {views.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
           </select>
-          <button className="button secondary" type="button" onClick={() => { setShowSaveView(true); setSaveViewName(''); }}>Save view</button>
+          <button className="button secondary ccv2-button" type="button" onClick={() => { setShowSaveView(true); setSaveViewName(''); }}>Save view</button>
         </div>
       </div>
 
@@ -289,8 +289,8 @@ export default function CommandCentreV2Page() {
         <div className="card" style={{ marginBottom: 14 }}>
           <input className="input" value={saveViewName} onChange={(e) => setSaveViewName(e.target.value)} placeholder="View name" />
           <div style={{ display: 'flex', gap: 8 }}>
-            <button className="button" type="button" onClick={saveView}>Save</button>
-            <button className="button secondary" type="button" onClick={() => setShowSaveView(false)}>Cancel</button>
+            <button className="button ccv2-button" type="button" onClick={saveView}>Save</button>
+            <button className="button secondary ccv2-button" type="button" onClick={() => setShowSaveView(false)}>Cancel</button>
           </div>
         </div>
       ) : null}
@@ -302,16 +302,16 @@ export default function CommandCentreV2Page() {
           <select className="input" style={{ margin: 0, width: 170 }} value={bulkStatus} onChange={(e) => setBulkStatus(e.target.value)}>
             {STATUS_LABELS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
           </select>
-          <button className="button secondary" type="button" onClick={() => triggerBulk('setStatus', { status: bulkStatus }, `Set status to ${bulkStatus}`)}>Status</button>
+          <button className="button secondary ccv2-button" type="button" onClick={() => triggerBulk('setStatus', { status: bulkStatus }, `Set status to ${bulkStatus}`)}>Status</button>
           <select className="input" style={{ margin: 0, width: 220 }} value={bulkLocation} onChange={(e) => setBulkLocation(e.target.value)}>
             <option value="all">All / none</option>
             {locations.map((loc) => <option key={loc.id} value={loc.id}>{loc.name}</option>)}
           </select>
-          <button className="button secondary" type="button" onClick={() => triggerBulk('setLocation', { locationId: bulkLocation }, `Assign location ${bulkLocation}`)}>Location</button>
+          <button className="button secondary ccv2-button" type="button" onClick={() => triggerBulk('setLocation', { locationId: bulkLocation }, `Assign location ${bulkLocation}`)}>Location</button>
           {demoPolishEnabled ? (
-            <button className="button secondary" type="button" onClick={() => triggerBulk('markComplete', {}, 'Mark complete')}>Mark Complete</button>
+            <button className="button secondary ccv2-button" type="button" onClick={() => triggerBulk('markComplete', {}, 'Mark complete')}>Mark Complete</button>
           ) : (
-            <button className="button secondary" type="button" onClick={() => triggerBulk('closeJobs', {}, 'Close jobs')}>Close</button>
+            <button className="button secondary ccv2-button" type="button" onClick={() => triggerBulk('closeJobs', {}, 'Close jobs')}>Close</button>
           )}
         </div>
       </div>
@@ -326,7 +326,7 @@ export default function CommandCentreV2Page() {
                   <strong>{job.jobRef}</strong>
                 </label>
                 <div>
-                  <button className="button secondary" type="button" onClick={(e) => { e.stopPropagation(); setOpenedJob(job); }}>Open</button>
+                  <button className="button secondary ccv2-button" type="button" onClick={(e) => { e.stopPropagation(); setOpenedJob(job); }}>Open</button>
                 </div>
               </div>
             ))}
@@ -358,8 +358,8 @@ export default function CommandCentreV2Page() {
           <select className="input" value={openedJob.status} onChange={(e) => setOpenedJob({ ...openedJob, status: e.target.value })}>
             {STATUS_LABELS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
           </select>
-          <button className="button" type="button" onClick={() => patchJob(openedJob.id, { status: openedJob.status })}>Inline save</button>
-          <button className="button secondary" type="button" onClick={() => setOpenedJob(null)}>Close</button>
+          <button className="button ccv2-button" type="button" onClick={() => patchJob(openedJob.id, { status: openedJob.status })}>Inline save</button>
+          <button className="button secondary ccv2-button" type="button" onClick={() => setOpenedJob(null)}>Close</button>
         </div>
       ) : null}
 
@@ -369,8 +369,8 @@ export default function CommandCentreV2Page() {
             <h3 style={{ marginTop: 0 }}>Confirm bulk action</h3>
             <p className="muted">{pendingBulk.label} on {selected.length} selected jobs.</p>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button className="button" type="button" onClick={confirmBulk}>Confirm</button>
-              <button className="button secondary" type="button" onClick={() => setPendingBulk(null)}>Cancel</button>
+              <button className="button ccv2-button" type="button" onClick={confirmBulk}>Confirm</button>
+              <button className="button secondary ccv2-button" type="button" onClick={() => setPendingBulk(null)}>Cancel</button>
             </div>
           </div>
         </div>

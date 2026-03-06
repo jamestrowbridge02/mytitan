@@ -789,3 +789,98 @@ input:focus, select:focus, textarea:focus {
 .container > .card:first-child {
   margin-top: 0 !important;
 }
+
+/* --- Command Centre V2 premium polish --- */
+.ccv2-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ccv2-hero,
+.ccv2-filters {
+  border: 1px solid rgba(255,255,255,0.08);
+  background: linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.025));
+  box-shadow: 0 12px 34px rgba(0,0,0,0.16);
+  border-radius: 18px;
+}
+
+.ccv2-hero {
+  padding: 18px 18px 16px;
+}
+
+.ccv2-filters {
+  padding: 16px;
+}
+
+.ccv2-title {
+  font-size: clamp(1.25rem, 2vw, 1.6rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 6px;
+}
+
+.ccv2-subtitle {
+  font-size: 0.95rem;
+  max-width: 70ch;
+  opacity: 0.78;
+}
+
+.ccv2-grid {
+  gap: 14px;
+  align-items: end;
+}
+
+.ccv2-input {
+  min-height: 42px;
+  border-radius: 14px !important;
+  border: 1px solid rgba(255,255,255,0.10) !important;
+  background: rgba(255,255,255,0.045) !important;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.05) inset;
+}
+
+.ccv2-input:focus {
+  outline: none;
+  border-color: rgba(255,255,255,0.18) !important;
+  box-shadow: 0 0 0 3px rgba(255,255,255,0.10);
+}
+
+.ccv2-button {
+  border-radius: 14px !important;
+  min-height: 40px;
+}
+
+.ccv2-filters label {
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: rgba(255,255,255,0.62);
+  margin-bottom: 6px;
+  display: inline-block;
+}
+
+.ccv2-hero .muted,
+.ccv2-filters .muted {
+  color: rgba(255,255,255,0.68);
+}
+
+.ccv2-stack .card {
+  border-radius: 18px;
+}
+
+.ccv2-stack .card h2,
+.ccv2-stack .card h3 {
+  letter-spacing: -0.01em;
+}
+
+.ccv2-stack .card[role=\"status\"] {
+  border: 1px dashed rgba(255,255,255,0.14);
+  background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.018));
+}
+
+@media (max-width: 900px) {
+  .ccv2-hero,
+  .ccv2-filters {
+    padding: 14px;
+    border-radius: 16px;
+  }
+}
