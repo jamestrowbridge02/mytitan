@@ -149,7 +149,7 @@ function SignaturePad({
 
   return (
     <div>
-      <label>{label}</label>
+      <label className="jobs-new-label">{label}</label>
       <div className="card" style={{ padding: 8 }}>
         <canvas
           ref={canvasRef}
@@ -767,24 +767,24 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
     if (key === "beforePhotos") {
       return (
         <div key={key}>
-          <label>{field.label} (up to 6 URLs)</label>
-          <textarea className="input" rows={3} value={beforeInput} onChange={(e) => setBeforeInput(e.target.value)} />
+          <label className="jobs-new-label">{field.label} (up to 6 URLs)</label>
+          <textarea className="input jobs-new-input" rows={3} value={beforeInput} onChange={(e) => setBeforeInput(e.target.value)} />
         </div>
       );
     }
     if (key === "afterPhotos") {
       return (
         <div key={key}>
-          <label>{field.label} (up to 6 URLs)</label>
-          <textarea className="input" rows={3} value={afterInput} onChange={(e) => setAfterInput(e.target.value)} />
+          <label className="jobs-new-label">{field.label} (up to 6 URLs)</label>
+          <textarea className="input jobs-new-input" rows={3} value={afterInput} onChange={(e) => setAfterInput(e.target.value)} />
         </div>
       );
     }
     if (key === "torqueEvidence") {
       return (
         <div key={key}>
-          <label>{field.label} (image/video URL)</label>
-          <input className="input" value={torqueInput} onChange={(e) => setTorqueInput(e.target.value)} />
+          <label className="jobs-new-label">{field.label} (image/video URL)</label>
+          <input className="input jobs-new-input" value={torqueInput} onChange={(e) => setTorqueInput(e.target.value)} />
         </div>
       );
     }
@@ -792,7 +792,7 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
     if (field.type === "checkbox" && Array.isArray(field.optionsJson) && field.optionsJson.length > 0) {
       return (
         <div key={key}>
-          <label>{field.label}</label>
+          <label className="jobs-new-label">{field.label}</label>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
             {field.optionsJson.map((opt) => {
               const arr = Array.isArray(value) ? value : [];
@@ -819,7 +819,7 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
     if (field.type === "radio" && Array.isArray(field.optionsJson) && field.optionsJson.length > 0) {
       return (
         <div key={key}>
-          <label>{field.label}</label>
+          <label className="jobs-new-label">{field.label}</label>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
             {field.optionsJson.map((opt) => (
               <label key={opt} style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -835,8 +835,8 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
     if (field.type === "select" && Array.isArray(field.optionsJson) && field.optionsJson.length > 0) {
       return (
         <div key={key}>
-          <label>{field.label}</label>
-          <select className="input" value={value} onChange={(e) => setField(key, e.target.value)}>
+          <label className="jobs-new-label">{field.label}</label>
+          <select className="input jobs-new-input" value={value} onChange={(e) => setField(key, e.target.value)}>
             <option value="">Choose...</option>
             {field.optionsJson.map((opt) => (
               <option key={opt} value={opt}>{opt}</option>
@@ -849,8 +849,8 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
     if (field.type === "textarea") {
       return (
         <div key={key}>
-          <label>{field.label}</label>
-          <textarea className="input" rows={3} value={value} onChange={(e) => setField(key, e.target.value)} required={!guidedExperienceEnabled && field.required} />
+          <label className="jobs-new-label">{field.label}</label>
+          <textarea className="input jobs-new-input" rows={3} value={value} onChange={(e) => setField(key, e.target.value)} required={!guidedExperienceEnabled && field.required} />
         </div>
       );
     }
@@ -866,9 +866,9 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
 
     return (
       <div key={key}>
-        <label>{field.label}</label>
+        <label className="jobs-new-label">{field.label}</label>
         <input
-          className="input"
+          className="input jobs-new-input"
           type={field.type === "number" ? "number" : field.type === "date" ? "date" : "text"}
           value={value}
           onChange={(e) => setField(key, e.target.value, { userEdited: key === "unitPrice" || key === "quantity" })}
@@ -887,7 +887,7 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
           Back
         </button>
         {activeSectionIndex < totalSteps - 1 ? (
-          <button className="button" type="button" onClick={goNextSection}>Next</button>
+          <button className="button jobs-new-submit" type="button" onClick={goNextSection}>Next</button>
         ) : null}
         <button className="button secondary" type="button" onClick={saveAndExit}>Save & Exit</button>
         <p className="muted" style={{ margin: 0, alignSelf: "center" }}>
@@ -1139,18 +1139,18 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
     if (step === 0) {
       return sectionCard("Step 1: Job Details", (
         <>
-          <label>Job reference</label>
-          <input className="input" value={formData.jobReference || ""} onChange={(e) => setField("jobReference", e.target.value)} />
+          <label className="jobs-new-label">Job reference</label>
+          <input className="input jobs-new-input" value={formData.jobReference || ""} onChange={(e) => setField("jobReference", e.target.value)} />
           <p className="muted" style={{ marginTop: -4 }}>Auto-generated — you can change it.</p>
 
-          <label>Job start date</label>
-          <input className="input" type="date" value={formData.jobStartDate || formData.jobDate || ""} onChange={(e) => setField("jobDate", e.target.value)} />
+          <label className="jobs-new-label">Job start date</label>
+          <input className="input jobs-new-input" type="date" value={formData.jobStartDate || formData.jobDate || ""} onChange={(e) => setField("jobDate", e.target.value)} />
 
-          <label>Job completed date (optional)</label>
-          <input className="input" type="date" value={formData.jobCompletedDate || formData.completedDate || ""} onChange={(e) => setField("completedDate", e.target.value)} />
+          <label className="jobs-new-label">Job completed date (optional)</label>
+          <input className="input jobs-new-input" type="date" value={formData.jobCompletedDate || formData.completedDate || ""} onChange={(e) => setField("completedDate", e.target.value)} />
 
-          <label>Job type</label>
-          <select className="input" value={formData.jobType || ""} onChange={(e) => setField("jobType", e.target.value)}>
+          <label className="jobs-new-label">Job type</label>
+          <select className="input jobs-new-input" value={formData.jobType || ""} onChange={(e) => setField("jobType", e.target.value)}>
             <option value="">Choose...</option>
             <option value="Retail">Retail</option>
             <option value="Trade">Trade</option>
@@ -1163,33 +1163,33 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
     if (step === 1) {
       return sectionCard("Step 2: Customer / Trade Details", (
         <>
-          <label>Customer / trade name</label>
+          <label className="jobs-new-label">Customer / trade name</label>
           <input
-            className="input"
+            className="input jobs-new-input"
             value={formData.customerTradeName || formData.customerName || customerName || ""}
             onChange={(e) => setField("customerTradeName", e.target.value)}
           />
 
-          <label>Trade contact name</label>
-          <input className="input" value={formData.tradeContactName || ""} onChange={(e) => setField("tradeContactName", e.target.value)} />
+          <label className="jobs-new-label">Trade contact name</label>
+          <input className="input jobs-new-input" value={formData.tradeContactName || ""} onChange={(e) => setField("tradeContactName", e.target.value)} />
 
-          <label>Phone</label>
-          <input className="input" value={formData.customerPhone || customerPhone || ""} onChange={(e) => setField("customerPhone", e.target.value)} />
+          <label className="jobs-new-label">Phone</label>
+          <input className="input jobs-new-input" value={formData.customerPhone || customerPhone || ""} onChange={(e) => setField("customerPhone", e.target.value)} />
 
-          <label>Email</label>
-          <input className="input" type="email" value={formData.customerEmail || customerEmail || ""} onChange={(e) => setField("customerEmail", e.target.value)} />
+          <label className="jobs-new-label">Email</label>
+          <input className="input jobs-new-input" type="email" value={formData.customerEmail || customerEmail || ""} onChange={(e) => setField("customerEmail", e.target.value)} />
 
-          <label>Address line 1</label>
-          <input className="input" value={formData.addressLine1 || ""} onChange={(e) => setField("addressLine1", e.target.value)} />
+          <label className="jobs-new-label">Address line 1</label>
+          <input className="input jobs-new-input" value={formData.addressLine1 || ""} onChange={(e) => setField("addressLine1", e.target.value)} />
 
-          <label>Address line 2</label>
-          <input className="input" value={formData.addressLine2 || ""} onChange={(e) => setField("addressLine2", e.target.value)} />
+          <label className="jobs-new-label">Address line 2</label>
+          <input className="input jobs-new-input" value={formData.addressLine2 || ""} onChange={(e) => setField("addressLine2", e.target.value)} />
 
-          <label>City</label>
-          <input className="input" value={formData.city || formData.town || ""} onChange={(e) => setField("city", e.target.value)} />
+          <label className="jobs-new-label">City</label>
+          <input className="input jobs-new-input" value={formData.city || formData.town || ""} onChange={(e) => setField("city", e.target.value)} />
 
-          <label>Postcode</label>
-          <input className="input" value={formData.postcode || ""} onChange={(e) => setField("postcode", e.target.value)} />
+          <label className="jobs-new-label">Postcode</label>
+          <input className="input jobs-new-input" value={formData.postcode || ""} onChange={(e) => setField("postcode", e.target.value)} />
 
           <label className="toggle-row" style={{ marginTop: 10 }}>
             <input type="checkbox" checked={Boolean(formData.saveTradeCustomer)} onChange={(e) => setField("saveTradeCustomer", e.target.checked)} />
@@ -1202,24 +1202,24 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
     if (step === 2) {
       return sectionCard("Step 3: Technician & Vehicle", (
         <>
-          <label>Technician name</label>
-          <input className="input" value={formData.technicianName || ""} onChange={(e) => setField("technicianName", e.target.value)} />
+          <label className="jobs-new-label">Technician name</label>
+          <input className="input jobs-new-input" value={formData.technicianName || ""} onChange={(e) => setField("technicianName", e.target.value)} />
 
-          <label>Car make / model</label>
-          <input className="input" value={formData.carMakeModel || `${vehicleMake} ${vehicleModel}`.trim()} onChange={(e) => setField("carMakeModel", e.target.value)} />
+          <label className="jobs-new-label">Car make / model</label>
+          <input className="input jobs-new-input" value={formData.carMakeModel || `${vehicleMake} ${vehicleModel}`.trim()} onChange={(e) => setField("carMakeModel", e.target.value)} />
 
-          <label>Registration / chassis</label>
-          <input className="input" value={formData.carRegOrChassis || formData.vehicleReg || vehicleReg || ""} onChange={(e) => setField("carRegOrChassis", e.target.value)} />
+          <label className="jobs-new-label">Registration / chassis</label>
+          <input className="input jobs-new-input" value={formData.carRegOrChassis || formData.vehicleReg || vehicleReg || ""} onChange={(e) => setField("carRegOrChassis", e.target.value)} />
 
-          <label>Torque setting</label>
-          <input className="input" value={formData.torqueSetting || ""} onChange={(e) => setField("torqueSetting", e.target.value)} />
+          <label className="jobs-new-label">Torque setting</label>
+          <input className="input jobs-new-input" value={formData.torqueSetting || ""} onChange={(e) => setField("torqueSetting", e.target.value)} />
           <p className="muted" style={{ marginTop: -4 }}>e.g. 130Nm</p>
 
-          <label>Tyre pressure</label>
-          <input className="input" value={formData.tyrePressure || ""} onChange={(e) => setField("tyrePressure", e.target.value)} />
+          <label className="jobs-new-label">Tyre pressure</label>
+          <input className="input jobs-new-input" value={formData.tyrePressure || ""} onChange={(e) => setField("tyrePressure", e.target.value)} />
 
-          <label>Notes</label>
-          <textarea className="input" rows={3} value={formData.notes || ""} onChange={(e) => setField("notes", e.target.value)} />
+          <label className="jobs-new-label">Notes</label>
+          <textarea className="input jobs-new-input" rows={3} value={formData.notes || ""} onChange={(e) => setField("notes", e.target.value)} />
         </>
       ));
     }
@@ -1241,7 +1241,7 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
             ))}
           </div>
 
-          <label>Loose wheels</label>
+          <label className="jobs-new-label">Loose wheels</label>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
             {looseOptions.map((opt) => (
               <label key={opt} style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -1251,7 +1251,7 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
             ))}
           </div>
 
-          <label>Service types</label>
+          <label className="jobs-new-label">Service types</label>
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
             {serviceOptions.map((opt) => (
               <label key={opt} style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -1274,10 +1274,10 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
     if (step === 4) {
       return sectionCard("Step 5: Evidence & Photos", (
         <>
-          <label>Torque evidence (image/video)</label>
+          <label className="jobs-new-label">Torque evidence (image/video)</label>
           <input
             ref={torqueFileInputRef}
-            className="input"
+            className="input jobs-new-input"
             type="file"
             accept="image/*,video/*"
             capture="environment"
@@ -1314,7 +1314,7 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
           <label style={{ marginTop: 12 }}>Before photos (up to 6)</label>
           <input
             ref={beforeFileInputRef}
-            className="input"
+            className="input jobs-new-input"
             type="file"
             accept="image/*"
             capture="environment"
@@ -1342,7 +1342,7 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
           <label style={{ marginTop: 12 }}>After photos (up to 6)</label>
           <input
             ref={afterFileInputRef}
-            className="input"
+            className="input jobs-new-input"
             type="file"
             accept="image/*"
             capture="environment"
@@ -1382,59 +1382,59 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
       <>
         <p className="muted" style={{ marginTop: 0 }}>Preview only — server recalculates totals.</p>
 
-        <label>Service name</label>
-        <input className="input" value={formData.serviceName || ""} onChange={(e) => setField("serviceName", e.target.value)} />
+        <label className="jobs-new-label">Service name</label>
+        <input className="input jobs-new-input" value={formData.serviceName || ""} onChange={(e) => setField("serviceName", e.target.value)} />
 
-        <label>Service unit price</label>
-        <input className="input" type="number" value={formData.unitPrice || ""} onChange={(e) => setField("unitPrice", e.target.value, { userEdited: true })} />
+        <label className="jobs-new-label">Service unit price</label>
+        <input className="input jobs-new-input" type="number" value={formData.unitPrice || ""} onChange={(e) => setField("unitPrice", e.target.value, { userEdited: true })} />
 
-        <label>Service quantity</label>
-        <input className="input" type="number" value={formData.serviceQuantity || formData.quantity || 1} onChange={(e) => setField("serviceQuantity", e.target.value, { userEdited: true })} />
+        <label className="jobs-new-label">Service quantity</label>
+        <input className="input jobs-new-input" type="number" value={formData.serviceQuantity || formData.quantity || 1} onChange={(e) => setField("serviceQuantity", e.target.value, { userEdited: true })} />
 
-        <label>Discount</label>
-        <input className="input" type="number" value={formData.discount || ""} onChange={(e) => setField("discount", e.target.value)} />
+        <label className="jobs-new-label">Discount</label>
+        <input className="input jobs-new-input" type="number" value={formData.discount || ""} onChange={(e) => setField("discount", e.target.value)} />
 
-        <label>Price per wheel</label>
-        <input className="input" type="number" value={formData.pricePerWheel || ""} onChange={(e) => setField("pricePerWheel", e.target.value)} />
+        <label className="jobs-new-label">Price per wheel</label>
+        <input className="input jobs-new-input" type="number" value={formData.pricePerWheel || ""} onChange={(e) => setField("pricePerWheel", e.target.value)} />
 
         <label className="toggle-row" style={{ marginTop: 10 }}>
           <input type="checkbox" checked={Boolean(formData.pricePerWheelMode)} onChange={(e) => setField("pricePerWheelMode", e.target.checked)} />
           <span>Sync service quantity to wheel count</span>
         </label>
 
-        <label>Wheel count</label>
-        <input className="input" type="number" value={formData.wheelCount || 0} onChange={(e) => setField("wheelCount", e.target.value)} />
+        <label className="jobs-new-label">Wheel count</label>
+        <input className="input jobs-new-input" type="number" value={formData.wheelCount || 0} onChange={(e) => setField("wheelCount", e.target.value)} />
 
         <label className="toggle-row" style={{ marginTop: 10 }}>
           <input type="checkbox" checked={Boolean(formData.vatEnabled)} onChange={(e) => setField("vatEnabled", e.target.checked)} />
           <span>VAT enabled</span>
         </label>
 
-        <label>VAT rate (%)</label>
-        <input className="input" type="number" value={formData.vatRate || ""} onChange={(e) => setField("vatRate", e.target.value)} />
+        <label className="jobs-new-label">VAT rate (%)</label>
+        <input className="input jobs-new-input" type="number" value={formData.vatRate || ""} onChange={(e) => setField("vatRate", e.target.value)} />
 
         <p className="muted">Subtotal £{totalsPreview.subtotal.toFixed(2)} • VAT £{totalsPreview.vat.toFixed(2)} • Total £{totalsPreview.total.toFixed(2)}</p>
 
-        <label>Invoice number (optional)</label>
-        <input className="input" value={formData.invoiceNumber || ""} onChange={(e) => setField("invoiceNumber", e.target.value)} />
+        <label className="jobs-new-label">Invoice number (optional)</label>
+        <input className="input jobs-new-input" value={formData.invoiceNumber || ""} onChange={(e) => setField("invoiceNumber", e.target.value)} />
 
-        <label>Payment status</label>
-        <select className="input" value={formData.paymentStatus || "UNPAID"} onChange={(e) => setField("paymentStatus", e.target.value)}>
+        <label className="jobs-new-label">Payment status</label>
+        <select className="input jobs-new-input" value={formData.paymentStatus || "UNPAID"} onChange={(e) => setField("paymentStatus", e.target.value)}>
           <option value="UNPAID">UNPAID</option>
           <option value="PART_PAID">PART_PAID</option>
           <option value="PAID">PAID</option>
         </select>
 
-        <label>Payment method</label>
-        <select className="input" value={formData.paymentMethod || "CARD"} onChange={(e) => setField("paymentMethod", e.target.value)}>
+        <label className="jobs-new-label">Payment method</label>
+        <select className="input jobs-new-input" value={formData.paymentMethod || "CARD"} onChange={(e) => setField("paymentMethod", e.target.value)}>
           <option value="CASH">CASH</option>
           <option value="CARD">CARD</option>
           <option value="BANK_TRANSFER">BANK_TRANSFER</option>
           <option value="STRIPE_LINK">STRIPE_LINK</option>
         </select>
 
-        <label>WhatsApp message</label>
-        <textarea className="input" rows={3} value={formData.whatsappMessage || ""} onChange={(e) => setField("whatsappMessage", e.target.value)} />
+        <label className="jobs-new-label">WhatsApp message</label>
+        <textarea className="input jobs-new-input" rows={3} value={formData.whatsappMessage || ""} onChange={(e) => setField("whatsappMessage", e.target.value)} />
 
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
           <button type="button" className="button secondary" onClick={sendWhatsApp}>Send WhatsApp</button>
@@ -1442,8 +1442,8 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
         </div>
         {whatsAppNotice ? <p className="muted">{whatsAppNotice}</p> : null}
 
-        <label>Technician signature name</label>
-        <input className="input" value={formData.technicianSignatureName || ""} onChange={(e) => setField("technicianSignatureName", e.target.value)} />
+        <label className="jobs-new-label">Technician signature name</label>
+        <input className="input jobs-new-input" value={formData.technicianSignatureName || ""} onChange={(e) => setField("technicianSignatureName", e.target.value)} />
 
         {mediaSignatureEnabled ? (
           <SignaturePad
@@ -1453,13 +1453,13 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
           />
         ) : (
           <>
-            <label>Technician signature (required)</label>
-            <textarea className="input" rows={2} value={formData.technicianSignature || ""} onChange={(e) => setField("technicianSignature", e.target.value)} />
+            <label className="jobs-new-label">Technician signature (required)</label>
+            <textarea className="input jobs-new-input" rows={2} value={formData.technicianSignature || ""} onChange={(e) => setField("technicianSignature", e.target.value)} />
           </>
         )}
 
-        <label>Customer signature name (optional)</label>
-        <input className="input" value={formData.customerSignatureName || ""} onChange={(e) => setField("customerSignatureName", e.target.value)} />
+        <label className="jobs-new-label">Customer signature name (optional)</label>
+        <input className="input jobs-new-input" value={formData.customerSignatureName || ""} onChange={(e) => setField("customerSignatureName", e.target.value)} />
 
         {mediaSignatureEnabled ? (
           <SignaturePad
@@ -1469,8 +1469,8 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
           />
         ) : (
           <>
-            <label>Customer signature (optional)</label>
-            <textarea className="input" rows={2} value={formData.customerSignature || ""} onChange={(e) => setField("customerSignature", e.target.value)} />
+            <label className="jobs-new-label">Customer signature (optional)</label>
+            <textarea className="input jobs-new-input" rows={2} value={formData.customerSignature || ""} onChange={(e) => setField("customerSignature", e.target.value)} />
           </>
         )}
       </>
@@ -1479,6 +1479,7 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
   if (!wheelsFeature) {
     return (
       <DashboardShell>
+<div className="jobs-new-shell">
         {__mtDebugTenantSettings ? (
           <div
             data-debug-tenant-settings="on"
@@ -1491,28 +1492,29 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
           </div>
         ) : null}
 <div className="card">
-          <h1>New Job</h1>
+          <h1 className="jobs-new-title">New Job</h1>
           {error && <p style={{ color: "#ff8a8a" }}>{error}</p>}
           <p className="muted" style={{ marginBottom: 12 }}>
             Wheels Form v1 is off or your primary trade is not WHEELS. Using standard quick job form.
           </p>
           <form onSubmit={submitLegacy}>
-            <label>Customer name</label>
-            <input className="input" value={customerName} onChange={(e) => setCustomerName(e.target.value)} required />
-            <label>Customer email</label>
-            <input className="input" type="email" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} />
-            <label>Customer phone</label>
-            <input className="input" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
-            <label>Vehicle make</label>
-            <input className="input" value={vehicleMake} onChange={(e) => setVehicleMake(e.target.value)} />
-            <label>Vehicle model</label>
-            <input className="input" value={vehicleModel} onChange={(e) => setVehicleModel(e.target.value)} />
-            <label>Vehicle registration</label>
-            <input className="input" value={vehicleReg} onChange={(e) => setVehicleReg(e.target.value)} />
+            <label className="jobs-new-label">Customer name</label>
+            <input className="input jobs-new-input" value={customerName} onChange={(e) => setCustomerName(e.target.value)} required />
+            <label className="jobs-new-label">Customer email</label>
+            <input className="input jobs-new-input" type="email" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} />
+            <label className="jobs-new-label">Customer phone</label>
+            <input className="input jobs-new-input" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
+            <label className="jobs-new-label">Vehicle make</label>
+            <input className="input jobs-new-input" value={vehicleMake} onChange={(e) => setVehicleMake(e.target.value)} />
+            <label className="jobs-new-label">Vehicle model</label>
+            <input className="input jobs-new-input" value={vehicleModel} onChange={(e) => setVehicleModel(e.target.value)} />
+            <label className="jobs-new-label">Vehicle registration</label>
+            <input className="input jobs-new-input" value={vehicleReg} onChange={(e) => setVehicleReg(e.target.value)} />
             <button className="button" type="submit">Create Job</button>
           </form>
         </div>
-      </DashboardShell>
+      </div>
+</DashboardShell>
     );
   }
 
@@ -1589,7 +1591,7 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
             <div className="card" style={{ marginBottom: 16, padding: 16 }}>
               <h3 style={{ marginTop: 0 }}>Parts / Stock used (optional)</h3>
               <input
-                className="input"
+                className="input jobs-new-input"
                 value={partsQuery}
                 onChange={(e) => setPartsQuery(e.target.value)}
                 placeholder="Search stock by SKU or name"
@@ -1612,7 +1614,7 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
                     </div>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                       <input
-                        className="input"
+                        className="input jobs-new-input"
                         style={{ width: 90, margin: 0 }}
                         type="number"
                         min={0}

@@ -884,3 +884,65 @@ input:focus, select:focus, textarea:focus {
     border-radius: 16px;
   }
 }
+
+/* --- Premium Jobs New Form --- */
+
+.jobs-new-shell {
+  max-width: 900px;
+  margin: 0 auto;
+  padding-top: 8px;
+}
+
+.jobs-new-title {
+  font-size: 1.55rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 14px;
+}
+
+.jobs-new-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.jobs-new-form label {
+  grid-column: span 2;
+}
+
+.jobs-new-label {
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  opacity: 0.72;
+  margin-bottom: 4px;
+}
+
+.jobs-new-input {
+  min-height: 44px;
+  border-radius: 14px !important;
+  border: 1px solid rgba(255,255,255,0.10) !important;
+  background: rgba(255,255,255,0.04) !important;
+}
+
+.jobs-new-input:focus {
+  border-color: rgba(255,255,255,0.18) !important;
+  box-shadow: 0 0 0 3px rgba(255,255,255,0.08);
+}
+
+.jobs-new-submit {
+  grid-column: span 2;
+  margin-top: 10px;
+  min-height: 46px;
+  border-radius: 14px !important;
+}
+
+@media (max-width: 700px) {
+  .jobs-new-form {
+    grid-template-columns: 1fr;
+  }
+
+  .jobs-new-submit {
+    grid-column: span 1;
+  }
+}
+
