@@ -216,7 +216,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         </div>
       ) : null}
 
-      <div className="dashboard-header">
+      <div className="dashboard-header dashboard-header--premium">
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'space-between', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             {settings?.logoUrl ? (

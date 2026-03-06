@@ -726,3 +726,54 @@ input:focus, select:focus, textarea:focus {
 [data-ui-coherence="on"] .nav--internal {
   display: none !important;
 }
+
+/* --- Premium dashboard shell toolbar --- */
+.dashboard-header--premium {
+  padding: 12px !important;
+  margin-bottom: 10px !important;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.025));
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.16);
+}
+
+.dashboard-header--premium .tenant-logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+}
+
+.dashboard-header--premium strong {
+  font-size: 14px;
+  letter-spacing: 0.01em;
+}
+
+.dashboard-header--premium .muted {
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.dashboard-header--premium .input {
+  min-width: 160px !important;
+  padding: 9px 11px !important;
+  border-radius: 12px !important;
+}
+
+.dashboard-header--premium .button {
+  padding: 9px 11px !important;
+  border-radius: 12px !important;
+}
+
+/* Keep the dashboard content tight under the toolbar */
+.dashboard-header--premium + .card,
+.dashboard-header--premium + .nav,
+.dashboard-header--premium + div {
+  margin-top: 0 !important;
+}
+
+/* Internal quick-links nav should not appear when coherence is on */
+[data-ui-coherence="on"] .nav--internal,
+[data-ui-coherence="on"] .dashboard-header--premium + .nav,
+[data-ui-coherence="on"] .dashboard-header--premium ~ .nav {
+  display: none !important;
+}
