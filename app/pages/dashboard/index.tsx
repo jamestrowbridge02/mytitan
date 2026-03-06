@@ -156,6 +156,7 @@ export default function Dashboard() {
 
   return (
     <DashboardShell>
+      <div className="dashboard-home-premium">
       <GuidedTourOverlay enabled={demoTourEnabled} isDemoUser={Boolean(me?.demoUser || me?.email === '@mytitan.co.uk')} />
       <GuidedSetupProgress enabled={guidedSetupEnabled} incomplete={!settings?.guidedSetupCompletedAt} />
 

@@ -1206,3 +1206,21 @@ input:focus, select:focus, textarea:focus {
   background: linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.02)) !important;
   box-shadow: 0 14px 36px rgba(0,0,0,0.18) !important;
 }
+
+/* --- Premium Dashboard Home V5 --- */
+.dashboard-home-premium {
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.dashboard-home-premium > * + * {
+  margin-top: 16px;
+}
+
+.dashboard-home-hero {
+  border-radius: 18px !important;
+  padding: 20px !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  background: linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.02)) !important;
+  box-shadow: 0 14px 36px rgba(0,0,0,0.18) !important;
+}
