@@ -284,6 +284,7 @@ export default function Dashboard() {
         <p className="muted">Setup is non-blocking. Continue when ready.</p>
         <Link className="button secondary" href="/dashboard/setup">Open Setup</Link>
       </div>
+      </div>
     </DashboardShell>
   );
 }
