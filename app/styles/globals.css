@@ -698,3 +698,31 @@ input:focus, select:focus, textarea:focus {
 [data-shell="app"] .mt-sidebar__footer{
   color: rgba(255,255,255,0.45);
 }
+
+/* --- Top-1: compact dashboard toolbar (removes the "second menu" feel) --- */
+.dashboard-header--compact {
+  padding: 12px !important;
+  margin-bottom: 12px !important;
+  border-radius: 16px;
+}
+
+.dashboard-header--compact .tenant-logo {
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+}
+
+.dashboard-header--compact select.input {
+  min-width: 160px !important;
+  padding: 8px 10px !important;
+}
+
+.dashboard-header--compact .button {
+  padding: 8px 10px !important;
+  border-radius: 12px !important;
+}
+
+/* Internal legacy dashboard nav list: keep out of the way in luxury mode */
+[data-ui-coherence="on"] .nav--internal {
+  display: none !important;
+}
