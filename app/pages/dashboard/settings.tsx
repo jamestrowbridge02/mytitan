@@ -207,12 +207,13 @@ export default function SettingsPage() {
 
   return (
     <DashboardShell>
+  <div className="settings-premium-shell">
       <GuidedSetupProgress enabled={guidedSetupEnabled} incomplete={!settings?.guidedSetupCompletedAt} compact />
-      <div className="card">
-        <h1>Tenant Settings</h1>
+      <div className="card settings-premium-card">
+        <h1 className="settings-premium-title">Tenant Settings</h1>
         <div style={{ marginBottom: 16 }}>
           <h2 style={{ marginTop: 0 }}>Appearance</h2>
-          <p className="muted">Theme mode</p>
+          <p className="muted settings-premium-muted">Theme mode</p>
           <div style={{ display: 'flex', gap: 10 }}>
             <button
               type="button"
@@ -230,14 +231,14 @@ export default function SettingsPage() {
             </button>
           </div>
           <div style={{ marginTop: 10 }}>
-            <button type="button" className="button secondary" onClick={restartDemoTour}>
+            <button type="button" className="button secondary settings-premium-button" onClick={restartDemoTour}>
               Restart  tour
             </button>
           </div>
         </div>
         {guidedSetupEnabled ? (
           <div style={{ marginBottom: 12 }}>
-            <button className="button secondary" type="button" onClick={runGuidedSetup}>
+            <button className="button secondary settings-premium-button" type="button" onClick={runGuidedSetup}>
               Run guided setup again
             </button>
           </div>
@@ -257,26 +258,26 @@ export default function SettingsPage() {
 
         {tab === 'branding' && (
           <>
-            <label>Company name</label>
-            <input className="input" value={form.companyName || ''} onChange={(e) => setForm({ ...form, companyName: e.target.value })} />
+            <label className="settings-premium-label">Company name</label>
+            <input className="input settings-premium-input" value={form.companyName || ''} onChange={(e) => setForm({ ...form, companyName: e.target.value })} />
 
-            <label>Logo URL</label>
-            <input className="input" value={form.logoUrl || ''} onChange={(e) => setForm({ ...form, logoUrl: e.target.value })} />
+            <label className="settings-premium-label">Logo URL</label>
+            <input className="input settings-premium-input" value={form.logoUrl || ''} onChange={(e) => setForm({ ...form, logoUrl: e.target.value })} />
 
-            <label>Upload logo (png/jpeg/webp)</label>
-            <input className="input" type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => setLogoFile(e.target.files?.[0] || null)} />
+            <label className="settings-premium-label">Upload logo (png/jpeg/webp)</label>
+            <input className="input settings-premium-input" type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => setLogoFile(e.target.files?.[0] || null)} />
 
-            <label>Primary colour</label>
-            <input className="input" type="color" value={form.brandPrimaryColor || '#4fd1c5'} onChange={(e) => setForm({ ...form, brandPrimaryColor: e.target.value })} />
+            <label className="settings-premium-label">Primary colour</label>
+            <input className="input settings-premium-input" type="color" value={form.brandPrimaryColor || '#4fd1c5'} onChange={(e) => setForm({ ...form, brandPrimaryColor: e.target.value })} />
 
-            <label>Secondary colour</label>
-            <input className="input" type="color" value={form.brandSecondaryColor || '#1a1f36'} onChange={(e) => setForm({ ...form, brandSecondaryColor: e.target.value })} />
+            <label className="settings-premium-label">Secondary colour</label>
+            <input className="input settings-premium-input" type="color" value={form.brandSecondaryColor || '#1a1f36'} onChange={(e) => setForm({ ...form, brandSecondaryColor: e.target.value })} />
 
-            <label>Accent colour</label>
-            <input className="input" type="color" value={form.brandAccentColor || '#4fd1c5'} onChange={(e) => setForm({ ...form, brandAccentColor: e.target.value })} />
+            <label className="settings-premium-label">Accent colour</label>
+            <input className="input settings-premium-input" type="color" value={form.brandAccentColor || '#4fd1c5'} onChange={(e) => setForm({ ...form, brandAccentColor: e.target.value })} />
 
-            <label>Default mode</label>
-            <select className="input" value={form.brandDefaultMode || 'dark'} onChange={(e) => setForm({ ...form, brandDefaultMode: e.target.value })}>
+            <label className="settings-premium-label">Default mode</label>
+            <select className="input settings-premium-input" value={form.brandDefaultMode || 'dark'} onChange={(e) => setForm({ ...form, brandDefaultMode: e.target.value })}>
               <option value="dark">Dark</option>
               <option value="light">Light</option>
             </select>
@@ -286,7 +287,7 @@ export default function SettingsPage() {
               <p style={{ color: preview.accent, marginBottom: 0 }}>Accent text preview</p>
             </div>
 
-            <button className="button" type="button" onClick={uploadLogo} style={{ marginRight: 12 }}>
+            <button className="button settings-premium-button" type="button" onClick={uploadLogo} style={{ marginRight: 12 }}>
               Save Logo
             </button>
           </>
@@ -294,36 +295,36 @@ export default function SettingsPage() {
 
         {tab === 'email' && (
           <>
-            <label>Sender name</label>
-            <input className="input" value={form.emailSenderName || ''} onChange={(e) => setForm({ ...form, emailSenderName: e.target.value })} />
+            <label className="settings-premium-label">Sender name</label>
+            <input className="input settings-premium-input" value={form.emailSenderName || ''} onChange={(e) => setForm({ ...form, emailSenderName: e.target.value })} />
 
-            <label>Reply-to</label>
-            <input className="input" type="email" value={form.emailReplyTo || ''} onChange={(e) => setForm({ ...form, emailReplyTo: e.target.value })} />
+            <label className="settings-premium-label">Reply-to</label>
+            <input className="input settings-premium-input" type="email" value={form.emailReplyTo || ''} onChange={(e) => setForm({ ...form, emailReplyTo: e.target.value })} />
 
-            <label>Notification recipients (comma separated)</label>
+            <label className="settings-premium-label">Notification recipients (comma separated)</label>
             <input
-              className="input"
+              className="input settings-premium-input"
               value={Array.isArray(form.emailNotificationRecipients) ? form.emailNotificationRecipients.join(', ') : form.emailNotificationRecipients || ''}
               onChange={(e) => setForm({ ...form, emailNotificationRecipients: e.target.value })}
             />
 
-            <label>SMTP host (placeholder)</label>
-            <input className="input" value={form.smtpHost || ''} onChange={(e) => setForm({ ...form, smtpHost: e.target.value })} />
+            <label className="settings-premium-label">SMTP host (placeholder)</label>
+            <input className="input settings-premium-input" value={form.smtpHost || ''} onChange={(e) => setForm({ ...form, smtpHost: e.target.value })} />
 
-            <label>SMTP port (placeholder)</label>
-            <input className="input" type="number" value={form.smtpPort || ''} onChange={(e) => setForm({ ...form, smtpPort: Number(e.target.value) || undefined })} />
+            <label className="settings-premium-label">SMTP port (placeholder)</label>
+            <input className="input settings-premium-input" type="number" value={form.smtpPort || ''} onChange={(e) => setForm({ ...form, smtpPort: Number(e.target.value) || undefined })} />
 
-            <label>SMTP username (placeholder)</label>
-            <input className="input" value={form.smtpUsername || ''} onChange={(e) => setForm({ ...form, smtpUsername: e.target.value })} />
+            <label className="settings-premium-label">SMTP username (placeholder)</label>
+            <input className="input settings-premium-input" value={form.smtpUsername || ''} onChange={(e) => setForm({ ...form, smtpUsername: e.target.value })} />
           </>
         )}
 
         {tab === 'pricing' && (
           <>
-            <label>WhatsApp template default</label>
-            <textarea className="input" rows={4} value={form.whatsappTemplateDefault || ''} onChange={(e) => setForm({ ...form, whatsappTemplateDefault: e.target.value })} />
+            <label className="settings-premium-label">WhatsApp template default</label>
+            <textarea className="input settings-premium-input" rows={4} value={form.whatsappTemplateDefault || ''} onChange={(e) => setForm({ ...form, whatsappTemplateDefault: e.target.value })} />
 
-            <label>
+            <label className="settings-premium-label">
               <input
                 type="checkbox"
                 checked={Boolean(form.vatEnabledDefault)}
@@ -333,28 +334,28 @@ export default function SettingsPage() {
               VAT enabled by default
             </label>
 
-            <label>VAT rate (basis points)</label>
-            <input className="input" type="number" min={0} value={form.vatRateBpsDefault || 0} onChange={(e) => setForm({ ...form, vatRateBpsDefault: Number(e.target.value) })} />
+            <label className="settings-premium-label">VAT rate (basis points)</label>
+            <input className="input settings-premium-input" type="number" min={0} value={form.vatRateBpsDefault || 0} onChange={(e) => setForm({ ...form, vatRateBpsDefault: Number(e.target.value) })} />
 
-            <label>Currency</label>
-            <input className="input" value={form.defaultCurrency || 'USD'} onChange={(e) => setForm({ ...form, defaultCurrency: e.target.value.toUpperCase() })} />
+            <label className="settings-premium-label">Currency</label>
+            <input className="input settings-premium-input" value={form.defaultCurrency || 'USD'} onChange={(e) => setForm({ ...form, defaultCurrency: e.target.value.toUpperCase() })} />
 
-            <label>Locale</label>
-            <input className="input" value={form.defaultLocale || 'en-US'} onChange={(e) => setForm({ ...form, defaultLocale: e.target.value })} />
+            <label className="settings-premium-label">Locale</label>
+            <input className="input settings-premium-input" value={form.defaultLocale || 'en-US'} onChange={(e) => setForm({ ...form, defaultLocale: e.target.value })} />
 
-            <label>Timezone</label>
-            <input className="input" value={form.defaultTimezone || 'UTC'} onChange={(e) => setForm({ ...form, defaultTimezone: e.target.value })} />
+            <label className="settings-premium-label">Timezone</label>
+            <input className="input settings-premium-input" value={form.defaultTimezone || 'UTC'} onChange={(e) => setForm({ ...form, defaultTimezone: e.target.value })} />
 
-            <label>Default service names (comma separated)</label>
+            <label className="settings-premium-label">Default service names (comma separated)</label>
             <input
-              className="input"
+              className="input settings-premium-input"
               value={Array.isArray(form.defaultServiceNamePresets) ? form.defaultServiceNamePresets.join(', ') : form.defaultServiceNamePresets || ''}
               onChange={(e) => setForm({ ...form, defaultServiceNamePresets: e.target.value })}
             />
 
-            <label>Default wheel pricing mode</label>
+            <label className="settings-premium-label">Default wheel pricing mode</label>
             <select
-              className="input"
+              className="input settings-premium-input"
               value={form.defaultWheelPricingMode || ''}
               onChange={(e) => setForm({ ...form, defaultWheelPricingMode: e.target.value || null })}
             >
@@ -385,7 +386,7 @@ export default function SettingsPage() {
               </label>
             ))}
             {notificationsEnabled ? (
-              <div className="card" style={{ marginTop: 12 }}>
+              <div className="card settings-premium-card" style={{ marginTop: 12 }}>
                 <h3 style={{ marginTop: 0 }}>Notifications</h3>
                 <label style={{ display: 'block', marginBottom: 8 }}>
                   <input
@@ -427,7 +428,7 @@ export default function SettingsPage() {
                 Your current plan does not include AI. Upgrade in Billing to enable it.
               </p>
             )}
-            <label>
+            <label className="settings-premium-label">
               <input
                 type="checkbox"
                 checked={Boolean(form.aiEnabled)}
@@ -440,7 +441,7 @@ export default function SettingsPage() {
 
             <label style={{ display: 'block', marginTop: 12 }}>AI requests limit (per month)</label>
             <input
-              className="input"
+              className="input settings-premium-input"
               type="number"
               min={0}
               value={form.aiRequestsLimit ?? ''}
@@ -458,7 +459,7 @@ export default function SettingsPage() {
         )}
 
         <div style={{ marginTop: 20 }}>
-          <button className="button" type="button" onClick={saveSettings}>
+          <button className="button settings-premium-button" type="button" onClick={saveSettings}>
             Save Settings
           </button>
         </div>
@@ -466,6 +467,7 @@ export default function SettingsPage() {
         {status && <p style={{ color: '#7bdba5' }}>{status}</p>}
         {error && <p style={{ color: '#ff8a8a' }}>{error}</p>}
       </div>
-    </DashboardShell>
+      </div>
+</DashboardShell>
   );
 }

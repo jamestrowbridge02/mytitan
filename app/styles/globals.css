@@ -1344,3 +1344,79 @@ input:focus, select:focus, textarea:focus {
     grid-template-columns: 1fr;
   }
 }
+
+/* --- Premium Settings Page --- */
+.settings-premium-shell {
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
+.settings-premium-shell > * + * {
+  margin-top: 16px;
+}
+
+.settings-premium-title {
+  font-size: clamp(1.35rem, 2vw, 1.75rem);
+  letter-spacing: -0.03em;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.settings-premium-muted {
+  color: rgba(255,255,255,0.70);
+  max-width: 68ch;
+}
+
+.settings-premium-card {
+  border-radius: 18px !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  background: linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.02)) !important;
+  box-shadow: 0 14px 36px rgba(0,0,0,0.16) !important;
+}
+
+.settings-premium-card h2,
+.settings-premium-card h3 {
+  letter-spacing: -0.02em;
+}
+
+.settings-premium-label {
+  display: inline-block;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: rgba(255,255,255,0.66);
+  margin-bottom: 6px;
+}
+
+.settings-premium-input {
+  min-height: 44px;
+  border-radius: 14px !important;
+  border: 1px solid rgba(255,255,255,0.10) !important;
+  background: rgba(255,255,255,0.04) !important;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.05) inset;
+}
+
+.settings-premium-input:focus {
+  border-color: rgba(255,255,255,0.18) !important;
+  box-shadow: 0 0 0 3px rgba(255,255,255,0.08);
+}
+
+.settings-premium-button {
+  min-height: 42px;
+  border-radius: 14px !important;
+}
+
+.settings-premium-shell .two-col,
+.settings-premium-shell .three-col,
+.settings-premium-shell .grid {
+  gap: 16px;
+}
+
+@media (max-width: 900px) {
+  .settings-premium-shell {
+    padding: 0 8px;
+  }
+
+  .settings-premium-card {
+    border-radius: 16px !important;
+  }
+}
