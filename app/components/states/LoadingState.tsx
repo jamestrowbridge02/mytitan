@@ -1,51 +1,34 @@
-import type { ReactNode } from 'react';
+import React from "react";
 
-type Action = {
-  label: string;
-  href?: string;
-  onClick?: () => void;
-};
-
-type LoadingStateProps = {
+export function LoadingState(props: {
   title?: string;
   description?: string;
-  primaryAction?: Action;
-  secondaryAction?: Action;
-  icon?: ReactNode;
-};
-
-function ActionButton({ action, primary }: { action: Action; primary: boolean }) {
-  if (action.href) {
-    return (
-      <a className={primary ? 'button' : 'button secondary'} href={action.href}>
-        {action.label}
-      </a>
-    );
-  }
-
+}) {
   return (
-    <button className={primary ? 'button' : 'button secondary'} type="button" onClick={action.onClick}>
-      {action.label}
-    </button>
-  );
-}
+    <div className="card loading-state-premium" role="status" aria-live="polite">
+      <div className="loading-state-premium__top">
+        <div className="loading-state-premium__eyebrow">Workspace</div>
+        <h2 className="loading-state-premium__title">
+          {props.title || "Loading"}
+        </h2>
+        {props.description ? (
+          <p className="loading-state-premium__description">{props.description}</p>
+        ) : null}
+      </div>
 
-export function LoadingState({
-  title = 'Loading...',
-  description = 'Please wait while we load your data.',
-  primaryAction,
-  secondaryAction,
-  icon,
-}: LoadingStateProps) {
-  return (
-    <div className="card" role="status" aria-live="polite">
-      {icon ? <div style={{ marginBottom: 10 }}>{icon}</div> : null}
-      <h2 style={{ marginTop: 0 }}>{title}</h2>
-      <p className="muted">{description}</p>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
-        {primaryAction ? <ActionButton action={primaryAction} primary /> : null}
-        {secondaryAction ? <ActionButton action={secondaryAction} primary={false} /> : null}
+      <div className="loading-state-premium__stats">
+        <div className="loading-state-premium__stat" />
+        <div className="loading-state-premium__stat" />
+        <div className="loading-state-premium__stat" />
+      </div>
+
+      <div className="loading-state-premium__panel">
+        <div className="loading-state-premium__line loading-state-premium__line--lg" />
+        <div className="loading-state-premium__line loading-state-premium__line--md" />
+        <div className="loading-state-premium__line loading-state-premium__line--sm" />
       </div>
     </div>
   );
 }
+
+export default LoadingState;
