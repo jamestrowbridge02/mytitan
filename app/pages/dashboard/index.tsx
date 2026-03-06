@@ -120,6 +120,7 @@ export default function Dashboard() {
   if (loading && !summary) {
     return (
       <DashboardShell>
+          <div className="dashboard-home-premium">
         {coherenceOn ? (
           <div className="rounded-2xl border border-border/60 bg-[color:var(--surface-1)] p-5 shadow-sm dashboard-home-hero" role="status" aria-live="polite">
             <div className="space-y-4">
@@ -136,6 +137,7 @@ export default function Dashboard() {
         ) : (
           <div className="dashboard-home-loading"><LoadingState title="Loading command centre" description="Fetching today's activity and quick actions." /></div>
         )}
+          </div>
       </DashboardShell>
     );
   }
@@ -143,13 +145,15 @@ export default function Dashboard() {
   if (error && !summary) {
     return (
       <DashboardShell>
-        <ErrorState
+          <div className="dashboard-home-premium">
+            <ErrorState
           title="Could not load dashboard"
           description={error}
           requestId={requestId}
           primaryAction={{ label: 'Try again', onClick: load }}
           secondaryAction={{ label: 'Go to jobs', href: '/dashboard/jobs' }}
         />
+          </div>
       </DashboardShell>
     );
   }
