@@ -1146,3 +1146,50 @@ input:focus, select:focus, textarea:focus {
     padding: 16px;
   }
 }
+
+/* --- Premium Dashboard Home V3 --- */
+.dashboard-home-premium {
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.dashboard-home-premium > * + * {
+  margin-top: 16px;
+}
+
+.dashboard-home-hero {
+  border-radius: 18px !important;
+  padding: 20px !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  background: linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.02)) !important;
+  box-shadow: 0 14px 36px rgba(0,0,0,0.18) !important;
+}
+
+.dashboard-home-loading .card[role="status"],
+.dashboard-home-loading [role="status"] {
+  border-radius: 18px !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02)) !important;
+  box-shadow: 0 12px 34px rgba(0,0,0,0.16) !important;
+}
+
+.dashboard-home-loading h2,
+.dashboard-home-loading h3 {
+  font-size: clamp(1.2rem, 2vw, 1.5rem);
+  letter-spacing: -0.02em;
+}
+
+.dashboard-home-loading .muted,
+.dashboard-home-premium .muted {
+  color: rgba(255,255,255,0.68);
+}
+
+@media (max-width: 900px) {
+  .dashboard-home-premium {
+    padding: 0 8px;
+  }
+
+  .dashboard-home-hero {
+    padding: 16px !important;
+  }
+}

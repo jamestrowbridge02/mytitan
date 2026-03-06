@@ -121,7 +121,7 @@ export default function Dashboard() {
     return (
       <DashboardShell>
         {coherenceOn ? (
-          <div className="rounded-2xl border border-border/60 bg-[color:var(--surface-1)] p-5 shadow-sm" role="status" aria-live="polite">
+          <div className="rounded-2xl border border-border/60 bg-[color:var(--surface-1)] p-5 shadow-sm dashboard-home-hero" role="status" aria-live="polite">
             <div className="space-y-4">
               <div className="flex items-center gap-3">
                 <Skeleton className="h-10 w-10 rounded-xl" />
@@ -134,7 +134,7 @@ export default function Dashboard() {
             </div>
           </div>
         ) : (
-          <LoadingState title="Loading command centre" description="Fetching today's activity and quick actions." />
+          <div className="dashboard-home-loading"><LoadingState title="Loading command centre" description="Fetching today's activity and quick actions." /></div>
         )}
       </DashboardShell>
     );
