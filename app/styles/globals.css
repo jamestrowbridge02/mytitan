@@ -1549,3 +1549,64 @@ input:focus, select:focus, textarea:focus {
     padding: 0 10px;
   }
 }
+
+/* ===== Global Dashboard Layout Tightening ===== */
+
+[data-ui-coherence="on"] main,
+[data-ui-coherence="on"] .dashboard-content,
+[data-ui-coherence="on"] .page-shell,
+[data-ui-coherence="on"] .dashboard-shell {
+
+  max-width: 1240px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Reduce excess vertical space */
+[data-ui-coherence="on"] main {
+  padding-top: 12px;
+}
+
+/* Consistent vertical rhythm */
+[data-ui-coherence="on"] main > * + * {
+  margin-top: 16px;
+}
+
+/* Improve card spacing */
+[data-ui-coherence="on"] .card {
+  margin-bottom: 14px;
+}
+
+/* Fix large whitespace under sidebar layouts */
+[data-ui-coherence="on"] .dashboard-shell {
+  align-items: flex-start;
+}
+
+/* Better page titles */
+[data-ui-coherence="on"] h1 {
+  margin-top: 0;
+  margin-bottom: 8px;
+  letter-spacing: -0.02em;
+}
+
+/* Reduce oversized sections */
+[data-ui-coherence="on"] .card > * + * {
+  margin-top: 10px;
+}
+
+/* Improve page density slightly */
+[data-ui-coherence="on"] .input,
+[data-ui-coherence="on"] select {
+  margin-bottom: 6px;
+}
+
+/* Mobile improvements */
+@media (max-width: 900px) {
+
+  [data-ui-coherence="on"] main,
+  [data-ui-coherence="on"] .dashboard-content {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+}
