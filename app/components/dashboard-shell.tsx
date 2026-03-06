@@ -215,56 +215,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       ) : null}
-            )}
-            <div>
-              <strong>{settings?.companyName || 'MyTitan Tenant'}</strong>
-              <p className="muted" style={{ margin: 0 }}>Operations workspace</p>
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            {notificationsEnabled ? (
-              <div style={{ position: 'relative' }}>
-                <button className="button secondary" type="button" onClick={() => setShowNotifications((v) => !v)}>
-                  Bell {unreadCount > 0 ? `(${unreadCount})` : ''}
-                </button>
-                {showNotifications ? (
-                  <div className="card" style={{ position: 'absolute', right: 0, top: 44, width: 360, zIndex: 20, maxHeight: 360, overflow: 'auto' }}>
-                    <strong>Notifications</strong>
-                    <div className="list" style={{ marginTop: 10 }}>
-                      {notifications.slice(0, 30).map((item) => (
-                        <div key={item.id} className="integration-card" style={{ alignItems: 'flex-start' }}>
-                          <div>
-                            <strong>{item.title}</strong>
-                            <p className="muted" style={{ margin: '4px 0 0 0' }}>{item.body || ''}</p>
-                          </div>
-                        </div>
-                      ))}
-                      {notifications.length === 0 ? <p className="muted">No notifications yet.</p> : null}
-                    </div>
-                    <div style={{ marginTop: 8 }}>
-                      <Link href="/dashboard/notifications" className="button secondary">Open Notifications Centre</Link>
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-            {locationsEnabled ? (
-              <select
-                className="input"
-                style={{ margin: 0, minWidth: 180, padding: '10px 12px' }}
-                value={locationCtx.activeLocationId}
-                onChange={(e) => updateLocationContext(e.target.value)}
-              >
-                {locationCtx.available.map((loc) => (
-                  <option key={loc.id} value={loc.id}>{loc.name}</option>
-                ))}
-              </select>
-            ) : null}
-            <button className="button secondary" onClick={signOut}>Sign out</button>
-            <button className="button secondary" onClick={signOutAllSessions}>Sign out all</button>
-          </div>
-        </div>
-      </div>
 
       {children}
 
