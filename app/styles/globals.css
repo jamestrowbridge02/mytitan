@@ -1610,3 +1610,89 @@ input:focus, select:focus, textarea:focus {
   }
 
 }
+
+/* ===== Premium Glass Dashboard Layer ===== */
+
+body[data-ui-coherence="on"] {
+  background:
+    radial-gradient(circle at 15% 20%, rgba(255,255,255,0.06), transparent 32%),
+    radial-gradient(circle at 85% 0%, rgba(120,160,255,0.08), transparent 30%),
+    linear-gradient(180deg, #0f1117 0%, #0b0d12 100%);
+}
+
+/* Glass surface for main cards */
+[data-ui-coherence="on"] .card {
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255,255,255,0.06),
+      rgba(255,255,255,0.02)
+    ) !important;
+
+  border: 1px solid rgba(255,255,255,0.08) !important;
+
+  box-shadow:
+    0 20px 48px rgba(0,0,0,0.28),
+    inset 0 1px 0 rgba(255,255,255,0.05);
+}
+
+/* Sidebar refinement */
+[data-ui-coherence="on"] .mt-sidebar {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255,255,255,0.04),
+      rgba(255,255,255,0.01)
+    );
+
+  border-right: 1px solid rgba(255,255,255,0.06);
+}
+
+/* Sidebar hover states */
+[data-ui-coherence="on"] .mt-sidebar a:hover {
+  background: rgba(255,255,255,0.05);
+  border-radius: 10px;
+}
+
+/* Premium headings */
+[data-ui-coherence="on"] h1 {
+  letter-spacing: -0.03em;
+}
+
+/* Premium card hover lift */
+[data-ui-coherence="on"] .card:hover {
+  transform: translateY(-2px);
+  transition: transform .18s ease, box-shadow .18s ease;
+
+  box-shadow:
+    0 28px 60px rgba(0,0,0,0.32),
+    inset 0 1px 0 rgba(255,255,255,0.06);
+}
+
+/* Inputs feel more premium */
+[data-ui-coherence="on"] .input,
+[data-ui-coherence="on"] select {
+  backdrop-filter: blur(6px);
+
+  background: rgba(255,255,255,0.04) !important;
+  border: 1px solid rgba(255,255,255,0.10) !important;
+}
+
+/* Buttons */
+[data-ui-coherence="on"] .button {
+  border-radius: 12px;
+}
+
+/* Subtle page fade */
+main {
+  animation: mt-fade-in .35s ease;
+}
+
+@keyframes mt-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
