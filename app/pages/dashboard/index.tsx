@@ -108,9 +108,11 @@ export default function Dashboard() {
   if (!commandCentreEnabled) {
     return (
       <DashboardShell>
+  <div className="dashboard-home-premium">
 <div className="dashboard-premium-shell">
         <EmptyState title="Dashboard" description="Command Centre feature is disabled." />
       </div>
+  </div>
 </DashboardShell>
     );
   }
