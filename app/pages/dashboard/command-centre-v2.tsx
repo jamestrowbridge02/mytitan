@@ -52,9 +52,10 @@ export default function CommandCentreV2Page() {
     return () => clearTimeout(t);
   }, [searchInput]);
 
-  async function loadBoard() {
+  async function loadBoard(background = false) {
     if (!enabled) return;
     try {
+      if (background) setIsRefreshing(true);
       const q = new URLSearchParams();
       if (search) q.set('search', search);
       if (status) q.set('status', status);
@@ -62,6 +63,7 @@ export default function CommandCentreV2Page() {
       if (selectedLocationIds.length > 0) q.set('locationIds', selectedLocationIds.join(','));
       const data = await apiFetch(`/jobs/board-v2?${q.toString()}`);
       setBoard(data || { grouped: {}, counts: {} });
+        setLastUpdated(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
     } catch (err: any) {
       setError(err?.message || 'Failed to load board');
     }
@@ -104,6 +106,19 @@ export default function CommandCentreV2Page() {
   useEffect(() => {
     loadBoard();
   }, [search, status, locationIds.join(',')]);
+
+  useEffect(() => {
+    if (!enabled) return;
+    const id = window.setInterval(() => {
+      void loadBoard(true);
+    }, 30000);
+    const onFocus = () => { void loadBoard(true); };
+    window.addEventListener('focus', onFocus);
+    return () => {
+      window.clearInterval(id);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [enabled, search, status, locationIds.join(',')]);
 
   useEffect(() => {
     if (!enabled || !demoPolishEnabled || seededDefaults || views.length > 0) return;
@@ -241,6 +256,17 @@ export default function CommandCentreV2Page() {
       <div className="card ccv2-hero" style={{ marginBottom: 14 }}>
         <h1 className="ccv2-title" style={{ marginTop: 0 }}>Command Centre</h1>
         <p className="muted ccv2-subtitle">Operations brain: board, bulk actions, reminders, and inline updates.</p>
+          <div className="ccv2-livebar">
+            <div className="ccv2-livebar__meta">
+              <span className={`ccv2-live-dot${isRefreshing ? " is-live" : ""}`}></span>
+              <span className="ccv2-live-text">
+                {lastUpdated ? `Updated ${lastUpdated}` : "Live workspace"}
+              </span>
+            </div>
+            <button className="button secondary ccv2-button" type="button" onClick={() => void loadBoard(true)}>
+              Refresh
+            </button>
+          </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
           <span className="ccv2-status-pill ccv2-status-pill--open">OPEN</span>
           <span className="ccv2-status-pill ccv2-status-pill--in_progress">IN_PROGRESS</span>
