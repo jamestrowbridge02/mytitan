@@ -37,6 +37,8 @@ export default function CommandCentreV2Page() {
   const [openedJob, setOpenedJob] = useState<any>(null);
   const [pendingBulk, setPendingBulk] = useState<{ op: string; payload: Record<string, any>; label: string } | null>(null);
   const [seededDefaults, setSeededDefaults] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<string>("");
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const defaultViews = [
     { name: 'All Open', filters: { status: 'OPEN', locationIds: ['all'], search: '', viewType: 'kanban' }, viewType: 'kanban' },
