@@ -2082,3 +2082,24 @@ body:has(input[type="password"]) .mt-sidebar {
   background:
     linear-gradient(180deg, rgba(96,165,250,0.10), rgba(255,255,255,0.03)) !important;
 }
+
+/* --- Command Centre sidepanel quick actions --- */
+.ccv2-sidepanel-status-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.ccv2-sidepanel-action {
+  min-height: 34px !important;
+  padding: 0 10px !important;
+  font-size: 12px !important;
+  border-radius: 999px !important;
+}
+
+.ccv2-sidepanel-primary-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}

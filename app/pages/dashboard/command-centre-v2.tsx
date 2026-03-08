@@ -308,9 +308,31 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
           </div>
 
           <div className="ccv2-sidepanel-actions">
-            <button className="button" onClick={() => router.push(`/dashboard/jobs/${openedJob.id}`)}>
-              Open full job
-            </button>
+            <div className="ccv2-sidepanel-status-actions">
+              {STATUS_LABELS.filter((s) => s.key !== String(openedJob?.status || "")).slice(0, 4).map((opt) => (
+                <button
+                  key={opt.key}
+                  type="button"
+                  className="button secondary ccv2-button ccv2-sidepanel-action"
+                  disabled={pendingInlineJobId === openedJob.id}
+                  onClick={async () => {
+                    await inlineSetStatus(openedJob.id, opt.key);
+                    setOpenedJob({ ...openedJob, status: opt.key });
+                  }}
+                >
+                  {pendingInlineJobId === openedJob.id ? "Updating..." : opt.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="ccv2-sidepanel-primary-actions">
+              <button className="button" onClick={() => router.push(`/dashboard/jobs/${openedJob.id}`)}>
+                Open full job
+              </button>
+              <button className="button secondary" onClick={() => setOpenedJob(null)}>
+                Close
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
@@ -323,6 +345,7 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
     <DashboardShell>
       <div className="ccv2-board-premium">
       <div data-drag-drop="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_DRAG_DROP_ENABLED</div>
+        <div data-sidepanel-actions="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_SIDEPANEL_ACTIONS_ENABLED</div>
         <div className="card ccv2-hero" style={{ marginBottom: 14 }}>
           <div className="ccv2-inline-actions-marker" data-inline-actions="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>
             INLINE_ACTIONS_ENABLED
