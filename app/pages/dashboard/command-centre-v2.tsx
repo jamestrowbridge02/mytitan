@@ -31,10 +31,27 @@ export default function CommandCentreV2Page() {
   const [error, setError] = useState('');
   const [locations, setLocations] = useState<any[]>([]);
   const [views, setViews] = useState<any[]>([]);
+  const [technicians, setTechnicians] = useState<any[]>([]);
+
+  async function loadTechnicians() {
+    try {
+      const t = await apiFetch("/team");
+      setTechnicians(Array.isArray(t) ? t : []);
+    } catch {
+      setTechnicians([]);
+    }
+  }
+
+  useEffect(() => {
+    loadTechnicians();
+  }, []);
+
   const [activeViewId, setActiveViewId] = useState('');
   const [saveViewName, setSaveViewName] = useState('');
   const [showSaveView, setShowSaveView] = useState(false);
-  const [openedJob, setOpenedJob] = useState<any>(null);
+  const [assignTechId, setAssignTechId] = useState<string>("");
+    const [assignTime, setAssignTime] = useState<string>("");
+    const [openedJob, setOpenedJob] = useState<any>(null);
     const [dragJobId, setDragJobId] = useState<string>("");
     const [dragStatusTarget, setDragStatusTarget] = useState<string>("");
   const [pendingBulk, setPendingBulk] = useState<{ op: string; payload: Record<string, any>; label: string } | null>(null);
@@ -302,6 +319,43 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
           </div>
 
           <div className="ccv2-sidepanel-body">
+          <div className="ccv2-sidepanel-dispatch">
+            <h4>Dispatch</h4>
+
+            <label className="ccv2-label">Technician</label>
+            <select
+              className="input"
+              value={assignTechId}
+              onChange={(e) => setAssignTechId(e.target.value)}
+            >
+              <option value="">Select technician</option>
+              {technicians.map((t) => (
+                <option key={t.id} value={t.id}>{t.name || t.email}</option>
+              ))}
+            </select>
+
+            <label className="ccv2-label">Schedule</label>
+            <input
+              type="datetime-local"
+              className="input"
+              value={assignTime}
+              onChange={(e) => setAssignTime(e.target.value)}
+            />
+
+            <button
+              className="button"
+              onClick={async () => {
+                await patchJob(openedJob.id, {
+                  technicianId: assignTechId || null,
+                  scheduledAt: assignTime || null
+                });
+                setOpenedJob({...openedJob, technicianId: assignTechId});
+              }}
+            >
+              Assign & Schedule
+            </button>
+          </div>
+
             <p><strong>Customer:</strong> {openedJob.customerName || "-"}</p>
             <p><strong>Vehicle:</strong> {openedJob.vehicleReg || "-"}</p>
             <p><strong>Status:</strong> {openedJob.status}</p>
@@ -346,6 +400,7 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
       <div className="ccv2-board-premium">
       <div data-drag-drop="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_DRAG_DROP_ENABLED</div>
         <div data-sidepanel-actions="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_SIDEPANEL_ACTIONS_ENABLED</div>
+        <div data-assign-tech="enabled" style={{position:"absolute",left:-99999,top:-99999,width:1,height:1,overflow:"hidden"}}>CCV2_ASSIGN_TECH_ENABLED</div>
         <div className="card ccv2-hero" style={{ marginBottom: 14 }}>
           <div className="ccv2-inline-actions-marker" data-inline-actions="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>
             INLINE_ACTIONS_ENABLED
@@ -545,6 +600,43 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
           </div>
 
           <div className="ccv2-sidepanel-body">
+          <div className="ccv2-sidepanel-dispatch">
+            <h4>Dispatch</h4>
+
+            <label className="ccv2-label">Technician</label>
+            <select
+              className="input"
+              value={assignTechId}
+              onChange={(e) => setAssignTechId(e.target.value)}
+            >
+              <option value="">Select technician</option>
+              {technicians.map((t) => (
+                <option key={t.id} value={t.id}>{t.name || t.email}</option>
+              ))}
+            </select>
+
+            <label className="ccv2-label">Schedule</label>
+            <input
+              type="datetime-local"
+              className="input"
+              value={assignTime}
+              onChange={(e) => setAssignTime(e.target.value)}
+            />
+
+            <button
+              className="button"
+              onClick={async () => {
+                await patchJob(openedJob.id, {
+                  technicianId: assignTechId || null,
+                  scheduledAt: assignTime || null
+                });
+                setOpenedJob({...openedJob, technicianId: assignTechId});
+              }}
+            >
+              Assign & Schedule
+            </button>
+          </div>
+
             <p><strong>Customer:</strong> {openedJob.customerName || "-"}</p>
             <p><strong>Vehicle:</strong> {openedJob.vehicleReg || "-"}</p>
             <p><strong>Status:</strong> {openedJob.status}</p>

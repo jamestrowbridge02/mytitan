@@ -2103,3 +2103,18 @@ body:has(input[type="password"]) .mt-sidebar {
   gap: 10px;
   flex-wrap: wrap;
 }
+
+/* --- Command Centre dispatch controls --- */
+
+.ccv2-sidepanel-dispatch{
+  border-top:1px solid rgba(255,255,255,0.08);
+  padding-top:16px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+.ccv2-label{
+  font-size:12px;
+  opacity:.7;
+}
