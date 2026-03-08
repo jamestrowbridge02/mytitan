@@ -287,6 +287,9 @@ export default function CommandCentreV2Page() {
     <DashboardShell>
       <div className="ccv2-board-premium">
       <div className="card ccv2-hero" style={{ marginBottom: 14 }}>
+          <div className="ccv2-inline-actions-marker" data-inline-actions="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>
+            INLINE_ACTIONS_ENABLED
+          </div>
         <h1 className="ccv2-title" style={{ marginTop: 0 }}>Command Centre</h1>
         <p className="muted ccv2-subtitle">Operations brain: board, bulk actions, reminders, and inline updates.</p>
           <div className="ccv2-livebar">
