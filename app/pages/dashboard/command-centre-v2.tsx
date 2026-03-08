@@ -301,6 +301,32 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
     }
   }
 
+
+  function buildTimeline(job: any) {
+    const rows = [
+      {
+        label: "Job created",
+        at: job?.createdAt || null,
+      },
+      {
+        label: "Status updated",
+        at: job?.updatedAt || null,
+      },
+      {
+        label: "Scheduled",
+        at: job?.scheduledAt || null,
+      },
+      {
+        label: "Assigned",
+        at: job?.assignedAt || null,
+      },
+    ].filter((x) => x.at);
+
+    return rows.length
+      ? rows
+      : [{ label: "No activity yet", at: null }];
+  }
+
   function InlineStatusActions({ job }: { job: any }) {
     const current = String(job?.status || "");
     const nextOptions = STATUS_LABELS.filter((s) => s.key !== current).slice(0, 3);
@@ -365,6 +391,24 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
               <div className="ccv2-sidepanel-sectionTitle">Notes</div>
               <div className="ccv2-sidepanel-note">
                 {openedJob.internalNotes || openedJob.notes || "No notes yet."}
+              </div>
+            </div>
+
+
+            <div className="ccv2-sidepanel-section">
+              <div className="ccv2-sidepanel-sectionTitle">Activity</div>
+              <div className="ccv2-timeline">
+                {buildTimeline(openedJob).map((item, idx) => (
+                  <div key={`${item.label}-${idx}`} className="ccv2-timeline-item">
+                    <div className="ccv2-timeline-dot"></div>
+                    <div className="ccv2-timeline-content">
+                      <div className="ccv2-timeline-label">{item.label}</div>
+                      <div className="ccv2-timeline-time">
+                        {item.at ? new Date(item.at).toLocaleString() : "Waiting for first event"}
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -466,6 +510,7 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
         <div data-assign-tech="enabled" style={{position:"absolute",left:-99999,top:-99999,width:1,height:1,overflow:"hidden"}}>CCV2_ASSIGN_TECH_ENABLED</div>
         <div data-realtime="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_REALTIME_ENABLED</div>
         <div data-sidepanel-rich="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_SIDEPANEL_RICH_DETAILS</div>
+        <div data-activity-timeline="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_ACTIVITY_TIMELINE_ENABLED</div>
         <div className="card ccv2-hero" style={{ marginBottom: 14 }}>
           <div className="ccv2-inline-actions-marker" data-inline-actions="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>
             INLINE_ACTIONS_ENABLED

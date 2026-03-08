@@ -2195,3 +2195,41 @@ body:has(input[type="password"]) .mt-sidebar {
   font-size: 12px !important;
   border-radius: 999px !important;
 }
+
+/* --- Command Centre activity timeline --- */
+.ccv2-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ccv2-timeline-item {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.ccv2-timeline-dot {
+  width: 10px;
+  height: 10px;
+  margin-top: 4px;
+  border-radius: 999px;
+  background: rgba(96,165,250,0.9);
+  box-shadow: 0 0 0 4px rgba(96,165,250,0.12);
+}
+
+.ccv2-timeline-content {
+  flex: 1;
+}
+
+.ccv2-timeline-label {
+  font-size: 13px;
+  color: rgba(255,255,255,0.95);
+  font-weight: 600;
+}
+
+.ccv2-timeline-time {
+  font-size: 12px;
+  color: rgba(255,255,255,0.58);
+  margin-top: 2px;
+}
