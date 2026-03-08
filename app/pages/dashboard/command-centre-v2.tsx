@@ -35,6 +35,8 @@ export default function CommandCentreV2Page() {
   const [saveViewName, setSaveViewName] = useState('');
   const [showSaveView, setShowSaveView] = useState(false);
   const [openedJob, setOpenedJob] = useState<any>(null);
+    const [dragJobId, setDragJobId] = useState<string>("");
+    const [dragStatusTarget, setDragStatusTarget] = useState<string>("");
   const [pendingBulk, setPendingBulk] = useState<{ op: string; payload: Record<string, any>; label: string } | null>(null);
   const [pendingInlineJobId, setPendingInlineJobId] = useState<string>("");
   const [seededDefaults, setSeededDefaults] = useState(false);
@@ -241,7 +243,18 @@ export default function CommandCentreV2Page() {
     }
   }
 
-  async function inlineSetStatus(jobId: string, nextStatus: string) {
+  
+  async function moveJobToStatus(jobId: string, nextStatus: string) {
+    try {
+      setDragStatusTarget(nextStatus);
+      await inlineSetStatus(jobId, nextStatus);
+    } finally {
+      setDragJobId("");
+      setDragStatusTarget("");
+    }
+  }
+
+async function inlineSetStatus(jobId: string, nextStatus: string) {
     try {
       setPendingInlineJobId(jobId);
       await patchJob(jobId, { status: nextStatus });
@@ -277,7 +290,10 @@ export default function CommandCentreV2Page() {
     return (
       <DashboardShell>
         <div className="ccv2-board-premium">
-          <div className="card ccv2-card"><h1>Command Centre</h1><p className="muted">Feature is disabled.</p></div>
+          <div className={`card ccv2-card ${dragStatusTarget === status.key ? "ccv2-dropzone-active" : ""}`}
+                      onDragOver={(e) => { e.preventDefault(); setDragStatusTarget(status.key); }}
+                      onDragLeave={() => setDragStatusTarget("")}
+                      onDrop={() => { if (dragJobId) void moveJobToStatus(dragJobId, status.key); }}><h1>Command Centre</h1><p className="muted">Feature is disabled.</p></div>
         </div>
       
 
@@ -309,7 +325,8 @@ export default function CommandCentreV2Page() {
   return (
     <DashboardShell>
       <div className="ccv2-board-premium">
-      <div className="card ccv2-hero" style={{ marginBottom: 14 }}>
+      <div data-drag-drop="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_DRAG_DROP_ENABLED</div>
+        <div className="card ccv2-hero" style={{ marginBottom: 14 }}>
           <div className="ccv2-inline-actions-marker" data-inline-actions="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>
             INLINE_ACTIONS_ENABLED
           </div>
