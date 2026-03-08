@@ -226,17 +226,24 @@ export default function CommandCentreV2Page() {
   if (!enabled) {
     return (
       <DashboardShell>
-      <div className="ccv2-board-premium">
-        <div className="card ccv2-card"><h1>Command Centre</h1><p className="muted">Feature is disabled.</p></div>
+        <div className="ccv2-board-premium">
+          <div className="card ccv2-card"><h1>Command Centre</h1><p className="muted">Feature is disabled.</p></div>
+        </div>
       </DashboardShell>
     );
   }
 
   return (
     <DashboardShell>
+      <div className="ccv2-board-premium">
       <div className="card ccv2-hero" style={{ marginBottom: 14 }}>
         <h1 className="ccv2-title" style={{ marginTop: 0 }}>Command Centre</h1>
         <p className="muted ccv2-subtitle">Operations brain: board, bulk actions, reminders, and inline updates.</p>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+          <span className="ccv2-status-pill ccv2-status-pill--open">OPEN</span>
+          <span className="ccv2-status-pill ccv2-status-pill--in_progress">IN_PROGRESS</span>
+          <span className="ccv2-status-pill ccv2-status-pill--completed">COMPLETED</span>
+        </div>
         {error ? <p style={{ color: '#ff8a8a' }}>{error}</p> : null}
         {toast ? <p style={{ color: '#5eead4' }}>{toast}</p> : null}
       </div>
@@ -311,7 +318,6 @@ export default function CommandCentreV2Page() {
           <button className="button secondary ccv2-button" type="button" onClick={() => triggerBulk('setLocation', { locationId: bulkLocation }, `Assign location ${bulkLocation}`)}>Location</button>
           {demoPolishEnabled ? (
             <button className="button secondary ccv2-button" type="button" onClick={() => triggerBulk('markComplete', {}, 'Mark complete')}>Mark Complete</button>
-                      </div>
           ) : (
             <button className="button secondary ccv2-button" type="button" onClick={() => triggerBulk('closeJobs', {}, 'Close jobs')}>Close</button>
           )}
