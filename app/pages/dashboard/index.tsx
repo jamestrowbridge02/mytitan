@@ -9,6 +9,20 @@ import { ErrorState } from '../../components/states/ErrorState';
 import { LoadingState } from '../../components/states/LoadingState';
 import { ApiError, apiFetch, setToken } from '../../lib/api';
 import {
+
+
+function formatMoneyGBP(value: number) {
+  try {
+    return new Intl.NumberFormat("en-GB", {
+      style: "currency",
+      currency: "GBP",
+      maximumFractionDigits: 0,
+    }).format(value || 0);
+  } catch {
+    return `£${Math.round(value || 0)}`;
+  }
+}
+
   isCommandCentreEnabled,
   isCommandCentreV1Enabled,
   isCommandCentreV2Enabled,
@@ -106,7 +120,55 @@ export default function Dashboard() {
   }, [summary]);
 
   if (!commandCentreEnabled) {
-    return (
+  
+  const dashboardMetrics = [
+    {
+      label: "Jobs today",
+      value: String(
+        Number(
+          (summary as any)?.jobsToday ??
+          (summary as any)?.todayJobs ??
+          (summary as any)?.counts?.jobsToday ??
+          0
+        )
+      ),
+    },
+    {
+      label: "Revenue today",
+      value: formatMoneyGBP(
+        Number(
+          (summary as any)?.revenueToday ??
+          (summary as any)?.todayRevenue ??
+          (summary as any)?.counts?.revenueToday ??
+          0
+        )
+      ),
+    },
+    {
+      label: "Technicians active",
+      value: String(
+        Number(
+          (summary as any)?.techniciansActive ??
+          (summary as any)?.activeTechnicians ??
+          (summary as any)?.counts?.techniciansActive ??
+          0
+        )
+      ),
+    },
+    {
+      label: "Pending approvals",
+      value: String(
+        Number(
+          (summary as any)?.pendingApprovals ??
+          (summary as any)?.approvalsPending ??
+          (summary as any)?.counts?.pendingApprovals ??
+          0
+        )
+      ),
+    },
+  ];
+
+  return (
       <DashboardShell>
   <div className="dashboard-home-premium">
 <div className="dashboard-premium-shell">
@@ -135,7 +197,16 @@ export default function Dashboard() {
             </div>
           </div>
         ) : (
-          <div className="dashboard-home-loading"><LoadingState title="Loading command centre" description="Fetching today's activity and quick actions." /></div>
+          <div className="dashboard-metrics-grid">
+                {dashboardMetrics.map((metric) => (
+                  <div key={metric.label} className="card dashboard-metric-card">
+                    <div className="dashboard-metric-label">{metric.label}</div>
+                    <div className="dashboard-metric-value">{metric.value}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="dashboard-home-loading"><LoadingState title="Loading command centre" description="Fetching today's activity and quick actions." /></div>
         )}
           </div>
       </DashboardShell>
