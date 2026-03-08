@@ -9,20 +9,6 @@ import { ErrorState } from '../../components/states/ErrorState';
 import { LoadingState } from '../../components/states/LoadingState';
 import { ApiError, apiFetch, setToken } from '../../lib/api';
 import {
-
-
-function formatMoneyGBP(value: number) {
-  try {
-    return new Intl.NumberFormat("en-GB", {
-      style: "currency",
-      currency: "GBP",
-      maximumFractionDigits: 0,
-    }).format(value || 0);
-  } catch {
-    return `£${Math.round(value || 0)}`;
-  }
-}
-
   isCommandCentreEnabled,
   isCommandCentreV1Enabled,
   isCommandCentreV2Enabled,
@@ -50,6 +36,18 @@ type Summary = {
 
 function money(cents: number, currency = 'GBP') {
   return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format((cents || 0) / 100);
+}
+
+function formatMoneyGBP(value: number) {
+  try {
+    return new Intl.NumberFormat('en-GB', {
+      style: 'currency',
+      currency: 'GBP',
+      maximumFractionDigits: 0,
+    }).format(value || 0);
+  } catch {
+    return `£${Math.round(value || 0)}`;
+  }
 }
 
 export default function Dashboard() {
@@ -119,56 +117,55 @@ export default function Dashboard() {
     ];
   }, [summary]);
 
-  if (!commandCentreEnabled) {
-  
   const dashboardMetrics = [
     {
-      label: "Jobs today",
+      label: 'Jobs today',
       value: String(
         Number(
           (summary as any)?.jobsToday ??
-          (summary as any)?.todayJobs ??
-          (summary as any)?.counts?.jobsToday ??
-          0
+            (summary as any)?.todayJobs ??
+            (summary as any)?.counts?.jobsToday ??
+            0
         )
       ),
     },
     {
-      label: "Revenue today",
+      label: 'Revenue today',
       value: formatMoneyGBP(
         Number(
           (summary as any)?.revenueToday ??
-          (summary as any)?.todayRevenue ??
-          (summary as any)?.counts?.revenueToday ??
-          0
+            (summary as any)?.todayRevenue ??
+            (summary as any)?.counts?.revenueToday ??
+            0
         )
       ),
     },
     {
-      label: "Technicians active",
+      label: 'Technicians active',
       value: String(
         Number(
           (summary as any)?.techniciansActive ??
-          (summary as any)?.activeTechnicians ??
-          (summary as any)?.counts?.techniciansActive ??
-          0
+            (summary as any)?.activeTechnicians ??
+            (summary as any)?.counts?.techniciansActive ??
+            0
         )
       ),
     },
     {
-      label: "Pending approvals",
+      label: 'Pending approvals',
       value: String(
         Number(
           (summary as any)?.pendingApprovals ??
-          (summary as any)?.approvalsPending ??
-          (summary as any)?.counts?.pendingApprovals ??
-          0
+            (summary as any)?.approvalsPending ??
+            (summary as any)?.counts?.pendingApprovals ??
+            0
         )
       ),
     },
   ];
 
-  return (
+  if (!commandCentreEnabled) {
+    return (
       <DashboardShell>
   <div className="dashboard-home-premium">
 <div className="dashboard-premium-shell">
@@ -197,16 +194,7 @@ export default function Dashboard() {
             </div>
           </div>
         ) : (
-          <div className="dashboard-metrics-grid">
-                {dashboardMetrics.map((metric) => (
-                  <div key={metric.label} className="card dashboard-metric-card">
-                    <div className="dashboard-metric-label">{metric.label}</div>
-                    <div className="dashboard-metric-value">{metric.value}</div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="dashboard-home-loading"><LoadingState title="Loading command centre" description="Fetching today's activity and quick actions." /></div>
+          <div className="dashboard-home-loading"><LoadingState title="Loading command centre" description="Fetching today's activity and quick actions." /></div>
         )}
           </div>
       </DashboardShell>
@@ -234,6 +222,15 @@ export default function Dashboard() {
       <div className="dashboard-home-premium">
       <GuidedTourOverlay enabled={demoTourEnabled} isDemoUser={Boolean(me?.demoUser || me?.email === '@mytitan.co.uk')} />
       <GuidedSetupProgress enabled={guidedSetupEnabled} incomplete={!settings?.guidedSetupCompletedAt} />
+
+      <div className="dashboard-metrics-grid">
+        {dashboardMetrics.map((metric) => (
+          <div key={metric.label} className="card dashboard-metric-card">
+            <div className="dashboard-metric-label">{metric.label}</div>
+            <div className="dashboard-metric-value">{metric.value}</div>
+          </div>
+        ))}
+      </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
         <h1 style={{ marginTop: 0 }}>Command Centre</h1>
