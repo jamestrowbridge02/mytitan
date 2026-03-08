@@ -279,7 +279,30 @@ export default function CommandCentreV2Page() {
         <div className="ccv2-board-premium">
           <div className="card ccv2-card"><h1>Command Centre</h1><p className="muted">Feature is disabled.</p></div>
         </div>
-      </DashboardShell>
+      
+
+      {openedJob ? (
+        <div className="ccv2-sidepanel">
+          <div className="ccv2-sidepanel-header">
+            <strong>{openedJob.jobRef || "Job"}</strong>
+            <button className="button secondary" onClick={() => setOpenedJob(null)}>Close</button>
+          </div>
+
+          <div className="ccv2-sidepanel-body">
+            <p><strong>Customer:</strong> {openedJob.customerName || "-"}</p>
+            <p><strong>Vehicle:</strong> {openedJob.vehicleReg || "-"}</p>
+            <p><strong>Status:</strong> {openedJob.status}</p>
+          </div>
+
+          <div className="ccv2-sidepanel-actions">
+            <button className="button" onClick={() => router.push(`/dashboard/jobs/${openedJob.id}`)}>
+              Open full job
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+</DashboardShell>
     );
   }
 
@@ -454,6 +477,29 @@ export default function CommandCentreV2Page() {
         </div>
       ) : null}
       </div>
-    </DashboardShell>
+    
+
+      {openedJob ? (
+        <div className="ccv2-sidepanel">
+          <div className="ccv2-sidepanel-header">
+            <strong>{openedJob.jobRef || "Job"}</strong>
+            <button className="button secondary" onClick={() => setOpenedJob(null)}>Close</button>
+          </div>
+
+          <div className="ccv2-sidepanel-body">
+            <p><strong>Customer:</strong> {openedJob.customerName || "-"}</p>
+            <p><strong>Vehicle:</strong> {openedJob.vehicleReg || "-"}</p>
+            <p><strong>Status:</strong> {openedJob.status}</p>
+          </div>
+
+          <div className="ccv2-sidepanel-actions">
+            <button className="button" onClick={() => router.push(`/dashboard/jobs/${openedJob.id}`)}>
+              Open full job
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+</DashboardShell>
   );
 }

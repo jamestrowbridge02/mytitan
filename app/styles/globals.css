@@ -2027,3 +2027,40 @@ body:has(input[type="password"]) .mt-sidebar {
   opacity: 0.65;
   cursor: wait;
 }
+
+/* --- Command Centre Job Side Panel --- */
+
+.ccv2-sidepanel{
+  position:fixed;
+  top:0;
+  right:0;
+  width:420px;
+  height:100vh;
+  background:var(--surface-1);
+  border-left:1px solid rgba(255,255,255,0.08);
+  box-shadow:-10px 0 40px rgba(0,0,0,0.4);
+  padding:24px;
+  z-index:40;
+  display:flex;
+  flex-direction:column;
+  gap:20px;
+}
+
+.ccv2-sidepanel-header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+
+.ccv2-sidepanel-body{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  font-size:14px;
+}
+
+.ccv2-sidepanel-actions{
+  border-top:1px solid rgba(255,255,255,0.08);
+  padding-top:16px;
+}
