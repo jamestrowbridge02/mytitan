@@ -158,7 +158,7 @@ export default function IntegrationsPage() {
                 <p className="muted" style={{ marginTop: 6 }}>Setup time: 2-5 min</p>
               </div>
               <div className="integration-actions">
-                {!item.allowed ? <span className="badge warn">Upgrade required</span> : null}
+                {!item.allowed ? <span className="badge warn">Integrations workspace</span> : null}
                 <a className="button secondary" href={item.configureUrl}>
                   Configure
                 </a>
@@ -189,7 +189,7 @@ export default function IntegrationsPage() {
                   <p className="muted">Benefit: {conn.benefits}</p>
                 </div>
                 <div className="integration-actions">
-                  {!status?.allowed ? <span className="badge warn">Upgrade required</span> : null}
+                  {!status?.allowed ? <span className="badge warn">Integrations workspace</span> : null}
                   {status?.connected ? <span className="badge">Connected</span> : <span className="badge warn">Not connected</span>}
                   {status?.connected ? (
                     <button className="button secondary" type="button" onClick={() => disconnect(conn.key)} disabled={savingKey === conn.key}>
