@@ -290,10 +290,7 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
     return (
       <DashboardShell>
         <div className="ccv2-board-premium">
-          <div className={`card ccv2-card ${dragStatusTarget === status.key ? "ccv2-dropzone-active" : ""}`}
-                      onDragOver={(e) => { e.preventDefault(); setDragStatusTarget(status.key); }}
-                      onDragLeave={() => setDragStatusTarget("")}
-                      onDrop={() => { if (dragJobId) void moveJobToStatus(dragJobId, status.key); }}><h1>Command Centre</h1><p className="muted">Feature is disabled.</p></div>
+          <div className="card ccv2-card"><h1>Command Centre</h1><p className="muted">Feature is disabled.</p></div>
         </div>
       
 
@@ -432,7 +429,15 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
         {viewMode === 'list' ? (
           <div className="list">
             {allJobs.map((job: any) => (
-              <div key={job.id} className="integration-card" onClick={() => setOpenedJob(job)} style={{ cursor: 'pointer' }}>
+              <div
+                key={job.id}
+                className="integration-card"
+                onClick={() => setOpenedJob(job)}
+                style={{ cursor: 'pointer' }}
+                draggable
+                onDragStart={() => setDragJobId(job.id)}
+                onDragEnd={() => { setDragJobId(""); setDragStatusTarget(""); }}
+              >
                 <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <input type="checkbox" checked={selected.includes(job.id)} onChange={(e) => { e.stopPropagation(); setSelected((prev) => prev.includes(job.id) ? prev.filter((x) => x !== job.id) : [...prev, job.id]); }} />
                   <strong>{job.jobRef}</strong>
@@ -449,11 +454,24 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 10 }}>
             {Object.entries(board.grouped || {}).map(([col, jobs]: [string, any]) => (
-              <div key={col} className="card ccv2-card" style={{ padding: 12 }}>
+              <div
+                key={col}
+                className={`card ccv2-card ${dragStatusTarget === col ? "ccv2-dropzone-active" : ""}`}
+                style={{ padding: 12 }}
+                onDragOver={(e) => { e.preventDefault(); setDragStatusTarget(col); }}
+                onDragLeave={() => setDragStatusTarget("")}
+                onDrop={() => { if (dragJobId) void moveJobToStatus(dragJobId, col); }}
+              >
                 <strong>{col} ({Array.isArray(jobs) ? jobs.length : 0})</strong>
                 <div className="list" style={{ marginTop: 8 }}>
                   {(jobs || []).map((job: any) => (
-                    <div key={job.id} className="integration-card">
+                    <div
+                      key={job.id}
+                      className="integration-card"
+                      draggable
+                      onDragStart={() => setDragJobId(job.id)}
+                      onDragEnd={() => { setDragJobId(""); setDragStatusTarget(""); }}
+                    >
                       <button type="button" onClick={() => setOpenedJob(job)} style={{ width: '100%', textAlign: 'left', background: 'transparent', border: 0, padding: 0 }}>
                         <span>{job.jobRef}</span>
                         <span className="muted">{job.customerName || 'Customer'}</span>
