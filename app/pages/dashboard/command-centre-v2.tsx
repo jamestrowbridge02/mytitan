@@ -28,6 +28,7 @@ export default function CommandCentreV2Page() {
   const [bulkStatus, setBulkStatus] = useState('IN_PROGRESS');
   const [bulkLocation, setBulkLocation] = useState('all');
   const [toast, setToast] = useState('');
+  const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('info');
   const [error, setError] = useState('');
   const [locations, setLocations] = useState<any[]>([]);
   const [views, setViews] = useState<any[]>([]);
@@ -93,7 +94,8 @@ export default function CommandCentreV2Page() {
         setLastBoardHash(nextHash);
         setLastUpdated(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
     } catch (err: any) {
-      setError(err?.message || 'Failed to load board');
+      setToastType('error');
+        setError(err?.message || 'Failed to load board');
     }
   }
 
@@ -233,7 +235,8 @@ export default function CommandCentreV2Page() {
           }),
         });
       }
-      setToast('View saved');
+      setToastType('success');
+        setToast('View saved');
       setShowSaveView(false);
       await loadViews();
     } catch (err: any) {
@@ -249,7 +252,8 @@ export default function CommandCentreV2Page() {
         method: 'POST',
         body: JSON.stringify({ jobIds: ids, operation, ...payload }),
       });
-      setToast(`Updated ${res?.successCount || 0} jobs. Undo available.`);
+      setToastType('success');
+        setToast(`Updated ${res?.successCount || 0} jobs. Undo available.`);
       setSelected([]);
       await loadBoard();
     } catch (err: any) {
@@ -274,7 +278,8 @@ export default function CommandCentreV2Page() {
   async function patchJob(jobId: string, payload: Record<string, any>) {
     try {
       await apiFetch(`/jobs/${jobId}`, { method: 'PATCH', body: JSON.stringify(payload) });
-      setToast('Job updated');
+      setToastType('success');
+        setToast('Job updated');
       await loadBoard();
     } catch (err: any) {
       setError(err?.message || 'Inline update failed');
@@ -511,6 +516,7 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
         <div data-realtime="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_REALTIME_ENABLED</div>
         <div data-sidepanel-rich="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_SIDEPANEL_RICH_DETAILS</div>
         <div data-activity-timeline="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_ACTIVITY_TIMELINE_ENABLED</div>
+        <div data-event-toasts="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_EVENT_TOASTS_ENABLED</div>
         <div className="card ccv2-hero" style={{ marginBottom: 14 }}>
           <div className="ccv2-inline-actions-marker" data-inline-actions="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>
             INLINE_ACTIONS_ENABLED
@@ -534,7 +540,7 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
           <span className="ccv2-status-pill ccv2-status-pill--completed">COMPLETED</span>
         </div>
         {error ? <p style={{ color: '#ff8a8a' }}>{error}</p> : null}
-        {toast ? <p style={{ color: '#5eead4' }}>{toast}</p> : null}
+        {toast ? <div className={`ccv2-toast ccv2-toast--${toastType}`}>{toast}</div> : null}
       </div>
 
       <div className="card ccv2-filters" style={{ marginBottom: 14 }}>
