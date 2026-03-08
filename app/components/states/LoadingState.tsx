@@ -3,12 +3,13 @@ import React from "react";
 export function LoadingState(props: {
   title?: string;
   description?: string;
+  metrics?: Array<{ label: string; value: string }>;
 }) {
   const showDashboardMetrics =
     (props.title || "").toLowerCase().includes("command centre") ||
     (props.title || "").toLowerCase().includes("dashboard");
 
-  const metrics = [
+  const metrics = props.metrics || [
     { label: "Jobs today", value: "0" },
     { label: "Revenue today", value: "£0" },
     { label: "Technicians active", value: "0" },

@@ -165,7 +165,27 @@ export default function Dashboard() {
   ];
 
   if (!commandCentreEnabled) {
-    return (
+  
+  const dashboardSummaryMetrics = [
+    {
+      label: "Jobs today",
+      value: String(Number((summary as any)?.jobsToday ?? (summary as any)?.todayJobs ?? (summary as any)?.counts?.jobsToday ?? 0)),
+    },
+    {
+      label: "Revenue today",
+      value: `£${Number((summary as any)?.revenueToday ?? (summary as any)?.todayRevenue ?? (summary as any)?.counts?.revenueToday ?? 0).toLocaleString()}`,
+    },
+    {
+      label: "Technicians active",
+      value: String(Number((summary as any)?.techniciansActive ?? (summary as any)?.activeTechnicians ?? (summary as any)?.counts?.techniciansActive ?? 0)),
+    },
+    {
+      label: "Pending approvals",
+      value: String(Number((summary as any)?.pendingApprovals ?? (summary as any)?.approvalsPending ?? (summary as any)?.counts?.pendingApprovals ?? 0)),
+    },
+  ];
+
+  return (
       <DashboardShell>
   <div className="dashboard-home-premium">
 <div className="dashboard-premium-shell">
@@ -194,7 +214,20 @@ export default function Dashboard() {
             </div>
           </div>
         ) : (
-          <div className="dashboard-home-loading"><LoadingState title="Loading command centre" description="Fetching today's activity and quick actions." /></div>
+          <>
+            <div className="dashboard-metrics-grid">
+              {dashboardMetrics.map((metric) => (
+                <div key={metric.label} className="card dashboard-metric-card">
+                  <div className="dashboard-metric-label">{metric.label}</div>
+                  <div className="dashboard-metric-value">{metric.value}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="dashboard-home-loading">
+              <LoadingState title="Loading command centre" description="Fetching today's activity and quick actions." />
+            </div>
+          </>
         )}
           </div>
       </DashboardShell>
