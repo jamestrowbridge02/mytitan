@@ -241,6 +241,15 @@ export default function CommandCentreV2Page() {
     }
   }
 
+  async function inlineSetStatus(jobId: string, nextStatus: string) {
+    try {
+      setPendingInlineJobId(jobId);
+      await patchJob(jobId, { status: nextStatus });
+    } finally {
+      setPendingInlineJobId("");
+    }
+  }
+
   function InlineStatusActions({ job }: { job: any }) {
     const current = String(job?.status || "");
     const nextOptions = STATUS_LABELS.filter((s) => s.key !== current).slice(0, 3);
@@ -292,7 +301,6 @@ export default function CommandCentreV2Page() {
             </button>
           </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
-                        <InlineStatusActions job={job} />
           <span className="ccv2-status-pill ccv2-status-pill--open">OPEN</span>
           <span className="ccv2-status-pill ccv2-status-pill--in_progress">IN_PROGRESS</span>
           <span className="ccv2-status-pill ccv2-status-pill--completed">COMPLETED</span>
@@ -389,6 +397,9 @@ export default function CommandCentreV2Page() {
                 <div>
                   <button className="button secondary ccv2-button" type="button" onClick={(e) => { e.stopPropagation(); setOpenedJob(job); }}>Open</button>
                 </div>
+                <div onClick={(e) => e.stopPropagation()}>
+                  <InlineStatusActions job={job} />
+                </div>
               </div>
             ))}
           </div>
@@ -399,10 +410,13 @@ export default function CommandCentreV2Page() {
                 <strong>{col} ({Array.isArray(jobs) ? jobs.length : 0})</strong>
                 <div className="list" style={{ marginTop: 8 }}>
                   {(jobs || []).map((job: any) => (
-                    <button key={job.id} type="button" className="integration-card" onClick={() => setOpenedJob(job)}>
-                      <span>{job.jobRef}</span>
-                      <span className="muted">{job.customerName || 'Customer'}</span>
-                    </button>
+                    <div key={job.id} className="integration-card">
+                      <button type="button" onClick={() => setOpenedJob(job)} style={{ width: '100%', textAlign: 'left', background: 'transparent', border: 0, padding: 0 }}>
+                        <span>{job.jobRef}</span>
+                        <span className="muted">{job.customerName || 'Customer'}</span>
+                      </button>
+                      <InlineStatusActions job={job} />
+                    </div>
                   ))}
                 </div>
               </div>
