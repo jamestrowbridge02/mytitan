@@ -226,7 +226,8 @@ export default function CommandCentreV2Page() {
   if (!enabled) {
     return (
       <DashboardShell>
-        <div className="card"><h1>Command Centre V2</h1><p className="muted">Feature is disabled.</p></div>
+      <div className="ccv2-board-premium">
+        <div className="card ccv2-card"><h1>Command Centre</h1><p className="muted">Feature is disabled.</p></div>
       </DashboardShell>
     );
   }
@@ -286,7 +287,7 @@ export default function CommandCentreV2Page() {
       </div>
 
       {showSaveView ? (
-        <div className="card" style={{ marginBottom: 14 }}>
+        <div className="card ccv2-surface" style={{ marginBottom: 14 }}>
           <input className="input" value={saveViewName} onChange={(e) => setSaveViewName(e.target.value)} placeholder="View name" />
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="button ccv2-button" type="button" onClick={saveView}>Save</button>
@@ -295,7 +296,7 @@ export default function CommandCentreV2Page() {
         </div>
       ) : null}
 
-      <div className="card" style={{ marginBottom: 14 }}>
+      <div className="card ccv2-surface ccv2-filters-surface" style={{ marginBottom: 14 }}>
         <strong>Bulk bar</strong>
         <p className="muted">Selected: {selected.length}</p>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -310,13 +311,14 @@ export default function CommandCentreV2Page() {
           <button className="button secondary ccv2-button" type="button" onClick={() => triggerBulk('setLocation', { locationId: bulkLocation }, `Assign location ${bulkLocation}`)}>Location</button>
           {demoPolishEnabled ? (
             <button className="button secondary ccv2-button" type="button" onClick={() => triggerBulk('markComplete', {}, 'Mark complete')}>Mark Complete</button>
+                      </div>
           ) : (
             <button className="button secondary ccv2-button" type="button" onClick={() => triggerBulk('closeJobs', {}, 'Close jobs')}>Close</button>
           )}
         </div>
       </div>
 
-      <div className="card" style={{ marginBottom: 14 }}>
+      <div className="card ccv2-card" style={{ marginBottom: 14 }}>
         {viewMode === 'list' ? (
           <div className="list">
             {allJobs.map((job: any) => (
@@ -334,7 +336,7 @@ export default function CommandCentreV2Page() {
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 10 }}>
             {Object.entries(board.grouped || {}).map(([col, jobs]: [string, any]) => (
-              <div key={col} className="card" style={{ padding: 12 }}>
+              <div key={col} className="card ccv2-card" style={{ padding: 12 }}>
                 <strong>{col} ({Array.isArray(jobs) ? jobs.length : 0})</strong>
                 <div className="list" style={{ marginTop: 8 }}>
                   {(jobs || []).map((job: any) => (
@@ -351,7 +353,7 @@ export default function CommandCentreV2Page() {
       </div>
 
       {openedJob ? (
-        <div className="card" style={{ position: 'fixed', right: 16, top: 110, width: 'min(460px, calc(100vw - 32px))', maxHeight: '80vh', overflow: 'auto', zIndex: 20 }}>
+        <div className="card ccv2-card" style={{ position: 'fixed', right: 16, top: 110, width: 'min(460px, calc(100vw - 32px))', maxHeight: '80vh', overflow: 'auto', zIndex: 20 }}>
           <h3 style={{ marginTop: 0 }}>Quick View</h3>
           <p className="muted">{openedJob.jobRef} • {openedJob.customerName}</p>
           <label>Status</label>
@@ -365,7 +367,7 @@ export default function CommandCentreV2Page() {
 
       {pendingBulk && demoPolishEnabled ? (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'grid', placeItems: 'center', zIndex: 40, padding: 16 }}>
-          <div className="card" style={{ width: 'min(520px, 100%)' }}>
+          <div className="card ccv2-card" style={{ width: 'min(520px, 100%)' }}>
             <h3 style={{ marginTop: 0 }}>Confirm bulk action</h3>
             <p className="muted">{pendingBulk.label} on {selected.length} selected jobs.</p>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -375,6 +377,7 @@ export default function CommandCentreV2Page() {
           </div>
         </div>
       ) : null}
+      </div>
     </DashboardShell>
   );
 }

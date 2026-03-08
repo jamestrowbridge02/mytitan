@@ -1820,3 +1820,99 @@ body:has(input[type="password"]) .mt-sidebar {
 .mt-sidebar nav {
   padding-right: 2px;
 }
+
+/* --- Premium Command Centre Board --- */
+.ccv2-board-premium {
+  max-width: 1320px;
+  margin: 0 auto;
+}
+
+.ccv2-board-premium > * + * {
+  margin-top: 14px;
+}
+
+.ccv2-surface,
+.ccv2-card {
+  border-radius: 18px !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.025)) !important;
+  box-shadow: 0 16px 36px rgba(0,0,0,0.18) !important;
+}
+
+.ccv2-filters-surface {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.ccv2-kanban-wrap {
+  margin-top: 6px;
+}
+
+.ccv2-kanban-wrap .card,
+.ccv2-card {
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+}
+
+.ccv2-kanban-wrap .card:hover,
+.ccv2-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 24px 52px rgba(0,0,0,0.24) !important;
+  border-color: rgba(255,255,255,0.12) !important;
+}
+
+.ccv2-status-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.90);
+}
+
+.ccv2-status-pill--open { background: rgba(96,165,250,0.14); }
+.ccv2-status-pill--scheduled { background: rgba(59,130,246,0.16); }
+.ccv2-status-pill--in_progress { background: rgba(250,204,21,0.14); }
+.ccv2-status-pill--completed { background: rgba(34,197,94,0.14); }
+.ccv2-status-pill--invoiced { background: rgba(168,85,247,0.14); }
+.ccv2-status-pill--cancelled { background: rgba(239,68,68,0.14); }
+.ccv2-status-pill--draft { background: rgba(148,163,184,0.14); }
+
+.ccv2-board-premium .input,
+.ccv2-board-premium select {
+  border-radius: 14px !important;
+  min-height: 42px;
+  background: rgba(255,255,255,0.04) !important;
+  border: 1px solid rgba(255,255,255,0.10) !important;
+}
+
+.ccv2-board-premium .button {
+  border-radius: 14px !important;
+  min-height: 40px;
+}
+
+.ccv2-board-premium h1,
+.ccv2-board-premium h2,
+.ccv2-board-premium h3 {
+  letter-spacing: -0.02em;
+}
+
+.ccv2-board-premium .muted {
+  color: rgba(255,255,255,0.68);
+}
+
+@media (max-width: 900px) {
+  .ccv2-board-premium {
+    padding: 0 8px;
+  }
+
+  .ccv2-surface,
+  .ccv2-card {
+    border-radius: 16px !important;
+  }
+}
