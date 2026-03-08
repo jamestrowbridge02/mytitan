@@ -36,6 +36,7 @@ export default function CommandCentreV2Page() {
   const [showSaveView, setShowSaveView] = useState(false);
   const [openedJob, setOpenedJob] = useState<any>(null);
   const [pendingBulk, setPendingBulk] = useState<{ op: string; payload: Record<string, any>; label: string } | null>(null);
+  const [pendingInlineJobId, setPendingInlineJobId] = useState<string>("");
   const [seededDefaults, setSeededDefaults] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string>("");
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -240,6 +241,29 @@ export default function CommandCentreV2Page() {
     }
   }
 
+  function InlineStatusActions({ job }: { job: any }) {
+    const current = String(job?.status || "");
+    const nextOptions = STATUS_LABELS.filter((s) => s.key !== current).slice(0, 3);
+
+    if (!nextOptions.length) return null;
+
+    return (
+      <div className="ccv2-inline-actions">
+        {nextOptions.map((opt) => (
+          <button
+            key={opt.key}
+            type="button"
+            className="button secondary ccv2-button ccv2-inline-action"
+            disabled={pendingInlineJobId === job.id}
+            onClick={() => void inlineSetStatus(job.id, opt.key)}
+          >
+            {pendingInlineJobId === job.id ? "Updating..." : opt.label}
+          </button>
+        ))}
+      </div>
+    );
+  }
+
   if (!enabled) {
     return (
       <DashboardShell>
@@ -268,6 +292,7 @@ export default function CommandCentreV2Page() {
             </button>
           </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+                        <InlineStatusActions job={job} />
           <span className="ccv2-status-pill ccv2-status-pill--open">OPEN</span>
           <span className="ccv2-status-pill ccv2-status-pill--in_progress">IN_PROGRESS</span>
           <span className="ccv2-status-pill ccv2-status-pill--completed">COMPLETED</span>
