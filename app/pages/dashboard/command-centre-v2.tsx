@@ -59,6 +59,8 @@ export default function CommandCentreV2Page() {
   const [seededDefaults, setSeededDefaults] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string>("");
   const [isRefreshing, setIsRefreshing] = useState(false);
+    const [lastBoardHash, setLastBoardHash] = useState("");
+    const [liveNotice, setLiveNotice] = useState("");
 
   const defaultViews = [
     { name: 'All Open', filters: { status: 'OPEN', locationIds: ['all'], search: '', viewType: 'kanban' }, viewType: 'kanban' },
@@ -82,7 +84,13 @@ export default function CommandCentreV2Page() {
       const selectedLocationIds = locationIds.filter((x) => x !== 'all');
       if (selectedLocationIds.length > 0) q.set('locationIds', selectedLocationIds.join(','));
       const data = await apiFetch(`/jobs/board-v2?${q.toString()}`);
+        const nextHash = JSON.stringify(data || {});
       setBoard(data || { grouped: {}, counts: {} });
+        if (lastBoardHash && lastBoardHash !== nextHash) {
+          setLiveNotice("Board updated");
+          window.setTimeout(() => setLiveNotice(""), 2200);
+        }
+        setLastBoardHash(nextHash);
         setLastUpdated(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
     } catch (err: any) {
       setError(err?.message || 'Failed to load board');
@@ -129,14 +137,27 @@ export default function CommandCentreV2Page() {
 
   useEffect(() => {
     if (!enabled) return;
-    const id = window.setInterval(() => {
-      void loadBoard(true);
-    }, 30000);
+
+    const tick = () => {
+      if (document.visibilityState === 'visible') {
+        void loadBoard(true);
+      }
+    };
+
+    const id = window.setInterval(tick, 12000);
     const onFocus = () => { void loadBoard(true); };
+    const onVisible = () => { if (document.visibilityState === 'visible') void loadBoard(true); };
+    const onOnline = () => { void loadBoard(true); };
+
     window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('online', onOnline);
+
     return () => {
       window.clearInterval(id);
       window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('online', onOnline);
     };
   }, [enabled, search, status, locationIds.join(',')]);
 
@@ -401,6 +422,7 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
       <div data-drag-drop="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_DRAG_DROP_ENABLED</div>
         <div data-sidepanel-actions="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_SIDEPANEL_ACTIONS_ENABLED</div>
         <div data-assign-tech="enabled" style={{position:"absolute",left:-99999,top:-99999,width:1,height:1,overflow:"hidden"}}>CCV2_ASSIGN_TECH_ENABLED</div>
+        <div data-realtime="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_REALTIME_ENABLED</div>
         <div className="card ccv2-hero" style={{ marginBottom: 14 }}>
           <div className="ccv2-inline-actions-marker" data-inline-actions="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>
             INLINE_ACTIONS_ENABLED
