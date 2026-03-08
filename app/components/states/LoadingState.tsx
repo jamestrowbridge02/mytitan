@@ -4,6 +4,17 @@ export function LoadingState(props: {
   title?: string;
   description?: string;
 }) {
+  const showDashboardMetrics =
+    (props.title || "").toLowerCase().includes("command centre") ||
+    (props.title || "").toLowerCase().includes("dashboard");
+
+  const metrics = [
+    { label: "Jobs today", value: "0" },
+    { label: "Revenue today", value: "£0" },
+    { label: "Technicians active", value: "0" },
+    { label: "Pending approvals", value: "0" },
+  ];
+
   return (
     <div className="card loading-state-premium" role="status" aria-live="polite">
       <div className="loading-state-premium__top">
@@ -15,6 +26,17 @@ export function LoadingState(props: {
           <p className="loading-state-premium__description">{props.description}</p>
         ) : null}
       </div>
+
+      {showDashboardMetrics ? (
+        <div className="dashboard-metrics-grid">
+          {metrics.map((metric) => (
+            <div key={metric.label} className="card dashboard-metric-card">
+              <div className="dashboard-metric-label">{metric.label}</div>
+              <div className="dashboard-metric-value">{metric.value}</div>
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       <div className="loading-state-premium__stats">
         <div className="loading-state-premium__stat" />
