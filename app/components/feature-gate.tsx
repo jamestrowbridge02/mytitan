@@ -22,7 +22,7 @@ export function FeatureGate({
 
   return (
     <div className="card">
-      <h2>Upgrade required</h2>
+      <h2>Workspace available</h2>
       <p className="muted">
         This feature is not available on your current plan or is disabled for this tenant.
       </p>
