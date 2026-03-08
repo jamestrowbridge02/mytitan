@@ -340,6 +340,48 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
           </div>
 
           <div className="ccv2-sidepanel-body">
+            <div className="ccv2-sidepanel-section">
+              <div className="ccv2-sidepanel-sectionTitle">Customer</div>
+              <div className="ccv2-sidepanel-kv"><span>Name</span><strong>{openedJob.customerName || "-"}</strong></div>
+              <div className="ccv2-sidepanel-kv"><span>Email</span><strong>{openedJob.customerEmail || "-"}</strong></div>
+              <div className="ccv2-sidepanel-kv"><span>Phone</span><strong>{openedJob.customerPhone || "-"}</strong></div>
+            </div>
+
+            <div className="ccv2-sidepanel-section">
+              <div className="ccv2-sidepanel-sectionTitle">Vehicle</div>
+              <div className="ccv2-sidepanel-kv"><span>Registration</span><strong>{openedJob.vehicleReg || openedJob.registration || "-"}</strong></div>
+              <div className="ccv2-sidepanel-kv"><span>Make / Model</span><strong>{[openedJob.vehicleMake, openedJob.vehicleModel].filter(Boolean).join(" ") || "-"}</strong></div>
+              <div className="ccv2-sidepanel-kv"><span>Status</span><strong>{openedJob.status || "-"}</strong></div>
+            </div>
+
+            <div className="ccv2-sidepanel-section">
+              <div className="ccv2-sidepanel-sectionTitle">Job</div>
+              <div className="ccv2-sidepanel-kv"><span>Reference</span><strong>{openedJob.jobRef || openedJob.id || "-"}</strong></div>
+              <div className="ccv2-sidepanel-kv"><span>Currency</span><strong>{openedJob.currency || "-"}</strong></div>
+              <div className="ccv2-sidepanel-kv"><span>Created</span><strong>{openedJob.createdAt ? new Date(openedJob.createdAt).toLocaleString() : "-"}</strong></div>
+            </div>
+
+            <div className="ccv2-sidepanel-section">
+              <div className="ccv2-sidepanel-sectionTitle">Notes</div>
+              <div className="ccv2-sidepanel-note">
+                {openedJob.internalNotes || openedJob.notes || "No notes yet."}
+              </div>
+            </div>
+
+            <div className="ccv2-sidepanel-section">
+              <div className="ccv2-sidepanel-sectionTitle">Shortcuts</div>
+              <div className="ccv2-sidepanel-shortcuts">
+                <button className="button secondary ccv2-button ccv2-sidepanel-chip" onClick={() => router.push(`/dashboard/jobs/${openedJob.id}`)}>
+                  Job
+                </button>
+                <button className="button secondary ccv2-button ccv2-sidepanel-chip" onClick={() => router.push(`/dashboard/bookings`)}>
+                  Bookings
+                </button>
+                <button className="button secondary ccv2-button ccv2-sidepanel-chip" onClick={() => router.push(`/dashboard/billing`)}>
+                  Billing
+                </button>
+              </div>
+            </div>
           <div className="ccv2-sidepanel-dispatch">
             <h4>Dispatch</h4>
 
@@ -423,6 +465,7 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
         <div data-sidepanel-actions="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_SIDEPANEL_ACTIONS_ENABLED</div>
         <div data-assign-tech="enabled" style={{position:"absolute",left:-99999,top:-99999,width:1,height:1,overflow:"hidden"}}>CCV2_ASSIGN_TECH_ENABLED</div>
         <div data-realtime="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_REALTIME_ENABLED</div>
+        <div data-sidepanel-rich="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_SIDEPANEL_RICH_DETAILS</div>
         <div className="card ccv2-hero" style={{ marginBottom: 14 }}>
           <div className="ccv2-inline-actions-marker" data-inline-actions="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>
             INLINE_ACTIONS_ENABLED

@@ -2132,3 +2132,66 @@ body:has(input[type="password"]) .mt-sidebar {
   background: rgba(34,197,94,0.16);
   border: 1px solid rgba(34,197,94,0.22);
 }
+
+/* --- Command Centre sidepanel rich details --- */
+.ccv2-sidepanel-section {
+  border-top: 1px solid rgba(255,255,255,0.08);
+  padding-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ccv2-sidepanel-section:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.ccv2-sidepanel-sectionTitle {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.52);
+}
+
+.ccv2-sidepanel-kv {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.ccv2-sidepanel-kv span {
+  color: rgba(255,255,255,0.58);
+  font-size: 12px;
+}
+
+.ccv2-sidepanel-kv strong {
+  text-align: right;
+  font-size: 13px;
+  color: rgba(255,255,255,0.96);
+  font-weight: 600;
+}
+
+.ccv2-sidepanel-note {
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.035);
+  padding: 12px;
+  color: rgba(255,255,255,0.82);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.ccv2-sidepanel-shortcuts {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ccv2-sidepanel-chip {
+  min-height: 32px !important;
+  padding: 0 10px !important;
+  font-size: 12px !important;
+  border-radius: 999px !important;
+}
