@@ -490,155 +490,7 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
         <div className="ccv2-board-premium">
           <div className="card ccv2-card"><h1>Command Centre</h1><p className="muted">Feature is disabled.</p></div>
         </div>
-      
-
-      {openedJob ? (
-        <div className="ccv2-sidepanel">
-          <div className="ccv2-sidepanel-header">
-            <strong>{openedJob.jobRef || "Job"}</strong>
-            <button className="button secondary" onClick={() => setOpenedJob(null)}>Close</button>
-          </div>
-
-          <div className="ccv2-sidepanel-body">
-            <div className="ccv2-sidepanel-section">
-              <div className="ccv2-sidepanel-sectionTitle">Customer</div>
-              <div className="ccv2-sidepanel-kv"><span>Name</span><strong>{openedJob.customerName || "-"}</strong></div>
-              <div className="ccv2-sidepanel-kv"><span>Email</span><strong>{openedJob.customerEmail || "-"}</strong></div>
-              <div className="ccv2-sidepanel-kv"><span>Phone</span><strong>{openedJob.customerPhone || "-"}</strong></div>
-            </div>
-
-            <div className="ccv2-sidepanel-section">
-              <div className="ccv2-sidepanel-sectionTitle">Vehicle</div>
-              <div className="ccv2-sidepanel-kv"><span>Registration</span><strong>{openedJob.vehicleReg || openedJob.registration || "-"}</strong></div>
-              <div className="ccv2-sidepanel-kv"><span>Make / Model</span><strong>{[openedJob.vehicleMake, openedJob.vehicleModel].filter(Boolean).join(" ") || "-"}</strong></div>
-              <div className="ccv2-sidepanel-kv"><span>Status</span><strong>{openedJob.status || "-"}</strong></div>
-            </div>
-
-            <div className="ccv2-sidepanel-section">
-              <div className="ccv2-sidepanel-sectionTitle">Job</div>
-              <div className="ccv2-sidepanel-kv"><span>Reference</span><strong>{openedJob.jobRef || openedJob.id || "-"}</strong></div>
-              <div className="ccv2-sidepanel-kv"><span>Currency</span><strong>{openedJob.currency || "-"}</strong></div>
-              <div className="ccv2-sidepanel-kv"><span>Created</span><strong>{openedJob.createdAt ? new Date(openedJob.createdAt).toLocaleString() : "-"}</strong></div>
-            </div>
-
-            <div className="ccv2-sidepanel-section">
-              <div className="ccv2-sidepanel-sectionTitle">Notes</div>
-              <div className="ccv2-sidepanel-note">
-                {openedJob.internalNotes || openedJob.notes || "No notes yet."}
-              </div>
-            </div>
-
-
-            <div className="ccv2-sidepanel-section">
-              <div className="ccv2-sidepanel-sectionTitle">Activity</div>
-              <div className="ccv2-timeline">
-                {buildTimeline(openedJob).map((item, idx) => (
-                  <div key={`${item.label}-${idx}`} className="ccv2-timeline-item">
-                    <div className="ccv2-timeline-dot"></div>
-                    <div className="ccv2-timeline-content">
-                      <div className="ccv2-timeline-label">{item.label}</div>
-                      <div className="ccv2-timeline-time">
-                        {item.at ? new Date(item.at).toLocaleString() : "Waiting for first event"}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="ccv2-sidepanel-section">
-              <div className="ccv2-sidepanel-sectionTitle">Shortcuts</div>
-              <div className="ccv2-sidepanel-shortcuts">
-                <button className="button secondary ccv2-button ccv2-sidepanel-chip" onClick={() => router.push(`/dashboard/jobs/${openedJob.id}`)}>
-                  Job
-                </button>
-                <button className="button secondary ccv2-button ccv2-sidepanel-chip" onClick={() => router.push(`/dashboard/bookings`)}>
-                  Bookings
-                </button>
-                <button className="button secondary ccv2-button ccv2-sidepanel-chip" onClick={() => router.push(`/dashboard/billing`)}>
-                  Billing
-                </button>
-                <button
-                  className="button secondary ccv2-button ccv2-sidepanel-chip"
-                  onClick={() => router.push(`/dashboard/customers/${openedJob.id}?name=${encodeURIComponent(openedJob.customerName || "Customer")}`)}
-                >
-                  Timeline
-                </button>
-              </div>
-            </div>
-          <div className="ccv2-sidepanel-dispatch">
-            <h4>Dispatch</h4>
-
-            <label className="ccv2-label">Technician</label>
-            <select
-              className="input"
-              value={assignTechId}
-              onChange={(e) => setAssignTechId(e.target.value)}
-            >
-              <option value="">Select technician</option>
-              {technicians.map((t) => (
-                <option key={t.id} value={t.id}>{t.name || t.email}</option>
-              ))}
-            </select>
-
-            <label className="ccv2-label">Schedule</label>
-            <input
-              type="datetime-local"
-              className="input"
-              value={assignTime}
-              onChange={(e) => setAssignTime(e.target.value)}
-            />
-
-            <button
-              className="button"
-              onClick={async () => {
-                await patchJob(openedJob.id, {
-                  technicianId: assignTechId || null,
-                  scheduledAt: assignTime || null
-                });
-                setOpenedJob({...openedJob, technicianId: assignTechId});
-              }}
-            >
-              Assign & Schedule
-            </button>
-          </div>
-
-            <p><strong>Customer:</strong> {openedJob.customerName || "-"}</p>
-            <p><strong>Vehicle:</strong> {openedJob.vehicleReg || "-"}</p>
-            <p><strong>Status:</strong> {openedJob.status}</p>
-          </div>
-
-          <div className="ccv2-sidepanel-actions">
-            <div className="ccv2-sidepanel-status-actions">
-              {STATUS_LABELS.filter((s) => s.key !== String(openedJob?.status || "")).slice(0, 4).map((opt) => (
-                <button
-                  key={opt.key}
-                  type="button"
-                  className="button secondary ccv2-button ccv2-sidepanel-action"
-                  disabled={pendingInlineJobId === openedJob.id}
-                  onClick={async () => {
-                    await inlineSetStatus(openedJob.id, opt.key);
-                    setOpenedJob({ ...openedJob, status: opt.key });
-                  }}
-                >
-                  {pendingInlineJobId === openedJob.id ? "Updating..." : opt.label}
-                </button>
-              ))}
-            </div>
-
-            <div className="ccv2-sidepanel-primary-actions">
-              <button className="button" onClick={() => router.push(`/dashboard/jobs/${openedJob.id}`)}>
-                Open full job
-              </button>
-              <button className="button secondary" onClick={() => setOpenedJob(null)}>
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-</DashboardShell>
+      </DashboardShell>
     );
   }
 
@@ -655,7 +507,10 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
         <div data-sse-realtime="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_SSE_REALTIME_ENABLED</div>
         <div data-activity-stream="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_ACTIVITY_STREAM_ENABLED</div>
         <div data-optimistic-board="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_OPTIMISTIC_BOARD_ENABLED</div>
-        <div data-targeted-sse="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_TARGETED_SSE_ENABLED</div>\n        <div data-persistent-activity="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_PERSISTENT_ACTIVITY_ENABLED</div>\n        <div data-customer-timeline-shortcut="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CUSTOMER_TIMELINE_SHORTCUT_ENABLED</div>\n        <div className="card ccv2-hero" style={{ marginBottom: 14 }}>
+        <div data-targeted-sse="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_TARGETED_SSE_ENABLED</div>
+        <div data-persistent-activity="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_PERSISTENT_ACTIVITY_ENABLED</div>
+        <div data-customer-timeline-shortcut="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CUSTOMER_TIMELINE_SHORTCUT_ENABLED</div>
+        <div className="card ccv2-hero" style={{ marginBottom: 14 }}>
           <div className="ccv2-inline-actions-marker" data-inline-actions="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>
             INLINE_ACTIONS_ENABLED
           </div>
@@ -827,19 +682,6 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
         )}
       </div>
 
-      {openedJob ? (
-        <div className="card ccv2-card" style={{ position: 'fixed', right: 16, top: 110, width: 'min(460px, calc(100vw - 32px))', maxHeight: '80vh', overflow: 'auto', zIndex: 20 }}>
-          <h3 style={{ marginTop: 0 }}>Quick View</h3>
-          <p className="muted">{openedJob.jobRef} • {openedJob.customerName}</p>
-          <label>Status</label>
-          <select className="input" value={openedJob.status} onChange={(e) => setOpenedJob({ ...openedJob, status: e.target.value })}>
-            {STATUS_LABELS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
-          </select>
-          <button className="button ccv2-button" type="button" onClick={() => patchJob(openedJob.id, { status: openedJob.status })}>Inline save</button>
-          <button className="button secondary ccv2-button" type="button" onClick={() => setOpenedJob(null)}>Close</button>
-        </div>
-      ) : null}
-
       {pendingBulk && demoPolishEnabled ? (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'grid', placeItems: 'center', zIndex: 40, padding: 16 }}>
           <div className="card ccv2-card" style={{ width: 'min(520px, 100%)' }}>
@@ -863,52 +705,120 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
           </div>
 
           <div className="ccv2-sidepanel-body">
-          <div className="ccv2-sidepanel-dispatch">
-            <h4>Dispatch</h4>
+            <div className="ccv2-sidepanel-section">
+              <div className="ccv2-sidepanel-sectionTitle">Customer</div>
+              <div className="ccv2-sidepanel-kv"><span>Name</span><strong>{openedJob.customerName || "-"}</strong></div>
+              <div className="ccv2-sidepanel-kv"><span>Email</span><strong>{openedJob.customerEmail || "-"}</strong></div>
+              <div className="ccv2-sidepanel-kv"><span>Phone</span><strong>{openedJob.customerPhone || "-"}</strong></div>
+            </div>
 
-            <label className="ccv2-label">Technician</label>
-            <select
-              className="input"
-              value={assignTechId}
-              onChange={(e) => setAssignTechId(e.target.value)}
-            >
-              <option value="">Select technician</option>
-              {technicians.map((t) => (
-                <option key={t.id} value={t.id}>{t.name || t.email}</option>
-              ))}
-            </select>
+            <div className="ccv2-sidepanel-section">
+              <div className="ccv2-sidepanel-sectionTitle">Vehicle</div>
+              <div className="ccv2-sidepanel-kv"><span>Registration</span><strong>{openedJob.vehicleReg || openedJob.registration || "-"}</strong></div>
+              <div className="ccv2-sidepanel-kv"><span>Make / Model</span><strong>{[openedJob.vehicleMake, openedJob.vehicleModel].filter(Boolean).join(" ") || "-"}</strong></div>
+              <div className="ccv2-sidepanel-kv"><span>Status</span><strong>{openedJob.status || "-"}</strong></div>
+            </div>
 
-            <label className="ccv2-label">Schedule</label>
-            <input
-              type="datetime-local"
-              className="input"
-              value={assignTime}
-              onChange={(e) => setAssignTime(e.target.value)}
-            />
+            <div className="ccv2-sidepanel-section">
+              <div className="ccv2-sidepanel-sectionTitle">Activity</div>
+              <div className="ccv2-timeline">
+                {buildTimeline(openedJob).map((item, idx) => (
+                  <div key={`${item.label}-${idx}`} className="ccv2-timeline-item">
+                    <div className="ccv2-timeline-dot"></div>
+                    <div className="ccv2-timeline-content">
+                      <div className="ccv2-timeline-label">{item.label}</div>
+                      <div className="ccv2-timeline-time">
+                        {item.at ? new Date(item.at).toLocaleString() : "Waiting for first event"}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
 
-            <button
-              className="button"
-              onClick={async () => {
-                await patchJob(openedJob.id, {
-                  technicianId: assignTechId || null,
-                  scheduledAt: assignTime || null
-                });
-                setOpenedJob({...openedJob, technicianId: assignTechId});
-              }}
-            >
-              Assign & Schedule
-            </button>
-          </div>
+            <div className="ccv2-sidepanel-dispatch">
+              <h4>Dispatch</h4>
+              <label className="ccv2-label">Technician</label>
+              <select
+                className="input"
+                value={assignTechId}
+                onChange={(e) => setAssignTechId(e.target.value)}
+              >
+                <option value="">Select technician</option>
+                {technicians.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name || t.email}</option>
+                ))}
+              </select>
 
-            <p><strong>Customer:</strong> {openedJob.customerName || "-"}</p>
-            <p><strong>Vehicle:</strong> {openedJob.vehicleReg || "-"}</p>
-            <p><strong>Status:</strong> {openedJob.status}</p>
+              <label className="ccv2-label">Schedule</label>
+              <input
+                type="datetime-local"
+                className="input"
+                value={assignTime}
+                onChange={(e) => setAssignTime(e.target.value)}
+              />
+
+              <button
+                className="button"
+                onClick={async () => {
+                  await patchJob(openedJob.id, {
+                    technicianId: assignTechId || null,
+                    scheduledAt: assignTime || null,
+                  });
+                  setOpenedJob({ ...openedJob, technicianId: assignTechId });
+                }}
+              >
+                Assign & Schedule
+              </button>
+            </div>
+
+            <div className="ccv2-sidepanel-section">
+              <div className="ccv2-sidepanel-sectionTitle">Shortcuts</div>
+              <div className="ccv2-sidepanel-shortcuts">
+                <button className="button secondary ccv2-button ccv2-sidepanel-chip" onClick={() => router.push(`/dashboard/jobs/${openedJob.id}`)}>
+                  Job
+                </button>
+                <button className="button secondary ccv2-button ccv2-sidepanel-chip" onClick={() => router.push(`/dashboard/bookings`)}>
+                  Bookings
+                </button>
+                <button className="button secondary ccv2-button ccv2-sidepanel-chip" onClick={() => router.push(`/dashboard/billing`)}>
+                  Billing
+                </button>
+                <button
+                  className="button secondary ccv2-button ccv2-sidepanel-chip"
+                  onClick={() => router.push(`/dashboard/customers/${openedJob.id}?name=${encodeURIComponent(openedJob.customerName || "Customer")}`)}
+                >
+                  Timeline
+                </button>
+              </div>
+            </div>
           </div>
 
           <div className="ccv2-sidepanel-actions">
-            <button className="button" onClick={() => router.push(`/dashboard/jobs/${openedJob.id}`)}>
-              Open full job
-            </button>
+            <div className="ccv2-sidepanel-status-actions">
+              {STATUS_LABELS.filter((s) => s.key !== String(openedJob?.status || "")).slice(0, 4).map((opt) => (
+                <button
+                  key={opt.key}
+                  type="button"
+                  className="button secondary ccv2-button ccv2-sidepanel-action"
+                  disabled={pendingInlineJobId === openedJob.id}
+                  onClick={async () => {
+                    await inlineSetStatus(openedJob.id, opt.key);
+                    setOpenedJob({ ...openedJob, status: opt.key });
+                  }}
+                >
+                  {pendingInlineJobId === openedJob.id ? "Updating..." : opt.label}
+                </button>
+              ))}
+            </div>
+            <div className="ccv2-sidepanel-primary-actions">
+              <button className="button" onClick={() => router.push(`/dashboard/jobs/${openedJob.id}`)}>
+                Open full job
+              </button>
+              <button className="button secondary" onClick={() => setOpenedJob(null)}>
+                Close
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
