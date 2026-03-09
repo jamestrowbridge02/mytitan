@@ -67,6 +67,25 @@ export class ActivityService {
     let customerId = event.customerId ?? null;
     let customerName = event.customerName ?? null;
 
+    if (!customerId && event.payloadJson && typeof event.payloadJson === "object") {
+      const fromPayload = (event.payloadJson as any)?.customerId;
+      if (typeof fromPayload === "string" && fromPayload.trim()) {
+        customerId = fromPayload.trim();
+      }
+    }
+
+    if (!customerId && event.jobId) {
+      const job = await this.prisma.job.findUnique({
+        where: { id: event.jobId },
+        select: { customerId: true, companyId: true, customerName: true },
+      });
+      if (job?.customerId) {
+        customerId = job.customerId;
+        tenantId = tenantId || job.companyId;
+        customerName = customerName || job.customerName || null;
+      }
+    }
+
     if (customerId) {
       const customer = await this.prisma.customer.findFirst({
         where: tenantId ? { id: customerId, companyId: tenantId } : { id: customerId },
