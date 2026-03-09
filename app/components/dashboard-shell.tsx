@@ -24,7 +24,6 @@ import {
 import { GUIDED_MODE_STORAGE_KEY } from '../lib/guided-mode';
 import { useTenantSettings } from '../lib/tenant-settings';
 import { AiAssistant } from './ai-assistant';
-import CommandPalette from './command/command-palette';
 
 type LocationCtx = {
   activeLocationId: string;
@@ -189,7 +188,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="dashboard-shell-content">
-      <CommandPalette />
       {isDemoUser ? (
         <div className="card" style={{ marginBottom: 12, borderColor: '#8cc8ff' }}>
           <strong> Mode</strong>
