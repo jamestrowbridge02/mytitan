@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { apiFetch } from '../../lib/api';
 import { DashboardShell } from '../../components/dashboard-shell';
-import { FeatureGate } from '../../components/feature-gate';
 import { isMarketplaceEnabled } from '../../lib/feature-flags';
 
 type BookingSettings = {
@@ -102,10 +101,9 @@ export default function BookingsPage() {
 
   return (
     <DashboardShell>
-      <FeatureGate featureKey="bookings_enabled">
-        <div className="card">
-          <h1>Bookings</h1>
-          {error && <p style={{ color: '#ff8a8a' }}>{error}</p>}
+      <div className="card">
+        <h1>Bookings</h1>
+        {error && <p style={{ color: '#ff8a8a' }}>{error}</p>}
 
           {marketplaceEnabled && settings ? (
             <div className="card" style={{ padding: 16, marginBottom: 16 }}>
@@ -212,8 +210,7 @@ export default function BookingsPage() {
             ))}
             {bookings.length === 0 && !error && <p>No bookings yet.</p>}
           </div>
-        </div>
-      </FeatureGate>
+      </div>
     </DashboardShell>
   );
 }

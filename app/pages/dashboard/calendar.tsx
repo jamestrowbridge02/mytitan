@@ -6,7 +6,6 @@ import { ErrorState } from '../../components/states/ErrorState';
 import { LoadingState } from '../../components/states/LoadingState';
 import { ApiError, apiFetch } from '../../lib/api';
 import {
-  isCalendarV1Enabled,
   isCalendarV2DragEnabled,
   isCalendarV2HardConflictsEnabled,
   isSchedulingIntelligenceV1Enabled,
@@ -441,7 +440,6 @@ function formatHours(minutes: number) {
 
 export default function CalendarPage() {
   const router = useRouter();
-  const enabled = isCalendarV1Enabled();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [weekStart, setWeekStart] = useState(() => startOfWeekMonday(new Date()));
   const [data, setData] = useState<CalendarResponse | null>(null);
@@ -716,7 +714,6 @@ export default function CalendarPage() {
   }, []);
 
   useEffect(() => {
-    if (!enabled) return;
     const load = async () => {
       setLoading(true);
       setError('');
@@ -741,10 +738,10 @@ export default function CalendarPage() {
       }
     };
     load();
-  }, [enabled, weekStart, clearToast]);
+  }, [weekStart, clearToast]);
 
   useEffect(() => {
-    if (!enabled || !schedulingEnabled) {
+    if (!schedulingEnabled) {
       setScheduleData(null);
       setScheduleError('');
       setScheduleLoading(false);
@@ -776,7 +773,7 @@ export default function CalendarPage() {
     return () => {
       isActive = false;
     };
-  }, [enabled, schedulingEnabled, weekStart]);
+  }, [schedulingEnabled, weekStart]);
 
   useEffect(() => {
     if (!data || !scrollRef.current) return;
@@ -1164,17 +1161,6 @@ export default function CalendarPage() {
     },
     [handleSuggestionToggle, isSuggestEligible, router],
   );
-
-  if (!enabled) {
-    return (
-      <DashboardShell>
-        <div className="card">
-          <h1>Calendar</h1>
-          <p className="muted">Calendar V1 is disabled.</p>
-        </div>
-      </DashboardShell>
-    );
-  }
 
   const locationOptions = useMemo(() => {
     if (!data?.blocks) return [] as Array<{ id: string; label: string }>;

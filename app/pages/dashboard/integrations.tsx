@@ -81,7 +81,6 @@ export default function IntegrationsPage() {
   };
 
   useEffect(() => {
-    if (!marketplaceEnabled) return;
     load();
   }, [marketplaceEnabled]);
 
@@ -131,22 +130,15 @@ export default function IntegrationsPage() {
     }
   };
 
-  if (!marketplaceEnabled) {
-    return (
-      <DashboardShell>
-        <div className="card">
-          <h1>Integrations marketplace</h1>
-          <p className="muted">The marketplace is currently disabled.</p>
-        </div>
-      </DashboardShell>
-    );
-  }
-
   return (
     <DashboardShell>
       <div className="card">
         <h1>Integrations marketplace</h1>
-        <p className="muted">Enable the tools you need now. You can upgrade later.</p>
+        <p className="muted">
+          {marketplaceEnabled
+            ? 'Enable the tools you need now. You can upgrade later.'
+            : 'Core integrations are available in this workspace. Additional marketplace packs can be enabled later.'}
+        </p>
         {error && <p style={{ color: '#ff8a8a' }}>{error}</p>}
 
         <div className="list">
