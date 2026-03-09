@@ -2398,3 +2398,57 @@ body:has(input[type="password"]) .mt-sidebar {
       0 18px 42px rgba(0,0,0,0.22);
   }
 }
+
+/* --- Job page activity history --- */
+.job-history-card {
+  border-radius: 18px !important;
+}
+
+.job-history-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.job-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.job-history-item {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.job-history-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  margin-top: 4px;
+  background: rgba(168,85,247,0.9);
+  box-shadow: 0 0 0 4px rgba(168,85,247,0.10);
+}
+
+.job-history-content {
+  flex: 1;
+}
+
+.job-history-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.96);
+}
+
+.job-history-meta {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: rgba(255,255,255,0.58);
+  margin-top: 2px;
+}

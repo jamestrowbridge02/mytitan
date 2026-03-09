@@ -216,9 +216,35 @@ export default function JobDetailPage() {
 
   if (loading && !job) {
     return (
-      <DashboardShell>
+      <DashboardShell>\  const [activityItems, setActivityItems] = useState<any[]>([]);\nn      <div data-job-history=\"enabled\" style={{ position: \"absolute\", left: -99999, top: -99999, width: 1, height: 1, overflow: \"hidden\" }}>CCV2_JOB_HISTORY_ENABLED</div>
         <LoadingState title="Loading job" description="Fetching job details and activity." />
-      </DashboardShell>
+      
+      <div className="card job-history-card">
+        <div className="job-history-head">
+          <h3 style={{ margin: 0 }}>Activity</h3>
+          <span className="muted">Persistent job history</span>
+        </div>
+
+        <div className="job-history-list">
+          {activityItems.length ? activityItems.map((item) => (
+            <div key={item.id || `${item.type}-${item.at}`} className="job-history-item">
+              <div className="job-history-dot"></div>
+              <div className="job-history-content">
+                <div className="job-history-label">{item.label || item.type}</div>
+                <div className="job-history-meta">
+                  <span>{item.status || "Event"}</span>
+                  <span>•</span>
+                  <span>{item.at ? new Date(item.at).toLocaleString() : ""}</span>
+                </div>
+              </div>
+            </div>
+          )) : (
+            <div className="muted">No persistent history yet for this job.</div>
+          )}
+        </div>
+      </div>
+
+    </DashboardShell>
     );
   }
 

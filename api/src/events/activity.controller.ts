@@ -6,8 +6,9 @@ export class ActivityController {
   constructor(private readonly activity: ActivityService) {}
 
   @Get("recent")
-  async recent(@Query("limit") limit?: string, @Query("tenantId") tenantId?: string) {
+  async recent(@Query("limit") limit?: string, @Query("tenantId") tenantId?: string, @Query("jobId") jobId?: string) {
     const n = Number(limit || 12);
-    return this.activity.list(n, tenantId || null);
+    const rows = await this.activity.list(n, tenantId || null);
+    return jobId ? rows.filter((x: any) => String(x?.jobId || "") === String(jobId)) : rows;
   }
 }
