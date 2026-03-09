@@ -179,6 +179,7 @@ model Company {
   bookingAnswers           BookingAnswer[]
   customerTags             CustomerTag[]
   customerSegments         CustomerSegment[]
+  customers                Customer[]
   crmNotes                 CRMNote[]
   crmTasks                 CRMTask[]
   notifications            Notification[]
@@ -292,10 +293,31 @@ model TradeAccount {
   @@index([companyId, status])
 }
 
+model Customer {
+  id             String          @id @default(cuid())
+  companyId      String
+  slug           String?
+  name           String
+  email          String?
+  phone          String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  company        Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  jobs           Job[]
+  activityEvents ActivityEvent[]
+
+  @@unique([companyId, slug])
+  @@index([companyId, name])
+  @@index([companyId, email])
+  @@index([companyId, phone])
+  @@index([companyId, createdAt])
+}
+
 model Job {
   id                       String            @id @default(cuid())
   companyId                String
   locationId               String?
+  customerId               String?
   jobRef                   String
   status                   JobStatus         @default(OPEN)
   customerName             String
@@ -341,6 +363,7 @@ model Job {
   updatedAt                DateTime          @updatedAt
   company                  Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
   location                 Location?         @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  customer                 Customer?         @relation(fields: [customerId], references: [id], onDelete: SetNull)
   tradeAccount             TradeAccount?     @relation(fields: [tradeAccountId], references: [id], onDelete: SetNull)
   assignedUser             User?             @relation("JobAssignee", fields: [assignedUserId], references: [id], onDelete: SetNull)
   createdByUser            User?             @relation("JobCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
@@ -362,6 +385,7 @@ model Job {
   @@unique([companyId, jobRef])
   @@index([companyId, createdAt])
   @@index([companyId, status])
+  @@index([companyId, customerId, createdAt])
   @@index([companyId, invoiceIssuedAt])
   @@index([companyId, invoicePaidAt])
   @@index([companyId, jobType])
@@ -1382,6 +1406,7 @@ model ActivityEvent {
   label        String
   at           DateTime @default(now())
   tenantId     String?
+  customerId   String?
   jobId        String?
   jobRef       String?
   customerName String?
@@ -1389,8 +1414,10 @@ model ActivityEvent {
   vehicleReg   String?
   technicianId String?
   payloadJson  Json?
+  customer     Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
 
   @@index([at])
   @@index([tenantId, at])
+  @@index([tenantId, customerId, at])
   @@index([jobId, at])
 }
