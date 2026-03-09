@@ -188,7 +188,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="container">
+    <div className="dashboard-shell-content">
       <CommandPalette />
       {isDemoUser ? (
         <div className="card" style={{ marginBottom: 12, borderColor: '#8cc8ff' }}>

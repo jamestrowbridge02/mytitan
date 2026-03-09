@@ -49,7 +49,7 @@ export function PageShell(props: {
 
           <div className="mx-auto w-full max-w-[1400px] px-6 pt-4 md:hidden">
             {showHeader ? (
-              <div className="mb-5 flex items-start justify-between gap-4">
+              <div className="mb-3 flex items-start justify-between gap-4">
                 <div>
                   {title ? <h1 className="text-xl font-semibold tracking-tight">{title}</h1> : null}
                   {props.subtitle ? <p className="mt-1 text-sm text-muted-foreground">{props.subtitle}</p> : null}
@@ -59,8 +59,7 @@ export function PageShell(props: {
             ) : null}
           </div>
 
-          {!showHeader ? <div className="h-4" /> : null}
-          <div className="mx-auto w-full max-w-[1400px] px-6 pb-8 pt-2">{props.children}</div>
+          <div className="mx-auto w-full max-w-[1400px] px-6 pb-8 pt-0 md:pt-1">{props.children}</div>
         </div>
       </div>
     </div>
