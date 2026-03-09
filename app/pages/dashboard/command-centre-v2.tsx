@@ -305,6 +305,42 @@ export default function CommandCentreV2Page() {
     setPendingBulk({ op, payload, label });
   }
 
+
+  function applyOptimisticJobUpdate(jobId: string, payload: Record<string, any>) {
+    setBoard((prev: any) => {
+      const grouped = { ...(prev?.grouped || {}) };
+      const counts = { ...(prev?.counts || {}) };
+      let movedJob: any = null;
+      let previousStatus = "";
+
+      for (const key of Object.keys(grouped)) {
+        const arr = Array.isArray(grouped[key]) ? [...grouped[key]] : [];
+        const idx = arr.findIndex((j: any) => j?.id === jobId);
+        if (idx !== -1) {
+          movedJob = { ...arr[idx], ...payload };
+          previousStatus = String(arr[idx]?.status || key);
+          arr.splice(idx, 1);
+          grouped[key] = arr;
+          break;
+        }
+      }
+
+      if (!movedJob) return prev;
+
+      const nextStatus = String(payload?.status || movedJob?.status || previousStatus);
+      const target = Array.isArray(grouped[nextStatus]) ? [...grouped[nextStatus]] : [];
+      target.unshift(movedJob);
+      grouped[nextStatus] = target;
+
+      if (previousStatus && previousStatus !== nextStatus) {
+        counts[previousStatus] = Math.max(0, Number(counts[previousStatus] || 0) - 1);
+        counts[nextStatus] = Number(counts[nextStatus] || 0) + 1;
+      }
+
+      return { ...(prev || {}), grouped, counts };
+    });
+  }
+
   async function patchJob(jobId: string, payload: Record<string, any>) {
     try {
       await apiFetch(`/jobs/${jobId}`, { method: 'PATCH', body: JSON.stringify(payload) });
@@ -549,13 +585,23 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
         <div data-event-toasts="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_EVENT_TOASTS_ENABLED</div>
         <div data-sse-realtime="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_SSE_REALTIME_ENABLED</div>
         <div data-activity-stream="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_ACTIVITY_STREAM_ENABLED</div>
+        <div data-optimistic-board="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_OPTIMISTIC_BOARD_ENABLED</div>
         <div className="card ccv2-hero" style={{ marginBottom: 14 }}>
           <div className="ccv2-inline-actions-marker" data-inline-actions="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>
             INLINE_ACTIONS_ENABLED
           </div>
         <h1 className="ccv2-title" style={{ marginTop: 0 }}>Command Centre</h1>
         <p className="muted ccv2-subtitle">Operations brain: board, bulk actions, reminders, and inline updates.</p>
-          <div className="ccv2-livebar">
+                  <div className="ccv2-count-strip">
+          {STATUS_LABELS.map((row) => (
+            <div key={row.key} className="ccv2-count-pill">
+              <span className="ccv2-count-pill__label">{row.label}</span>
+              <strong className="ccv2-count-pill__value">{Number(board?.counts?.[row.key] || 0)}</strong>
+            </div>
+          ))}
+        </div>
+
+<div className="ccv2-livebar">
             <div className="ccv2-livebar__meta">
               <span className={`ccv2-live-dot${isRefreshing ? " is-live" : ""}`}></span>
               <span className="ccv2-live-text">
