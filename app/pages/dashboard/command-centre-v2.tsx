@@ -179,8 +179,13 @@ export default function CommandCentreV2Page() {
     const base = (window.location.origin || '').replace(':3001', ':3000');
     const es = new EventSource(`${base}/events/command-centre`, { withCredentials: true });
 
-    es.onmessage = () => {
-      void loadBoard(true);
+    es.onmessage = (msg) => {
+      try {
+        const payload = JSON.parse(msg.data || "{}");
+        applyIncomingEvent(payload);
+      } catch {
+        void loadBoard(true);
+      }
       void loadActivity();
     };
 
@@ -324,6 +329,62 @@ export default function CommandCentreV2Page() {
           break;
         }
       }
+
+
+  function applyIncomingEvent(event: any) {
+    const jobId = String(event?.jobId || "");
+    if (!jobId) {
+      void loadBoard(true);
+      return;
+    }
+
+    setBoard((prev: any) => {
+      const grouped = { ...(prev?.grouped || {}) };
+      const counts = { ...(prev?.counts || {}) };
+      let found: any = null;
+      let previousStatus = "";
+
+      for (const key of Object.keys(grouped)) {
+        const arr = Array.isArray(grouped[key]) ? [...grouped[key]] : [];
+        const idx = arr.findIndex((j: any) => String(j?.id || "") === jobId);
+        if (idx !== -1) {
+          found = { ...arr[idx], ...event };
+          previousStatus = String(arr[idx]?.status || key);
+          arr.splice(idx, 1);
+          grouped[key] = arr;
+          break;
+        }
+      }
+
+      // If not currently on board, do a safe reload fallback.
+      if (!found) {
+        queueMicrotask(() => { void loadBoard(true); });
+        return prev;
+      }
+
+      const nextStatus = String(event?.status || found?.status || previousStatus);
+      found.status = nextStatus;
+
+      const target = Array.isArray(grouped[nextStatus]) ? [...grouped[nextStatus]] : [];
+      target.unshift(found);
+      grouped[nextStatus] = target;
+
+      if (previousStatus && previousStatus !== nextStatus) {
+        counts[previousStatus] = Math.max(0, Number(counts[previousStatus] || 0) - 1);
+        counts[nextStatus] = Number(counts[nextStatus] || 0) + 1;
+      }
+
+      return { ...(prev || {}), grouped, counts };
+    });
+
+    if (openedJob && String(openedJob?.id || "") === jobId) {
+      setOpenedJob((prev: any) => ({ ...(prev || {}), ...event }));
+    }
+
+    setToastType("info");
+    setToast(event?.label || "Live update received");
+    window.setTimeout(() => setToast(""), 1800);
+  }
 
       if (!movedJob) return prev;
 
@@ -586,7 +647,7 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
         <div data-sse-realtime="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_SSE_REALTIME_ENABLED</div>
         <div data-activity-stream="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_ACTIVITY_STREAM_ENABLED</div>
         <div data-optimistic-board="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_OPTIMISTIC_BOARD_ENABLED</div>
-        <div className="card ccv2-hero" style={{ marginBottom: 14 }}>
+        <div data-targeted-sse="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_TARGETED_SSE_ENABLED</div>\n        <div className="card ccv2-hero" style={{ marginBottom: 14 }}>
           <div className="ccv2-inline-actions-marker" data-inline-actions="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>
             INLINE_ACTIONS_ENABLED
           </div>
