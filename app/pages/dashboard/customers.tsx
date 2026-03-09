@@ -1,17 +1,40 @@
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { DashboardShell } from "../../components/dashboard-shell";
 import { apiFetch } from "../../lib/api";
 
-const DEMO_CUSTOMERS = [
-  { id: "cust-jane-doe", name: "Jane Doe" },
-  { id: "cust-alex-morgan", name: "Alex Morgan" },
-];
+type CustomerRow = {
+  id: string;
+  slug?: string | null;
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  jobCount?: number;
+  activityCount?: number;
+};
 
 export default function CustomersPage() {
+  const [customers, setCustomers] = useState<CustomerRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
-  async function createMessageEvent(customer: { id: string; name: string }, kind: "sms.sent" | "email.sent" | "portal.viewed") {
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const rows = await apiFetch("/customers?limit=100");
+        setCustomers(Array.isArray(rows) ? rows : []);
+      } catch (err: any) {
+        setError(err?.message || "Failed to load customers");
+        setCustomers([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    void load();
+  }, []);
+
+  async function createMessageEvent(customer: CustomerRow, kind: "sms.sent" | "email.sent" | "portal.viewed") {
     try {
       const label =
         kind === "sms.sent"
@@ -25,6 +48,7 @@ export default function CustomersPage() {
         body: JSON.stringify({
           type: kind,
           label,
+          customerId: customer.id,
           customerName: customer.name,
           payloadJson: { customerId: customer.id, channel: kind },
         }),
@@ -38,7 +62,7 @@ export default function CustomersPage() {
     }
   }
 
-  async function sendQuickCommunication(customer: { id: string; name: string }, channel: "sms" | "email") {
+  async function sendQuickCommunication(customer: CustomerRow, channel: "sms" | "email") {
     try {
       const message =
         channel === "sms"
@@ -51,6 +75,7 @@ export default function CustomersPage() {
         method: "POST",
         body: JSON.stringify({
           channel,
+          customerId: customer.id,
           customerName: customer.name,
           subject,
           message,
@@ -80,12 +105,23 @@ export default function CustomersPage() {
           Customer records, messaging events, communications, and timeline access from one workspace.
         </p>
 
+        {error ? <p style={{ color: "#ff8a8a" }}>{error}</p> : null}
         {notice ? <div className="ccv2-toast ccv2-toast--info">{notice}</div> : null}
 
         <div className="customer-grid">
-          {DEMO_CUSTOMERS.map((customer) => (
+          {loading ? (
+            <div className="muted">Loading customers…</div>
+          ) : customers.length === 0 ? (
+            <div className="muted">No customers found yet. Create a job or message event to seed records.</div>
+          ) : customers.map((customer) => (
             <div key={customer.id} className="card customer-card">
               <h3 style={{ marginTop: 0 }}>{customer.name}</h3>
+              <p className="muted" style={{ marginTop: 0 }}>
+                {customer.email || customer.phone || "No contact details"}
+              </p>
+              <p className="muted" style={{ marginTop: 0 }}>
+                {Number(customer.jobCount || 0)} jobs • {Number(customer.activityCount || 0)} activity events
+              </p>
               <div className="customer-card-actions">
                 <button className="button secondary settings-premium-button" onClick={() => void createMessageEvent(customer, "sms.sent")}>
                   Log SMS
@@ -103,7 +139,7 @@ export default function CustomersPage() {
                   Send email
                 </button>
                 <Link
-                  href={`/dashboard/customers/${customer.id}?name=${encodeURIComponent(customer.name)}`}
+                  href={`/dashboard/customers/${encodeURIComponent(customer.slug || customer.id)}?name=${encodeURIComponent(customer.name)}`}
                   className="button settings-premium-button"
                 >
                   Open timeline

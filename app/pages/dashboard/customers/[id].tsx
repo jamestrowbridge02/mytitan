@@ -6,6 +6,7 @@ import { apiFetch } from "../../../lib/api";
 export default function CustomerTimelinePage() {
   const router = useRouter();
   const { id, name } = router.query;
+  const [customer, setCustomer] = useState<any>(null);
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [channel, setChannel] = useState<"sms" | "email">("sms");
@@ -13,10 +14,16 @@ export default function CustomerTimelinePage() {
   const [message, setMessage] = useState("");
   const [notice, setNotice] = useState("");
 
-  async function loadTimeline() {
+  async function loadTimeline(activeCustomer?: any) {
     try {
-      const customerName = typeof name === "string" ? name : "";
-      const rows = await apiFetch(`/activity/recent?limit=30&customerName=${encodeURIComponent(customerName)}`);
+      const customerName =
+        String(activeCustomer?.name || "")
+        || (typeof name === "string" ? name : "");
+      const customerId = String(activeCustomer?.id || "");
+      const qs = customerId
+        ? `/activity/recent?limit=30&customerId=${encodeURIComponent(customerId)}`
+        : `/activity/recent?limit=30&customerName=${encodeURIComponent(customerName)}`;
+      const rows = await apiFetch(qs);
       setItems(Array.isArray(rows) ? rows : []);
     } catch {
       setItems([]);
@@ -27,16 +34,30 @@ export default function CustomerTimelinePage() {
 
   useEffect(() => {
     if (!router.isReady) return;
-    void loadTimeline();
-  }, [router.isReady, name]);
+    const run = async () => {
+      setLoading(true);
+      let resolved: any = null;
+      try {
+        if (typeof id === "string" && id) {
+          resolved = await apiFetch(`/customers/${encodeURIComponent(id)}`);
+          setCustomer(resolved || null);
+        }
+      } catch {
+        setCustomer(null);
+      }
+      await loadTimeline(resolved);
+    };
+    void run();
+  }, [router.isReady, id, name]);
 
   async function sendCommunication() {
     try {
-      const customerName = typeof name === "string" ? name : "Customer";
+      const customerName = String(customer?.name || "") || (typeof name === "string" ? name : "Customer");
       const res = await apiFetch("/activity/communications/send", {
         method: "POST",
         body: JSON.stringify({
           channel,
+          customerId: customer?.id || null,
           customerName,
           subject: channel === "email" ? subject : null,
           message,
@@ -45,7 +66,7 @@ export default function CustomerTimelinePage() {
       setNotice(res?.label || "Sent");
       setMessage("");
       setSubject("");
-      await loadTimeline();
+      await loadTimeline(customer);
       window.setTimeout(() => setNotice(""), 1800);
     } catch {
       setNotice("Could not send communication");
@@ -67,7 +88,7 @@ export default function CustomerTimelinePage() {
           <div>
             <h1 className="settings-premium-title" style={{ marginTop: 0, marginBottom: 6 }}>Customer timeline</h1>
             <p className="muted settings-premium-muted" style={{ margin: 0 }}>
-              {typeof name === "string" && name ? name : `Customer ${typeof id === "string" ? id : ""}`}
+              {customer?.name || (typeof name === "string" && name ? name : `Customer ${typeof id === "string" ? id : ""}`)}
             </p>
           </div>
         </div>

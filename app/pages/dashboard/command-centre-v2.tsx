@@ -828,7 +828,7 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
                 </button>
                 <button
                   className="button secondary ccv2-button ccv2-sidepanel-chip"
-                  onClick={() => router.push(`/dashboard/customers/${openedJob.id}?name=${encodeURIComponent(openedJob.customerName || "Customer")}`)}
+                  onClick={() => router.push(`/dashboard/customers/${openedJob.customerId || openedJob.id}?name=${encodeURIComponent(openedJob.customerName || "Customer")}`)}
                 >
                   Timeline
                 </button>
