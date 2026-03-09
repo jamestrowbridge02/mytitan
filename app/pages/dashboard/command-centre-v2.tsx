@@ -134,6 +134,7 @@ export default function CommandCentreV2Page() {
       apiFetch('/locations').catch(() => []),
       loadViews(),
       loadBoard(),
+      loadActivity(),
     ]).then(([l]) => setLocations(Array.isArray(l) ? l : []));
   }, [enabled]);
 
@@ -146,6 +147,20 @@ export default function CommandCentreV2Page() {
   useEffect(() => {
     loadBoard();
   }, [search, status, locationIds.join(',')]);
+
+  useEffect(() => {
+    if (!openedJob) return;
+    setAssignTechId(String(openedJob.assignedUserId || openedJob.technicianId || ""));
+    if (openedJob.scheduledAt) {
+      const dt = new Date(openedJob.scheduledAt);
+      if (!Number.isNaN(dt.getTime())) {
+        const local = new Date(dt.getTime() - dt.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+        setAssignTime(local);
+        return;
+      }
+    }
+    setAssignTime("");
+  }, [openedJob]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -510,7 +525,7 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
         <div data-targeted-sse="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_TARGETED_SSE_ENABLED</div>
         <div data-persistent-activity="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_PERSISTENT_ACTIVITY_ENABLED</div>
         <div data-customer-timeline-shortcut="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CUSTOMER_TIMELINE_SHORTCUT_ENABLED</div>
-        <div className="card ccv2-hero" style={{ marginBottom: 14 }}>
+      <div className="card ccv2-hero" style={{ marginBottom: 14 }}>
           <div className="ccv2-inline-actions-marker" data-inline-actions="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>
             INLINE_ACTIONS_ENABLED
           </div>
@@ -543,6 +558,33 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
         </div>
         {error ? <p style={{ color: '#ff8a8a' }}>{error}</p> : null}
         {toast ? <div className={`ccv2-toast ccv2-toast--${toastType}`}>{toast}</div> : null}
+      </div>
+
+      <div className="card ccv2-activity-stream" style={{ marginBottom: 14 }}>
+        <div className="ccv2-activity-stream__head">
+          <h3 style={{ margin: 0 }}>Live activity</h3>
+          <span className="muted">Latest events across the board</span>
+        </div>
+
+        <div className="ccv2-activity-stream__list">
+          {activityItems.length ? activityItems.map((item) => (
+            <div key={item.id || `${item.type}-${item.at}`} className="ccv2-activity-stream__item">
+              <div className="ccv2-activity-stream__dot"></div>
+              <div className="ccv2-activity-stream__content">
+                <div className="ccv2-activity-stream__label">{item.label || item.type}</div>
+                <div className="ccv2-activity-stream__meta">
+                  <span>{item.jobRef || "Job"}</span>
+                  <span>•</span>
+                  <span>{item.customerName || "No customer"}</span>
+                  <span>•</span>
+                  <span>{item.at ? new Date(item.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}</span>
+                </div>
+              </div>
+            </div>
+          )) : (
+            <div className="muted">No live activity yet.</div>
+          )}
+        </div>
       </div>
 
       <div className="card ccv2-filters" style={{ marginBottom: 14 }}>
@@ -762,10 +804,10 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
                 className="button"
                 onClick={async () => {
                   await patchJob(openedJob.id, {
-                    technicianId: assignTechId || null,
+                    assignedUserId: assignTechId || null,
                     scheduledAt: assignTime || null,
                   });
-                  setOpenedJob({ ...openedJob, technicianId: assignTechId });
+                  setOpenedJob({ ...openedJob, assignedUserId: assignTechId || null, scheduledAt: assignTime || null });
                 }}
               >
                 Assign & Schedule

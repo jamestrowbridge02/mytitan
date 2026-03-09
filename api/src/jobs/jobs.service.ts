@@ -34,7 +34,7 @@ export class JobsService {
       customerName: job?.customerName || null,
       status: job?.status || null,
       vehicleReg: job?.vehicleReg || null,
-      technicianId: job?.technicianId || null,
+      technicianId: job?.technicianId || job?.assignedUserId || null,
       at: new Date().toISOString(),
       payloadJson: {
         jobId: job?.id || null,
