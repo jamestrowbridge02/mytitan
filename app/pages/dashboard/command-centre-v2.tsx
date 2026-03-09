@@ -102,7 +102,7 @@ export default function CommandCentreV2Page() {
 
   async function loadActivity() {
     try {
-      const data = await apiFetch(/activity/recent?limit=10);
+      const data = await apiFetch('/activity/recent?limit=10');
       setActivityItems(Array.isArray(data) ? data : []);
     } catch {
       setActivityItems([]);
