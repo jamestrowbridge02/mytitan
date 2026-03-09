@@ -3,6 +3,7 @@ import { randomBytes } from "crypto";
 import { AuditService } from "../audit/audit.service";
 import { JobStatus } from "../common/constants";
 import { isAutomationsV1Enabled, isMediaSignatureV1Enabled, isNotificationsV1Enabled, isWheelsFormV1Enabled } from "../common/feature-flags";
+import { EventsService } from "../events/events.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { AutomationsService } from "../automations/automations.service";
 import { PrismaService } from "../prisma/prisma.service";

@@ -1,6 +1,6 @@
-import { Controller, Sse } from @nestjs/common;
-import { map, Observable } from rxjs;
-import { EventsService } from ./events.service;
+import { Controller, Sse } from '@nestjs/common';
+import { map, Observable } from 'rxjs';
+import { EventsService } from './events.service';
 
 @Controller('events')
 export class EventsController {

@@ -35,6 +35,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { AutomationsModule } from './automations/automations.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { AdminModule } from './admin/admin.module';
+import { EventsModule } from './events/events.module';
 
 @Module({
   imports: [
