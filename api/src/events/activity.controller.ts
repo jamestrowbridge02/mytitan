@@ -10,11 +10,13 @@ export class ActivityController {
     @Query("limit") limit?: string,
     @Query("tenantId") tenantId?: string,
     @Query("jobId") jobId?: string,
+    @Query("customerId") customerId?: string,
     @Query("customerName") customerName?: string,
   ) {
     const n = Number(limit || 12);
     return this.activity.list(n, tenantId || null, {
       jobId: jobId || null,
+      customerId: customerId || null,
       customerName: customerName || null,
     });
   }
@@ -26,6 +28,7 @@ export class ActivityController {
       type: string;
       label: string;
       tenantId?: string | null;
+      customerId?: string | null;
       jobId?: string | null;
       jobRef?: string | null;
       customerName?: string | null;
@@ -39,6 +42,7 @@ export class ActivityController {
       type: body.type,
       label: body.label,
       tenantId: body.tenantId ?? null,
+      customerId: body.customerId ?? null,
       jobId: body.jobId ?? null,
       jobRef: body.jobRef ?? null,
       customerName: body.customerName ?? null,
@@ -57,6 +61,7 @@ export class ActivityController {
       customerName: string;
       subject?: string | null;
       message: string;
+      customerId?: string | null;
       jobId?: string | null;
       jobRef?: string | null;
       tenantId?: string | null;
@@ -72,6 +77,7 @@ export class ActivityController {
       type: `${channel}.sent`,
       label,
       tenantId: body.tenantId ?? null,
+      customerId: body.customerId ?? null,
       jobId: body.jobId ?? null,
       jobRef: body.jobRef ?? null,
       customerName: body.customerName || null,

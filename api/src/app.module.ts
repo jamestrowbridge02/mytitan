@@ -36,6 +36,7 @@ import { AutomationsModule } from './automations/automations.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { AdminModule } from './admin/admin.module';
 import { EventsModule } from './events/events.module';
+import { CustomersModule } from './customers/customers.module';
 
 @Module({
   imports: [
@@ -83,6 +84,7 @@ import { EventsModule } from './events/events.module';
     PublicModule,
     PricingPresetsModule,
     AdminModule,
+    CustomersModule,
   ],
 })
 export class AppModule {}

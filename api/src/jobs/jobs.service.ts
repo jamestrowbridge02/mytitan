@@ -29,6 +29,7 @@ export class JobsService {
       type,
       label,
       tenantId: job?.companyId || job?.tenantId || null,
+      customerId: job?.customerId || null,
       jobId: job?.id || null,
       jobRef: job?.jobRef || null,
       customerName: job?.customerName || null,
@@ -62,6 +63,77 @@ export class JobsService {
   private asNumber(value: any, fallback = 0) {
     const num = Number(value);
     return Number.isFinite(num) ? num : fallback;
+  }
+
+  private slugifyCustomerName(value: string) {
+    return value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 80);
+  }
+
+  private async resolveOrCreateCustomer(companyId: string, input: { customerId?: string | null; name?: string | null; email?: string | null; phone?: string | null }) {
+    const db = this.prisma as any;
+    const providedId = String(input.customerId || "").trim();
+    const name = String(input.name || "").trim();
+    const email = String(input.email || "").trim().toLowerCase();
+    const phone = String(input.phone || "").trim();
+
+    if (providedId) {
+      const existingById = await db.customer.findFirst({
+        where: { id: providedId, companyId },
+        select: { id: true },
+      });
+      if (existingById) return existingById.id as string;
+    }
+
+    if (!name) return null;
+
+    if (email) {
+      const byEmail = await db.customer.findFirst({
+        where: { companyId, email: { equals: email, mode: "insensitive" } },
+        select: { id: true },
+      });
+      if (byEmail) return byEmail.id as string;
+    }
+
+    if (phone) {
+      const byPhone = await db.customer.findFirst({
+        where: { companyId, phone },
+        select: { id: true },
+      });
+      if (byPhone) return byPhone.id as string;
+    }
+
+    const byName = await db.customer.findFirst({
+      where: { companyId, name: { equals: name, mode: "insensitive" } },
+      select: { id: true },
+    });
+    if (byName) return byName.id as string;
+
+    const baseSlug = this.slugifyCustomerName(name) || "customer";
+    let slug = baseSlug;
+    for (let i = 0; i < 6; i += 1) {
+      try {
+        const created = await db.customer.create({
+          data: {
+            companyId,
+            slug,
+            name,
+            email: email || null,
+            phone: phone || null,
+          },
+          select: { id: true },
+        });
+        return created.id as string;
+      } catch {
+        slug = `${baseSlug}-${Date.now().toString(36).slice(-4)}-${i + 1}`;
+      }
+    }
+
+    return null;
   }
 
   private computeTotals(input: { laborCents: number; partsCents: number; miscCents: number; taxRateBps: number }, currency: string) {
@@ -552,6 +624,14 @@ export class JobsService {
     const whatsappTemplate = dto.whatsappTemplate ?? settings?.whatsappTemplateDefault ?? null;
     const jobType = (submittedForm?.jobType as string | undefined) || dto.jobType || null;
     const tradeCode = (dto.tradeCode || settings?.primaryTrade || null) as string | null;
+    const customerName = ((submittedForm?.customerName as string | undefined) || dto.customerName || "").trim();
+    const customerEmail = ((submittedForm?.customerEmail as string | undefined) || dto.customerEmail || "").trim();
+    const customerPhone = ((submittedForm?.customerPhone as string | undefined) || dto.customerPhone || "").trim();
+    const customerId = await this.resolveOrCreateCustomer(companyId, {
+      name: customerName || null,
+      email: customerEmail || null,
+      phone: customerPhone || null,
+    });
     const scheduledAtRaw =
       (submittedForm?.scheduledAt as string | undefined) ||
       (submittedForm?.scheduledFor as string | undefined) ||
@@ -568,11 +648,12 @@ export class JobsService {
         data: {
           companyId,
           locationId: dto.locationId,
+          customerId: customerId || null,
           jobRef,
           status: "OPEN",
-          customerName: (submittedForm?.customerName as string | undefined) || dto.customerName,
-          customerEmail: (submittedForm?.customerEmail as string | undefined) || dto.customerEmail,
-          customerPhone: (submittedForm?.customerPhone as string | undefined) || dto.customerPhone,
+          customerName,
+          customerEmail: customerEmail || null,
+          customerPhone: customerPhone || null,
           vehicleMake: (submittedForm?.vehicleMake as string | undefined) || dto.vehicleMake,
           vehicleModel: (submittedForm?.vehicleModel as string | undefined) || dto.vehicleModel,
           vehicleReg: (submittedForm?.vehicleReg as string | undefined) || dto.vehicleReg,
@@ -740,6 +821,17 @@ export class JobsService {
     if (dto.customerName !== undefined) payload.customerName = dto.customerName || null;
     if (dto.customerEmail !== undefined) payload.customerEmail = dto.customerEmail || null;
     if (dto.customerPhone !== undefined) payload.customerPhone = dto.customerPhone || null;
+    if (dto.customerName !== undefined || dto.customerEmail !== undefined || dto.customerPhone !== undefined) {
+      const nextName = dto.customerName !== undefined ? String(dto.customerName || "").trim() : String(job.customerName || "").trim();
+      const nextEmail = dto.customerEmail !== undefined ? String(dto.customerEmail || "").trim() : String(job.customerEmail || "").trim();
+      const nextPhone = dto.customerPhone !== undefined ? String(dto.customerPhone || "").trim() : String(job.customerPhone || "").trim();
+      payload.customerId = await this.resolveOrCreateCustomer(companyId, {
+        customerId: job.customerId || null,
+        name: nextName || null,
+        email: nextEmail || null,
+        phone: nextPhone || null,
+      });
+    }
     if (dto.completedAt !== undefined) payload.completedAt = dto.completedAt ? new Date(dto.completedAt) : null;
     if (dto.status === "COMPLETED" && dto.completedAt === undefined) payload.completedAt = new Date();
 
