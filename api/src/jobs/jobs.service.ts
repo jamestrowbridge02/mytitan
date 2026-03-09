@@ -3,6 +3,7 @@ import { randomBytes } from "crypto";
 import { AuditService } from "../audit/audit.service";
 import { JobStatus } from "../common/constants";
 import { isAutomationsV1Enabled, isMediaSignatureV1Enabled, isNotificationsV1Enabled, isWheelsFormV1Enabled } from "../common/feature-flags";
+import { ActivityService } from "../events/activity.service";
 import { EventsService } from "../events/events.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { AutomationsService } from "../automations/automations.service";
@@ -34,13 +35,13 @@ export class JobsService {
       at: new Date().toISOString(),
     };
     this.events.emit(payload);
-    this.activity.push(payload);
+    this.activityStream.push(payload);
   }
 
 
   constructor(
     private readonly events: EventsService,
-    private readonly activity: ActivityService,
+    private readonly activityStream: ActivityService,
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly templatesService: TemplatesService,
