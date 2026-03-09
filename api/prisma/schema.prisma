@@ -1374,3 +1374,23 @@ model EmailVerificationToken {
   @@index([companyId, userId, createdAt])
   @@index([expiresAt])
 }
+
+
+model ActivityEvent {
+  id           String   @id @default(cuid())
+  type         String
+  label        String
+  at           DateTime @default(now())
+  tenantId     String?
+  jobId        String?
+  jobRef       String?
+  customerName String?
+  status       String?
+  vehicleReg   String?
+  technicianId String?
+  payloadJson  Json?
+
+  @@index([at])
+  @@index([tenantId, at])
+  @@index([jobId, at])
+}

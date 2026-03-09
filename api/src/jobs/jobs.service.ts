@@ -24,7 +24,7 @@ const JOB_STATUS_TRANSITIONS: Record<JobStatus, JobStatus[]> = {
 @Injectable()
 export class JobsService {
 
-  private emitJobActivity(type: string, job: any, label: string) {
+  private async emitJobActivity(type: string, job: any, label: string) {
     const payload = {
       type,
       label,

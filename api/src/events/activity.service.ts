@@ -1,32 +1,47 @@
 import { Injectable } from "@nestjs/common";
+import { PrismaService } from "../prisma/prisma.service";
 
-type ActivityEvent = {
-  id: string;
+type ActivityEventInput = {
   type: string;
   label: string;
-  at: string;
+  at?: string;
+  tenantId?: string | null;
   jobId?: string | null;
   jobRef?: string | null;
   customerName?: string | null;
   status?: string | null;
+  vehicleReg?: string | null;
+  technicianId?: string | null;
+  payloadJson?: any;
 };
 
 @Injectable()
 export class ActivityService {
-  private readonly events: ActivityEvent[] = [];
+  constructor(private readonly prisma: PrismaService) {}
 
-  push(event: Omit<ActivityEvent, "id" | "at"> & { at?: string }) {
-    const row: ActivityEvent = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      at: event.at || new Date().toISOString(),
-      ...event,
-    };
-    this.events.unshift(row);
-    if (this.events.length > 100) this.events.length = 100;
-    return row;
+  async push(event: ActivityEventInput) {
+    return this.prisma.activityEvent.create({
+      data: {
+        type: event.type,
+        label: event.label,
+        at: event.at ? new Date(event.at) : new Date(),
+        tenantId: event.tenantId ?? null,
+        jobId: event.jobId ?? null,
+        jobRef: event.jobRef ?? null,
+        customerName: event.customerName ?? null,
+        status: event.status ?? null,
+        vehicleReg: event.vehicleReg ?? null,
+        technicianId: event.technicianId ?? null,
+        payloadJson: event.payloadJson ?? null,
+      },
+    });
   }
 
-  list(limit = 20) {
-    return this.events.slice(0, Math.max(1, Math.min(limit, 50)));
+  async list(limit = 20, tenantId?: string | null) {
+    return this.prisma.activityEvent.findMany({
+      where: tenantId ? { tenantId } : {},
+      orderBy: { at: "desc" },
+      take: Math.max(1, Math.min(limit, 50)),
+    });
   }
 }

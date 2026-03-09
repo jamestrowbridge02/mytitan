@@ -6,8 +6,8 @@ export class ActivityController {
   constructor(private readonly activity: ActivityService) {}
 
   @Get("recent")
-  recent(@Query("limit") limit?: string) {
+  async recent(@Query("limit") limit?: string, @Query("tenantId") tenantId?: string) {
     const n = Number(limit || 12);
-    return this.activity.list(n);
+    return this.activity.list(n, tenantId || null);
   }
 }

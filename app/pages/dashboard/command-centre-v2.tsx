@@ -649,7 +649,7 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
         <div data-sse-realtime="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_SSE_REALTIME_ENABLED</div>
         <div data-activity-stream="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_ACTIVITY_STREAM_ENABLED</div>
         <div data-optimistic-board="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_OPTIMISTIC_BOARD_ENABLED</div>
-        <div data-targeted-sse="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_TARGETED_SSE_ENABLED</div>\n        <div className="card ccv2-hero" style={{ marginBottom: 14 }}>
+        <div data-targeted-sse="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_TARGETED_SSE_ENABLED</div>\n        <div data-persistent-activity="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_PERSISTENT_ACTIVITY_ENABLED</div>\n        <div className="card ccv2-hero" style={{ marginBottom: 14 }}>
           <div className="ccv2-inline-actions-marker" data-inline-actions="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>
             INLINE_ACTIONS_ENABLED
           </div>
