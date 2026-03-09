@@ -2554,3 +2554,66 @@ body:has(input[type="password"]) .mt-sidebar {
 .customer-comms-textarea {
   min-height: 120px;
 }
+
+/* --- Core workflow polish pass (dashboard coherence + readability) --- */
+:root {
+  --bg: #0d111a;
+  --card: #151c29;
+  --text: #e8eefb;
+  --muted: #a6b2cb;
+  --line: rgba(255, 255, 255, 0.14);
+}
+
+body {
+  background:
+    radial-gradient(900px 480px at 14% -10%, rgba(59, 130, 246, 0.2), transparent 60%),
+    radial-gradient(800px 420px at 95% -15%, rgba(20, 184, 166, 0.14), transparent 58%),
+    var(--bg);
+  color: var(--text);
+}
+
+[data-shell="app"] .dashboard-shell-content {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 8px 0 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+[data-shell="app"] .dashboard-shell-content > .card:first-child {
+  margin-top: 0;
+}
+
+[data-shell="app"] .card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.22);
+}
+
+[data-shell="app"] .muted {
+  color: #b5c0d8;
+}
+
+[data-shell="app"] .input,
+[data-shell="app"] select.input,
+[data-shell="app"] textarea {
+  background: rgba(15, 23, 42, 0.58);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #edf2ff;
+}
+
+[data-shell="app"] .input::placeholder,
+[data-shell="app"] textarea::placeholder {
+  color: rgba(221, 231, 255, 0.52);
+}
+
+[data-shell="app"] .button.secondary {
+  border-color: rgba(255, 255, 255, 0.24);
+  color: #ecf2ff;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+[data-shell="app"] .button.secondary:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
