@@ -38,16 +38,43 @@ export default function CustomersPage() {
     }
   }
 
+  async function sendQuickCommunication(customer: { id: string; name: string }, channel: "sms" | "email") {
+    try {
+      const message =
+        channel === "sms"
+          ? `Hi ${customer.name}, your MyTitan update is ready.`
+          : `Hello ${customer.name}, your latest MyTitan update is ready.`;
+
+      const subject = channel === "email" ? "MyTitan customer update" : null;
+
+      const res = await apiFetch("/activity/communications/send", {
+        method: "POST",
+        body: JSON.stringify({
+          channel,
+          customerName: customer.name,
+          subject,
+          message,
+        }),
+      });
+
+      setNotice(res?.label || `${channel.toUpperCase()} sent`);
+      window.setTimeout(() => setNotice(""), 1800);
+    } catch {
+      setNotice(`Could not send ${channel.toUpperCase()}`);
+      window.setTimeout(() => setNotice(""), 1800);
+    }
+  }
+
   return (
     <DashboardShell>
-      <div data-customer-events="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>
-        CUSTOMER_EVENTS_ENABLED
+      <div data-customer-comms="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>
+        CUSTOMER_COMMS_ENABLED
       </div>
 
       <div className="card settings-premium-card">
         <h1 className="settings-premium-title">CRM</h1>
         <p className="muted settings-premium-muted">
-          Customer records, messaging events, and timeline access from one workspace.
+          Customer records, messaging events, communications, and timeline access from one workspace.
         </p>
 
         {notice ? <div className="ccv2-toast ccv2-toast--info">{notice}</div> : null}
@@ -65,6 +92,12 @@ export default function CustomersPage() {
                 </button>
                 <button className="button secondary settings-premium-button" onClick={() => void createMessageEvent(customer, "portal.viewed")}>
                   Log portal view
+                </button>
+                <button className="button secondary settings-premium-button" onClick={() => void sendQuickCommunication(customer, "sms")}>
+                  Send SMS
+                </button>
+                <button className="button secondary settings-premium-button" onClick={() => void sendQuickCommunication(customer, "email")}>
+                  Send email
                 </button>
                 <Link
                   href={`/dashboard/customers/${customer.id}?name=${encodeURIComponent(customer.name)}`}

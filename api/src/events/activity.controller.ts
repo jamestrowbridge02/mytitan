@@ -50,4 +50,41 @@ export class ActivityController {
       payloadJson: body.payloadJson ?? null,
     });
   }
+
+  @Post("communications/send")
+  async sendCommunication(
+    @Body()
+    body: {
+      channel: "sms" | "email";
+      customerName: string;
+      subject?: string | null;
+      message: string;
+      jobId?: string | null;
+      jobRef?: string | null;
+      tenantId?: string | null;
+    },
+  ) {
+    const channel = body.channel === "email" ? "email" : "sms";
+    const label =
+      channel === "email"
+        ? `Email sent to ${body.customerName}${body.subject ? `: ${body.subject}` : ""}`
+        : `SMS sent to ${body.customerName}`;
+
+    const row = await this.activity.push({
+      type: `${channel}.sent`,
+      label,
+      tenantId: body.tenantId ?? null,
+      jobId: body.jobId ?? null,
+      jobRef: body.jobRef ?? null,
+      customerName: body.customerName || null,
+      payloadJson: {
+        channel,
+        subject: body.subject ?? null,
+        message: body.message ?? "",
+        delivered: true,
+      },
+    });
+
+    return { ok: true, eventId: row.id, label };
+  }
 }

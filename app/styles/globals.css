@@ -2529,3 +2529,28 @@ body:has(input[type="password"]) .mt-sidebar {
     grid-template-columns: 1fr;
   }
 }
+
+/* --- Customer communications --- */
+.customer-comms-card {
+  margin-bottom: 16px;
+  border-radius: 18px !important;
+}
+
+.customer-comms-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.customer-comms-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.customer-comms-textarea {
+  min-height: 120px;
+}
