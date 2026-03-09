@@ -13,11 +13,9 @@ export class ActivityController {
     @Query("customerName") customerName?: string,
   ) {
     const n = Number(limit || 12);
-    const rows = await this.activity.list(n, tenantId || null);
-    return rows.filter((x: any) => {
-      if (jobId && String(x?.jobId || "") !== String(jobId)) return false;
-      if (customerName && String(x?.customerName || "").toLowerCase() !== String(customerName).toLowerCase()) return false;
-      return true;
+    return this.activity.list(n, tenantId || null, {
+      jobId: jobId || null,
+      customerName: customerName || null,
     });
   }
 

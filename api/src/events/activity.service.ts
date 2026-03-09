@@ -37,9 +37,13 @@ export class ActivityService {
     });
   }
 
-  async list(limit = 20, tenantId?: string | null) {
+  async list(limit = 20, tenantId?: string | null, filters?: { jobId?: string | null; customerName?: string | null }) {
+    const where: any = {};
+    if (tenantId) where.tenantId = tenantId;
+    if (filters?.jobId) where.jobId = filters.jobId;
+    if (filters?.customerName) where.customerName = { equals: filters.customerName, mode: "insensitive" };
     return this.prisma.activityEvent.findMany({
-      where: tenantId ? { tenantId } : {},
+      where,
       orderBy: { at: "desc" },
       take: Math.max(1, Math.min(limit, 50)),
     });

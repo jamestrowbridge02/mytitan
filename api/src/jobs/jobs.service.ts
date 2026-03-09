@@ -28,14 +28,24 @@ export class JobsService {
     const payload = {
       type,
       label,
+      tenantId: job?.companyId || job?.tenantId || null,
       jobId: job?.id || null,
       jobRef: job?.jobRef || null,
       customerName: job?.customerName || null,
       status: job?.status || null,
+      vehicleReg: job?.vehicleReg || null,
+      technicianId: job?.technicianId || null,
       at: new Date().toISOString(),
+      payloadJson: {
+        jobId: job?.id || null,
+        jobRef: job?.jobRef || null,
+        status: job?.status || null,
+        customerName: job?.customerName || null,
+        vehicleReg: job?.vehicleReg || null,
+      },
     };
     this.events.emit(payload);
-    this.activityStream.push(payload);
+    await this.activityStream.push(payload);
   }
 
 
@@ -706,6 +716,12 @@ export class JobsService {
       }
     }
 
+    await this.emitJobActivity(
+      "job.status_changed",
+      updated,
+      `Job ${updated?.jobRef || updated?.id || id} moved to ${newStatus}`,
+    );
+
     return updated;
   }
 
@@ -765,6 +781,11 @@ export class JobsService {
     if ((updated.status === "COMPLETED" || (updated.completedAt && !job.completedAt)) && isNotificationsV1Enabled()) {
       await this.notifications.notifyJobCompleted(companyId, job.id);
     }
+    await this.emitJobActivity(
+      "job.updated",
+      updated,
+      `Job ${updated?.jobRef || updated?.id || id} updated`,
+    );
     return updated;
   }
 
