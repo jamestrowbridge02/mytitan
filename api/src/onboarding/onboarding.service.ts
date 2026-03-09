@@ -282,12 +282,14 @@ export class OnboardingService {
 
     let installedTradePacks = 0;
     if (isTradePacksEnabled()) {
-      installedTradePacks = await db.tradePackInstall.count({
-        where: {
-          tenantId,
-          OR: [{ configJson: null }, { configJson: { path: ['active'], equals: true } }],
-        },
+      const installs = await db.tradePackInstall.findMany({
+        where: { tenantId },
+        select: { configJson: true },
       });
+      installedTradePacks = installs.filter((install: any) => {
+        if (!install?.configJson) return true;
+        return install.configJson?.active !== false;
+      }).length;
     }
 
     const items = [

@@ -91,21 +91,22 @@ export class TradePacksService {
   async getInstalled(tenantId: string) {
     const db = this.prisma as any;
     const installs = await db.tradePackInstall.findMany({
-      where: {
-        tenantId,
-        OR: [{ configJson: null }, { configJson: { path: ['active'], equals: true } }],
-      },
+      where: { tenantId },
       orderBy: { installedAt: 'desc' },
+    });
+    const activeInstalls = installs.filter((install: any) => {
+      if (!install?.configJson) return true;
+      return install.configJson?.active !== false;
     });
 
     return {
-      items: installs.map((install: any) => ({
+      items: activeInstalls.map((install: any) => ({
         packCode: install.packCode,
         installedAt: install.installedAt,
         installedByUserId: install.installedByUserId,
         configJson: install.configJson,
       })),
-      count: installs.length,
+      count: activeInstalls.length,
     };
   }
 
