@@ -330,6 +330,21 @@ export default function CommandCentreV2Page() {
         }
       }
 
+      if (!movedJob) return prev;
+
+      const nextStatus = String(payload?.status || movedJob?.status || previousStatus);
+      const target = Array.isArray(grouped[nextStatus]) ? [...grouped[nextStatus]] : [];
+      target.unshift(movedJob);
+      grouped[nextStatus] = target;
+
+      if (previousStatus && previousStatus !== nextStatus) {
+        counts[previousStatus] = Math.max(0, Number(counts[previousStatus] || 0) - 1);
+        counts[nextStatus] = Number(counts[nextStatus] || 0) + 1;
+      }
+
+      return { ...(prev || {}), grouped, counts };
+    });
+  }
 
   function applyIncomingEvent(event: any) {
     const jobId = String(event?.jobId || "");
@@ -356,7 +371,6 @@ export default function CommandCentreV2Page() {
         }
       }
 
-      // If not currently on board, do a safe reload fallback.
       if (!found) {
         queueMicrotask(() => { void loadBoard(true); });
         return prev;
@@ -386,29 +400,17 @@ export default function CommandCentreV2Page() {
     window.setTimeout(() => setToast(""), 1800);
   }
 
-      if (!movedJob) return prev;
-
-      const nextStatus = String(payload?.status || movedJob?.status || previousStatus);
-      const target = Array.isArray(grouped[nextStatus]) ? [...grouped[nextStatus]] : [];
-      target.unshift(movedJob);
-      grouped[nextStatus] = target;
-
-      if (previousStatus && previousStatus !== nextStatus) {
-        counts[previousStatus] = Math.max(0, Number(counts[previousStatus] || 0) - 1);
-        counts[nextStatus] = Number(counts[nextStatus] || 0) + 1;
-      }
-
-      return { ...(prev || {}), grouped, counts };
-    });
-  }
-
   async function patchJob(jobId: string, payload: Record<string, any>) {
+    const snapshot = board;
     try {
+      applyOptimisticJobUpdate(jobId, payload);
       await apiFetch(`/jobs/${jobId}`, { method: 'PATCH', body: JSON.stringify(payload) });
       setToastType('success');
-        setToast('Job updated');
-      await loadBoard();
+      setToast('Job updated');
+      await loadBoard(true);
     } catch (err: any) {
+      setBoard(snapshot);
+      setToastType('error');
       setError(err?.message || 'Inline update failed');
     }
   }
