@@ -38,6 +38,7 @@ import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
+    EventsModule,
     ThrottlerModule.forRoot([{ ttl: 60, limit: 120 }]),
     ConfigModule.forRoot({ isGlobal: true }),
     JwtModule.registerAsync({

@@ -164,6 +164,25 @@ export default function CommandCentreV2Page() {
   }, [enabled, search, status, locationIds.join(',')]);
 
   useEffect(() => {
+    if (!enabled || typeof window === 'undefined') return;
+
+    const base = (window.location.origin || '').replace(':3001', ':3000');
+    const es = new EventSource(`${base}/events/command-centre`, { withCredentials: true });
+
+    es.onmessage = () => {
+      void loadBoard(true);
+    };
+
+    es.onerror = () => {
+      // Keep polling as fallback; SSE is additive.
+    };
+
+    return () => {
+      es.close();
+    };
+  }, [enabled, search, status, locationIds.join(',')]);
+
+  useEffect(() => {
     if (!enabled || !demoPolishEnabled || seededDefaults || views.length > 0) return;
     const seedDefaults = async () => {
       try {
@@ -517,6 +536,7 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
         <div data-sidepanel-rich="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_SIDEPANEL_RICH_DETAILS</div>
         <div data-activity-timeline="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_ACTIVITY_TIMELINE_ENABLED</div>
         <div data-event-toasts="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_EVENT_TOASTS_ENABLED</div>
+        <div data-sse-realtime="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_SSE_REALTIME_ENABLED</div>
         <div className="card ccv2-hero" style={{ marginBottom: 14 }}>
           <div className="ccv2-inline-actions-marker" data-inline-actions="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>
             INLINE_ACTIONS_ENABLED

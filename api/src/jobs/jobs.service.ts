@@ -22,6 +22,7 @@ const JOB_STATUS_TRANSITIONS: Record<JobStatus, JobStatus[]> = {
 @Injectable()
 export class JobsService {
   constructor(
+    private readonly events: EventsService,
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly templatesService: TemplatesService,
