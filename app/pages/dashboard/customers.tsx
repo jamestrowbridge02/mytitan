@@ -70,6 +70,9 @@ export default function CustomersPage() {
       <div data-customer-comms="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>
         CUSTOMER_COMMS_ENABLED
       </div>
+      <div data-customer-events="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>
+        CUSTOMER_EVENTS_ENABLED
+      </div>
 
       <div className="card settings-premium-card">
         <h1 className="settings-premium-title">CRM</h1>

@@ -58,6 +58,9 @@ export default function CustomerTimelinePage() {
       <div data-customer-comms-timeline="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>
         CUSTOMER_COMMS_TIMELINE_ENABLED
       </div>
+      <div data-customer-timeline="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>
+        CUSTOMER_TIMELINE_ENABLED
+      </div>
 
       <div className="card customer-timeline-card">
         <div className="customer-timeline-head">
