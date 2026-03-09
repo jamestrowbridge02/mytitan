@@ -22,8 +22,25 @@ const JOB_STATUS_TRANSITIONS: Record<JobStatus, JobStatus[]> = {
 
 @Injectable()
 export class JobsService {
+
+  private emitJobActivity(type: string, job: any, label: string) {
+    const payload = {
+      type,
+      label,
+      jobId: job?.id || null,
+      jobRef: job?.jobRef || null,
+      customerName: job?.customerName || null,
+      status: job?.status || null,
+      at: new Date().toISOString(),
+    };
+    this.events.emit(payload);
+    this.activity.push(payload);
+  }
+
+
   constructor(
     private readonly events: EventsService,
+    private readonly activity: ActivityService,
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly templatesService: TemplatesService,

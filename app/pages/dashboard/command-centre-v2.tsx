@@ -62,6 +62,7 @@ export default function CommandCentreV2Page() {
   const [isRefreshing, setIsRefreshing] = useState(false);
     const [lastBoardHash, setLastBoardHash] = useState("");
     const [liveNotice, setLiveNotice] = useState("");
+  const [activityItems, setActivityItems] = useState<any[]>([]);
 
   const defaultViews = [
     { name: 'All Open', filters: { status: 'OPEN', locationIds: ['all'], search: '', viewType: 'kanban' }, viewType: 'kanban' },
@@ -96,6 +97,15 @@ export default function CommandCentreV2Page() {
     } catch (err: any) {
       setToastType('error');
         setError(err?.message || 'Failed to load board');
+    }
+  }
+
+  async function loadActivity() {
+    try {
+      const data = await apiFetch(/activity/recent?limit=10);
+      setActivityItems(Array.isArray(data) ? data : []);
+    } catch {
+      setActivityItems([]);
     }
   }
 
@@ -171,6 +181,7 @@ export default function CommandCentreV2Page() {
 
     es.onmessage = () => {
       void loadBoard(true);
+      void loadActivity();
     };
 
     es.onerror = () => {
@@ -537,6 +548,7 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
         <div data-activity-timeline="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_ACTIVITY_TIMELINE_ENABLED</div>
         <div data-event-toasts="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_EVENT_TOASTS_ENABLED</div>
         <div data-sse-realtime="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_SSE_REALTIME_ENABLED</div>
+        <div data-activity-stream="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_ACTIVITY_STREAM_ENABLED</div>
         <div className="card ccv2-hero" style={{ marginBottom: 14 }}>
           <div className="ccv2-inline-actions-marker" data-inline-actions="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>
             INLINE_ACTIONS_ENABLED
