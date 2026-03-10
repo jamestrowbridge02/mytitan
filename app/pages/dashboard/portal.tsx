@@ -29,6 +29,7 @@ type PortalOverview = {
     invoiceIssuedAt?: string | null;
     invoicePaidAt?: string | null;
     portalTokenActive: boolean;
+    portalExpiresAt?: string | null;
     portalUrl?: string | null;
     paymentReady: boolean;
   }>;
@@ -60,6 +61,24 @@ export default function PortalOpsPage() {
       await load();
     } catch (err: any) {
       setError(err?.message || "Failed to prepare portal link");
+    } finally {
+      setBusyJobId(null);
+    }
+  }
+
+  async function run(jobId: string, action: "link" | "revoke" | "regenerate") {
+    setBusyJobId(jobId);
+    try {
+      const endpoint =
+        action === "link"
+          ? `/portal/jobs/${jobId}/link`
+          : action === "revoke"
+          ? `/portal/jobs/${jobId}/revoke`
+          : `/portal/jobs/${jobId}/regenerate`;
+      await apiFetch(endpoint, { method: "POST" });
+      await load();
+    } catch (err: any) {
+      setError(err?.message || `Failed to ${action} portal link`);
     } finally {
       setBusyJobId(null);
     }
@@ -125,6 +144,7 @@ export default function PortalOpsPage() {
                   <div className="operator-table__cell">
                     <div className="operator-cellMeta">
                       <span><strong>{job.portalTokenActive ? "Link active" : "No active link"}</strong></span>
+                      <span>{job.portalExpiresAt ? `Expires ${new Date(job.portalExpiresAt).toLocaleDateString()}` : "No expiry set"}</span>
                       <span>{job.approvedAt ? "Approved" : "Awaiting approval state"}</span>
                     </div>
                   </div>
@@ -143,6 +163,12 @@ export default function PortalOpsPage() {
                       }
                       actions={[
                         { label: "Open job", href: `/dashboard/jobs/${job.id}`, group: "Internal", description: "Review the internal job record" },
+                        ...(job.portalTokenActive
+                          ? [
+                              { label: busyJobId === job.id ? "Regenerating..." : "Regenerate link", onClick: () => void run(job.id, "regenerate"), group: "Portal lifecycle", description: "Invalidate the current link and issue a new token", disabled: busyJobId === job.id },
+                              { label: busyJobId === job.id ? "Revoking..." : "Revoke link", onClick: () => void run(job.id, "revoke"), group: "Portal lifecycle", description: "Expire the current customer portal token", disabled: busyJobId === job.id },
+                            ]
+                          : []),
                         { label: "Open billing readiness", href: "/dashboard/billing/readiness", group: "Internal", description: "Review billing and payment readiness" },
                       ]}
                     />

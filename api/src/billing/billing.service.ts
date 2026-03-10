@@ -400,6 +400,58 @@ export class BillingService {
     };
   }
 
+  async issueInvoice(tenantId: string, userId: string, jobId: string) {
+    const db = this.prisma as any;
+    const job = await db.job.findFirst({ where: { id: jobId, companyId: tenantId } });
+    if (!job) {
+      throw new BadRequestException('Job not found');
+    }
+    if (!(job.status === 'COMPLETED' || job.status === 'INVOICED')) {
+      throw new BadRequestException('Only completed jobs can move into invoice state');
+    }
+
+    const updated = await db.job.update({
+      where: { id: job.id },
+      data: {
+        status: 'INVOICED',
+        invoiceIssuedAt: job.invoiceIssuedAt ?? new Date(),
+        completedAt: job.completedAt ?? new Date(),
+      },
+    });
+    await this.audit.log(tenantId, 'billing.invoice.issue', `Invoice issued for ${job.jobRef || job.id}`, userId);
+    return updated;
+  }
+
+  async markPaidOffline(tenantId: string, userId: string, jobId: string) {
+    const db = this.prisma as any;
+    const job = await db.job.findFirst({ where: { id: jobId, companyId: tenantId } });
+    if (!job) {
+      throw new BadRequestException('Job not found');
+    }
+    if (!job.invoiceIssuedAt && job.status !== 'INVOICED') {
+      throw new BadRequestException('Issue the invoice before marking the job paid');
+    }
+    if (job.invoicePaidAt) {
+      return job;
+    }
+
+    const updated = await db.job.update({
+      where: { id: job.id },
+      data: {
+        status: 'INVOICED',
+        invoicePaidAt: new Date(),
+        invoiceIssuedAt: job.invoiceIssuedAt ?? new Date(),
+        completedAt: job.completedAt ?? new Date(),
+      },
+    });
+    await this.audit.log(tenantId, 'billing.invoice.mark_paid', `Offline payment recorded for ${job.jobRef || job.id}`, userId);
+    if (isNotificationsV1Enabled()) {
+      await this.notifications.notifyPaymentReceived(tenantId, job.id);
+    }
+    await this.maybeQueueReviewRequest(tenantId, job.id);
+    return updated;
+  }
+
   private truncateWebhookError(error: unknown) {
     const message = error instanceof Error ? error.message : String(error || 'unknown webhook error');
     return message.slice(0, 500);

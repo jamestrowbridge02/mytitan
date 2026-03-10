@@ -33,6 +33,7 @@ type PortalInfo = {
     paymentStatus?: string | null;
     pdfReady?: boolean | null;
   };
+  timeline?: Array<{ eventType?: string | null; message?: string | null; createdAt?: string | null }>;
 };
 
 const formatDateTime = (value?: string | null) => {
@@ -602,6 +603,19 @@ export default function PublicJobPortal() {
           <p><strong>Services:</strong> {services.length ? services.join(', ') : 'Not specified'}</p>
           <p><strong>Pricing:</strong> {job?.currency} {(job?.subtotalCents / 100 || 0).toFixed(2)} subtotal</p>
           <p><strong>Total:</strong> {job?.currency} {(job?.totalCents / 100 || 0).toFixed(2)}</p>
+          {portal?.timeline?.length ? (
+            <div style={{ marginTop: 16 }}>
+              <p><strong>Recent progress</strong></p>
+              <div style={{ display: 'grid', gap: 8 }}>
+                {portal.timeline.map((item, index) => (
+                  <div key={`${item.eventType || 'event'}-${index}`} style={{ padding: '10px 12px', border: '1px solid #2a3042', borderRadius: 12 }}>
+                    <div style={{ fontWeight: 600 }}>{item.message || item.eventType || 'Update'}</div>
+                    <div className="muted" style={{ marginTop: 4 }}>{formatDateTime(item.createdAt) || 'Time unavailable'}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </StepCard>
 
         <StepCard

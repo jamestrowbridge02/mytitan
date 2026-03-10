@@ -22,4 +22,16 @@ export class PortalController {
   ensureLink(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     return this.portal.ensureJobPortal(user.companyId, user.sub, id);
   }
+
+  @Post('jobs/:id/revoke')
+  @Roles('OWNER', 'ADMIN', 'STAFF')
+  revoke(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.portal.revokeJobPortal(user.companyId, user.sub, id);
+  }
+
+  @Post('jobs/:id/regenerate')
+  @Roles('OWNER', 'ADMIN', 'STAFF')
+  regenerate(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.portal.regenerateJobPortal(user.companyId, user.sub, id);
+  }
 }

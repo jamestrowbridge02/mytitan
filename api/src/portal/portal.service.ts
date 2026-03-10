@@ -48,6 +48,7 @@ export class PortalService {
         invoiceIssuedAt: job.invoiceIssuedAt,
         invoicePaidAt: job.invoicePaidAt,
         portalTokenActive: Boolean(token),
+        portalExpiresAt: token?.expiresAt || null,
         portalUrl: token?.token ? this.buildPortalUrl(token.token) : null,
         paymentReady: Boolean(settings?.paymentsEnabled && this.billing.isStripeConfigured() && (job.totalCents || 0) > 0),
       };
@@ -104,5 +105,27 @@ export class PortalService {
       portalUrl,
       expiresAt: token.expiresAt,
     };
+  }
+
+  async revokeJobPortal(companyId: string, userId: string, jobId: string) {
+    const db = this.prisma as any;
+    const job = await db.job.findFirst({ where: { id: jobId, companyId } });
+    if (!job) throw new NotFoundException('Job not found');
+
+    await db.publicJobToken.updateMany({
+      where: { jobId: job.id, expiresAt: { gt: new Date() } },
+      data: { expiresAt: new Date() },
+    });
+    await db.job.update({
+      where: { id: job.id },
+      data: { whatsappCompletionLink: null },
+    });
+    await this.audit.log(companyId, 'portal.link.revoke', `Portal link revoked for ${job.jobRef}`, userId);
+    return { ok: true };
+  }
+
+  async regenerateJobPortal(companyId: string, userId: string, jobId: string) {
+    await this.revokeJobPortal(companyId, userId, jobId);
+    return this.ensureJobPortal(companyId, userId, jobId);
   }
 }

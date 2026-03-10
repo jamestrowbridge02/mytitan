@@ -1,4 +1,4 @@
-import { Body, Controller, ForbiddenException, Get, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -77,6 +77,18 @@ export class BillingController {
   @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
   readiness(@CurrentUser() user: JwtPayload) {
     return this.billing.getBillingReadiness(user.companyId);
+  }
+
+  @Post('jobs/:id/issue-invoice')
+  @Roles('OWNER', 'ADMIN', 'STAFF')
+  issueInvoice(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.billing.issueInvoice(user.companyId, user.sub, id);
+  }
+
+  @Post('jobs/:id/mark-paid')
+  @Roles('OWNER', 'ADMIN', 'STAFF')
+  markPaid(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.billing.markPaidOffline(user.companyId, user.sub, id);
   }
 }
 

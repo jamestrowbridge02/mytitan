@@ -39,7 +39,22 @@ export class PublicController {
     const db = this.prisma as any;
     const record = await db.publicJobToken.findUnique({
       where: { token },
-      include: { job: { include: { media: true, assets: true, signatures: true, pdf: true, company: true } } },
+      include: {
+        job: {
+          include: {
+            media: true,
+            assets: true,
+            signatures: true,
+            pdf: true,
+            company: true,
+            activities: {
+              orderBy: { createdAt: 'desc' },
+              take: 12,
+              select: { eventType: true, message: true, createdAt: true },
+            },
+          },
+        },
+      },
     });
     if (!record) {
       throw new NotFoundException("Token not found");
@@ -130,6 +145,13 @@ export class PublicController {
           paymentStatus,
           pdfReady,
         },
+        timeline: (record.job.activities || [])
+          .filter((item: any) => ['job.status', 'job.reminder.create', 'tech.note'].includes(String(item.eventType || '')))
+          .map((item: any) => ({
+            eventType: item.eventType,
+            message: item.message,
+            createdAt: item.createdAt,
+          })),
       },
     };
   }

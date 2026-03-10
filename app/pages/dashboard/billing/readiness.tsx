@@ -47,19 +47,33 @@ function money(cents: number, currency: string) {
 export default function BillingReadinessPage() {
   const [data, setData] = useState<BillingReadiness | null>(null);
   const [error, setError] = useState("");
+  const [busyJobId, setBusyJobId] = useState<string | null>(null);
+
+  const load = async () => {
+    try {
+      const res = await apiFetch("/billing/readiness");
+      setData(res);
+      setError("");
+    } catch (err: any) {
+      setError(err?.message || "Failed to load billing readiness");
+    }
+  };
 
   useEffect(() => {
-    const load = async () => {
-      try {
-        const res = await apiFetch("/billing/readiness");
-        setData(res);
-        setError("");
-      } catch (err: any) {
-        setError(err?.message || "Failed to load billing readiness");
-      }
-    };
     void load();
   }, []);
+
+  async function run(jobId: string, action: "issue-invoice" | "mark-paid") {
+    setBusyJobId(jobId);
+    try {
+      await apiFetch(`/billing/jobs/${jobId}/${action}`, { method: "POST" });
+      await load();
+    } catch (err: any) {
+      setError(err?.message || `Failed to ${action}`);
+    } finally {
+      setBusyJobId(null);
+    }
+  }
 
   const stats = useMemo(() => {
     if (!data) return [];
@@ -134,8 +148,15 @@ export default function BillingReadinessPage() {
                   </div>
                   <div className="operator-table__cell operator-table__cell--actions">
                     <OperatorRowActions
-                      primaryAction={{ label: "Open job", href: `/dashboard/jobs/${job.id}` }}
+                      primaryAction={
+                        !job.invoiceIssuedAt
+                          ? { label: busyJobId === job.id ? "Issuing..." : "Issue invoice", onClick: () => void run(job.id, "issue-invoice"), disabled: busyJobId === job.id }
+                          : !job.invoicePaidAt
+                          ? { label: busyJobId === job.id ? "Recording..." : "Mark paid", onClick: () => void run(job.id, "mark-paid"), disabled: busyJobId === job.id }
+                          : { label: "Open job", href: `/dashboard/jobs/${job.id}` }
+                      }
                       actions={[
+                        { label: "Open job", href: `/dashboard/jobs/${job.id}`, group: "Internal", description: "Open the internal job record" },
                         ...(job.portalUrl ? [{ label: "Open portal", href: job.portalUrl, group: "Customer access", description: "Open the current customer-facing job summary" }] : []),
                         ...(job.paymentLinkUrl ? [{ label: "Open payment link", href: job.paymentLinkUrl, group: "Payments", description: "Open the current payment URL" }] : []),
                         { label: "Open billing", href: "/dashboard/billing", group: "Payments", description: "Review Stripe and tenant billing configuration" },
