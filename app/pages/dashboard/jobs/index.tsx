@@ -335,6 +335,7 @@ export default function Jobs() {
               <OperatorDataTableHeader>
                 <div className="operator-table__cell">
                   <input
+                    aria-label={allVisibleSelected ? "Clear visible job selection" : "Select all visible jobs"}
                     className="operator-checkbox"
                     type="checkbox"
                     checked={allVisibleSelected}
@@ -362,6 +363,7 @@ export default function Jobs() {
                   <OperatorDataTableRow key={job.id} selected={selected}>
                     <div className="operator-table__cell">
                       <input
+                        aria-label={`Select job ${job.jobRef || job.id}`}
                         className="operator-checkbox"
                         type="checkbox"
                         checked={selected}
@@ -403,10 +405,20 @@ export default function Jobs() {
                       <OperatorRowActions
                         primaryAction={{ label: "Open", href: `/dashboard/jobs/${job.id}` }}
                         actions={[
-                          { label: "Copy ref", onClick: () => void copyText(job.jobRef || job.id, "Job ref"), variant: "secondary" },
+                          {
+                            label: "Copy ref",
+                            description: "Copy the job reference to the clipboard",
+                            shortcut: "Ref",
+                            group: "Tools",
+                            onClick: () => void copyText(job.jobRef || job.id, "Job ref"),
+                            variant: "secondary",
+                          },
                           ...(nextStatus
                             ? [{
                                 label: nextStatus === "IN_PROGRESS" ? "Start job" : "Complete job",
+                                description: nextStatus === "IN_PROGRESS" ? "Advance this job into active work" : "Mark this job as done",
+                                shortcut: nextStatus === "IN_PROGRESS" ? "Go" : "Done",
+                                group: "Queue",
                                 onClick: () => void updateSingleStatus(job.id, nextStatus),
                                 disabled: savingIds.includes(job.id),
                               }]

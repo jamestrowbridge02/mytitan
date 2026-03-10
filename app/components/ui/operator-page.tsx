@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 
 type OperatorAction = {
   label: string;
@@ -7,6 +7,9 @@ type OperatorAction = {
   onClick?: () => void;
   variant?: "primary" | "secondary";
   disabled?: boolean;
+  description?: string;
+  shortcut?: string;
+  group?: string;
 };
 
 type OperatorStat = {
@@ -39,8 +42,16 @@ function OperatorActionButton({ action }: { action: OperatorAction | OperatorFil
   const className = action.variant === "secondary" ? "button secondary operator-page__button" : "button operator-page__button";
 
   if (action.href) {
+    if (action.disabled) {
+      return (
+        <button className={className} type="button" disabled>
+          {action.label}
+        </button>
+      );
+    }
+
     return (
-      <Link aria-disabled={action.disabled ? true : undefined} className={className} href={action.disabled ? "#" : action.href}>
+      <Link className={className} href={action.href}>
         {action.label}
       </Link>
     );
@@ -132,6 +143,7 @@ export function OperatorFilterBar({
           <label className="operator-filterbar__search">
             <span className="operator-filterbar__label">Search</span>
             <input
+              aria-label={searchPlaceholder}
               className="input operator-filterbar__input"
               value={searchValue}
               onChange={(event) => onSearchChange(event.target.value)}
@@ -169,14 +181,13 @@ export function OperatorSavedViews({
   onChange: (view: string) => void;
 }) {
   return (
-    <div className="operator-viewTabs" aria-label={label} role="tablist">
+    <div aria-label={label} className="operator-viewTabs" role="group">
       {views.map((view) => (
         <button
           key={view.id}
           className={`operator-viewTabs__item${view.id === activeView ? " is-active" : ""}`}
           type="button"
-          role="tab"
-          aria-selected={view.id === activeView}
+          aria-pressed={view.id === activeView}
           onClick={() => onChange(view.id)}
         >
           <span>{view.label}</span>
@@ -207,6 +218,7 @@ export function OperatorActiveFilters({
           type="button"
           onClick={chip.onClear}
           disabled={!chip.onClear}
+          aria-label={`Clear ${chip.label}`}
         >
           {chip.label}
         </button>
@@ -270,7 +282,7 @@ export function OperatorDataTableRow({
   children: ReactNode;
   selected?: boolean;
 }) {
-  return <div className={`operator-table__row${selected ? " is-selected" : ""}`}>{children}</div>;
+  return <div aria-selected={selected ? true : undefined} className={`operator-table__row${selected ? " is-selected" : ""}`}>{children}</div>;
 }
 
 export function OperatorFilterField({
@@ -298,6 +310,26 @@ export function OperatorRowActions({
   const [open, setOpen] = useState(false);
   const menuId = useId();
   const ref = useRef<HTMLDivElement | null>(null);
+  const toggleRef = useRef<HTMLButtonElement | null>(null);
+  const itemRefs = useRef<Array<HTMLAnchorElement | HTMLButtonElement | null>>([]);
+
+  const actionGroups = useMemo(() => {
+    const groups: Array<{ key: string; label?: string; items: Array<OperatorAction & { itemIndex: number }> }> = [];
+    actions?.forEach((action, itemIndex) => {
+      const groupKey = action.group || "__default__";
+      const last = groups[groups.length - 1];
+      if (!last || last.key !== groupKey) {
+        groups.push({
+          key: groupKey,
+          label: action.group,
+          items: [{ ...action, itemIndex }],
+        });
+        return;
+      }
+      last.items.push({ ...action, itemIndex });
+    });
+    return groups;
+  }, [actions]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -311,6 +343,7 @@ export function OperatorRowActions({
     function handleKey(event: KeyboardEvent) {
       if (event.key === "Escape") {
         setOpen(false);
+        window.setTimeout(() => toggleRef.current?.focus(), 0);
       }
     }
 
@@ -322,6 +355,56 @@ export function OperatorRowActions({
     };
   }, [open]);
 
+  useEffect(() => {
+    if (!open) return;
+    const firstEnabled = itemRefs.current.find((item) => item && !item.hasAttribute("disabled") && item.getAttribute("aria-disabled") !== "true");
+    firstEnabled?.focus();
+  }, [open]);
+
+  function focusItem(index: number) {
+    const items = itemRefs.current.filter(Boolean).filter((item) => !item?.hasAttribute("disabled") && item?.getAttribute("aria-disabled") !== "true");
+    if (!items.length) return;
+    const normalized = ((index % items.length) + items.length) % items.length;
+    items[normalized]?.focus();
+  }
+
+  function handleToggleKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>) {
+    if (!actions?.length) return;
+    if (event.key === "ArrowDown" || event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      setOpen(true);
+      window.setTimeout(() => focusItem(0), 0);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setOpen(true);
+      window.setTimeout(() => focusItem(-1), 0);
+    }
+  }
+
+  function handleMenuKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    const items = itemRefs.current.filter(Boolean).filter((item) => !item?.hasAttribute("disabled") && item?.getAttribute("aria-disabled") !== "true");
+    const currentIndex = items.findIndex((item) => item === document.activeElement);
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      focusItem(currentIndex + 1);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      focusItem(currentIndex - 1);
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      focusItem(0);
+    } else if (event.key === "End") {
+      event.preventDefault();
+      focusItem(items.length - 1);
+    } else if (event.key === "Tab") {
+      setOpen(false);
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      setOpen(false);
+      toggleRef.current?.focus();
+    }
+  }
+
   return (
     <div className="operator-rowActions" ref={ref}>
       {primaryAction ? <OperatorActionButton action={primaryAction} /> : null}
@@ -331,41 +414,72 @@ export function OperatorRowActions({
             aria-controls={menuId}
             aria-expanded={open}
             aria-label="More actions"
+            aria-haspopup="menu"
             className="button secondary operator-rowActions__toggle"
+            ref={toggleRef}
             type="button"
             onClick={() => setOpen((prev) => !prev)}
+            onKeyDown={handleToggleKeyDown}
           >
-            •••
+            More
           </button>
           {open ? (
-            <div className="operator-rowActions__panel" id={menuId} role="menu">
-              {actions.map((action) =>
-                action.href ? (
-                  <Link
-                    key={`${action.label}-${action.href}`}
-                    className={`operator-rowActions__item${action.disabled ? " is-disabled" : ""}`}
-                    href={action.disabled ? "#" : action.href}
-                    onClick={() => setOpen(false)}
-                    role="menuitem"
-                  >
-                    {action.label}
-                  </Link>
-                ) : (
-                  <button
-                    key={`${action.label}-button`}
-                    className="operator-rowActions__item"
-                    disabled={action.disabled}
-                    role="menuitem"
-                    type="button"
-                    onClick={() => {
-                      action.onClick?.();
-                      setOpen(false);
-                    }}
-                  >
-                    {action.label}
-                  </button>
-                ),
-              )}
+            <div aria-label="Row actions" className="operator-rowActions__panel" id={menuId} role="menu" onKeyDown={handleMenuKeyDown}>
+              {actionGroups.map((group, groupIndex) => (
+                <div key={group.key} className="operator-rowActions__group">
+                  {group.label ? <div className="operator-rowActions__groupLabel">{group.label}</div> : null}
+                  {group.items.map((action) =>
+                    action.href ? (
+                      <Link
+                        key={`${action.label}-${action.href}`}
+                        aria-disabled={action.disabled ? true : undefined}
+                        className={`operator-rowActions__item${action.disabled ? " is-disabled" : ""}`}
+                        href={action.disabled ? "#" : action.href}
+                        onClick={(event) => {
+                          if (action.disabled) {
+                            event.preventDefault();
+                            return;
+                          }
+                          setOpen(false);
+                        }}
+                        ref={(node) => {
+                          itemRefs.current[action.itemIndex] = node;
+                        }}
+                        role="menuitem"
+                        tabIndex={0}
+                      >
+                        <span className="operator-rowActions__itemBody">
+                          <span className="operator-rowActions__label">{action.label}</span>
+                          {action.description ? <span className="operator-rowActions__description">{action.description}</span> : null}
+                        </span>
+                        {action.shortcut ? <span className="operator-rowActions__shortcut">{action.shortcut}</span> : null}
+                      </Link>
+                    ) : (
+                      <button
+                        key={`${action.label}-button`}
+                        className="operator-rowActions__item"
+                        disabled={action.disabled}
+                        ref={(node) => {
+                          itemRefs.current[action.itemIndex] = node;
+                        }}
+                        role="menuitem"
+                        type="button"
+                        onClick={() => {
+                          action.onClick?.();
+                          setOpen(false);
+                        }}
+                      >
+                        <span className="operator-rowActions__itemBody">
+                          <span className="operator-rowActions__label">{action.label}</span>
+                          {action.description ? <span className="operator-rowActions__description">{action.description}</span> : null}
+                        </span>
+                        {action.shortcut ? <span className="operator-rowActions__shortcut">{action.shortcut}</span> : null}
+                      </button>
+                    ),
+                  )}
+                  {groupIndex < actionGroups.length - 1 ? <div className="operator-rowActions__divider" /> : null}
+                </div>
+              ))}
             </div>
           ) : null}
         </div>

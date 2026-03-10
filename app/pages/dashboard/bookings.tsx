@@ -459,6 +459,7 @@ export default function BookingsPage() {
               <OperatorDataTableHeader>
                 <div className="operator-table__cell">
                   <input
+                    aria-label={allVisibleSelected ? "Clear visible booking selection" : "Select all visible bookings"}
                     className="operator-checkbox"
                     type="checkbox"
                     checked={allVisibleSelected}
@@ -485,6 +486,7 @@ export default function BookingsPage() {
                   <OperatorDataTableRow key={booking.id} selected={selected}>
                     <div className="operator-table__cell">
                       <input
+                        aria-label={`Select booking ${booking.customerName || booking.id}`}
                         className="operator-checkbox"
                         type="checkbox"
                         checked={selected}
@@ -519,9 +521,27 @@ export default function BookingsPage() {
                       <OperatorRowActions
                         primaryAction={{ label: "Schedule", href: "/dashboard/calendar" }}
                         actions={[
-                          { label: "Open booking", href: `/dashboard/bookings/${booking.id}` },
-                          ...(!booking.jobId ? [{ label: "Convert to job", href: convertHref }] : []),
-                          { label: "Copy booking ID", onClick: () => void copyText(booking.id, "Booking ID") },
+                          {
+                            label: "Open booking",
+                            description: "Open the booking detail record",
+                            shortcut: "Open",
+                            group: "Booking",
+                            href: `/dashboard/bookings/${booking.id}`,
+                          },
+                          ...(!booking.jobId ? [{
+                            label: "Convert to job",
+                            description: "Create a job from this unlinked booking",
+                            shortcut: "New",
+                            group: "Booking",
+                            href: convertHref,
+                          }] : []),
+                          {
+                            label: "Copy booking ID",
+                            description: "Copy the booking reference",
+                            shortcut: "Copy",
+                            group: "Tools",
+                            onClick: () => void copyText(booking.id, "Booking ID"),
+                          },
                         ]}
                       />
                     </div>

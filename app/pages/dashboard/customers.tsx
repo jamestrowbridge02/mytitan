@@ -307,6 +307,7 @@ export default function CustomersPage() {
               <OperatorDataTableHeader>
                 <div className="operator-table__cell">
                   <input
+                    aria-label={allVisibleSelected ? "Clear visible customer selection" : "Select all visible customers"}
                     className="operator-checkbox"
                     type="checkbox"
                     checked={allVisibleSelected}
@@ -333,6 +334,7 @@ export default function CustomersPage() {
                   <OperatorDataTableRow key={customer.id} selected={selected}>
                     <div className="operator-table__cell">
                       <input
+                        aria-label={`Select customer ${customer.name}`}
                         className="operator-checkbox"
                         type="checkbox"
                         checked={selected}
@@ -370,12 +372,48 @@ export default function CustomersPage() {
                       <OperatorRowActions
                         primaryAction={{ label: "Open timeline", href }}
                         actions={[
-                          ...(customer.phone ? [{ label: "Send SMS", onClick: () => void sendQuickCommunication(customer, "sms") }] : []),
-                          ...(customer.email ? [{ label: "Send email", onClick: () => void sendQuickCommunication(customer, "email") }] : []),
-                          { label: "Log SMS", onClick: () => void createMessageEvent(customer, "sms.sent") },
-                          { label: "Log email", onClick: () => void createMessageEvent(customer, "email.sent") },
-                          { label: "Log portal view", onClick: () => void createMessageEvent(customer, "portal.viewed") },
-                          { label: "Copy contact", onClick: () => void copyText(customer.email || customer.phone || customer.name, "Customer contact") },
+                          ...(customer.phone ? [{
+                            label: "Send SMS",
+                            description: "Send a quick customer text update",
+                            shortcut: "SMS",
+                            group: "Communications",
+                            onClick: () => void sendQuickCommunication(customer, "sms"),
+                          }] : []),
+                          ...(customer.email ? [{
+                            label: "Send email",
+                            description: "Send a quick email update",
+                            shortcut: "Mail",
+                            group: "Communications",
+                            onClick: () => void sendQuickCommunication(customer, "email"),
+                          }] : []),
+                          {
+                            label: "Log SMS",
+                            description: "Record an outbound SMS event",
+                            shortcut: "Log",
+                            group: "Timeline",
+                            onClick: () => void createMessageEvent(customer, "sms.sent"),
+                          },
+                          {
+                            label: "Log email",
+                            description: "Record an outbound email event",
+                            shortcut: "Log",
+                            group: "Timeline",
+                            onClick: () => void createMessageEvent(customer, "email.sent"),
+                          },
+                          {
+                            label: "Log portal view",
+                            description: "Record that the customer opened the portal",
+                            shortcut: "Log",
+                            group: "Timeline",
+                            onClick: () => void createMessageEvent(customer, "portal.viewed"),
+                          },
+                          {
+                            label: "Copy contact",
+                            description: "Copy the best available contact detail",
+                            shortcut: "Copy",
+                            group: "Tools",
+                            onClick: () => void copyText(customer.email || customer.phone || customer.name, "Customer contact"),
+                          },
                         ]}
                       />
                     </div>

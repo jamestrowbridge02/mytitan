@@ -288,6 +288,9 @@ export default function IntegrationsPage() {
                       actions={[
                         {
                           label: item.enabled ? "Disable module" : "Enable module",
+                          description: item.enabled ? "Turn this module off for the workspace" : "Turn this module on for the workspace",
+                          shortcut: item.enabled ? "Off" : "On",
+                          group: "Module",
                           onClick: () => void toggle(item),
                           disabled: !item.allowed || savingKey === item.key,
                         },
@@ -377,7 +380,13 @@ export default function IntegrationsPage() {
                           : { label: "Connect", onClick: () => void connect(conn.key), disabled: !canConnect || savingKey === conn.key }}
                         actions={[
                           ...(items.find((item) => item.key === conn.key)?.configureUrl
-                            ? [{ label: "Configure module", href: items.find((item) => item.key === conn.key)?.configureUrl as string }]
+                            ? [{
+                                label: "Configure module",
+                                description: "Open the underlying module settings",
+                                shortcut: "Open",
+                                group: "Provider",
+                                href: items.find((item) => item.key === conn.key)?.configureUrl as string,
+                              }]
                             : []),
                         ]}
                       />
