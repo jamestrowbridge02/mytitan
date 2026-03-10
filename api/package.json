@@ -12,6 +12,7 @@
     "prisma": "prisma",
     "prisma:generate": "prisma generate",
     "migration:init": "prisma migrate dev --name init",
+    "seed:e2e": "MYTITAN_ENABLE_E2E_FIXTURES=1 node scripts/seed-e2e.js",
     "seed:tenant-settings": "node scripts/seed-tenant-settings.js",
     "audit:top1": "node scripts/top1-audit.mjs"
   },

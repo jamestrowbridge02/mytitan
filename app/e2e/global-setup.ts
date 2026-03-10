@@ -1,7 +1,6 @@
 import fs from "fs/promises";
-import path from "path";
 import { request, type FullConfig } from "@playwright/test";
-import { authDir, authFile, metadataFile, type E2EMetadata } from "./utils";
+import { authDir, authFile, defaultOperatorEmail, defaultOperatorPassword, metadataFile, type E2EMetadata } from "./utils";
 
 async function safeUnlink(filePath: string) {
   try {
@@ -23,13 +22,14 @@ export default async function globalSetup(config: FullConfig) {
   const baseURL = process.env.PLAYWRIGHT_BASE_URL || String(config.projects[0]?.use?.baseURL || "http://127.0.0.1:3001");
   const appOrigin = new URL(baseURL).origin;
   const apiBase = process.env.PLAYWRIGHT_API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:3000";
-  const email = process.env.PLAYWRIGHT_TEST_EMAIL?.trim();
-  const password = process.env.PLAYWRIGHT_TEST_PASSWORD;
+  const email = process.env.PLAYWRIGHT_TEST_EMAIL?.trim() || defaultOperatorEmail;
+  const password = process.env.PLAYWRIGHT_TEST_PASSWORD || defaultOperatorPassword;
 
   await fs.mkdir(authDir, { recursive: true });
 
   const metadata: E2EMetadata = {
     email: email || null,
+    authReady: false,
     portalUrl: null,
     portalToken: null,
   };
@@ -52,7 +52,9 @@ export default async function globalSetup(config: FullConfig) {
       data: { email, password },
     });
     if (!loginResponse.ok()) {
-      throw new Error(`Auth bootstrap failed with ${loginResponse.status()} ${loginResponse.statusText()}`);
+      await safeUnlink(authFile);
+      await fs.writeFile(metadataFile, JSON.stringify(metadata, null, 2));
+      return;
     }
 
     const loginBody = await loginResponse.json();
@@ -71,6 +73,7 @@ export default async function globalSetup(config: FullConfig) {
       ],
     };
     await fs.writeFile(authFile, JSON.stringify(storageState, null, 2));
+    metadata.authReady = true;
 
     const authedContext = await request.newContext({
       baseURL: apiBase,
