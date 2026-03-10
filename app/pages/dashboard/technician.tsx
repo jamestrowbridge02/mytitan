@@ -37,6 +37,8 @@ type TechQueue = {
       createdAt?: string | null;
     }>;
     nextStep?: string;
+    workflowChecklist?: string[];
+    sequenceState?: string;
   }>;
   bookings: Array<{
     id: string;
@@ -185,6 +187,7 @@ export default function TechnicianPage() {
                   <div className="operator-table__cell">
                     <div className="operator-cellMeta">
                       <span><strong>{job.scheduledAt ? new Date(job.scheduledAt).toLocaleString() : "Not scheduled"}</strong></span>
+                      {job.sequenceState ? <span>Workflow {job.sequenceState.replaceAll("_", " ")}</span> : null}
                       <span>
                         {job.urgency === "overdue"
                           ? "Late for arrival"
@@ -198,6 +201,9 @@ export default function TechnicianPage() {
                         <span>{job.lastFieldEvent.message || job.lastFieldEvent.eventType} · {new Date(job.lastFieldEvent.createdAt).toLocaleString()}</span>
                       ) : null}
                       {job.nextStep ? <span>{job.nextStep}</span> : null}
+                      {job.workflowChecklist?.slice(0, 2).map((item, index) => (
+                        <span key={`${job.id}-check-${index}`}>Next: {item}</span>
+                      ))}
                       {job.recentFieldEvents?.slice(0, 2).map((event, index) => (
                         <span key={`${job.id}-${event.createdAt || index}`}>{event.message || event.eventType} · {event.createdAt ? new Date(event.createdAt).toLocaleString() : "Recent"}</span>
                       ))}

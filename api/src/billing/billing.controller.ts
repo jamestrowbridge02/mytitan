@@ -96,6 +96,12 @@ export class BillingController {
   queueFollowUp(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     return this.billing.queueBillingFollowUp(user.companyId, user.sub, id);
   }
+
+  @Post('jobs/:id/escalate-follow-up')
+  @Roles('OWNER', 'ADMIN', 'STAFF')
+  escalateFollowUp(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.billing.escalateBillingFollowUp(user.companyId, user.sub, id);
+  }
 }
 
 @Controller()

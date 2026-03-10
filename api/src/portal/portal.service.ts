@@ -31,7 +31,6 @@ export class PortalService {
         },
         include: {
           publicTokens: {
-            where: { expiresAt: { gt: now } },
             orderBy: { createdAt: 'desc' },
             take: 1,
           },
@@ -51,6 +50,7 @@ export class PortalService {
 
     const rows = jobs.map((job: any) => {
       const token = job.publicTokens?.[0] || null;
+      const portalState = !token ? 'not_provisioned' : new Date(token.expiresAt).getTime() > now.getTime() ? 'active' : 'expired';
       return {
         id: job.id,
         jobRef: job.jobRef,
@@ -60,9 +60,10 @@ export class PortalService {
         invoiceIssuedAt: job.invoiceIssuedAt,
         invoiceDueAt: job.invoiceDueAt,
         invoicePaidAt: job.invoicePaidAt,
-        portalTokenActive: Boolean(token),
+        portalTokenActive: portalState === 'active',
+        portalState,
         portalExpiresAt: token?.expiresAt || null,
-        portalUrl: token?.token ? this.buildPortalUrl(token.token) : null,
+        portalUrl: token?.token && portalState === 'active' ? this.buildPortalUrl(token.token) : null,
         invoiceOverdue: Boolean(job.invoiceDueAt && !job.invoicePaidAt && new Date(job.invoiceDueAt).getTime() < now.getTime()),
         paymentReady: Boolean(settings?.paymentsEnabled && this.billing.isStripeConfigured() && (job.totalCents || 0) > 0),
       };
@@ -74,9 +75,10 @@ export class PortalService {
       stripeConfigured: this.billing.isStripeConfigured(),
       summary: {
         activeLinks: rows.filter((row) => row.portalTokenActive).length,
+        expiredLinks: rows.filter((row) => row.portalState === 'expired').length,
         awaitingApproval: rows.filter((row) => row.status === 'COMPLETED' && !row.approvedAt).length,
         paymentReady: rows.filter((row) => row.paymentReady).length,
-        expiringSoon: rows.filter((row) => row.portalExpiresAt && new Date(row.portalExpiresAt).getTime() < now.getTime() + 7 * 24 * 60 * 60 * 1000).length,
+        expiringSoon: rows.filter((row) => row.portalState === 'active' && row.portalExpiresAt && new Date(row.portalExpiresAt).getTime() < now.getTime() + 7 * 24 * 60 * 60 * 1000).length,
       },
       jobs: rows,
       recentActivity: recentActivity.map((event: any) => ({

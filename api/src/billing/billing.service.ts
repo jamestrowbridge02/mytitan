@@ -609,6 +609,63 @@ export class BillingService {
     };
   }
 
+  async escalateBillingFollowUp(tenantId: string, userId: string, jobId: string) {
+    const db = this.prisma as any;
+    const job = await db.job.findFirst({ where: { id: jobId, companyId: tenantId } });
+    if (!job) {
+      throw new BadRequestException('Job not found');
+    }
+    if (job.invoicePaidAt) {
+      throw new BadRequestException('Paid jobs do not need billing escalation');
+    }
+    if (!(job.completedAt || job.status === 'COMPLETED' || job.status === 'INVOICED')) {
+      throw new BadRequestException('Only completed or invoiced jobs can enter billing escalation');
+    }
+
+    const now = Date.now();
+    const reminderAt = new Date(now + 30 * 60 * 1000);
+    const existing = await db.jobReminder.findFirst({
+      where: {
+        companyId: tenantId,
+        jobId,
+        completedAt: null,
+        note: 'Automation billing follow-up',
+      },
+    });
+
+    const reminder = existing
+      ? await db.jobReminder.update({
+          where: { id: existing.id },
+          data: { remindAt: reminderAt, channel: existing.channel || 'in_app' },
+        })
+      : await db.jobReminder.create({
+          data: {
+            companyId: tenantId,
+            jobId,
+            remindAt: reminderAt,
+            channel: 'in_app',
+            note: 'Automation billing follow-up',
+          },
+        });
+
+    await this.audit.log(tenantId, 'billing.follow_up.escalate', `Billing follow-up escalated for ${job.jobRef || job.id}`, userId);
+    await this.logBillingActivity(tenantId, jobId, userId, 'billing.follow_up.escalated', 'Billing follow-up escalated for operator attention', {
+      reminderId: reminder.id,
+      remindAt: reminder.remindAt,
+      previousRemindAt: existing?.remindAt || null,
+      escalated: true,
+    });
+    await this.automations.handleBillingFollowUpEscalation(tenantId, userId, job, reminder);
+
+    return {
+      jobId: job.id,
+      reminderId: reminder.id,
+      remindAt: reminder.remindAt,
+      escalated: true,
+      created: !existing,
+    };
+  }
+
   private truncateWebhookError(error: unknown) {
     const message = error instanceof Error ? error.message : String(error || 'unknown webhook error');
     return message.slice(0, 500);

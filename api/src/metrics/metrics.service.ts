@@ -80,10 +80,12 @@ export class MetricsService {
       stalledJobs,
       unassignedOpenJobs,
       overdueBillingFollowUps,
+      overdueDispatchFollowUps,
       bookingsConvertedLast7Days,
       agedUnlinkedBookings,
       inProgressTechnicianJobs,
       portalLinksExpiringSoon,
+      expiredPortalLinks,
       overdueInvoices,
       completedLast7Days,
       completedPrevious7Days,
@@ -176,6 +178,14 @@ export class MetricsService {
           remindAt: { lt: now },
         },
       }),
+      db.jobReminder.count({
+        where: {
+          companyId: tenantId,
+          completedAt: null,
+          note: 'Automation dispatch follow-up',
+          remindAt: { lt: now },
+        },
+      }),
       db.booking.count({
         where: {
           companyId: tenantId,
@@ -205,6 +215,12 @@ export class MetricsService {
             gt: now,
             lte: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
           },
+        },
+      }),
+      db.publicJobToken.count({
+        where: {
+          job: { companyId: tenantId },
+          expiresAt: { lte: now },
         },
       }),
       db.job.count({
@@ -289,6 +305,8 @@ export class MetricsService {
         agedUnlinkedBookings,
         technicianCompletionQueue: inProgressTechnicianJobs,
         portalLinksExpiringSoon,
+        overdueDispatchFollowUps,
+        expiredPortalLinks,
         overdueInvoices,
       },
       attentionQueue: [
@@ -301,11 +319,17 @@ export class MetricsService {
         agedUnlinkedBookings > 0
           ? { key: 'conversion_backlog', label: 'Aged conversion backlog', count: agedUnlinkedBookings, href: '/dashboard/bookings', hint: 'Bookings older than 48h are still not linked to jobs' }
           : null,
+        overdueDispatchFollowUps > 0
+          ? { key: 'dispatch_followups_due', label: 'Dispatch follow-ups overdue', count: overdueDispatchFollowUps, href: '/dashboard/bookings', hint: 'Converted work still has overdue dispatch reminders' }
+          : null,
         unassignedOpenJobs > 0
           ? { key: 'dispatch_backlog', label: 'Unassigned open jobs', count: unassignedOpenJobs, href: '/dashboard/jobs', hint: 'Dispatch ownership is missing on active work' }
           : null,
         portalLinksExpiringSoon > 0
           ? { key: 'portal_access_pressure', label: 'Portal links expiring soon', count: portalLinksExpiringSoon, href: '/dashboard/portal', hint: 'Customer access links should be refreshed before they go stale' }
+          : null,
+        expiredPortalLinks > 0
+          ? { key: 'portal_access_expired', label: 'Expired portal links', count: expiredPortalLinks, href: '/dashboard/portal', hint: 'Customer access has already lapsed on existing portal links' }
           : null,
         inProgressTechnicianJobs > 0
           ? { key: 'technician_completion_pressure', label: 'Technician completion queue', count: inProgressTechnicianJobs, href: '/dashboard/technician', hint: 'Field work is active and should be closed out promptly' }
@@ -315,10 +339,12 @@ export class MetricsService {
         stalledJobs > 0 ? { key: 'stalled_jobs', severity: 'warn', label: 'Stalled active jobs', count: stalledJobs, href: '/dashboard/jobs' } : null,
         unassignedOpenJobs > 0 ? { key: 'unassigned_jobs', severity: 'warn', label: 'Unassigned open jobs', count: unassignedOpenJobs, href: '/dashboard/jobs' } : null,
         overdueBillingFollowUps > 0 ? { key: 'overdue_followups', severity: 'warn', label: 'Overdue reminders', count: overdueBillingFollowUps, href: '/dashboard/billing/readiness' } : null,
+        overdueDispatchFollowUps > 0 ? { key: 'dispatch_followups', severity: 'warn', label: 'Dispatch follow-ups overdue', count: overdueDispatchFollowUps, href: '/dashboard/bookings' } : null,
         overdueInvoices > 0 ? { key: 'overdue_invoices', severity: 'warn', label: 'Invoices overdue for payment', count: overdueInvoices, href: '/dashboard/billing/readiness' } : null,
         publicUnlinkedBookings > 0 ? { key: 'public_conversion', severity: 'info', label: 'Public bookings awaiting conversion', count: publicUnlinkedBookings, href: '/dashboard/bookings' } : null,
         agedUnlinkedBookings > 0 ? { key: 'stale_booking_conversion', severity: 'warn', label: 'Unlinked bookings older than 48h', count: agedUnlinkedBookings, href: '/dashboard/bookings' } : null,
         portalLinksExpiringSoon > 0 ? { key: 'portal_links_expiring', severity: 'info', label: 'Portal links expiring within 7 days', count: portalLinksExpiringSoon, href: '/dashboard/portal' } : null,
+        expiredPortalLinks > 0 ? { key: 'portal_links_expired', severity: 'warn', label: 'Portal links already expired', count: expiredPortalLinks, href: '/dashboard/portal' } : null,
       ].filter(Boolean),
       trends: {
         completedLast7Days,

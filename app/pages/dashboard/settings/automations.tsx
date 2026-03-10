@@ -88,6 +88,7 @@ type AutomationDiagnostics = {
     pendingBillingFollowUps: number;
     overdueBillingFollowUps: number;
     resolvedBillingFollowUpsLast7Days: number;
+    billingEscalationsLast7Days: number;
     pendingDispatchFollowUps: number;
     resolvedDispatchFollowUpsLast7Days: number;
     contactGapJobs: number;
@@ -499,6 +500,7 @@ export default function AutomationsSettingsPage() {
               <span className="badge">Billing follow-ups {diagnostics.summary.pendingBillingFollowUps}</span>
               <span className="badge">Billing overdue {diagnostics.summary.overdueBillingFollowUps}</span>
               <span className="badge">Billing resolved 7d {diagnostics.summary.resolvedBillingFollowUpsLast7Days}</span>
+              <span className="badge">Billing escalations 7d {diagnostics.summary.billingEscalationsLast7Days}</span>
               <span className="badge">Dispatch follow-ups {diagnostics.summary.pendingDispatchFollowUps}</span>
               <span className="badge">Dispatch resolved 7d {diagnostics.summary.resolvedDispatchFollowUpsLast7Days}</span>
               <span className="badge">Contact gaps {diagnostics.summary.contactGapJobs}</span>

@@ -71,6 +71,20 @@ export class TechService {
             : job.scheduledAt && new Date(job.scheduledAt).getTime() < now.getTime()
             ? 'Log arrival or update dispatch'
             : 'Review handoff and head to site',
+        workflowChecklist:
+          job.status === 'IN_PROGRESS'
+            ? ['Capture progress note if scope changed', 'Complete work and close out final note']
+            : job.activities?.some((activity: any) => activity.eventType === 'tech.arrived')
+            ? ['Start assigned work', 'Add note if parts, access, or scope changed']
+            : job.scheduledAt && new Date(job.scheduledAt).getTime() < now.getTime()
+            ? ['Log arrival now', 'Escalate to dispatch if access has failed']
+            : ['Review dispatch handoff', 'Travel to site and log arrival on entry'],
+        sequenceState:
+          job.status === 'IN_PROGRESS'
+            ? 'active_work'
+            : job.activities?.some((activity: any) => activity.eventType === 'tech.arrived')
+            ? 'arrived'
+            : 'assigned',
         urgency:
           job.status === 'IN_PROGRESS'
             ? 'active'

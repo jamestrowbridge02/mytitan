@@ -17,6 +17,7 @@ type PortalOverview = {
   stripeConfigured: boolean;
   summary: {
     activeLinks: number;
+    expiredLinks: number;
     awaitingApproval: number;
     paymentReady: number;
     expiringSoon: number;
@@ -37,6 +38,7 @@ type PortalOverview = {
     invoiceDueAt?: string | null;
     invoicePaidAt?: string | null;
     portalTokenActive: boolean;
+    portalState?: string;
     portalExpiresAt?: string | null;
     portalUrl?: string | null;
     invoiceOverdue?: boolean;
@@ -97,6 +99,7 @@ export default function PortalOpsPage() {
     if (!data) return [];
     return [
       { label: "Active links", value: String(data.summary.activeLinks), hint: "Jobs with portal access live now" },
+      { label: "Expired links", value: String(data.summary.expiredLinks), hint: "Links that need regeneration before customers can re-enter" },
       { label: "Awaiting approval", value: String(data.summary.awaitingApproval), hint: "Completed work still waiting on sign-off" },
       { label: "Payment ready", value: String(data.summary.paymentReady), hint: data.stripeConfigured ? "Portal can hand off to payment" : "Stripe not configured" },
       { label: "Expiring soon", value: String(data.summary.expiringSoon), hint: "Portal links expiring within 7 days" },
@@ -153,9 +156,10 @@ export default function PortalOpsPage() {
                   </div>
                   <div className="operator-table__cell">
                     <div className="operator-cellMeta">
-                      <span><strong>{job.portalTokenActive ? "Link active" : "No active link"}</strong></span>
-                      <span>{job.portalExpiresAt ? `Expires ${new Date(job.portalExpiresAt).toLocaleDateString()}` : "No expiry set"}</span>
-                      {job.portalExpiresAt && new Date(job.portalExpiresAt).getTime() < Date.now() + 7 * 24 * 60 * 60 * 1000 ? <span>Refresh recommended</span> : null}
+                      <span><strong>{job.portalState === "active" ? "Link active" : job.portalState === "expired" ? "Link expired" : "No active link"}</strong></span>
+                      <span>{job.portalExpiresAt ? `${job.portalState === "expired" ? "Expired" : "Expires"} ${new Date(job.portalExpiresAt).toLocaleDateString()}` : "No expiry set"}</span>
+                      {job.portalState === "expired" ? <span>Regeneration required</span> : null}
+                      {job.portalState === "active" && job.portalExpiresAt && new Date(job.portalExpiresAt).getTime() < Date.now() + 7 * 24 * 60 * 60 * 1000 ? <span>Refresh recommended</span> : null}
                       <span>{job.approvedAt ? "Approved" : "Awaiting approval state"}</span>
                     </div>
                   </div>
@@ -180,6 +184,8 @@ export default function PortalOpsPage() {
                               { label: busyJobId === job.id ? "Regenerating..." : "Regenerate link", onClick: () => void run(job.id, "regenerate"), group: "Portal lifecycle", description: "Invalidate the current link and issue a new token", disabled: busyJobId === job.id },
                               { label: busyJobId === job.id ? "Revoking..." : "Revoke link", onClick: () => void run(job.id, "revoke"), group: "Portal lifecycle", description: "Expire the current customer portal token", disabled: busyJobId === job.id },
                             ]
+                          : job.portalState === "expired"
+                          ? [{ label: busyJobId === job.id ? "Regenerating..." : "Regenerate link", onClick: () => void run(job.id, "regenerate"), group: "Portal lifecycle", description: "Issue a fresh customer portal token after expiry", disabled: busyJobId === job.id }]
                           : []),
                         { label: "Open billing readiness", href: "/dashboard/billing/readiness", group: "Internal", description: "Review billing and payment readiness" },
                       ]}

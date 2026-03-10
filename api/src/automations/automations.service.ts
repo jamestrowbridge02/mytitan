@@ -314,6 +314,14 @@ export class AutomationsService {
         deliveryMode: "metadata_only",
       },
       {
+        key: "billing_follow_up_escalation",
+        label: "Billing follow-up escalation",
+        enabled: true,
+        trigger: "job.reminder.overdue_billing",
+        action: "Refresh overdue billing follow-ups and log escalation pressure for collections work",
+        deliveryMode: "metadata_only",
+      },
+      {
         key: "portal_lifecycle_audit",
         label: "Portal lifecycle audit",
         enabled: true,
@@ -352,7 +360,7 @@ export class AutomationsService {
     const db = this.prisma as any;
     const now = new Date();
     const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const [rules, pendingRuns, pendingBillingFollowUps, overdueBillingFollowUps, resolvedBillingFollowUpsLast7Days, pendingDispatchFollowUps, resolvedDispatchFollowUpsLast7Days, contactGapJobs, staleUnassignedJobs, publicBookingsAwaitingConversion, recentBookingConversions, recentPortalLifecycleEvents] = await Promise.all([
+    const [rules, pendingRuns, pendingBillingFollowUps, overdueBillingFollowUps, resolvedBillingFollowUpsLast7Days, billingEscalationsLast7Days, pendingDispatchFollowUps, resolvedDispatchFollowUpsLast7Days, contactGapJobs, staleUnassignedJobs, publicBookingsAwaitingConversion, recentBookingConversions, recentPortalLifecycleEvents] = await Promise.all([
       this.listRules(tenantId),
       this.listRuns(tenantId, 12),
       db.jobReminder.count({
@@ -379,6 +387,13 @@ export class AutomationsService {
             path: ['reason'],
             in: ['invoice_issued', 'payment_received'],
           },
+        },
+      }),
+      db.activityEvent.count({
+        where: {
+          tenantId,
+          type: "automation.billing_follow_up_escalation",
+          at: { gte: last7Days },
         },
       }),
       db.jobReminder.count({
@@ -443,6 +458,7 @@ export class AutomationsService {
         pendingBillingFollowUps,
         overdueBillingFollowUps,
         resolvedBillingFollowUpsLast7Days,
+        billingEscalationsLast7Days,
         pendingDispatchFollowUps,
         resolvedDispatchFollowUpsLast7Days,
         contactGapJobs,
@@ -656,6 +672,27 @@ export class AutomationsService {
         action,
         portalUrl: portalUrl || null,
         expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null,
+      },
+    });
+
+    return { logged: true };
+  }
+
+  async handleBillingFollowUpEscalation(companyId: string, userId: string | null, job: any, reminder: any) {
+    await this.activity.push({
+      tenantId: companyId,
+      type: "automation.billing_follow_up_escalation",
+      label: `Automation escalated billing follow-up for ${job?.jobRef || job?.id || "job"}`,
+      jobId: job?.id || null,
+      jobRef: job?.jobRef || null,
+      customerId: job?.customerId || null,
+      customerName: job?.customerName || null,
+      status: job?.status || null,
+      payloadJson: {
+        automationKey: "billing_follow_up_escalation",
+        reminderId: reminder?.id || null,
+        remindAt: reminder?.remindAt ? new Date(reminder.remindAt).toISOString() : null,
+        escalated: true,
       },
     });
 

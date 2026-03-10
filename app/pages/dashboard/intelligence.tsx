@@ -26,6 +26,8 @@ type IntelligenceData = {
     agedUnlinkedBookings: number;
     technicianCompletionQueue: number;
     portalLinksExpiringSoon: number;
+    overdueDispatchFollowUps: number;
+    expiredPortalLinks: number;
     overdueInvoices: number;
   };
   attentionQueue: Array<{ key: string; label: string; count: number; href: string; hint: string }>;
@@ -54,6 +56,8 @@ const EMPTY: IntelligenceData = {
     agedUnlinkedBookings: 0,
     technicianCompletionQueue: 0,
     portalLinksExpiringSoon: 0,
+    overdueDispatchFollowUps: 0,
+    expiredPortalLinks: 0,
     overdueInvoices: 0,
   },
   attentionQueue: [],
@@ -93,6 +97,7 @@ export default function IntelligencePage() {
       { label: "Billing ready", value: String(data.summary.billingReadyJobs), hint: "Completed work not yet invoiced" },
       { label: "Overdue invoices", value: String(data.summary.overdueInvoices), hint: "Issued invoices already past due" },
       { label: "Portal ready", value: String(data.summary.portalReadyJobs), hint: "Jobs with active customer access" },
+      { label: "Portal expired", value: String(data.summary.expiredPortalLinks), hint: "Links that already need customer access recovery" },
       { label: "Converted", value: String(data.summary.bookingsConvertedLast7Days), hint: "Bookings turned into jobs in the last 7 days" },
       { label: "Completion delta", value: data.trends.completionDelta >= 0 ? `+${data.trends.completionDelta}` : String(data.trends.completionDelta), hint: "Last 7 days vs previous 7 days" },
     ],
@@ -204,6 +209,8 @@ export default function IntelligencePage() {
               ["Aged unlinked bookings", data.summary.agedUnlinkedBookings, "Bookings that have been waiting for conversion for more than 48 hours"],
               ["Technician completion queue", data.summary.technicianCompletionQueue, "Assigned field jobs currently in progress"],
               ["Portal links expiring soon", data.summary.portalLinksExpiringSoon, "Customer access links that need refresh before they go stale"],
+              ["Portal links expired", data.summary.expiredPortalLinks, "Customer access links that have already lapsed and need regeneration"],
+              ["Dispatch follow-ups overdue", data.summary.overdueDispatchFollowUps, "Converted work still waiting for dispatch follow-through"],
               ["Overdue invoices", data.summary.overdueInvoices, "Issued invoices already past their due date without payment"],
             ].map(([label, value, meaning]) => (
               <OperatorDataTableRow key={String(label)}>

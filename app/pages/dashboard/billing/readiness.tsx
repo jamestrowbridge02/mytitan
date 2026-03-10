@@ -76,7 +76,7 @@ export default function BillingReadinessPage() {
     return () => window.clearTimeout(timer);
   }, [notice]);
 
-  async function run(jobId: string, action: "issue-invoice" | "mark-paid" | "queue-follow-up") {
+  async function run(jobId: string, action: "issue-invoice" | "mark-paid" | "queue-follow-up" | "escalate-follow-up") {
     setBusyJobId(jobId);
     try {
       await apiFetch(`/billing/jobs/${jobId}/${action}`, { method: "POST" });
@@ -85,6 +85,8 @@ export default function BillingReadinessPage() {
           ? "Invoice issued"
           : action === "mark-paid"
           ? "Payment recorded"
+          : action === "escalate-follow-up"
+          ? "Billing follow-up escalated"
           : "Billing follow-up queued",
       );
       await load();
@@ -165,6 +167,7 @@ export default function BillingReadinessPage() {
                     <div className="operator-cellMeta">
                       <span><strong>{job.invoiceIssuedAt ? "Invoice issued" : job.invoiceReady ? "Invoice ready" : "Not ready"}</strong></span>
                       <span>{job.invoicePaidAt ? "Paid" : job.paymentReady ? "Payment-capable" : "Payment not ready"}</span>
+                      {job.lifecycleState ? <span>Lifecycle {job.lifecycleState.replaceAll("_", " ")}</span> : null}
                       {job.invoiceDueAt ? (
                         <span>{job.invoiceOverdue ? `Payment overdue since ${new Date(job.invoiceDueAt).toLocaleDateString()}` : `Payment due ${new Date(job.invoiceDueAt).toLocaleDateString()}`}</span>
                       ) : null}
@@ -184,13 +187,26 @@ export default function BillingReadinessPage() {
                           : { label: "Open job", href: `/dashboard/jobs/${job.id}` }
                       }
                       actions={[
-                        ...(!job.invoicePaidAt ? [{
-                          label: busyJobId === job.id ? "Queuing..." : "Queue follow-up",
-                          onClick: () => void run(job.id, "queue-follow-up"),
-                          group: "Payments",
-                          description: "Create or refresh a billing reminder for this job",
-                          disabled: busyJobId === job.id,
-                        }] : []),
+                        ...(!job.invoicePaidAt
+                          ? [
+                              {
+                                label: busyJobId === job.id ? "Queuing..." : "Queue follow-up",
+                                onClick: () => void run(job.id, "queue-follow-up"),
+                                group: "Payments",
+                                description: "Create or refresh a billing reminder for this job",
+                                disabled: busyJobId === job.id,
+                              },
+                              ...(job.billingFollowUpOverdue
+                                ? [{
+                                    label: busyJobId === job.id ? "Escalating..." : "Escalate follow-up",
+                                    onClick: () => void run(job.id, "escalate-follow-up"),
+                                    group: "Payments",
+                                    description: "Pull an overdue billing follow-up forward for operator attention",
+                                    disabled: busyJobId === job.id,
+                                  }]
+                                : []),
+                            ]
+                          : []),
                         { label: "Open job", href: `/dashboard/jobs/${job.id}`, group: "Internal", description: "Open the internal job record" },
                         ...(job.portalUrl ? [{ label: "Open portal", href: job.portalUrl, group: "Customer access", description: "Open the current customer-facing job summary" }] : []),
                         ...(job.paymentLinkUrl ? [{ label: "Open payment link", href: job.paymentLinkUrl, group: "Payments", description: "Open the current payment URL" }] : []),
