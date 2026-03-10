@@ -1,11 +1,12 @@
 import Link from "next/link";
-import type { CSSProperties, ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 type OperatorAction = {
   label: string;
   href?: string;
   onClick?: () => void;
   variant?: "primary" | "secondary";
+  disabled?: boolean;
 };
 
 type OperatorStat = {
@@ -19,6 +20,19 @@ type OperatorFilterAction = {
   href?: string;
   onClick?: () => void;
   variant?: "primary" | "secondary";
+  disabled?: boolean;
+};
+
+type OperatorSavedView = {
+  id: string;
+  label: string;
+  count?: number;
+};
+
+type OperatorChip = {
+  id: string;
+  label: string;
+  onClear?: () => void;
 };
 
 function OperatorActionButton({ action }: { action: OperatorAction | OperatorFilterAction }) {
@@ -26,14 +40,14 @@ function OperatorActionButton({ action }: { action: OperatorAction | OperatorFil
 
   if (action.href) {
     return (
-      <Link className={className} href={action.href}>
+      <Link aria-disabled={action.disabled ? true : undefined} className={className} href={action.disabled ? "#" : action.href}>
         {action.label}
       </Link>
     );
   }
 
   return (
-    <button className={className} type="button" onClick={action.onClick}>
+    <button className={className} type="button" onClick={action.onClick} disabled={action.disabled}>
       {action.label}
     </button>
   );
@@ -143,6 +157,69 @@ export function OperatorFilterBar({
   );
 }
 
+export function OperatorSavedViews({
+  label = "Views",
+  views,
+  activeView,
+  onChange,
+}: {
+  label?: string;
+  views: OperatorSavedView[];
+  activeView: string;
+  onChange: (view: string) => void;
+}) {
+  return (
+    <div className="operator-viewTabs" aria-label={label} role="tablist">
+      {views.map((view) => (
+        <button
+          key={view.id}
+          className={`operator-viewTabs__item${view.id === activeView ? " is-active" : ""}`}
+          type="button"
+          role="tab"
+          aria-selected={view.id === activeView}
+          onClick={() => onChange(view.id)}
+        >
+          <span>{view.label}</span>
+          {typeof view.count === "number" ? <span className="operator-viewTabs__count">{view.count}</span> : null}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function OperatorActiveFilters({
+  chips,
+  clearLabel = "Reset all",
+  onClearAll,
+}: {
+  chips: OperatorChip[];
+  clearLabel?: string;
+  onClearAll?: () => void;
+}) {
+  if (!chips.length && !onClearAll) return null;
+
+  return (
+    <div className="operator-filterChips">
+      {chips.map((chip) => (
+        <button
+          key={chip.id}
+          className="operator-filterChips__item"
+          type="button"
+          onClick={chip.onClear}
+          disabled={!chip.onClear}
+        >
+          {chip.label}
+        </button>
+      ))}
+      {onClearAll ? (
+        <button className="operator-filterChips__clear" type="button" onClick={onClearAll}>
+          {clearLabel}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
 export function OperatorBulkBar({
   count,
   hint,
@@ -208,6 +285,92 @@ export function OperatorFilterField({
       <span className="operator-filterbar__label">{label}</span>
       {children}
     </label>
+  );
+}
+
+export function OperatorRowActions({
+  primaryAction,
+  actions,
+}: {
+  primaryAction?: OperatorAction;
+  actions?: OperatorAction[];
+}) {
+  const [open, setOpen] = useState(false);
+  const menuId = useId();
+  const ref = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+
+    function handlePointer(event: MouseEvent) {
+      if (!ref.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+
+    function handleKey(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    }
+
+    window.addEventListener("mousedown", handlePointer);
+    window.addEventListener("keydown", handleKey);
+    return () => {
+      window.removeEventListener("mousedown", handlePointer);
+      window.removeEventListener("keydown", handleKey);
+    };
+  }, [open]);
+
+  return (
+    <div className="operator-rowActions" ref={ref}>
+      {primaryAction ? <OperatorActionButton action={primaryAction} /> : null}
+      {actions?.length ? (
+        <div className={`operator-rowActions__menu${open ? " is-open" : ""}`}>
+          <button
+            aria-controls={menuId}
+            aria-expanded={open}
+            aria-label="More actions"
+            className="button secondary operator-rowActions__toggle"
+            type="button"
+            onClick={() => setOpen((prev) => !prev)}
+          >
+            •••
+          </button>
+          {open ? (
+            <div className="operator-rowActions__panel" id={menuId} role="menu">
+              {actions.map((action) =>
+                action.href ? (
+                  <Link
+                    key={`${action.label}-${action.href}`}
+                    className={`operator-rowActions__item${action.disabled ? " is-disabled" : ""}`}
+                    href={action.disabled ? "#" : action.href}
+                    onClick={() => setOpen(false)}
+                    role="menuitem"
+                  >
+                    {action.label}
+                  </Link>
+                ) : (
+                  <button
+                    key={`${action.label}-button`}
+                    className="operator-rowActions__item"
+                    disabled={action.disabled}
+                    role="menuitem"
+                    type="button"
+                    onClick={() => {
+                      action.onClick?.();
+                      setOpen(false);
+                    }}
+                  >
+                    {action.label}
+                  </button>
+                ),
+              )}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
   );
 }
 

@@ -1,16 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 import { DashboardShell } from "../../components/dashboard-shell";
 import {
+  OperatorActiveFilters,
   OperatorDataTable,
   OperatorDataTableHeader,
   OperatorDataTableRow,
   OperatorEmptyStateCard,
   OperatorFilterBar,
-  OperatorFilterField,
   OperatorPageHeader,
+  OperatorRowActions,
+  OperatorSavedViews,
 } from "../../components/ui/operator-page";
 import { apiFetch } from "../../lib/api";
 import { isMarketplaceEnabled } from "../../lib/feature-flags";
+import { useStickyOperatorView } from "../../lib/operator-view-state";
 
 type Integration = {
   key: string;
@@ -71,9 +74,9 @@ export default function IntegrationsPage() {
   const [error, setError] = useState("");
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [moduleSearch, setModuleSearch] = useState("");
-  const [moduleScope, setModuleScope] = useState<IntegrationScope>("all");
+  const [moduleScope, setModuleScope] = useStickyOperatorView<IntegrationScope>("mytitan_integrations_module_view_v1", "all");
   const [connectionSearch, setConnectionSearch] = useState("");
-  const [connectionScope, setConnectionScope] = useState<ConnectionScope>("all");
+  const [connectionScope, setConnectionScope] = useStickyOperatorView<ConnectionScope>("mytitan_integrations_connection_view_v1", "all");
   const marketplaceEnabled = isMarketplaceEnabled();
 
   const load = async () => {
@@ -182,6 +185,26 @@ export default function IntegrationsPage() {
     });
   }, [connectionScope, connectionSearch, connections]);
 
+  const clearModuleFilters = () => {
+    setModuleSearch("");
+    setModuleScope("all");
+  };
+
+  const clearConnectionFilters = () => {
+    setConnectionSearch("");
+    setConnectionScope("all");
+  };
+
+  const moduleFilterChips = [
+    moduleScope !== "all" ? { id: "module-view", label: `View: ${moduleScope}`, onClear: () => setModuleScope("all") } : null,
+    moduleSearch ? { id: "module-search", label: `Search: ${moduleSearch}`, onClear: () => setModuleSearch("") } : null,
+  ].filter((chip): chip is { id: string; label: string; onClear: () => void } => Boolean(chip));
+
+  const connectionFilterChips = [
+    connectionScope !== "all" ? { id: "connection-view", label: `View: ${connectionScope}`, onClear: () => setConnectionScope("all") } : null,
+    connectionSearch ? { id: "connection-search", label: `Search: ${connectionSearch}`, onClear: () => setConnectionSearch("") } : null,
+  ].filter((chip): chip is { id: string; label: string; onClear: () => void } => Boolean(chip));
+
   return (
     <DashboardShell>
       <div className="operator-stack">
@@ -207,23 +230,27 @@ export default function IntegrationsPage() {
             </div>
           </div>
 
+          <OperatorSavedViews
+            views={[
+              { id: "all", label: "All", count: items.length },
+              { id: "enabled", label: "Enabled", count: items.filter((item) => item.enabled).length },
+              { id: "restricted", label: "Restricted", count: items.filter((item) => !item.allowed).length },
+            ]}
+            activeView={moduleScope}
+            onChange={(view) => setModuleScope(view as IntegrationScope)}
+          />
+
           <OperatorFilterBar
             searchValue={moduleSearch}
             onSearchChange={setModuleSearch}
             searchPlaceholder="Search module, description, or key"
             resultsLabel={`${filteredItems.length} shown of ${items.length} modules`}
             actions={[
-              { label: "Reset filters", variant: "secondary", onClick: () => { setModuleSearch(""); setModuleScope("all"); } },
+              { label: "Reset filters", variant: "secondary", onClick: clearModuleFilters },
             ]}
-          >
-            <OperatorFilterField label="Scope">
-              <select className="input" value={moduleScope} onChange={(event) => setModuleScope(event.target.value as IntegrationScope)}>
-                <option value="all">All modules</option>
-                <option value="enabled">Enabled only</option>
-                <option value="restricted">Restricted only</option>
-              </select>
-            </OperatorFilterField>
-          </OperatorFilterBar>
+          />
+
+          <OperatorActiveFilters chips={moduleFilterChips} onClearAll={moduleFilterChips.length ? clearModuleFilters : undefined} />
 
           {filteredItems.length ? (
             <OperatorDataTable columns="minmax(220px, 1.4fr) minmax(160px, 0.9fr) minmax(160px, 0.9fr) minmax(170px, auto)">
@@ -256,17 +283,16 @@ export default function IntegrationsPage() {
                     </div>
                   </div>
                   <div className="operator-table__cell operator-table__cell--actions">
-                    <a className="button secondary operator-compact-button" href={item.configureUrl}>
-                      Configure
-                    </a>
-                    <button
-                      className={`toggle ${item.enabled ? "on" : ""}`}
-                      type="button"
-                      onClick={() => void toggle(item)}
-                      disabled={!item.allowed || savingKey === item.key}
-                    >
-                      {item.enabled ? "Enabled" : "Disabled"}
-                    </button>
+                    <OperatorRowActions
+                      primaryAction={{ label: "Configure", href: item.configureUrl, variant: "secondary" }}
+                      actions={[
+                        {
+                          label: item.enabled ? "Disable module" : "Enable module",
+                          onClick: () => void toggle(item),
+                          disabled: !item.allowed || savingKey === item.key,
+                        },
+                      ]}
+                    />
                   </div>
                 </OperatorDataTableRow>
               ))}
@@ -275,7 +301,7 @@ export default function IntegrationsPage() {
             <OperatorEmptyStateCard
               title="No modules match this filter"
               description="Clear the search or scope filter to review the full activation matrix."
-              actions={[{ label: "Reset filters", variant: "secondary", onClick: () => { setModuleSearch(""); setModuleScope("all"); } }]}
+              actions={[{ label: "Reset filters", variant: "secondary", onClick: clearModuleFilters }]}
             />
           )}
         </section>
@@ -288,24 +314,28 @@ export default function IntegrationsPage() {
             </div>
           </div>
 
+          <OperatorSavedViews
+            views={[
+              { id: "all", label: "All", count: CONNECTIONS.length },
+              { id: "connected", label: "Connected", count: CONNECTIONS.filter((conn) => connections[conn.key]?.connected).length },
+              { id: "ready", label: "Needs setup", count: CONNECTIONS.filter((conn) => connections[conn.key]?.allowed && connections[conn.key]?.enabled && !connections[conn.key]?.connected).length },
+              { id: "blocked", label: "Blocked", count: CONNECTIONS.filter((conn) => !connections[conn.key]?.allowed).length },
+            ]}
+            activeView={connectionScope}
+            onChange={(view) => setConnectionScope(view as ConnectionScope)}
+          />
+
           <OperatorFilterBar
             searchValue={connectionSearch}
             onSearchChange={setConnectionSearch}
             searchPlaceholder="Search provider or benefit"
             resultsLabel={`${filteredConnections.length} shown of ${CONNECTIONS.length} providers`}
             actions={[
-              { label: "Reset filters", variant: "secondary", onClick: () => { setConnectionSearch(""); setConnectionScope("all"); } },
+              { label: "Reset filters", variant: "secondary", onClick: clearConnectionFilters },
             ]}
-          >
-            <OperatorFilterField label="Connection state">
-              <select className="input" value={connectionScope} onChange={(event) => setConnectionScope(event.target.value as ConnectionScope)}>
-                <option value="all">All providers</option>
-                <option value="connected">Connected</option>
-                <option value="ready">Ready to connect</option>
-                <option value="blocked">Blocked</option>
-              </select>
-            </OperatorFilterField>
-          </OperatorFilterBar>
+          />
+
+          <OperatorActiveFilters chips={connectionFilterChips} onClearAll={connectionFilterChips.length ? clearConnectionFilters : undefined} />
 
           {filteredConnections.length ? (
             <OperatorDataTable columns="minmax(220px, 1.4fr) minmax(160px, 0.9fr) minmax(180px, 1fr) minmax(170px, auto)">
@@ -341,16 +371,16 @@ export default function IntegrationsPage() {
                       </div>
                     </div>
                     <div className="operator-table__cell operator-table__cell--actions">
-                      {!status?.allowed ? <span className="badge warn">Restricted</span> : null}
-                      {status?.connected ? (
-                        <button className="button secondary operator-compact-button" type="button" onClick={() => void disconnect(conn.key)} disabled={savingKey === conn.key}>
-                          Disconnect
-                        </button>
-                      ) : (
-                        <button className="button operator-compact-button" type="button" onClick={() => void connect(conn.key)} disabled={!canConnect || savingKey === conn.key}>
-                          Connect
-                        </button>
-                      )}
+                      <OperatorRowActions
+                        primaryAction={status?.connected
+                          ? { label: "Disconnect", onClick: () => void disconnect(conn.key), variant: "secondary", disabled: savingKey === conn.key }
+                          : { label: "Connect", onClick: () => void connect(conn.key), disabled: !canConnect || savingKey === conn.key }}
+                        actions={[
+                          ...(items.find((item) => item.key === conn.key)?.configureUrl
+                            ? [{ label: "Configure module", href: items.find((item) => item.key === conn.key)?.configureUrl as string }]
+                            : []),
+                        ]}
+                      />
                     </div>
                   </OperatorDataTableRow>
                 );
@@ -360,7 +390,7 @@ export default function IntegrationsPage() {
             <OperatorEmptyStateCard
               title="No providers match this filter"
               description="Clear the search or scope filter to review the full provider connection matrix."
-              actions={[{ label: "Reset filters", variant: "secondary", onClick: () => { setConnectionSearch(""); setConnectionScope("all"); } }]}
+              actions={[{ label: "Reset filters", variant: "secondary", onClick: clearConnectionFilters }]}
             />
           )}
         </section>

@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
 import { DashboardShell } from "../../../components/dashboard-shell";
 import {
+  OperatorActiveFilters,
   OperatorBulkBar,
   OperatorDataTable,
   OperatorDataTableHeader,
@@ -11,13 +12,17 @@ import {
   OperatorFilterBar,
   OperatorFilterField,
   OperatorPageHeader,
+  OperatorRowActions,
+  OperatorSavedViews,
 } from "../../../components/ui/operator-page";
 import OpsSignalsBar from "../../../components/entity/OpsSignalsBar";
+import { useStickyOperatorView } from "../../../lib/operator-view-state";
 import { apiFetch } from "../../../lib/api";
 import { getJobSignals } from "../../../lib/ops-signals";
 
 type JobStatus = "OPEN" | "SCHEDULED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
 type DateBucket = "all" | "upcoming" | "overdue" | "completed";
+type JobSavedView = "all" | "unassigned" | "needs-scheduling" | "in-progress" | "completed";
 
 const BULK_STATUSES: JobStatus[] = ["OPEN", "SCHEDULED", "IN_PROGRESS", "COMPLETED", "CANCELLED"];
 
@@ -64,6 +69,7 @@ export default function Jobs() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkStatus, setBulkStatus] = useState<JobStatus>("IN_PROGRESS");
   const [savingIds, setSavingIds] = useState<string[]>([]);
+  const [savedView, setSavedView] = useStickyOperatorView<JobSavedView>("mytitan_jobs_saved_view_v1", "all");
 
   const load = async () => {
     try {
@@ -85,11 +91,12 @@ export default function Jobs() {
     const filterParam = typeof router.query.filter === "string" ? router.query.filter : "";
     if (searchParam) setSearch(searchParam);
     if (filterParam === "unassigned") {
+      setSavedView("unassigned");
       setAssignmentFilter("unassigned");
     } else if (filterParam === "overdue" || filterParam === "unpaid") {
       setDateBucket("overdue");
     }
-  }, [router.isReady, router.query.filter, router.query.search]);
+  }, [router.isReady, router.query.filter, router.query.search, setSavedView]);
 
   function pushNotice(message: string) {
     setNotice(message);
@@ -160,9 +167,14 @@ export default function Jobs() {
     return jobs.filter((job) => {
       const status = String(job.status || "OPEN").toUpperCase();
       const assignment = resolveAssignment(job);
+      const hasSchedule = Boolean(job.scheduledAt);
       const searchable = [job.jobRef, job.customerName, job.vehicleReg, job.serviceName, assignment, status].filter(Boolean).join(" ").toLowerCase();
 
       if (normalizedSearch && !searchable.includes(normalizedSearch)) return false;
+      if (savedView === "unassigned" && assignment !== "Unassigned") return false;
+      if (savedView === "needs-scheduling" && (hasSchedule || ["COMPLETED", "CANCELLED"].includes(status))) return false;
+      if (savedView === "in-progress" && status !== "IN_PROGRESS") return false;
+      if (savedView === "completed" && status !== "COMPLETED") return false;
       if (statusFilter !== "all" && status !== statusFilter) return false;
       if (assignmentFilter === "unassigned" && assignment !== "Unassigned") return false;
       if (assignmentFilter !== "all" && assignmentFilter !== "unassigned" && assignment !== assignmentFilter) return false;
@@ -174,7 +186,42 @@ export default function Jobs() {
       if (dateBucket === "completed" && status !== "COMPLETED") return false;
       return true;
     });
-  }, [assignmentFilter, dateBucket, jobs, search, statusFilter]);
+  }, [assignmentFilter, dateBucket, jobs, savedView, search, statusFilter]);
+
+  const savedViewCounts = useMemo(() => {
+    const counts: Record<JobSavedView, number> = {
+      all: jobs.length,
+      unassigned: 0,
+      "needs-scheduling": 0,
+      "in-progress": 0,
+      completed: 0,
+    };
+    for (const job of jobs) {
+      const status = String(job.status || "OPEN").toUpperCase();
+      const assignment = resolveAssignment(job);
+      if (assignment === "Unassigned") counts.unassigned += 1;
+      if (!job.scheduledAt && !["COMPLETED", "CANCELLED"].includes(status)) counts["needs-scheduling"] += 1;
+      if (status === "IN_PROGRESS") counts["in-progress"] += 1;
+      if (status === "COMPLETED") counts.completed += 1;
+    }
+    return counts;
+  }, [jobs]);
+
+  const clearFilters = () => {
+    setSavedView("all");
+    setSearch("");
+    setStatusFilter("all");
+    setAssignmentFilter("all");
+    setDateBucket("all");
+  };
+
+  const activeFilters = [
+    savedView !== "all" ? { id: "view", label: `View: ${savedView.replace("-", " ")}`, onClear: () => setSavedView("all") } : null,
+    search ? { id: "search", label: `Search: ${search}`, onClear: () => setSearch("") } : null,
+    statusFilter !== "all" ? { id: "status", label: `Status: ${statusFilter}`, onClear: () => setStatusFilter("all") } : null,
+    assignmentFilter !== "all" ? { id: "assignment", label: `Owner: ${assignmentFilter}`, onClear: () => setAssignmentFilter("all") } : null,
+    dateBucket !== "all" ? { id: "dateBucket", label: `Timing: ${dateBucket}`, onClear: () => setDateBucket("all") } : null,
+  ].filter((chip): chip is { id: string; label: string; onClear: () => void } => Boolean(chip));
 
   const selectedVisibleCount = useMemo(
     () => filteredJobs.filter((job) => selectedIds.includes(job.id)).length,
@@ -206,13 +253,25 @@ export default function Jobs() {
             </div>
           </div>
 
+          <OperatorSavedViews
+            views={[
+              { id: "all", label: "All", count: savedViewCounts.all },
+              { id: "unassigned", label: "Unassigned", count: savedViewCounts.unassigned },
+              { id: "needs-scheduling", label: "Needs scheduling", count: savedViewCounts["needs-scheduling"] },
+              { id: "in-progress", label: "In progress", count: savedViewCounts["in-progress"] },
+              { id: "completed", label: "Completed", count: savedViewCounts.completed },
+            ]}
+            activeView={savedView}
+            onChange={(view) => setSavedView(view as JobSavedView)}
+          />
+
           <OperatorFilterBar
             searchValue={search}
             onSearchChange={setSearch}
             searchPlaceholder="Search job ref, customer, reg, service, or owner"
             resultsLabel={`${filteredJobs.length} shown of ${jobs.length} jobs`}
             actions={[
-              { label: "Reset filters", variant: "secondary", onClick: () => { setSearch(""); setStatusFilter("all"); setAssignmentFilter("all"); setDateBucket("all"); } },
+              { label: "Reset filters", variant: "secondary", onClick: clearFilters },
             ]}
           >
             <OperatorFilterField label="Status">
@@ -241,6 +300,8 @@ export default function Jobs() {
               </select>
             </OperatorFilterField>
           </OperatorFilterBar>
+
+          <OperatorActiveFilters chips={activeFilters} onClearAll={activeFilters.length ? clearFilters : undefined} />
 
           <OperatorBulkBar count={selectedIds.length} hint={`${selectedVisibleCount} of ${filteredJobs.length} visible rows selected`}>
             <button className="button secondary operator-compact-button" type="button" onClick={() => setSelectedIds([])}>
@@ -339,22 +400,19 @@ export default function Jobs() {
                       </div>
                     </div>
                     <div className="operator-table__cell operator-table__cell--actions">
-                      <button className="button secondary operator-compact-button" type="button" onClick={() => void copyText(job.jobRef || job.id, "Job ref")}>
-                        Copy ref
-                      </button>
-                      {nextStatus ? (
-                        <button
-                          className="button secondary operator-compact-button"
-                          type="button"
-                          disabled={savingIds.includes(job.id)}
-                          onClick={() => void updateSingleStatus(job.id, nextStatus)}
-                        >
-                          {nextStatus === "IN_PROGRESS" ? "Start" : "Complete"}
-                        </button>
-                      ) : null}
-                      <Link className="button operator-compact-button" href={`/dashboard/jobs/${job.id}`}>
-                        Open
-                      </Link>
+                      <OperatorRowActions
+                        primaryAction={{ label: "Open", href: `/dashboard/jobs/${job.id}` }}
+                        actions={[
+                          { label: "Copy ref", onClick: () => void copyText(job.jobRef || job.id, "Job ref"), variant: "secondary" },
+                          ...(nextStatus
+                            ? [{
+                                label: nextStatus === "IN_PROGRESS" ? "Start job" : "Complete job",
+                                onClick: () => void updateSingleStatus(job.id, nextStatus),
+                                disabled: savingIds.includes(job.id),
+                              }]
+                            : []),
+                        ]}
+                      />
                     </div>
                   </OperatorDataTableRow>
                 );
@@ -365,7 +423,7 @@ export default function Jobs() {
               title="No jobs match these filters"
               description="Try clearing the filters, open Command Centre for the live board, or create a new job."
               actions={[
-                { label: "Reset filters", variant: "secondary", onClick: () => { setSearch(""); setStatusFilter("all"); setAssignmentFilter("all"); setDateBucket("all"); } },
+                { label: "Reset filters", variant: "secondary", onClick: clearFilters },
                 { label: "Create job", href: "/dashboard/jobs/new" },
               ]}
             />

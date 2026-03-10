@@ -2,6 +2,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { DashboardShell } from "../../components/dashboard-shell";
 import {
+  OperatorActiveFilters,
   OperatorBulkBar,
   OperatorDataTable,
   OperatorDataTableHeader,
@@ -10,9 +11,12 @@ import {
   OperatorFilterBar,
   OperatorFilterField,
   OperatorPageHeader,
+  OperatorRowActions,
+  OperatorSavedViews,
 } from "../../components/ui/operator-page";
 import { apiFetch } from "../../lib/api";
 import { isMarketplaceEnabled } from "../../lib/feature-flags";
+import { useStickyOperatorView } from "../../lib/operator-view-state";
 
 type BookingSettings = {
   publicEnabled: boolean;
@@ -24,6 +28,7 @@ type BookingSettings = {
 };
 
 type TimingFilter = "all" | "upcoming" | "today" | "unlinked";
+type BookingSavedView = "all" | "upcoming" | "today" | "unlinked";
 
 function formatDateTime(value?: string | null) {
   if (!value) return "Unscheduled";
@@ -59,6 +64,7 @@ export default function BookingsPage() {
   const [timingFilter, setTimingFilter] = useState<TimingFilter>("all");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [notice, setNotice] = useState("");
+  const [savedView, setSavedView] = useStickyOperatorView<BookingSavedView>("mytitan_bookings_saved_view_v1", "all");
   const marketplaceEnabled = isMarketplaceEnabled();
 
   const load = async () => {
@@ -171,13 +177,46 @@ export default function BookingsPage() {
       const startsAt = booking?.startsAt ? new Date(booking.startsAt) : null;
 
       if (normalizedSearch && !searchable.includes(normalizedSearch)) return false;
+      if (savedView === "upcoming" && (!startsAt || Number.isNaN(startsAt.getTime()) || startsAt.getTime() < Date.now())) return false;
+      if (savedView === "today" && !isToday(booking.startsAt)) return false;
+      if (savedView === "unlinked" && booking.jobId) return false;
       if (statusFilter !== "all" && String(booking.status || "PLANNED") !== statusFilter) return false;
       if (timingFilter === "upcoming" && (!startsAt || Number.isNaN(startsAt.getTime()) || startsAt.getTime() < Date.now())) return false;
       if (timingFilter === "today" && !isToday(booking.startsAt)) return false;
       if (timingFilter === "unlinked" && booking.jobId) return false;
       return true;
     });
-  }, [bookings, search, statusFilter, timingFilter]);
+  }, [bookings, savedView, search, statusFilter, timingFilter]);
+
+  const savedViewCounts = useMemo(() => {
+    const counts: Record<BookingSavedView, number> = {
+      all: bookings.length,
+      upcoming: 0,
+      today: 0,
+      unlinked: 0,
+    };
+    for (const booking of bookings) {
+      const startsAt = booking?.startsAt ? new Date(booking.startsAt) : null;
+      if (startsAt && !Number.isNaN(startsAt.getTime()) && startsAt.getTime() >= Date.now()) counts.upcoming += 1;
+      if (isToday(booking.startsAt)) counts.today += 1;
+      if (!booking.jobId) counts.unlinked += 1;
+    }
+    return counts;
+  }, [bookings]);
+
+  const clearFilters = () => {
+    setSavedView("all");
+    setSearch("");
+    setStatusFilter("all");
+    setTimingFilter("all");
+  };
+
+  const activeFilters = [
+    savedView !== "all" ? { id: "view", label: `View: ${savedView.replace(/-/g, " ")}`, onClear: () => setSavedView("all") } : null,
+    search ? { id: "search", label: `Search: ${search}`, onClear: () => setSearch("") } : null,
+    statusFilter !== "all" ? { id: "status", label: `Status: ${statusFilter}`, onClear: () => setStatusFilter("all") } : null,
+    timingFilter !== "all" ? { id: "timing", label: `Timing: ${timingFilter}`, onClear: () => setTimingFilter("all") } : null,
+  ].filter((chip): chip is { id: string; label: string; onClear: () => void } => Boolean(chip));
 
   const allVisibleSelected = filteredBookings.length > 0 && filteredBookings.every((booking) => selectedIds.includes(booking.id));
 
@@ -339,13 +378,24 @@ export default function BookingsPage() {
             </div>
           </div>
 
+          <OperatorSavedViews
+            views={[
+              { id: "all", label: "All", count: savedViewCounts.all },
+              { id: "upcoming", label: "Upcoming", count: savedViewCounts.upcoming },
+              { id: "today", label: "Today", count: savedViewCounts.today },
+              { id: "unlinked", label: "Needs conversion", count: savedViewCounts.unlinked },
+            ]}
+            activeView={savedView}
+            onChange={(view) => setSavedView(view as BookingSavedView)}
+          />
+
           <OperatorFilterBar
             searchValue={search}
             onSearchChange={setSearch}
             searchPlaceholder="Search customer, booking id, job id, or status"
             resultsLabel={`${filteredBookings.length} shown of ${bookings.length} bookings`}
             actions={[
-              { label: "Reset filters", variant: "secondary", onClick: () => { setSearch(""); setStatusFilter("all"); setTimingFilter("all"); } },
+              { label: "Reset filters", variant: "secondary", onClick: clearFilters },
             ]}
           >
             <OperatorFilterField label="Status">
@@ -365,6 +415,8 @@ export default function BookingsPage() {
               </select>
             </OperatorFilterField>
           </OperatorFilterBar>
+
+          <OperatorActiveFilters chips={activeFilters} onClearAll={activeFilters.length ? clearFilters : undefined} />
 
           <OperatorBulkBar count={selectedIds.length} hint="Bulk tools stay non-destructive on bookings">
             <button className="button secondary operator-compact-button" type="button" onClick={() => setSelectedIds([])}>
@@ -464,17 +516,14 @@ export default function BookingsPage() {
                       </div>
                     </div>
                     <div className="operator-table__cell operator-table__cell--actions">
-                      {!booking.jobId ? (
-                        <Link className="button secondary operator-compact-button" href={convertHref}>
-                          Convert
-                        </Link>
-                      ) : null}
-                      <Link className="button secondary operator-compact-button" href={`/dashboard/bookings/${booking.id}`}>
-                        Open
-                      </Link>
-                      <Link className="button operator-compact-button" href="/dashboard/calendar">
-                        Schedule
-                      </Link>
+                      <OperatorRowActions
+                        primaryAction={{ label: "Schedule", href: "/dashboard/calendar" }}
+                        actions={[
+                          { label: "Open booking", href: `/dashboard/bookings/${booking.id}` },
+                          ...(!booking.jobId ? [{ label: "Convert to job", href: convertHref }] : []),
+                          { label: "Copy booking ID", onClick: () => void copyText(booking.id, "Booking ID") },
+                        ]}
+                      />
                     </div>
                   </OperatorDataTableRow>
                 );
@@ -485,7 +534,7 @@ export default function BookingsPage() {
               title="No bookings match this view"
               description="Clear the filters, open the calendar, or create a fresh booking from this page."
               actions={[
-                { label: "Reset filters", variant: "secondary", onClick: () => { setSearch(""); setStatusFilter("all"); setTimingFilter("all"); } },
+                { label: "Reset filters", variant: "secondary", onClick: clearFilters },
                 { label: "Open calendar", href: "/dashboard/calendar" },
               ]}
             />

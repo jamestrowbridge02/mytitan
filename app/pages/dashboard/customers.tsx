@@ -2,6 +2,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { DashboardShell } from "../../components/dashboard-shell";
 import {
+  OperatorActiveFilters,
   OperatorBulkBar,
   OperatorDataTable,
   OperatorDataTableHeader,
@@ -10,8 +11,11 @@ import {
   OperatorFilterBar,
   OperatorFilterField,
   OperatorPageHeader,
+  OperatorRowActions,
+  OperatorSavedViews,
 } from "../../components/ui/operator-page";
 import { apiFetch } from "../../lib/api";
+import { useStickyOperatorView } from "../../lib/operator-view-state";
 
 type CustomerRow = {
   id: string;
@@ -25,6 +29,7 @@ type CustomerRow = {
 
 type ContactFilter = "all" | "email" | "phone" | "missing";
 type ActivityFilter = "all" | "active" | "quiet";
+type CustomerSavedView = "all" | "needs-follow-up" | "recent-activity" | "missing-contact";
 
 function getTimelineHref(customer: CustomerRow) {
   return `/dashboard/customers/${encodeURIComponent(customer.slug || customer.id)}?name=${encodeURIComponent(customer.name)}`;
@@ -39,6 +44,7 @@ export default function CustomersPage() {
   const [contactFilter, setContactFilter] = useState<ContactFilter>("all");
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [savedView, setSavedView] = useStickyOperatorView<CustomerSavedView>("mytitan_customers_saved_view_v1", "all");
 
   useEffect(() => {
     const load = async () => {
@@ -142,6 +148,9 @@ export default function CustomersPage() {
       const activityCount = Number(customer.activityCount || 0);
 
       if (normalizedSearch && !searchable.includes(normalizedSearch)) return false;
+      if (savedView === "needs-follow-up" && activityCount > 0) return false;
+      if (savedView === "recent-activity" && activityCount <= 0) return false;
+      if (savedView === "missing-contact" && (hasEmail || hasPhone)) return false;
       if (contactFilter === "email" && !hasEmail) return false;
       if (contactFilter === "phone" && !hasPhone) return false;
       if (contactFilter === "missing" && (hasEmail || hasPhone)) return false;
@@ -149,7 +158,37 @@ export default function CustomersPage() {
       if (activityFilter === "quiet" && activityCount > 0) return false;
       return true;
     });
-  }, [activityFilter, contactFilter, customers, search]);
+  }, [activityFilter, contactFilter, customers, savedView, search]);
+
+  const savedViewCounts = useMemo(() => {
+    const counts: Record<CustomerSavedView, number> = {
+      all: customers.length,
+      "needs-follow-up": 0,
+      "recent-activity": 0,
+      "missing-contact": 0,
+    };
+    for (const customer of customers) {
+      const activityCount = Number(customer.activityCount || 0);
+      if (activityCount <= 0) counts["needs-follow-up"] += 1;
+      if (activityCount > 0) counts["recent-activity"] += 1;
+      if (!customer.email && !customer.phone) counts["missing-contact"] += 1;
+    }
+    return counts;
+  }, [customers]);
+
+  const clearFilters = () => {
+    setSavedView("all");
+    setSearch("");
+    setContactFilter("all");
+    setActivityFilter("all");
+  };
+
+  const activeFilters = [
+    savedView !== "all" ? { id: "view", label: `View: ${savedView.replace(/-/g, " ")}`, onClear: () => setSavedView("all") } : null,
+    search ? { id: "search", label: `Search: ${search}`, onClear: () => setSearch("") } : null,
+    contactFilter !== "all" ? { id: "contact", label: `Contact: ${contactFilter}`, onClear: () => setContactFilter("all") } : null,
+    activityFilter !== "all" ? { id: "activity", label: `Activity: ${activityFilter}`, onClear: () => setActivityFilter("all") } : null,
+  ].filter((chip): chip is { id: string; label: string; onClear: () => void } => Boolean(chip));
 
   const allVisibleSelected = filteredCustomers.length > 0 && filteredCustomers.every((customer) => selectedIds.includes(customer.id));
 
@@ -183,13 +222,24 @@ export default function CustomersPage() {
             </div>
           </div>
 
+          <OperatorSavedViews
+            views={[
+              { id: "all", label: "All", count: savedViewCounts.all },
+              { id: "needs-follow-up", label: "Needs follow-up", count: savedViewCounts["needs-follow-up"] },
+              { id: "recent-activity", label: "Recent activity", count: savedViewCounts["recent-activity"] },
+              { id: "missing-contact", label: "Missing contact", count: savedViewCounts["missing-contact"] },
+            ]}
+            activeView={savedView}
+            onChange={(view) => setSavedView(view as CustomerSavedView)}
+          />
+
           <OperatorFilterBar
             searchValue={search}
             onSearchChange={setSearch}
             searchPlaceholder="Search customer, phone, or email"
             resultsLabel={`${filteredCustomers.length} shown of ${customers.length} customers`}
             actions={[
-              { label: "Reset filters", variant: "secondary", onClick: () => { setSearch(""); setContactFilter("all"); setActivityFilter("all"); } },
+              { label: "Reset filters", variant: "secondary", onClick: clearFilters },
             ]}
           >
             <OperatorFilterField label="Contact">
@@ -208,6 +258,8 @@ export default function CustomersPage() {
               </select>
             </OperatorFilterField>
           </OperatorFilterBar>
+
+          <OperatorActiveFilters chips={activeFilters} onClearAll={activeFilters.length ? clearFilters : undefined} />
 
           <OperatorBulkBar count={selectedIds.length} hint="Bulk actions are non-destructive">
             <button className="button secondary operator-compact-button" type="button" onClick={() => setSelectedIds([])}>
@@ -293,17 +345,7 @@ export default function CustomersPage() {
                         <span className="operator-tag">{Number(customer.jobCount || 0)} jobs</span>
                       </div>
                       <div className="operator-cellSubtle">
-                        <button className="button secondary operator-compact-button" type="button" onClick={() => void createMessageEvent(customer, "sms.sent")}>
-                          Log SMS
-                        </button>
-                        {" "}
-                        <button className="button secondary operator-compact-button" type="button" onClick={() => void createMessageEvent(customer, "email.sent")}>
-                          Log email
-                        </button>
-                        {" "}
-                        <button className="button secondary operator-compact-button" type="button" onClick={() => void createMessageEvent(customer, "portal.viewed")}>
-                          Log portal
-                        </button>
+                        {customer.email || customer.phone ? "Direct contact available" : "Needs contact detail"}
                       </div>
                     </div>
                     <div className="operator-table__cell">
@@ -325,15 +367,17 @@ export default function CustomersPage() {
                       </div>
                     </div>
                     <div className="operator-table__cell operator-table__cell--actions">
-                      <button className="button secondary operator-compact-button" type="button" onClick={() => void sendQuickCommunication(customer, "sms")}>
-                        Send SMS
-                      </button>
-                      <button className="button secondary operator-compact-button" type="button" onClick={() => void sendQuickCommunication(customer, "email")}>
-                        Send email
-                      </button>
-                      <Link href={href} className="button operator-compact-button">
-                        Open timeline
-                      </Link>
+                      <OperatorRowActions
+                        primaryAction={{ label: "Open timeline", href }}
+                        actions={[
+                          ...(customer.phone ? [{ label: "Send SMS", onClick: () => void sendQuickCommunication(customer, "sms") }] : []),
+                          ...(customer.email ? [{ label: "Send email", onClick: () => void sendQuickCommunication(customer, "email") }] : []),
+                          { label: "Log SMS", onClick: () => void createMessageEvent(customer, "sms.sent") },
+                          { label: "Log email", onClick: () => void createMessageEvent(customer, "email.sent") },
+                          { label: "Log portal view", onClick: () => void createMessageEvent(customer, "portal.viewed") },
+                          { label: "Copy contact", onClick: () => void copyText(customer.email || customer.phone || customer.name, "Customer contact") },
+                        ]}
+                      />
                     </div>
                   </OperatorDataTableRow>
                 );
@@ -344,7 +388,7 @@ export default function CustomersPage() {
               title="No customers match this view"
               description="Clear the filters, create a job, or log a customer message event to seed the CRM workspace."
               actions={[
-                { label: "Reset filters", variant: "secondary", onClick: () => { setSearch(""); setContactFilter("all"); setActivityFilter("all"); } },
+                { label: "Reset filters", variant: "secondary", onClick: clearFilters },
                 { label: "Create job", href: "/dashboard/jobs/new" },
               ]}
             />

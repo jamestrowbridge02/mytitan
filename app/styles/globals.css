@@ -2628,6 +2628,46 @@ body {
   background: rgba(255, 255, 255, 0.03);
 }
 
+[data-shell="app"] .operator-viewTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+[data-shell="app"] .operator-viewTabs__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(226, 232, 240, 0.82);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+[data-shell="app"] .operator-viewTabs__item.is-active {
+  border-color: rgba(94, 234, 212, 0.34);
+  background: rgba(20, 184, 166, 0.14);
+  color: #effcf9;
+}
+
+[data-shell="app"] .operator-viewTabs__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 11px;
+}
+
 [data-shell="app"] .operator-filterbar__main {
   display: flex;
   align-items: flex-end;
@@ -2728,6 +2768,33 @@ body {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+[data-shell="app"] .operator-filterChips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+[data-shell="app"] .operator-filterChips__item,
+[data-shell="app"] .operator-filterChips__clear {
+  min-height: 30px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(226, 232, 240, 0.82);
+  padding: 0 10px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+[data-shell="app"] .operator-filterChips__clear {
+  border-color: rgba(94, 234, 212, 0.22);
+  color: #def7f3;
 }
 
 [data-shell="app"] .operator-list {
@@ -2892,6 +2959,64 @@ body {
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.04em;
+}
+
+[data-shell="app"] .operator-rowActions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  position: relative;
+}
+
+[data-shell="app"] .operator-rowActions__menu {
+  position: relative;
+}
+
+[data-shell="app"] .operator-rowActions__toggle {
+  min-width: 38px;
+  padding: 8px 10px;
+  font-size: 14px;
+  letter-spacing: 0.2em;
+}
+
+[data-shell="app"] .operator-rowActions__panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 12;
+  min-width: 180px;
+  padding: 6px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(10, 14, 24, 0.98);
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.35);
+}
+
+[data-shell="app"] .operator-rowActions__item {
+  display: flex;
+  width: 100%;
+  min-height: 34px;
+  align-items: center;
+  padding: 0 10px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: #edf2ff;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+}
+
+[data-shell="app"] .operator-rowActions__item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+[data-shell="app"] .operator-rowActions__item.is-disabled,
+[data-shell="app"] .operator-rowActions__item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 [data-shell="app"] .operator-empty {

@@ -4,12 +4,14 @@ import { useRouter } from 'next/router';
 import { DashboardShell } from '../../components/dashboard-shell';
 import { Skeleton } from '../../components/ui/Skeleton';
 import {
+  OperatorActiveFilters,
   OperatorDataTable,
   OperatorDataTableHeader,
   OperatorDataTableRow,
   OperatorFilterBar,
   OperatorFilterField,
   OperatorPageHeader,
+  OperatorSavedViews,
 } from '../../components/ui/operator-page';
 import { ErrorState } from '../../components/states/ErrorState';
 import { LoadingState } from '../../components/states/LoadingState';
@@ -21,6 +23,7 @@ import {
 } from '../../lib/feature-flags';
 import { formatSuggestedSlotLabel, type SuggestedSlot } from '../../lib/suggested-slot';
 import { SuggestedSlotReasons } from '../../components/SuggestedSlotReasons';
+import { useStickyOperatorView } from '../../lib/operator-view-state';
 
 type BookingWarning =
   | { code: 'OVERLAP'; id: string; startsAt: string; endsAt: string }
@@ -455,7 +458,7 @@ export default function CalendarPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [requestId, setRequestId] = useState<string | undefined>(undefined);
-  const [statusFilter, setStatusFilter] = useState<StatusFilterKey>('ALL');
+  const [statusFilter, setStatusFilter] = useStickyOperatorView<StatusFilterKey>('mytitan_calendar_status_view_v1', 'ALL');
   const [search, setSearch] = useState('');
   const [selectedTechId, setSelectedTechId] = useState('ALL');
   const [selectedLocationId, setSelectedLocationId] = useState('ALL');
@@ -1236,6 +1239,20 @@ export default function CalendarPage() {
       .slice(0, 10);
   }, [filteredBlocks]);
 
+  const clearFilters = () => {
+    setSearch('');
+    setSelectedTechId('ALL');
+    setSelectedLocationId('ALL');
+    setStatusFilter('ALL');
+  };
+
+  const activeFilters = [
+    statusFilter !== 'ALL' ? { id: 'status', label: `View: ${statusFilter.replace('_', ' ')}`, onClear: () => setStatusFilter('ALL') } : null,
+    search ? { id: 'search', label: `Search: ${search}`, onClear: () => setSearch('') } : null,
+    selectedTechId !== 'ALL' ? { id: 'tech', label: `Tech: ${technicianFilterOptions.find((tech) => tech.id === selectedTechId)?.name || selectedTechId}`, onClear: () => setSelectedTechId('ALL') } : null,
+    selectedLocationId !== 'ALL' ? { id: 'location', label: `Location: ${locationOptions.find((loc) => loc.id === selectedLocationId)?.label || selectedLocationId}`, onClear: () => setSelectedLocationId('ALL') } : null,
+  ].filter((chip): chip is { id: string; label: string; onClear: () => void } => Boolean(chip));
+
   return (
     <>
       <DashboardShell>
@@ -1268,6 +1285,21 @@ export default function CalendarPage() {
               </div>
             </div>
 
+        <OperatorSavedViews
+          views={STATUS_FILTERS.map((filter) => ({
+            id: filter.key,
+            label: filter.label,
+            count: filter.key === 'ALL'
+              ? (data?.blocks?.length || 0)
+              : filteredBlocks.filter((block) => {
+                  if (filter.key === 'UNASSIGNED') return !block.technician?.id;
+                  return block.status === filter.key;
+                }).length,
+          }))}
+          activeView={statusFilter}
+          onChange={(view) => setStatusFilter(view as StatusFilterKey)}
+        />
+
         <OperatorFilterBar
           searchValue={search}
           onSearchChange={setSearch}
@@ -1277,12 +1309,7 @@ export default function CalendarPage() {
             {
               label: 'Reset filters',
               variant: 'secondary',
-              onClick: () => {
-                setSearch('');
-                setSelectedTechId('ALL');
-                setSelectedLocationId('ALL');
-                setStatusFilter('ALL');
-              },
+              onClick: clearFilters,
             },
           ]}
         >
@@ -1312,6 +1339,7 @@ export default function CalendarPage() {
             </select>
           </OperatorFilterField>
         </OperatorFilterBar>
+        <OperatorActiveFilters chips={activeFilters} onClearAll={activeFilters.length ? clearFilters : undefined} />
         {schedulingEnabled && scheduleLoading ? (
           <p className="muted" style={{ marginTop: 6, fontSize: 12 }}>Loading schedules…</p>
         ) : null}
