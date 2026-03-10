@@ -29,6 +29,19 @@ export type AutomationRuleCondition = {
   invoiceIssued?: boolean | null;
   invoicePaid?: boolean | null;
   hasAssignedUser?: boolean | null;
+  customFieldEquals?: {
+    entityType: "job" | "booking" | "customer" | "technician";
+    key: string;
+    value: string | number | boolean;
+  } | null;
+  customFieldExists?: {
+    entityType: "job" | "booking" | "customer" | "technician";
+    key: string;
+  } | null;
+  customFieldNotExists?: {
+    entityType: "job" | "booking" | "customer" | "technician";
+    key: string;
+  } | null;
 };
 
 export type CreateReminderAction = {
@@ -90,6 +103,23 @@ export class AutomationRuleEngine {
     return this.moduleRef.get<any>(JobsService, { strict: false });
   }
 
+  private normalizeCustomFieldMatcher(
+    input: unknown,
+    mode: "equals" | "exists" | "not_exists",
+  ): AutomationRuleCondition["customFieldEquals"] | AutomationRuleCondition["customFieldExists"] | AutomationRuleCondition["customFieldNotExists"] | null {
+    if (!input || typeof input !== "object" || Array.isArray(input)) return null;
+    const raw = input as Record<string, unknown>;
+    const entityType = String(raw.entityType || "").trim().toLowerCase();
+    const key = String(raw.key || "").trim().toLowerCase();
+    if (!["job", "booking", "customer", "technician"].includes(entityType) || !key) return null;
+    if (mode === "equals") {
+      const value = raw.value;
+      if (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean") return null;
+      return { entityType: entityType as any, key, value };
+    }
+    return { entityType: entityType as any, key };
+  }
+
   private normalizeCondition(input: unknown): AutomationRuleCondition | null {
     if (!input || typeof input !== "object" || Array.isArray(input)) return null;
     const raw = input as Record<string, unknown>;
@@ -101,6 +131,9 @@ export class AutomationRuleEngine {
       invoiceIssued: typeof raw.invoiceIssued === "boolean" ? raw.invoiceIssued : null,
       invoicePaid: typeof raw.invoicePaid === "boolean" ? raw.invoicePaid : null,
       hasAssignedUser: typeof raw.hasAssignedUser === "boolean" ? raw.hasAssignedUser : null,
+      customFieldEquals: this.normalizeCustomFieldMatcher(raw.customFieldEquals, "equals") as any,
+      customFieldExists: this.normalizeCustomFieldMatcher(raw.customFieldExists, "exists") as any,
+      customFieldNotExists: this.normalizeCustomFieldMatcher(raw.customFieldNotExists, "not_exists") as any,
     };
   }
 
@@ -156,7 +189,39 @@ export class AutomationRuleEngine {
     return this.normalizeCondition(input);
   }
 
-  private matchesCondition(condition: AutomationRuleCondition | null, payload: AutomationRulePayload) {
+  private async resolveCustomFieldValue(
+    tenantId: string,
+    matcher: { entityType: "job" | "booking" | "customer" | "technician"; key: string },
+    payload: AutomationRulePayload,
+  ) {
+    const entityId =
+      matcher.entityType === "job"
+        ? payload.jobId
+        : matcher.entityType === "booking"
+          ? payload.bookingId
+          : matcher.entityType === "customer"
+            ? payload.customerId
+            : payload.assignedUserId;
+    if (!entityId) return { found: false, value: null };
+    const row = await this.prisma.customFieldValue.findFirst({
+      where: {
+        tenantId,
+        entityType: matcher.entityType.toUpperCase() as any,
+        entityId,
+        field: {
+          tenantId,
+          entityType: matcher.entityType.toUpperCase() as any,
+          key: matcher.key,
+        },
+      },
+      select: {
+        valueJson: true,
+      },
+    });
+    return { found: Boolean(row && row.valueJson !== null && row.valueJson !== undefined && row.valueJson !== ""), value: row?.valueJson ?? null };
+  }
+
+  private async matchesCondition(tenantId: string, condition: AutomationRuleCondition | null, payload: AutomationRulePayload) {
     if (!condition) return true;
     const currentStatus = String(payload.status || "").toUpperCase();
     if (condition.currentStatus && currentStatus !== condition.currentStatus) return false;
@@ -172,6 +237,18 @@ export class AutomationRuleEngine {
     if (condition.hasAssignedUser !== null && condition.hasAssignedUser !== undefined) {
       const hasAssignedUser = Boolean(payload.assignedUserId);
       if (hasAssignedUser !== condition.hasAssignedUser) return false;
+    }
+    if (condition.customFieldEquals) {
+      const resolved = await this.resolveCustomFieldValue(tenantId, condition.customFieldEquals, payload);
+      if (!resolved.found || resolved.value !== condition.customFieldEquals.value) return false;
+    }
+    if (condition.customFieldExists) {
+      const resolved = await this.resolveCustomFieldValue(tenantId, condition.customFieldExists, payload);
+      if (!resolved.found) return false;
+    }
+    if (condition.customFieldNotExists) {
+      const resolved = await this.resolveCustomFieldValue(tenantId, condition.customFieldNotExists, payload);
+      if (resolved.found) return false;
     }
     return true;
   }
@@ -372,7 +449,7 @@ export class AutomationRuleEngine {
     let matched = 0;
     for (const rule of rules) {
       const condition = this.normalizeCondition(rule.conditionJson);
-      if (!this.matchesCondition(condition, payload)) {
+      if (!(await this.matchesCondition(tenantId, condition, payload))) {
         continue;
       }
       matched += 1;
