@@ -187,6 +187,7 @@ model Company {
   jobSignatures            JobSignature[]
   automationsSetting       AutomationsSetting?
   automationRules          AutomationRule[]
+  automationSuggestionStates AutomationSuggestionState[]
 }
 
 model User {
@@ -965,6 +966,20 @@ model AutomationRule {
 
   @@index([tenantId, trigger, enabled])
   @@index([tenantId, createdAt])
+}
+
+model AutomationSuggestionState {
+  id            String   @id @default(cuid())
+  tenantId       String
+  suggestionKey  String
+  status         String
+  appliedRuleId  String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  tenant         Company  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, suggestionKey])
+  @@index([tenantId, status, updatedAt])
 }
 
 model ServiceCatalogItem {

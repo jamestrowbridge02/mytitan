@@ -69,6 +69,27 @@ export class AutomationsController {
     return this.automations.listWorkspaceRules(user.companyId);
   }
 
+  @Get("suggestions")
+  @Roles("OWNER", "ADMIN", "STAFF", "READ_ONLY")
+  suggestions(@CurrentUser() user: JwtPayload) {
+    requireAutomationsV1Enabled();
+    return this.automations.listSuggestions(user.companyId);
+  }
+
+  @Post("suggestions/:id/apply")
+  @Roles("OWNER", "ADMIN", "STAFF")
+  applySuggestion(@CurrentUser() user: JwtPayload, @Param("id") id: string) {
+    requireAutomationsV1Enabled();
+    return this.automations.applySuggestion(user, id);
+  }
+
+  @Post("suggestions/:id/dismiss")
+  @Roles("OWNER", "ADMIN", "STAFF")
+  dismissSuggestion(@CurrentUser() user: JwtPayload, @Param("id") id: string) {
+    requireAutomationsV1Enabled();
+    return this.automations.dismissSuggestion(user, id);
+  }
+
   @Post("workspace-rules")
   @Roles("OWNER", "ADMIN", "STAFF")
   createWorkspaceRule(@CurrentUser() user: JwtPayload, @Body() dto: CreateAutomationRuleDto) {

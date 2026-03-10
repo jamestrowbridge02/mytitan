@@ -6,6 +6,8 @@ import { ActivityService } from "../events/activity.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateAutomationRuleDto, UpdateAutomationRuleDto, UpdateAutomationsSettingsDto } from "./automations.dto";
 import { AUTOMATION_RULE_TRIGGERS, AutomationRuleAction, AutomationRuleEngine } from "./rule-engine";
+import { AutomationSuggestionEngine } from "./suggestion-engine";
+import type { AutomationSuggestion, AutomationSuggestionStatus } from "./suggestion-engine";
 
 const DEFAULT_SETTINGS = {
   bookingRemindersEnabled: false,
@@ -23,6 +25,7 @@ export class AutomationsService {
     private readonly audit: AuditService,
     private readonly activity: ActivityService,
     private readonly ruleEngine: AutomationRuleEngine,
+    private readonly suggestionEngine: AutomationSuggestionEngine,
   ) {}
 
   private normalizeSettings(configJson: any) {
@@ -124,6 +127,110 @@ export class AutomationsService {
       orderBy: [{ createdAt: "asc" }],
     });
     return rows.map((row) => this.serializeWorkspaceRule(row));
+  }
+
+  private serializeSuggestion(
+    suggestion: AutomationSuggestion,
+    status: AutomationSuggestionStatus = "new",
+    appliedRuleId?: string | null,
+  ) {
+    return {
+      ...suggestion,
+      status,
+      appliedRuleId: appliedRuleId || null,
+    };
+  }
+
+  async listSuggestions(tenantId: string) {
+    const [suggestions, states] = await Promise.all([
+      this.suggestionEngine.buildSuggestions(tenantId),
+      this.prisma.automationSuggestionState.findMany({
+        where: { tenantId },
+        select: {
+          suggestionKey: true,
+          status: true,
+          appliedRuleId: true,
+        },
+      }),
+    ]);
+
+    const stateMap = new Map(
+      (states || []).map((state) => [
+        state.suggestionKey,
+        { status: String(state.status || "new") as AutomationSuggestionStatus, appliedRuleId: state.appliedRuleId || null },
+      ]),
+    );
+
+    return suggestions
+      .map((suggestion) => {
+        const state = stateMap.get(suggestion.key);
+        return this.serializeSuggestion(suggestion, state?.status || "new", state?.appliedRuleId || null);
+      })
+      .filter((suggestion) => suggestion.status === "new");
+  }
+
+  private async upsertSuggestionState(
+    tenantId: string,
+    suggestionKey: string,
+    status: AutomationSuggestionStatus,
+    appliedRuleId?: string | null,
+  ) {
+    return this.prisma.automationSuggestionState.upsert({
+      where: {
+        tenantId_suggestionKey: {
+          tenantId,
+          suggestionKey,
+        },
+      },
+      create: {
+        tenantId,
+        suggestionKey,
+        status,
+        appliedRuleId: appliedRuleId || null,
+      },
+      update: {
+        status,
+        appliedRuleId: appliedRuleId || null,
+      },
+    });
+  }
+
+  async applySuggestion(user: JwtPayload, suggestionKey: string) {
+    const tenantId = user.companyId;
+    const suggestions = await this.listSuggestions(tenantId);
+    const suggestion = suggestions.find((item) => item.key === suggestionKey);
+    if (!suggestion) {
+      throw new BadRequestException("Automation suggestion not found");
+    }
+
+    const rule = await this.createWorkspaceRule(user, {
+      name: suggestion.title,
+      trigger: suggestion.trigger as CreateAutomationRuleDto["trigger"],
+      conditionJson: suggestion.conditionJson || undefined,
+      actionJson: suggestion.actionJson as any,
+      enabled: true,
+    });
+
+    await this.upsertSuggestionState(tenantId, suggestion.key, "applied", rule.id);
+    await this.audit.log(tenantId, "automations.suggestion.apply", `Applied automation suggestion: ${suggestion.title}`, user.sub);
+    return {
+      ok: true,
+      suggestionKey: suggestion.key,
+      rule,
+    };
+  }
+
+  async dismissSuggestion(user: JwtPayload, suggestionKey: string) {
+    const tenantId = user.companyId;
+    const suggestions = await this.suggestionEngine.buildSuggestions(tenantId);
+    const suggestion = suggestions.find((item) => item.key === suggestionKey);
+    if (!suggestion) {
+      throw new BadRequestException("Automation suggestion not found");
+    }
+
+    await this.upsertSuggestionState(tenantId, suggestion.key, "dismissed");
+    await this.audit.log(tenantId, "automations.suggestion.dismiss", `Dismissed automation suggestion: ${suggestion.title}`, user.sub);
+    return { ok: true, suggestionKey: suggestion.key };
   }
 
   async createWorkspaceRule(user: JwtPayload, dto: CreateAutomationRuleDto) {
