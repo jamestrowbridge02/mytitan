@@ -400,6 +400,7 @@ export class BillingService {
     const settings = await db.tenantSetting.findUnique({ where: { tenantId } });
     const now = new Date();
     const appUrl = process.env.APP_PUBLIC_URL || 'https://app.mytitan.co.uk';
+    const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const jobs = await db.job.findMany({
       where: {
         companyId: tenantId,
@@ -419,9 +420,33 @@ export class BillingService {
           orderBy: { remindAt: 'asc' },
           take: 1,
         },
+        activities: {
+          where: {
+            eventType: {
+              in: [
+                'billing.invoice.issued',
+                'billing.payment.received',
+                'billing.follow_up.requeued',
+                'billing.follow_up.escalated',
+                'job.reminder.create',
+                'job.reminder.completed',
+              ],
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 4,
+        },
       },
       orderBy: [{ completedAt: 'desc' }, { updatedAt: 'desc' }],
       take: 50,
+    });
+
+    const billingEscalationsLast7Days = await db.activityEvent.count({
+      where: {
+        tenantId,
+        type: 'automation.billing_follow_up_escalation',
+        at: { gte: last7Days },
+      },
     });
 
     const rows = jobs.map((job: any) => {
@@ -432,15 +457,34 @@ export class BillingService {
       const billingFollowUpAt = job.reminders?.[0]?.remindAt || null;
       const invoiceDueAt = job.invoiceDueAt || null;
       const invoiceOverdue = Boolean(invoiceDueAt && !job.invoicePaidAt && new Date(invoiceDueAt).getTime() < now.getTime());
+      const invoiceDueSoon = Boolean(
+        invoiceDueAt &&
+          !job.invoicePaidAt &&
+          !invoiceOverdue &&
+          new Date(invoiceDueAt).getTime() < now.getTime() + 48 * 60 * 60 * 1000,
+      );
       const lifecycleState = job.invoicePaidAt
         ? 'paid'
         : job.invoiceIssuedAt
         ? invoiceOverdue
           ? 'invoice_overdue'
+          : invoiceDueSoon
+          ? 'invoice_due_soon'
           : 'invoice_issued'
         : invoiceReady
         ? 'invoice_ready'
         : 'pre_billing';
+      const nextStep = job.invoicePaidAt
+        ? 'Payment recorded. Share receipt or close billing follow-through.'
+        : !job.invoiceIssuedAt
+        ? 'Issue invoice to start collections and customer payment guidance.'
+        : invoiceOverdue
+        ? 'Escalate collections and refresh customer payment guidance now.'
+        : billingFollowUpAt && new Date(billingFollowUpAt).getTime() < now.getTime()
+        ? 'Escalate the overdue billing follow-up.'
+        : paymentReady
+        ? 'Customer can pay through the portal or payment link once shared.'
+        : 'Track manual payment follow-through and customer confirmation.';
       return {
         id: job.id,
         jobRef: job.jobRef,
@@ -457,8 +501,16 @@ export class BillingService {
         portalReady,
         invoiceOverdue,
         lifecycleState,
+        nextStep,
         billingFollowUpAt,
         billingFollowUpOverdue: Boolean(billingFollowUpAt && new Date(billingFollowUpAt).getTime() < now.getTime()),
+        invoiceDocumentReady: Boolean(job.invoicePdfUrl),
+        receiptReady: Boolean(job.paymentReceiptUrl),
+        billingTimeline: (job.activities || []).map((activity: any) => ({
+          eventType: activity.eventType,
+          message: activity.message,
+          createdAt: activity.createdAt,
+        })),
         portalUrl: token ? `${appUrl}/portal/job/${token}` : null,
         paymentLinkUrl: job.paymentLinkUrl || null,
       };
@@ -471,10 +523,13 @@ export class BillingService {
         completedJobs: rows.length,
         invoiceReady: rows.filter((row) => row.invoiceReady).length,
         invoiceIssued: rows.filter((row) => Boolean(row.invoiceIssuedAt)).length,
+        issuedAwaitingPayment: rows.filter((row) => Boolean(row.invoiceIssuedAt) && !row.invoicePaidAt).length,
         paid: rows.filter((row) => Boolean(row.invoicePaidAt)).length,
         paymentReady: rows.filter((row) => row.paymentReady).length,
         portalReady: rows.filter((row) => row.portalReady).length,
+        overdueInvoices: rows.filter((row) => row.invoiceOverdue).length,
         overdueBillingFollowUps: rows.filter((row) => row.billingFollowUpOverdue).length,
+        billingEscalationsLast7Days,
       },
       jobs: rows,
     };

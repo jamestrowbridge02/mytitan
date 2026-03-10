@@ -32,6 +32,11 @@ type PortalInfo = {
     currency?: string | null;
     paymentMethod?: string | null;
     paymentStatus?: string | null;
+    paymentAvailable?: boolean | null;
+    billingState?: string | null;
+    nextCustomerStep?: string | null;
+    invoiceOverdue?: boolean | null;
+    receiptReady?: boolean | null;
     pdfReady?: boolean | null;
   };
   timeline?: Array<{ eventType?: string | null; message?: string | null; createdAt?: string | null }>;
@@ -546,17 +551,19 @@ export default function PublicJobPortal() {
   const dueTime = formatDateTime(portal?.summary?.invoiceDueAt);
   const nextStepMessage = declined
     ? 'This job is currently declined. Contact support if you need the scope corrected before continuing.'
-    : !approved
-      ? 'Review the scope and approve the job to continue.'
-      : !signed
-        ? 'Add your signature to confirm the approved work.'
-        : paymentsConfigured && !paid
-          ? dueTime
-            ? `Payment is the next step. The current invoice is due by ${dueTime}. Once payment is complete, your receipt and PDF will be available here.`
-            : 'Payment is the next step. Once payment is complete, your receipt and PDF will be available here.'
-          : !step5Done
-            ? 'Your PDF will unlock once the remaining steps complete.'
-            : 'Everything is complete. You can download the PDF or contact support if you need anything else.';
+    : portal?.summary?.nextCustomerStep
+      ? portal.summary.nextCustomerStep
+      : !approved
+        ? 'Review the scope and approve the job to continue.'
+        : !signed
+          ? 'Add your signature to confirm the approved work.'
+          : paymentsConfigured && !paid
+            ? dueTime
+              ? `Payment is the next step. The current invoice is due by ${dueTime}. Once payment is complete, your receipt and PDF will be available here.`
+              : 'Payment is the next step. Once payment is complete, your receipt and PDF will be available here.'
+            : !step5Done
+              ? 'Your PDF will unlock once the remaining steps complete.'
+              : 'Everything is complete. You can download the PDF or contact support if you need anything else.';
 
   const pdfSummary = step5Done ? (
     <>
@@ -601,6 +608,27 @@ export default function PublicJobPortal() {
           <StatusChip label="Paid" value={paid} />
           <StatusChip label="Completed" value={completed} />
         </div>
+
+        <section className="card" style={{ padding: 16, marginTop: 14 }}>
+          <h3 style={{ marginTop: 0 }}>Billing progress</h3>
+          <div style={{ display: 'grid', gap: 8 }}>
+            <p style={{ margin: 0 }}>
+              <strong>Billing state:</strong> {String(portal?.summary?.billingState || (paid ? 'paid' : job?.invoiceIssuedAt ? 'invoice_issued' : 'pre_invoice')).replaceAll('_', ' ')}
+            </p>
+            {dueTime ? (
+              <p style={{ margin: 0 }}>
+                <strong>Invoice due:</strong> {dueTime}
+                {portal?.summary?.invoiceOverdue ? ' · overdue' : ''}
+              </p>
+            ) : null}
+            <p style={{ margin: 0 }}>
+              <strong>Payment availability:</strong> {portal?.summary?.paymentAvailable ? 'Secure payment available here' : 'Payment handoff not enabled for this job'}
+            </p>
+            <p style={{ margin: 0 }}>
+              <strong>Receipt:</strong> {portal?.summary?.receiptReady ? 'Available after payment' : 'Not available yet'}
+            </p>
+          </div>
+        </section>
 
         <p className="muted" style={{ marginTop: 12 }}>{nextStepMessage}</p>
 
@@ -722,7 +750,11 @@ export default function PublicJobPortal() {
           title="Step 4: Pay"
           description={
             step4Enabled
-              ? 'Pay now, then come back and refresh your payment status.'
+              ? portal?.summary?.invoiceOverdue
+                ? 'Your invoice is overdue. Pay now or contact support if anything is unclear.'
+                : dueTime
+                  ? `Pay now. The current invoice is due by ${dueTime}.`
+                  : 'Pay now, then come back and refresh your payment status.'
               : 'Complete Step 3 first.'
           }
           done={step4Done}
@@ -733,6 +765,11 @@ export default function PublicJobPortal() {
             <p style={{ fontSize: 24, fontWeight: 800, color: '#7ff3b0', margin: 0 }}>Paid ✅</p>
           ) : paymentsConfigured ? (
             <div style={{ display: 'grid', gap: 10 }}>
+              {portal?.summary?.billingState ? (
+                <p className="muted" style={{ margin: 0 }}>
+                  Billing state: {String(portal.summary.billingState).replaceAll('_', ' ')}
+                </p>
+              ) : null}
               <button className="button" type="button" onClick={pay} disabled={!step4Enabled} style={{ width: '100%', minHeight: 46 }}>
                 Pay now
               </button>

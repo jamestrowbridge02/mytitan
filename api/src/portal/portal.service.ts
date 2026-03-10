@@ -52,6 +52,25 @@ export class PortalService {
       const token = job.publicTokens?.[0] || null;
       const portalState = !token ? 'not_provisioned' : new Date(token.expiresAt).getTime() > now.getTime() ? 'active' : 'expired';
       return {
+        commercialState:
+          job.invoicePaidAt
+            ? 'paid'
+            : job.invoiceIssuedAt
+            ? Boolean(job.invoiceDueAt && new Date(job.invoiceDueAt).getTime() < now.getTime())
+              ? 'invoice_overdue'
+              : 'invoice_issued'
+            : job.status === 'COMPLETED' || job.status === 'INVOICED'
+            ? 'invoice_ready'
+            : 'pre_invoice',
+        nextCustomerStep: job.invoicePaidAt
+          ? 'Payment has been recorded.'
+          : job.invoiceIssuedAt
+          ? Boolean(job.invoiceDueAt && new Date(job.invoiceDueAt).getTime() < now.getTime())
+            ? 'Customer payment is overdue.'
+            : 'Customer can review and pay the issued invoice.'
+          : job.status === 'COMPLETED' || job.status === 'INVOICED'
+          ? 'Prepare invoice and customer-facing payment guidance.'
+          : 'Portal can be used for progress visibility until billing is ready.',
         id: job.id,
         jobRef: job.jobRef,
         customerName: job.customerName,

@@ -80,6 +80,34 @@ export class PublicController {
     const paymentMethod = formData?.paymentMethod ?? null;
     const paymentStatus = formData?.paymentStatus ?? null;
     const pdfReady = Boolean(record.job.pdf?.contentBase64);
+    const paymentAvailable = Boolean(portalEnabled && paymentsEnabled && stripeReady && (record.job.totalCents || 0) > 0);
+    const invoiceOverdue = Boolean(record.job.invoiceDueAt && !record.job.invoicePaidAt && new Date(record.job.invoiceDueAt).getTime() < Date.now());
+    const billingState = record.job.invoicePaidAt
+      ? 'paid'
+      : record.job.invoiceIssuedAt
+      ? invoiceOverdue
+        ? 'invoice_overdue'
+        : 'invoice_issued'
+      : record.job.status === 'COMPLETED' || record.job.status === 'INVOICED'
+      ? 'invoice_ready'
+      : 'pre_invoice';
+    const nextCustomerStep = record.job.declinedAt
+      ? 'We are waiting for scope confirmation before work can continue.'
+      : !record.job.approvedAt
+      ? 'Review the work summary and approve it to continue.'
+      : !record.job.signedAt
+      ? 'Add your signature to confirm the approved work.'
+      : record.job.invoicePaidAt
+      ? 'Payment is complete. Your receipt and PDF are available below.'
+      : record.job.invoiceIssuedAt
+      ? invoiceOverdue
+        ? 'Your invoice is overdue. Please complete payment or contact support if anything is unclear.'
+        : paymentAvailable
+        ? 'Your invoice is ready for payment. You can pay securely from this portal.'
+        : 'Your invoice is ready. Contact support to complete payment.'
+      : record.job.status === 'COMPLETED' || record.job.status === 'INVOICED'
+      ? 'The job is complete. We are preparing the billing step now.'
+      : 'Track progress here while the job is still moving through service delivery.';
 
     return {
       job: {
@@ -145,10 +173,15 @@ export class PublicController {
           currency: record.job.currency,
           paymentMethod,
           paymentStatus,
+          paymentAvailable,
+          billingState,
+          nextCustomerStep,
+          invoiceOverdue,
+          receiptReady: Boolean(record.job.paymentReceiptUrl),
           pdfReady,
         },
         timeline: (record.job.activities || [])
-          .filter((item: any) => ['job.status', 'job.reminder.create', 'job.reminder.completed', 'tech.note', 'tech.arrived', 'booking.converted', 'billing.invoice.issued', 'billing.payment.received'].includes(String(item.eventType || '')))
+          .filter((item: any) => ['job.status', 'job.reminder.create', 'job.reminder.completed', 'tech.note', 'tech.arrived', 'booking.converted', 'billing.invoice.issued', 'billing.payment.received', 'billing.follow_up.escalated'].includes(String(item.eventType || '')))
           .map((item: any) => ({
             eventType: item.eventType,
             message: item.message,

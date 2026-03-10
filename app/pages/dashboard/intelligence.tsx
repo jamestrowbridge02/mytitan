@@ -22,6 +22,7 @@ type IntelligenceData = {
     customersNeedingFollowUp: number;
     billingReadyJobs: number;
     portalReadyJobs: number;
+    issuedAwaitingPayment: number;
     bookingsConvertedLast7Days: number;
     agedUnlinkedBookings: number;
     technicianCompletionQueue: number;
@@ -52,6 +53,7 @@ const EMPTY: IntelligenceData = {
     customersNeedingFollowUp: 0,
     billingReadyJobs: 0,
     portalReadyJobs: 0,
+    issuedAwaitingPayment: 0,
     bookingsConvertedLast7Days: 0,
     agedUnlinkedBookings: 0,
     technicianCompletionQueue: 0,
@@ -95,6 +97,7 @@ export default function IntelligencePage() {
       { label: "Upcoming bookings", value: String(data.summary.upcomingBookingsNext7Days), hint: "Next 7 days of schedule load" },
       { label: "Follow-up load", value: String(data.summary.customersNeedingFollowUp), hint: "Customers without recent activity" },
       { label: "Billing ready", value: String(data.summary.billingReadyJobs), hint: "Completed work not yet invoiced" },
+      { label: "Awaiting payment", value: String(data.summary.issuedAwaitingPayment), hint: "Issued invoices still waiting on payment" },
       { label: "Overdue invoices", value: String(data.summary.overdueInvoices), hint: "Issued invoices already past due" },
       { label: "Portal ready", value: String(data.summary.portalReadyJobs), hint: "Jobs with active customer access" },
       { label: "Portal expired", value: String(data.summary.expiredPortalLinks), hint: "Links that already need customer access recovery" },
@@ -204,6 +207,7 @@ export default function IntelligencePage() {
               ["Activity velocity in last 7 days", data.summary.activityEventsLast7Days, "System-wide activity event throughput"],
               ["Customers needing follow-up", data.summary.customersNeedingFollowUp, "No activity or stale activity in the last 30 days"],
               ["Billing-ready jobs", data.summary.billingReadyJobs, "Completed work still waiting on invoice issuance"],
+              ["Issued invoices awaiting payment", data.summary.issuedAwaitingPayment, "Collections is active but payment has not landed yet"],
               ["Portal-ready jobs", data.summary.portalReadyJobs, "Jobs already exposed through an active customer portal link"],
               ["Bookings converted last 7 days", data.summary.bookingsConvertedLast7Days, "Real booking-to-job throughput from the scheduling queue"],
               ["Aged unlinked bookings", data.summary.agedUnlinkedBookings, "Bookings that have been waiting for conversion for more than 48 hours"],

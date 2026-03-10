@@ -18,10 +18,13 @@ type BillingReadiness = {
     completedJobs: number;
     invoiceReady: number;
     invoiceIssued: number;
+    issuedAwaitingPayment: number;
     paid: number;
     paymentReady: number;
     portalReady: number;
+    overdueInvoices: number;
     overdueBillingFollowUps: number;
+    billingEscalationsLast7Days: number;
   };
   jobs: Array<{
     id: string;
@@ -39,8 +42,12 @@ type BillingReadiness = {
     portalReady: boolean;
     invoiceOverdue?: boolean;
     lifecycleState?: string;
+    nextStep?: string;
     billingFollowUpAt?: string | null;
     billingFollowUpOverdue?: boolean;
+    invoiceDocumentReady?: boolean;
+    receiptReady?: boolean;
+    billingTimeline?: Array<{ eventType?: string | null; message?: string | null; createdAt?: string | null }>;
     portalUrl?: string | null;
     paymentLinkUrl?: string | null;
   }>;
@@ -102,9 +109,12 @@ export default function BillingReadinessPage() {
     return [
       { label: "Invoice-ready", value: String(data.summary.invoiceReady), hint: "Completed work awaiting invoice flow" },
       { label: "Issued", value: String(data.summary.invoiceIssued), hint: "Invoice already issued" },
+      { label: "Awaiting payment", value: String(data.summary.issuedAwaitingPayment), hint: "Issued invoices still open" },
+      { label: "Overdue invoices", value: String(data.summary.overdueInvoices), hint: "Issued invoices already past due" },
       { label: "Paid", value: String(data.summary.paid), hint: "Paid jobs tracked by current billing fields" },
       { label: "Payment-ready", value: String(data.summary.paymentReady), hint: data.stripeConfigured ? "Stripe can attach later" : "Stripe not configured" },
       { label: "Overdue follow-ups", value: String(data.summary.overdueBillingFollowUps), hint: "Billing reminders already past due" },
+      { label: "Escalations 7d", value: String(data.summary.billingEscalationsLast7Days), hint: "Billing reminders pushed into faster collections follow-up" },
     ];
   }, [data]);
 
@@ -175,6 +185,12 @@ export default function BillingReadinessPage() {
                       {job.billingFollowUpAt ? (
                         <span>{job.billingFollowUpOverdue ? `Follow-up overdue since ${new Date(job.billingFollowUpAt).toLocaleDateString()}` : `Follow-up due ${new Date(job.billingFollowUpAt).toLocaleDateString()}`}</span>
                       ) : null}
+                      {job.nextStep ? <span>{job.nextStep}</span> : null}
+                      {job.billingTimeline?.[0]?.createdAt ? (
+                        <span>{job.billingTimeline[0].message || job.billingTimeline[0].eventType} · {new Date(job.billingTimeline[0].createdAt).toLocaleString()}</span>
+                      ) : null}
+                      <span>{job.invoiceDocumentReady ? "Invoice artifact linked" : "Invoice artifact not linked"}</span>
+                      <span>{job.receiptReady ? "Receipt stored" : "Receipt not stored"}</span>
                     </div>
                   </div>
                   <div className="operator-table__cell operator-table__cell--actions">

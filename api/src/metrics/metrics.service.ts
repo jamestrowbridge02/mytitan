@@ -77,6 +77,7 @@ export class MetricsService {
       customersNeedingFollowUp,
       billingReadyJobs,
       portalReadyJobs,
+      issuedAwaitingPayment,
       stalledJobs,
       unassignedOpenJobs,
       overdueBillingFollowUps,
@@ -155,6 +156,13 @@ export class MetricsService {
           companyId: tenantId,
           status: { in: ['COMPLETED', 'INVOICED'] },
           publicTokens: { some: { expiresAt: { gt: now } } },
+        },
+      }),
+      db.job.count({
+        where: {
+          companyId: tenantId,
+          invoiceIssuedAt: { not: null },
+          invoicePaidAt: null,
         },
       }),
       db.job.count({
@@ -301,6 +309,7 @@ export class MetricsService {
         customersNeedingFollowUp,
         billingReadyJobs,
         portalReadyJobs,
+        issuedAwaitingPayment,
         bookingsConvertedLast7Days,
         agedUnlinkedBookings,
         technicianCompletionQueue: inProgressTechnicianJobs,
@@ -315,6 +324,9 @@ export class MetricsService {
           : null,
         overdueInvoices > 0
           ? { key: 'overdue_invoices', label: 'Invoices overdue for payment', count: overdueInvoices, href: '/dashboard/billing/readiness', hint: 'Issued invoices have passed their due date without payment' }
+          : null,
+        issuedAwaitingPayment > 0
+          ? { key: 'issued_unpaid', label: 'Issued invoices awaiting payment', count: issuedAwaitingPayment, href: '/dashboard/billing/readiness', hint: 'Invoice collection is active but payment has not landed yet' }
           : null,
         agedUnlinkedBookings > 0
           ? { key: 'conversion_backlog', label: 'Aged conversion backlog', count: agedUnlinkedBookings, href: '/dashboard/bookings', hint: 'Bookings older than 48h are still not linked to jobs' }

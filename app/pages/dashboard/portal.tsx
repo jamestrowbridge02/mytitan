@@ -43,12 +43,15 @@ type PortalOverview = {
     portalUrl?: string | null;
     invoiceOverdue?: boolean;
     paymentReady: boolean;
+    commercialState?: string;
+    nextCustomerStep?: string;
   }>;
 };
 
 export default function PortalOpsPage() {
   const [data, setData] = useState<PortalOverview | null>(null);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [busyJobId, setBusyJobId] = useState<string | null>(null);
 
   async function load() {
@@ -65,10 +68,17 @@ export default function PortalOpsPage() {
     void load();
   }, []);
 
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(""), 2200);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+
   async function provisionLink(jobId: string) {
     setBusyJobId(jobId);
     try {
       await apiFetch(`/portal/jobs/${jobId}/link`, { method: "POST" });
+      setNotice("Portal link prepared");
       await load();
     } catch (err: any) {
       setError(err?.message || "Failed to prepare portal link");
@@ -87,6 +97,7 @@ export default function PortalOpsPage() {
           ? `/portal/jobs/${jobId}/revoke`
           : `/portal/jobs/${jobId}/regenerate`;
       await apiFetch(endpoint, { method: "POST" });
+      setNotice(action === "revoke" ? "Portal link revoked" : action === "regenerate" ? "Portal link regenerated" : "Portal link prepared");
       await load();
     } catch (err: any) {
       setError(err?.message || `Failed to ${action} portal link`);
@@ -131,6 +142,7 @@ export default function PortalOpsPage() {
         />
 
         {error ? <p role="alert" style={{ color: "#ff8a8a", marginTop: 0 }}>{error}</p> : null}
+        {notice ? <div aria-live="polite" className="ccv2-toast ccv2-toast--info" role="status">{notice}</div> : null}
 
         <section className="card operator-section">
           <div className="operator-section__header">
@@ -166,8 +178,10 @@ export default function PortalOpsPage() {
                   <div className="operator-table__cell">
                     <div className="operator-cellMeta">
                       <span><strong>{job.invoicePaidAt ? "Paid" : job.invoiceIssuedAt ? "Invoice issued" : "Pre-invoice"}</strong></span>
+                      {job.commercialState ? <span>Lifecycle {job.commercialState.replaceAll("_", " ")}</span> : null}
                       {job.invoiceDueAt ? <span>{job.invoiceOverdue ? `Payment overdue since ${new Date(job.invoiceDueAt).toLocaleDateString()}` : `Payment due ${new Date(job.invoiceDueAt).toLocaleDateString()}`}</span> : null}
                       <span>{job.paymentReady ? "Payment-capable portal" : "Portal-only / payment disabled"}</span>
+                      {job.nextCustomerStep ? <span>{job.nextCustomerStep}</span> : null}
                     </div>
                   </div>
                   <div className="operator-table__cell operator-table__cell--actions">
