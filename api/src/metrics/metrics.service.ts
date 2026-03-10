@@ -58,4 +58,123 @@ export class MetricsService {
       storageUsageBytes: usage?.storageBytesUsed ?? null,
     };
   }
+
+  async getIntelligence(tenantId: string) {
+    const db = this.prisma as any;
+    const now = new Date();
+    const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const last30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const next7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+    const [
+      jobsByStatus,
+      technicianLoad,
+      upcomingBookings,
+      publicUnlinkedBookings,
+      communicationsLast7Days,
+      activityVelocity,
+      customersNeedingFollowUp,
+      billingReadyJobs,
+      portalReadyJobs,
+    ] = await Promise.all([
+      db.job.groupBy({
+        by: ['status'],
+        where: { companyId: tenantId },
+        _count: { status: true },
+      }),
+      db.job.groupBy({
+        by: ['assignedUserId'],
+        where: {
+          companyId: tenantId,
+          assignedUserId: { not: null },
+          status: { in: ['OPEN', 'SCHEDULED', 'IN_PROGRESS'] },
+        },
+        _count: { assignedUserId: true },
+      }),
+      db.booking.count({
+        where: {
+          companyId: tenantId,
+          status: { not: 'CANCELLED' },
+          startsAt: { gte: now, lte: next7Days },
+        },
+      }),
+      db.booking.count({
+        where: {
+          companyId: tenantId,
+          source: 'PUBLIC',
+          jobId: null,
+          status: { in: ['PENDING', 'PLANNED', 'CONFIRMED'] },
+        },
+      }),
+      db.activityEvent.count({
+        where: {
+          tenantId,
+          type: { in: ['sms.sent', 'email.sent'] },
+          at: { gte: last7Days },
+        },
+      }),
+      db.activityEvent.count({
+        where: {
+          tenantId,
+          at: { gte: last7Days },
+        },
+      }),
+      db.customer.count({
+        where: {
+          companyId: tenantId,
+          OR: [
+            { activityEvents: { none: {} } },
+            { activityEvents: { none: { at: { gte: last30Days } } } },
+          ],
+        },
+      }),
+      db.job.count({
+        where: {
+          companyId: tenantId,
+          status: { in: ['COMPLETED', 'INVOICED'] },
+          invoiceIssuedAt: null,
+        },
+      }),
+      db.job.count({
+        where: {
+          companyId: tenantId,
+          status: { in: ['COMPLETED', 'INVOICED'] },
+          publicTokens: { some: { expiresAt: { gt: now } } },
+        },
+      }),
+    ]);
+
+    const assignedIds = technicianLoad.map((row: any) => row.assignedUserId).filter(Boolean);
+    const technicians = assignedIds.length
+      ? await db.user.findMany({
+          where: { id: { in: assignedIds } },
+          select: { id: true, email: true },
+        })
+      : [];
+    const techMap = new Map(technicians.map((tech: any) => [tech.id, tech.email]));
+
+    return {
+      jobsByStatus: jobsByStatus.map((row: any) => ({
+        status: row.status,
+        count: row._count.status,
+      })),
+      technicianLoad: technicianLoad
+        .filter((row: any) => row.assignedUserId)
+        .map((row: any) => ({
+          technicianId: row.assignedUserId,
+          technicianName: techMap.get(row.assignedUserId) || row.assignedUserId,
+          assignedJobs: row._count.assignedUserId,
+        }))
+        .sort((a: any, b: any) => b.assignedJobs - a.assignedJobs),
+      summary: {
+        upcomingBookingsNext7Days: upcomingBookings,
+        publicBookingsAwaitingConversion: publicUnlinkedBookings,
+        communicationsLast7Days,
+        activityEventsLast7Days: activityVelocity,
+        customersNeedingFollowUp,
+        billingReadyJobs,
+        portalReadyJobs,
+      },
+    };
+  }
 }

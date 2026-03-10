@@ -72,6 +72,12 @@ export class BillingController {
   me(@CurrentUser() user: JwtPayload) {
     return this.billing.getBillingInfo(user.companyId);
   }
+
+  @Get('readiness')
+  @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
+  readiness(@CurrentUser() user: JwtPayload) {
+    return this.billing.getBillingReadiness(user.companyId);
+  }
 }
 
 @Controller()

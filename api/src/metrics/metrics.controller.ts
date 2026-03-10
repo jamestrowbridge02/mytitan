@@ -27,4 +27,25 @@ export class MetricsController {
     }
     return this.metrics.getOverview(user.companyId);
   }
+
+  @Get('intelligence')
+  @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
+  intelligence(@CurrentUser() user: JwtPayload) {
+    if (!isMarketplaceEnabled()) {
+      return {
+        jobsByStatus: [],
+        technicianLoad: [],
+        summary: {
+          upcomingBookingsNext7Days: 0,
+          publicBookingsAwaitingConversion: 0,
+          communicationsLast7Days: 0,
+          activityEventsLast7Days: 0,
+          customersNeedingFollowUp: 0,
+          billingReadyJobs: 0,
+          portalReadyJobs: 0,
+        },
+      };
+    }
+    return this.metrics.getIntelligence(user.companyId);
+  }
 }

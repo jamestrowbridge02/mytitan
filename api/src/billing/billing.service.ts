@@ -341,6 +341,65 @@ export class BillingService {
     };
   }
 
+  async getBillingReadiness(tenantId: string) {
+    const db = this.prisma as any;
+    const settings = await db.tenantSetting.findUnique({ where: { tenantId } });
+    const now = new Date();
+    const appUrl = process.env.APP_PUBLIC_URL || 'https://app.mytitan.co.uk';
+    const jobs = await db.job.findMany({
+      where: {
+        companyId: tenantId,
+        status: { in: ['COMPLETED', 'INVOICED'] },
+      },
+      include: {
+        publicTokens: {
+          where: { expiresAt: { gt: now } },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
+      },
+      orderBy: [{ completedAt: 'desc' }, { updatedAt: 'desc' }],
+      take: 50,
+    });
+
+    const rows = jobs.map((job: any) => {
+      const token = job.publicTokens?.[0]?.token || null;
+      const invoiceReady = Boolean(job.completedAt || job.status === 'COMPLETED' || job.status === 'INVOICED');
+      const paymentReady = Boolean(settings?.paymentsEnabled && this.isStripeConfigured() && (job.totalCents || 0) > 0);
+      const portalReady = Boolean((settings?.featureCustomerPortal || settings?.paymentsEnabled) && token);
+      return {
+        id: job.id,
+        jobRef: job.jobRef,
+        customerName: job.customerName,
+        status: job.status,
+        totalCents: job.totalCents,
+        currency: job.currency,
+        completedAt: job.completedAt,
+        invoiceIssuedAt: job.invoiceIssuedAt,
+        invoicePaidAt: job.invoicePaidAt,
+        invoiceReady,
+        paymentReady,
+        portalReady,
+        portalUrl: token ? `${appUrl}/portal/job/${token}` : null,
+        paymentLinkUrl: job.paymentLinkUrl || null,
+      };
+    });
+
+    return {
+      paymentsEnabled: Boolean(settings?.paymentsEnabled),
+      stripeConfigured: this.isStripeConfigured(),
+      summary: {
+        completedJobs: rows.length,
+        invoiceReady: rows.filter((row) => row.invoiceReady).length,
+        invoiceIssued: rows.filter((row) => Boolean(row.invoiceIssuedAt)).length,
+        paid: rows.filter((row) => Boolean(row.invoicePaidAt)).length,
+        paymentReady: rows.filter((row) => row.paymentReady).length,
+        portalReady: rows.filter((row) => row.portalReady).length,
+      },
+      jobs: rows,
+    };
+  }
+
   private truncateWebhookError(error: unknown) {
     const message = error instanceof Error ? error.message : String(error || 'unknown webhook error');
     return message.slice(0, 500);
