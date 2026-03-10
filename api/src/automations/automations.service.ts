@@ -18,6 +18,9 @@ const DEFAULT_SETTINGS = {
   deliveryMode: "metadata_only" as const,
 };
 
+const BILLING_CONDITION_TRIGGERS = new Set(["job.completed", "invoice.issued", "invoice.overdue", "portal.document_signed"]);
+const ASSIGNMENT_CONDITION_TRIGGERS = new Set(["booking.converted", "job.created", "job.completed", "technician.arrived"]);
+
 @Injectable()
 export class AutomationsService {
   constructor(
@@ -99,6 +102,73 @@ export class AutomationsService {
       throw new BadRequestException("Unsupported automation trigger");
     }
     return trigger;
+  }
+
+  private describeRunResult(result: Record<string, any> | null | undefined) {
+    if (!result) return "No result details recorded";
+    if (result.outcome === "success") {
+      if (result.reminderId) return "Created a reminder successfully";
+      if (result.targetStatus) return `Advanced the job to ${result.targetStatus}`;
+      if (result.deliveryMode === "metadata_only") return "Queued a customer message in metadata-only mode";
+      return "Executed successfully";
+    }
+    if (result.outcome === "skipped") {
+      if (result.reason === "existing_open_reminder") return "Skipped because an open reminder already exists";
+      if (result.reason === "already_in_target_status") return "Skipped because the job was already in the target stage";
+      if (result.reason === "missing_job") return "Skipped because the event had no linked job";
+      if (result.reason === "missing_actor_or_jobs_service") return "Skipped because the required job service context was unavailable";
+      return `Skipped: ${String(result.reason || "condition not met").replace(/_/g, " ")}`;
+    }
+    if (result.outcome === "failed") {
+      return `Failed: ${String(result.error || "unknown error")}`;
+    }
+    return "Result recorded";
+  }
+
+  private describeRunWhy(payloadJson: any) {
+    const condition = payloadJson?.condition || null;
+    const fragments: string[] = [];
+    if (condition?.currentStatus) fragments.push(`status matched ${condition.currentStatus}`);
+    if (condition?.invoiceIssued === true) fragments.push("invoice was issued");
+    if (condition?.invoiceIssued === false) fragments.push("invoice was not issued");
+    if (condition?.invoicePaid === true) fragments.push("invoice was paid");
+    if (condition?.invoicePaid === false) fragments.push("invoice was unpaid");
+    if (condition?.hasAssignedUser === true) fragments.push("an assigned user was present");
+    if (condition?.hasAssignedUser === false) fragments.push("no assigned user was present");
+    if (fragments.length) {
+      return `Why: ${fragments.join(" and ")}`;
+    }
+    const result = payloadJson?.result || null;
+    if (result?.reason) {
+      return `Why: ${String(result.reason).replace(/_/g, " ")}`;
+    }
+    if (payloadJson?.trigger) {
+      return `Triggered by ${payloadJson.trigger}`;
+    }
+    return "Triggered by a matching automation event";
+  }
+
+  private validateWorkspaceRuleDefinition(
+    trigger: string,
+    conditionJson: Record<string, any> | null,
+    actionJson: AutomationRuleAction,
+  ) {
+    const condition = conditionJson || {};
+    if ((condition.invoiceIssued !== null && condition.invoiceIssued !== undefined) && !BILLING_CONDITION_TRIGGERS.has(trigger)) {
+      throw new BadRequestException("invoiceIssued can only be used with job completion, invoice, or portal-signing triggers");
+    }
+    if ((condition.invoicePaid !== null && condition.invoicePaid !== undefined) && !BILLING_CONDITION_TRIGGERS.has(trigger)) {
+      throw new BadRequestException("invoicePaid can only be used with job completion, invoice, or portal-signing triggers");
+    }
+    if ((condition.hasAssignedUser !== null && condition.hasAssignedUser !== undefined) && !ASSIGNMENT_CONDITION_TRIGGERS.has(trigger)) {
+      throw new BadRequestException("hasAssignedUser can only be used with booking, job, or technician workflow triggers");
+    }
+    if (actionJson.type === "advance_job_stage" && !actionJson.targetStatus) {
+      throw new BadRequestException("advance_job_stage requires a targetStatus");
+    }
+    if (actionJson.type === "send_internal_notification" && !String(actionJson.title || "").trim()) {
+      throw new BadRequestException("send_internal_notification requires a title");
+    }
   }
 
   private serializeWorkspaceRule(rule: any) {
@@ -242,6 +312,7 @@ export class AutomationsService {
     const trigger = this.validateTrigger(String(dto.trigger || ""));
     const conditionJson = this.ruleEngine.normalizeConditionInput(dto.conditionJson);
     const actionJson = this.ruleEngine.normalizeAction(dto.actionJson);
+    this.validateWorkspaceRuleDefinition(trigger, conditionJson, actionJson);
     const created = await this.prisma.automationRule.create({
       data: {
         tenantId,
@@ -280,6 +351,12 @@ export class AutomationsService {
     if (dto.enabled !== undefined) {
       data.enabled = Boolean(dto.enabled);
     }
+
+    this.validateWorkspaceRuleDefinition(
+      String(data.trigger ?? existing.trigger),
+      (data.conditionJson ?? this.ruleEngine.normalizeConditionInput(existing.conditionJson)) as Record<string, any> | null,
+      (data.actionJson ?? this.ruleEngine.normalizeAction(existing.actionJson)) as AutomationRuleAction,
+    );
 
     const updated = await this.prisma.automationRule.update({
       where: { id: existing.id },
@@ -567,18 +644,31 @@ export class AutomationsService {
       take: Math.max(1, Math.min(limit, 100)),
     });
 
-    return rows.map((row) => ({
-      id: row.id,
-      type: row.type,
-      label: row.label,
-      at: row.at,
-      jobId: row.jobId,
-      customerId: row.customerId,
-      jobRef: row.jobRef,
-      customerName: row.customerName,
-      status: row.status,
-      payloadJson: row.payloadJson,
-    }));
+    return rows.map((row) => {
+      const payloadJson =
+        row.payloadJson && typeof row.payloadJson === "object" && !Array.isArray(row.payloadJson)
+          ? (row.payloadJson as Record<string, any>)
+          : null;
+      return {
+        id: row.id,
+        type: row.type,
+        label: row.label,
+        at: row.at,
+        jobId: row.jobId,
+        customerId: row.customerId,
+        jobRef: row.jobRef,
+        customerName: row.customerName,
+        status: row.status,
+        payloadJson,
+        actionSummary: payloadJson?.action?.type
+          ? String(payloadJson.action.type).replace(/_/g, " ")
+          : payloadJson?.actionType
+          ? String(payloadJson.actionType).replace(/_/g, " ")
+          : null,
+        resultSummary: this.describeRunResult(payloadJson?.result),
+        whyItRan: this.describeRunWhy(payloadJson),
+      };
+    });
   }
 
   async getDiagnostics(tenantId: string) {

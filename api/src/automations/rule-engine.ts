@@ -335,6 +335,8 @@ export class AutomationRuleEngine {
   private async logRuleRun(
     tenantId: string,
     rule: any,
+    condition: AutomationRuleCondition | null,
+    action: AutomationRuleAction,
     payload: AutomationRulePayload,
     status: "success" | "skipped" | "failed",
     result: Record<string, any>,
@@ -352,7 +354,9 @@ export class AutomationRuleEngine {
         automationRuleId: rule.id,
         automationRuleName: rule.name,
         trigger: rule.trigger,
-        actionType: result?.actionType || null,
+        condition,
+        actionType: action.type,
+        action,
         result,
       },
     });
@@ -376,12 +380,12 @@ export class AutomationRuleEngine {
       const actorUserId = await this.resolveActorUserId(tenantId, payload.actorUserId || null);
       try {
         const result = await this.executeRuleAction(tenantId, actorUserId, rule, action, payload);
-        await this.logRuleRun(tenantId, rule, payload, (result.outcome === "success" ? "success" : "skipped"), {
+        await this.logRuleRun(tenantId, rule, condition, action, payload, (result.outcome === "success" ? "success" : "skipped"), {
           ...result,
           actionType: action.type,
         });
       } catch (error: any) {
-        await this.logRuleRun(tenantId, rule, payload, "failed", {
+        await this.logRuleRun(tenantId, rule, condition, action, payload, "failed", {
           actionType: action.type,
           outcome: "failed",
           error: String(error?.message || error || "unknown error").slice(0, 300),

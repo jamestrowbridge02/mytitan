@@ -135,6 +135,15 @@ type WorkspaceAutomationRule = {
   updatedAt?: string | null;
 };
 
+type AutomationTemplate = {
+  key: string;
+  title: string;
+  description: string;
+  trigger: string;
+  conditionJson: AutomationConditionDraft;
+  actionJson: AutomationActionDraft;
+};
+
 type AutomationSuggestion = {
   key: string;
   title: string;
@@ -161,26 +170,72 @@ type AutomationRun = {
     actionType?: string | null;
     result?: Record<string, any> | null;
   } | null;
+  actionSummary?: string | null;
+  resultSummary?: string | null;
+  whyItRan?: string | null;
 };
 
 const AUTOMATION_TRIGGER_OPTIONS = [
-  { value: 'booking.converted', label: 'Booking converted' },
-  { value: 'job.created', label: 'Job created' },
-  { value: 'job.completed', label: 'Job completed' },
-  { value: 'invoice.issued', label: 'Invoice issued' },
-  { value: 'invoice.overdue', label: 'Invoice overdue' },
-  { value: 'technician.arrived', label: 'Technician arrived' },
-  { value: 'portal.document_signed', label: 'Portal document signed' },
+  { value: 'booking.converted', label: 'Booking converted', description: 'Use this when work intake becomes a live job and dispatch follow-up may be needed.' },
+  { value: 'job.created', label: 'Job created', description: 'Use this when newly created jobs should immediately create a follow-up or notification.' },
+  { value: 'job.completed', label: 'Job completed', description: 'Use this for post-completion billing, review, or customer follow-up workflows.' },
+  { value: 'invoice.issued', label: 'Invoice issued', description: 'Use this when collections or customer communication should start once billing is sent.' },
+  { value: 'invoice.overdue', label: 'Invoice overdue', description: 'Use this to escalate unpaid invoice follow-up once due dates have passed.' },
+  { value: 'technician.arrived', label: 'Technician arrived', description: 'Use this to notify dispatch or office staff when field work begins.' },
+  { value: 'portal.document_signed', label: 'Portal document signed', description: 'Use this to continue workflow after a customer signs portal paperwork.' },
 ];
 
 const AUTOMATION_ACTION_OPTIONS = [
-  { value: 'create_reminder', label: 'Create reminder' },
-  { value: 'send_internal_notification', label: 'Send internal notification' },
-  { value: 'advance_job_stage', label: 'Advance job stage' },
-  { value: 'send_customer_message', label: 'Queue customer message' },
+  { value: 'create_reminder', label: 'Create reminder', description: 'Create an in-app follow-up reminder tied to the job.' },
+  { value: 'send_internal_notification', label: 'Send internal notification', description: 'Log and surface an internal notification in the activity stream.' },
+  { value: 'advance_job_stage', label: 'Advance job stage', description: 'Move the job to another canonical status using the existing jobs service.' },
+  { value: 'send_customer_message', label: 'Queue customer message', description: 'Queue a customer follow-up message as metadata-only activity.' },
 ];
 
 const AUTOMATION_STATUS_OPTIONS = ['OPEN', 'SCHEDULED', 'IN_PROGRESS', 'COMPLETED', 'INVOICED', 'CANCELLED'];
+
+const AUTOMATION_TEMPLATES: AutomationTemplate[] = [
+  {
+    key: 'completed-job-billing-reminder',
+    title: 'Completed job billing reminder',
+    description: 'Follow up on completed work that still needs billing closure.',
+    trigger: 'job.completed',
+    conditionJson: { invoicePaid: false },
+    actionJson: { type: 'create_reminder', delayDays: 3, note: 'Completed job billing follow-up', channel: 'in_app' },
+  },
+  {
+    key: 'overdue-invoice-follow-up',
+    title: 'Overdue invoice follow-up',
+    description: 'Create a collections reminder when an invoice becomes overdue.',
+    trigger: 'invoice.overdue',
+    conditionJson: { invoicePaid: false },
+    actionJson: { type: 'create_reminder', delayDays: 0, note: 'Overdue invoice follow-up', channel: 'in_app' },
+  },
+  {
+    key: 'technician-arrival-office-notification',
+    title: 'Technician arrival office notification',
+    description: 'Notify the office when a technician arrives on site.',
+    trigger: 'technician.arrived',
+    conditionJson: {},
+    actionJson: { type: 'send_internal_notification', title: 'Technician arrival check-in', body: 'A technician arrived on site and the office may need to follow up.' },
+  },
+  {
+    key: 'portal-document-signed-follow-up',
+    title: 'Portal document signed follow-up',
+    description: 'Notify internal staff when portal paperwork is signed.',
+    trigger: 'portal.document_signed',
+    conditionJson: {},
+    actionJson: { type: 'send_internal_notification', title: 'Portal document signed', body: 'A customer signed portal paperwork and the next office action should be reviewed.' },
+  },
+  {
+    key: 'booking-conversion-dispatch',
+    title: 'Booking conversion dispatch notification',
+    description: 'Alert dispatch when converted work still needs assignment.',
+    trigger: 'booking.converted',
+    conditionJson: { hasAssignedUser: false },
+    actionJson: { type: 'send_internal_notification', title: 'Dispatch follow-up required', body: 'A converted booking still needs dispatch review.' },
+  },
+];
 
 function createDefaultRuleDraft(): AutomationRuleDraft {
   return {
@@ -195,6 +250,73 @@ function createDefaultRuleDraft(): AutomationRuleDraft {
 
 function renderStatuses(stage: WorkflowStage) {
   return stage.statuses.join(', ');
+}
+
+function describeTrigger(trigger: string) {
+  return AUTOMATION_TRIGGER_OPTIONS.find((option) => option.value === trigger)?.description || 'Choose the workflow event that should start this rule.';
+}
+
+function describeAction(actionType: string) {
+  return AUTOMATION_ACTION_OPTIONS.find((option) => option.value === actionType)?.description || 'Choose what the rule should do when conditions match.';
+}
+
+function buildRuleSummary(ruleDraft: AutomationRuleDraft) {
+  const triggerLabel = AUTOMATION_TRIGGER_OPTIONS.find((option) => option.value === ruleDraft.trigger)?.label || ruleDraft.trigger;
+  const conditionParts: string[] = [];
+  if (ruleDraft.conditionJson.currentStatus) conditionParts.push(`status is ${ruleDraft.conditionJson.currentStatus}`);
+  if (ruleDraft.conditionJson.invoiceIssued === true) conditionParts.push('invoice is issued');
+  if (ruleDraft.conditionJson.invoiceIssued === false) conditionParts.push('invoice is not issued');
+  if (ruleDraft.conditionJson.invoicePaid === true) conditionParts.push('invoice is paid');
+  if (ruleDraft.conditionJson.invoicePaid === false) conditionParts.push('invoice is unpaid');
+  if (ruleDraft.conditionJson.hasAssignedUser === true) conditionParts.push('an assigned user exists');
+  if (ruleDraft.conditionJson.hasAssignedUser === false) conditionParts.push('no assigned user exists');
+
+  let actionSummary = 'record an action';
+  if (ruleDraft.actionJson.type === 'create_reminder') {
+    actionSummary = `create a reminder after ${ruleDraft.actionJson.delayDays ?? 0} day(s)`;
+  } else if (ruleDraft.actionJson.type === 'send_internal_notification') {
+    actionSummary = `send an internal notification${ruleDraft.actionJson.title ? ` called "${ruleDraft.actionJson.title}"` : ''}`;
+  } else if (ruleDraft.actionJson.type === 'advance_job_stage') {
+    actionSummary = `advance the job to ${ruleDraft.actionJson.targetStatus || 'a new status'}`;
+  } else if (ruleDraft.actionJson.type === 'send_customer_message') {
+    actionSummary = 'queue a customer message';
+  }
+
+  return `When ${triggerLabel.toLowerCase()}${conditionParts.length ? ` and ${conditionParts.join(' and ')}` : ''}, ${actionSummary}.`;
+}
+
+function getRuleDraftValidationError(ruleDraft: AutomationRuleDraft) {
+  const name = String(ruleDraft.name || '').trim();
+  if (!name) return 'Rule name is required.';
+  if (ruleDraft.actionJson.type === 'create_reminder') {
+    const delayDays = Number(ruleDraft.actionJson.delayDays ?? 0);
+    if (!Number.isFinite(delayDays) || delayDays < 0 || delayDays > 30) {
+      return 'Reminder delay must be between 0 and 30 days.';
+    }
+  }
+  if (ruleDraft.actionJson.type === 'send_internal_notification' && !String(ruleDraft.actionJson.title || '').trim()) {
+    return 'Internal notifications need a title.';
+  }
+  if (ruleDraft.actionJson.type === 'advance_job_stage' && !String(ruleDraft.actionJson.targetStatus || '').trim()) {
+    return 'Choose a target status for the stage advance action.';
+  }
+  if (ruleDraft.actionJson.type === 'send_customer_message' && !String(ruleDraft.actionJson.body || '').trim()) {
+    return 'Customer messages need message body text.';
+  }
+  const billingConditionSelected =
+    ruleDraft.conditionJson.invoiceIssued !== null && ruleDraft.conditionJson.invoiceIssued !== undefined
+    || ruleDraft.conditionJson.invoicePaid !== null && ruleDraft.conditionJson.invoicePaid !== undefined;
+  if (billingConditionSelected && !['job.completed', 'invoice.issued', 'invoice.overdue', 'portal.document_signed'].includes(ruleDraft.trigger)) {
+    return 'Invoice conditions can only be used with job completion, invoice, or portal-signing triggers.';
+  }
+  if (
+    ruleDraft.conditionJson.hasAssignedUser !== null &&
+    ruleDraft.conditionJson.hasAssignedUser !== undefined &&
+    !['booking.converted', 'job.created', 'job.completed', 'technician.arrived'].includes(ruleDraft.trigger)
+  ) {
+    return 'Assigned-user conditions can only be used with booking, job, or technician workflow triggers.';
+  }
+  return '';
 }
 
 export default function SettingsPage() {
@@ -260,6 +382,16 @@ export default function SettingsPage() {
   const bookingStages = useMemo(() => getBookingStages(form), [form]);
   const jobStages = useMemo(() => getJobStages(form), [form]);
   const technicianStages = useMemo(() => getTechnicianStages(form), [form]);
+  const selectedTriggerMeta = useMemo(
+    () => AUTOMATION_TRIGGER_OPTIONS.find((option) => option.value === ruleDraft.trigger) || null,
+    [ruleDraft.trigger],
+  );
+  const selectedActionMeta = useMemo(
+    () => AUTOMATION_ACTION_OPTIONS.find((option) => option.value === ruleDraft.actionJson.type) || null,
+    [ruleDraft.actionJson.type],
+  );
+  const automationRuleSummary = useMemo(() => buildRuleSummary(ruleDraft), [ruleDraft]);
+  const automationRuleValidationError = useMemo(() => getRuleDraftValidationError(ruleDraft), [ruleDraft]);
   const stageSections: StageSectionConfig[] = useMemo(() => [
     { key: 'bookings', title: 'Bookings workflow', stages: bookingStages },
     { key: 'jobs', title: 'Jobs workflow', stages: jobStages },
@@ -402,6 +534,18 @@ export default function SettingsPage() {
     setRuleEditorOpen(true);
   }
 
+  function applyAutomationTemplate(template: AutomationTemplate) {
+    setRuleDraft({
+      id: null,
+      name: template.title,
+      trigger: template.trigger,
+      enabled: true,
+      conditionJson: template.conditionJson,
+      actionJson: template.actionJson,
+    });
+    setRuleEditorOpen(true);
+  }
+
   function openEditRule(rule: WorkspaceAutomationRule) {
     setRuleDraft({
       id: rule.id,
@@ -417,6 +561,10 @@ export default function SettingsPage() {
   async function saveAutomationRule() {
     if (!automationsEnabled) return;
     clearNotice();
+    if (automationRuleValidationError) {
+      showError(automationRuleValidationError);
+      return;
+    }
     setSavingRule(true);
     setAutomationRulesError('');
     try {
@@ -1127,6 +1275,32 @@ export default function SettingsPage() {
                 <p className="muted settings-premium-muted">Automations are disabled for this runtime.</p>
               ) : null}
 
+              <div className="theme-preview" data-testid="automation-template-list" style={{ marginBottom: 14 }}>
+                <strong>Common templates</strong>
+                <p className="muted settings-premium-muted" style={{ marginTop: 8, marginBottom: 12 }}>
+                  Start from a safe template, then review the rule before saving it.
+                </p>
+                <div style={{ display: 'grid', gap: 10 }}>
+                  {AUTOMATION_TEMPLATES.map((template) => (
+                    <div key={template.key} style={{ border: '1px solid rgba(148,163,184,0.16)', borderRadius: 12, padding: 12, display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+                      <div>
+                        <strong>{template.title}</strong>
+                        <div className="muted settings-premium-muted" style={{ marginTop: 4 }}>{template.description}</div>
+                      </div>
+                      <button
+                        className="button secondary settings-premium-button"
+                        type="button"
+                        data-testid={`automation-template-${template.key}`}
+                        onClick={() => applyAutomationTemplate(template)}
+                        disabled={!automationsEnabled}
+                      >
+                        Use template
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               {automationRulesError ? <p style={{ color: '#fca5a5' }}>{automationRulesError}</p> : null}
 
               <div data-testid="automation-rule-list" style={{ display: 'grid', gap: 12 }}>
@@ -1199,6 +1373,10 @@ export default function SettingsPage() {
             {ruleEditorOpen ? (
               <div className="card settings-premium-card" data-testid="automation-rule-editor" style={{ marginBottom: 12 }}>
                 <h3 style={{ marginTop: 0 }}>{ruleDraft.id ? 'Edit automation rule' : 'Create automation rule'}</h3>
+                <div className="theme-preview" data-testid="automation-rule-summary" style={{ marginBottom: 12 }}>
+                  <strong>Rule preview</strong>
+                  <p className="muted settings-premium-muted" style={{ margin: '8px 0 0' }}>{automationRuleSummary}</p>
+                </div>
 
                 <label className="settings-premium-label">Rule name</label>
                 <input
@@ -1222,6 +1400,7 @@ export default function SettingsPage() {
                     </option>
                   ))}
                 </select>
+                <p className="muted settings-premium-muted" style={{ marginTop: 6 }}>{selectedTriggerMeta?.description || describeTrigger(ruleDraft.trigger)}</p>
 
                 <label style={{ display: 'block', marginBottom: 12 }}>
                   <input
@@ -1251,6 +1430,7 @@ export default function SettingsPage() {
                         </option>
                       ))}
                     </select>
+                    <p className="muted settings-premium-muted" style={{ marginTop: 6 }}>Only run when the job is already in a specific canonical status.</p>
                   </div>
 
                   <div>
@@ -1270,6 +1450,7 @@ export default function SettingsPage() {
                       <option value="true">Yes</option>
                       <option value="false">No</option>
                     </select>
+                    <p className="muted settings-premium-muted" style={{ marginTop: 6 }}>Only valid for job completion, invoice, or portal-signing triggers.</p>
                   </div>
 
                   <div>
@@ -1289,6 +1470,7 @@ export default function SettingsPage() {
                       <option value="true">Assigned</option>
                       <option value="false">Unassigned</option>
                     </select>
+                    <p className="muted settings-premium-muted" style={{ marginTop: 6 }}>Use this for dispatch-oriented workflows where assignment matters.</p>
                   </div>
                 </div>
 
@@ -1316,6 +1498,7 @@ export default function SettingsPage() {
                     </option>
                   ))}
                 </select>
+                <p className="muted settings-premium-muted" style={{ marginTop: 6 }}>{selectedActionMeta?.description || describeAction(ruleDraft.actionJson.type)}</p>
 
                 {ruleDraft.actionJson.type === 'create_reminder' ? (
                   <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
@@ -1420,13 +1603,17 @@ export default function SettingsPage() {
                   </>
                 ) : null}
 
+                {automationRuleValidationError ? (
+                  <p data-testid="automation-rule-validation-error" style={{ color: '#fca5a5', marginTop: 12 }}>{automationRuleValidationError}</p>
+                ) : null}
+
                 <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
                   <button
                     className="button settings-premium-button"
                     type="button"
                     data-testid="automation-rule-save"
                     onClick={() => void saveAutomationRule()}
-                    disabled={savingRule}
+                    disabled={savingRule || Boolean(automationRuleValidationError)}
                   >
                     {savingRule ? 'Saving…' : 'Save rule'}
                   </button>
@@ -1447,7 +1634,7 @@ export default function SettingsPage() {
             <div className="card settings-premium-card">
               <h3 style={{ marginTop: 0 }}>Recent automation runs</h3>
               <p className="muted settings-premium-muted">Use recent runs to confirm rules executed, skipped, or failed against real workflow events.</p>
-              <div style={{ display: 'grid', gap: 10 }}>
+              <div data-testid="automation-run-list" style={{ display: 'grid', gap: 10 }}>
                 {automationRunsLoading ? (
                   <p className="muted settings-premium-muted">Loading recent automation runs…</p>
                 ) : automationRuns.length ? (
@@ -1459,6 +1646,12 @@ export default function SettingsPage() {
                         {run.payloadJson?.trigger || run.type}
                         {run.jobRef ? ` • ${run.jobRef}` : ''}
                         {run.status ? ` • ${run.status}` : ''}
+                      </div>
+                      <div className="muted settings-premium-muted" style={{ marginTop: 4 }}>
+                        {run.actionSummary ? `Action: ${run.actionSummary}` : 'Action: not recorded'} • {run.resultSummary || 'Result recorded'}
+                      </div>
+                      <div className="muted settings-premium-muted" style={{ marginTop: 4 }}>
+                        {run.whyItRan || 'Triggered by a matching automation event'}
                       </div>
                     </div>
                   ))
