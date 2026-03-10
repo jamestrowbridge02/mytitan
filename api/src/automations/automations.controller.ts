@@ -38,4 +38,20 @@ export class AutomationsController {
     const clamped = Math.max(1, Math.min(30, Math.floor(raw)));
     return this.automations.preview(user.companyId, clamped);
   }
+
+  @Get("rules")
+  @Roles("OWNER", "ADMIN", "STAFF", "READ_ONLY")
+  rules(@CurrentUser() user: JwtPayload) {
+    requireAutomationsV1Enabled();
+    return this.automations.listRules(user.companyId);
+  }
+
+  @Get("runs")
+  @Roles("OWNER", "ADMIN", "STAFF", "READ_ONLY")
+  runs(@CurrentUser() user: JwtPayload, @Query("limit") limit?: string) {
+    requireAutomationsV1Enabled();
+    const parsed = Number(limit || 20);
+    const clamped = Number.isNaN(parsed) ? 20 : Math.max(1, Math.min(100, Math.floor(parsed)));
+    return this.automations.listRuns(user.companyId, clamped);
+  }
 }

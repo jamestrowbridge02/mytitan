@@ -49,6 +49,17 @@ export class JobsService {
     await this.activityStream.push(payload);
   }
 
+  private async maybeRunCompletionAutomation(companyId: string, userId: string, before: any, after: any) {
+    if (!isAutomationsV1Enabled()) return;
+    const wasCompleted = Boolean(before?.completedAt) || before?.status === "COMPLETED" || before?.status === "INVOICED";
+    const isCompleted = Boolean(after?.completedAt) || after?.status === "COMPLETED" || after?.status === "INVOICED";
+    if (wasCompleted || !isCompleted) return;
+    const db = this.prisma as any;
+    const current = await db.job.findFirst({ where: { id: after.id, companyId } });
+    if (!current) return;
+    await this.automations.handleJobCompleted(companyId, userId, current);
+  }
+
 
   constructor(
     private readonly events: EventsService,
@@ -802,6 +813,7 @@ export class JobsService {
       updated,
       `Job ${updated?.jobRef || updated?.id || id} moved to ${newStatus}`,
     );
+    await this.maybeRunCompletionAutomation(companyId, userId, job, updated);
 
     return updated;
   }
@@ -878,6 +890,7 @@ export class JobsService {
       updated,
       `Job ${updated?.jobRef || updated?.id || id} updated`,
     );
+    await this.maybeRunCompletionAutomation(companyId, userId, job, updated);
     return updated;
   }
 
@@ -1073,6 +1086,9 @@ export class JobsService {
         if (after?.status === "COMPLETED" && !before.completedAt && isNotificationsV1Enabled()) {
           await this.notifications.notifyJobCompleted(companyId, id);
         }
+        if (after?.status === "COMPLETED" && !before.completedAt) {
+          await this.maybeRunCompletionAutomation(companyId, userId, { ...before, id }, { ...after, id });
+        }
         successCount += 1;
       } catch (err: any) {
         failed.push({ id, reason: err?.message || "update failed" });
@@ -1185,7 +1201,7 @@ export class JobsService {
     const uniqueIds = Array.from(new Set((dto.jobIds || []).filter(Boolean)));
     if (uniqueIds.length === 0) return { successCount: 0, failed: [] };
 
-    return db.$transaction(async (tx: any) => {
+    const result = await db.$transaction(async (tx: any) => {
       const jobs = await tx.job.findMany({ where: { companyId, id: { in: uniqueIds } } });
       if (jobs.length !== uniqueIds.length) {
         const found = new Set(jobs.map((j: any) => j.id));
@@ -1194,6 +1210,7 @@ export class JobsService {
       }
 
       const undoChanges: Array<{ id: string; before: any; after: any }> = [];
+      const completionCandidates: Array<{ id: string; before: any; after: any }> = [];
       for (const job of jobs) {
         const before = {
           status: job.status,
@@ -1237,6 +1254,9 @@ export class JobsService {
           select: { status: true, completedAt: true, assignedUserId: true, locationId: true, tags: true, invoiceDueAt: true },
         });
         undoChanges.push({ id: job.id, before, after });
+        if (after?.status === "COMPLETED" && !before.completedAt) {
+          completionCandidates.push({ id: job.id, before, after });
+        }
         await tx.jobActivity.create({
           data: {
             companyId,
@@ -1269,8 +1289,17 @@ export class JobsService {
         }
       }
 
-      return { successCount: uniqueIds.length, failed: [] };
+      return { successCount: uniqueIds.length, failed: [], completionCandidates };
     });
+
+    for (const entry of result.completionCandidates || []) {
+      const current = await db.job.findFirst({ where: { id: entry.id, companyId } });
+      if (current) {
+        await this.maybeRunCompletionAutomation(companyId, userId, entry.before, current);
+      }
+    }
+
+    return { successCount: result.successCount, failed: result.failed };
   }
 
   async createReminder(companyId: string, userId: string, dto: CreateJobReminderDto) {

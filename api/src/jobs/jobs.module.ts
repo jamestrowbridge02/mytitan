@@ -11,5 +11,6 @@ import { JobsService } from "./jobs.service";
   imports: [AuditModule, TemplatesModule, NotificationsModule, AutomationsModule, EventsModule],
   controllers: [JobsController],
   providers: [JobsService],
+  exports: [JobsService],
 })
 export class JobsModule {}

@@ -11,7 +11,36 @@ type AutomationSettings = {
   bookingRemindersEnabled: boolean;
   approvalRequestEnabled: boolean;
   reviewRequestEnabled: boolean;
+  jobCompletionFollowUpEnabled: boolean;
   deliveryMode?: "metadata_only" | "live_send";
+};
+
+type AutomationRule = {
+  key: string;
+  label: string;
+  enabled: boolean;
+  trigger: string;
+  action: string;
+  deliveryMode?: "metadata_only" | "live_send";
+};
+
+type AutomationRun = {
+  id: string;
+  type: string;
+  label: string;
+  at?: string | null;
+  jobId?: string | null;
+  customerId?: string | null;
+  jobRef?: string | null;
+  customerName?: string | null;
+  status?: string | null;
+  payloadJson?: {
+    automationKey?: string | null;
+    reminderCreated?: boolean;
+    remindAt?: string | null;
+    invoiceDueAt?: string | null;
+    invoicePaidAt?: string | null;
+  } | null;
 };
 
 type CommsEvent = {
@@ -34,6 +63,7 @@ type ActivityAggregate = {
 };
 
 type PreviewData = {
+  rules?: AutomationRule[];
   bookingReminders: {
     reminders24h: number;
     reminders2h: number;
@@ -54,6 +84,7 @@ const DEFAULT_SETTINGS: AutomationSettings = {
   bookingRemindersEnabled: false,
   approvalRequestEnabled: false,
   reviewRequestEnabled: false,
+  jobCompletionFollowUpEnabled: false,
   deliveryMode: "metadata_only",
 };
 
@@ -104,6 +135,12 @@ export default function AutomationsSettingsPage() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState("");
   const [previewRequestId, setPreviewRequestId] = useState<string | undefined>(undefined);
+  const [rules, setRules] = useState<AutomationRule[]>([]);
+  const [rulesLoading, setRulesLoading] = useState(false);
+  const [rulesError, setRulesError] = useState("");
+  const [runs, setRuns] = useState<AutomationRun[]>([]);
+  const [runsLoading, setRunsLoading] = useState(false);
+  const [runsError, setRunsError] = useState("");
 
   async function load() {
     if (!enabled) return;
@@ -189,11 +226,43 @@ export default function AutomationsSettingsPage() {
     }
   }
 
+  async function loadRules() {
+    if (!enabled) return;
+    setRulesLoading(true);
+    setRulesError("");
+    try {
+      const data = await apiFetch("/automations/rules");
+      setRules(Array.isArray(data) ? data : []);
+    } catch (err: any) {
+      setRules([]);
+      setRulesError(err?.message || "Failed to load automation rules");
+    } finally {
+      setRulesLoading(false);
+    }
+  }
+
+  async function loadRuns() {
+    if (!enabled) return;
+    setRunsLoading(true);
+    setRunsError("");
+    try {
+      const data = await apiFetch("/automations/runs?limit=12");
+      setRuns(Array.isArray(data) ? data : []);
+    } catch (err: any) {
+      setRuns([]);
+      setRunsError(err?.message || "Failed to load automation runs");
+    } finally {
+      setRunsLoading(false);
+    }
+  }
+
   useEffect(() => {
     load();
     loadActivity(filter);
     loadAggregate();
     loadPreview();
+    loadRules();
+    loadRuns();
   }, [enabled]);
 
   async function updateSetting(key: keyof AutomationSettings, value: boolean) {
@@ -344,6 +413,19 @@ export default function AutomationsSettingsPage() {
               <p className="muted" style={{ margin: 0 }}>Queue review requests after payment is received.</p>
             </div>
           </label>
+
+          <label style={{ display: "flex", gap: 12, alignItems: "center" }}>
+            <input
+              type="checkbox"
+              checked={current.jobCompletionFollowUpEnabled}
+              onChange={(e) => updateSetting("jobCompletionFollowUpEnabled", e.target.checked)}
+              disabled={savingKey === "jobCompletionFollowUpEnabled"}
+            />
+            <div>
+              <strong>Billing follow-up reminder</strong>
+              <p className="muted" style={{ margin: 0 }}>Create a durable follow-up reminder when completed work still needs invoice or payment handling.</p>
+            </div>
+          </label>
         </div>
       </div>
 
@@ -472,8 +554,64 @@ export default function AutomationsSettingsPage() {
               <span className="badge">Jobs {preview.reviewRequests.jobsEligible}</span>
               <Link className="button secondary" href="/dashboard/jobs">View jobs</Link>
             </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
+              <div style={{ minWidth: 220 }}>
+                <strong>Billing follow-up reminders</strong>
+                <p className="muted" style={{ margin: 0 }}>A completion rule can create a durable reminder for invoice and payment follow-through.</p>
+              </div>
+              <span className="badge">{current.jobCompletionFollowUpEnabled ? "Enabled" : "Disabled"}</span>
+              <Link className="button secondary" href="/dashboard/billing/readiness">Open billing readiness</Link>
+            </div>
           </div>
         ) : null}
+      </div>
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", justifyContent: "space-between" }}>
+          <div>
+            <h2 style={{ marginTop: 0 }}>Rule catalog</h2>
+            <p className="muted" style={{ marginTop: 4 }}>Current workflow automations mapped to real booking, job, and payment lifecycle events.</p>
+          </div>
+          <button type="button" className="button secondary" onClick={() => void loadRules()} disabled={rulesLoading}>
+            {rulesLoading ? "Refreshing..." : "Refresh rules"}
+          </button>
+        </div>
+        {rulesError ? <p className="muted">{rulesError}</p> : null}
+        {rules.length ? (
+          <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
+            {rules.map((rule) => (
+              <div
+                key={rule.key}
+                style={{
+                  display: "grid",
+                  gap: 8,
+                  gridTemplateColumns: "minmax(180px, 0.9fr) minmax(220px, 1fr) minmax(120px, auto)",
+                  alignItems: "start",
+                  padding: "12px 14px",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  borderRadius: 14,
+                  background: "rgba(255,255,255,0.02)",
+                }}
+              >
+                <div>
+                  <strong>{rule.label}</strong>
+                  <p className="muted" style={{ margin: "4px 0 0" }}>{rule.trigger}</p>
+                </div>
+                <div>
+                  <p style={{ margin: 0 }}>{rule.action}</p>
+                  <p className="muted" style={{ margin: "4px 0 0" }}>
+                    Delivery: {rule.deliveryMode === "live_send" ? "Live send" : "Metadata only"}
+                  </p>
+                </div>
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <span className="badge">{rule.enabled ? "Enabled" : "Disabled"}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          !rulesLoading ? <p className="muted" style={{ marginBottom: 0 }}>No automation rules are available for this workspace yet.</p> : null
+        )}
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
@@ -579,10 +717,63 @@ export default function AutomationsSettingsPage() {
         ) : null}
       </div>
 
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", justifyContent: "space-between" }}>
+          <div>
+            <h2 style={{ marginTop: 0 }}>Automation run log</h2>
+            <p className="muted" style={{ marginTop: 4 }}>Durable automation evaluations written into ActivityEvent for auditability and ops visibility.</p>
+          </div>
+          <button type="button" className="button secondary" onClick={() => void loadRuns()} disabled={runsLoading}>
+            {runsLoading ? "Refreshing..." : "Refresh run log"}
+          </button>
+        </div>
+        {runsError ? <p className="muted">{runsError}</p> : null}
+        {runs.length ? (
+          <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
+            {runs.map((run) => (
+              <div
+                key={run.id}
+                style={{
+                  display: "grid",
+                  gap: 8,
+                  gridTemplateColumns: "minmax(220px, 1fr) minmax(160px, 0.8fr) minmax(200px, 0.9fr)",
+                  alignItems: "start",
+                  padding: "12px 14px",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  borderRadius: 14,
+                  background: "rgba(255,255,255,0.02)",
+                }}
+              >
+                <div>
+                  <strong>{run.label}</strong>
+                  <p className="muted" style={{ margin: "4px 0 0" }}>{run.type}</p>
+                </div>
+                <div>
+                  <p style={{ margin: 0 }}>{run.jobRef || run.jobId || "No job ref"}</p>
+                  <p className="muted" style={{ margin: "4px 0 0" }}>{run.customerName || "Customer not set"}</p>
+                </div>
+                <div>
+                  <p style={{ margin: 0 }}>{formatTime(run.at)}</p>
+                  <p className="muted" style={{ margin: "4px 0 0" }}>
+                    {run.payloadJson?.reminderCreated ? "Reminder created" : "Evaluated"}
+                    {run.payloadJson?.remindAt ? ` · Follow-up ${formatTime(run.payloadJson.remindAt)}` : ""}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          !runsLoading ? <p className="muted" style={{ marginBottom: 0 }}>No automation runs have been recorded yet.</p> : null
+        )}
+      </div>
+
       <div className="card">
         <h2 style={{ marginTop: 0 }}>Need to check timelines?</h2>
-        <p className="muted">Automation events appear in job and booking timelines.</p>
-        <Link className="button secondary" href="/dashboard/command-centre">Open Command Centre</Link>
+        <p className="muted">Automation events appear in job activity, tenant activity, and the command-centre timeline.</p>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <Link className="button secondary" href="/dashboard/command-centre-v2">Open Command Centre</Link>
+          <Link className="button secondary" href="/dashboard/intelligence">Open intelligence</Link>
+        </div>
       </div>
     </DashboardShell>
   );

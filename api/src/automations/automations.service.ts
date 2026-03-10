@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from "@nestjs/common";
 import { JwtPayload } from "../auth/auth.types";
 import { AuditService } from "../audit/audit.service";
 import { assertPermission } from "../common/permissions";
+import { ActivityService } from "../events/activity.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { UpdateAutomationsSettingsDto } from "./automations.dto";
 
@@ -9,12 +10,17 @@ const DEFAULT_SETTINGS = {
   bookingRemindersEnabled: false,
   approvalRequestEnabled: false,
   reviewRequestEnabled: false,
+  jobCompletionFollowUpEnabled: false,
   deliveryMode: "metadata_only" as const,
 };
 
 @Injectable()
 export class AutomationsService {
-  constructor(private readonly prisma: PrismaService, private readonly audit: AuditService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+    private readonly activity: ActivityService,
+  ) {}
 
   private normalizeSettings(configJson: any) {
     const v1 = configJson?.automations?.v1 || {};
@@ -22,6 +28,7 @@ export class AutomationsService {
       bookingRemindersEnabled: Boolean(v1.bookingRemindersEnabled),
       approvalRequestEnabled: Boolean(v1.approvalRequestEnabled),
       reviewRequestEnabled: Boolean(v1.reviewRequestEnabled),
+      jobCompletionFollowUpEnabled: Boolean(v1.jobCompletionFollowUpEnabled),
       deliveryMode: v1.deliveryMode === "live_send" ? "live_send" : "metadata_only",
     };
   }
@@ -58,6 +65,7 @@ export class AutomationsService {
       bookingRemindersEnabled: dto.bookingRemindersEnabled ?? current.bookingRemindersEnabled,
       approvalRequestEnabled: dto.approvalRequestEnabled ?? current.approvalRequestEnabled,
       reviewRequestEnabled: dto.reviewRequestEnabled ?? current.reviewRequestEnabled,
+      jobCompletionFollowUpEnabled: dto.jobCompletionFollowUpEnabled ?? current.jobCompletionFollowUpEnabled,
       deliveryMode: nextDeliveryMode,
     };
     const configJson = {
@@ -228,6 +236,7 @@ export class AutomationsService {
 
     return {
       windowDays,
+      rules: await this.listRules(tenantId),
       bookingReminders: {
         reminders24h: reminders24,
         reminders2h: reminders2,
@@ -240,5 +249,124 @@ export class AutomationsService {
         jobsEligible,
       },
     };
+  }
+
+  async listRules(tenantId: string) {
+    const settings = await this.getSettings(tenantId);
+    return [
+      {
+        key: "booking_reminders",
+        label: "Booking reminders",
+        enabled: Boolean(settings.bookingRemindersEnabled),
+        trigger: "booking.scheduled",
+        action: "Queue in-app reminder notifications before the booking window",
+        deliveryMode: settings.deliveryMode,
+      },
+      {
+        key: "approval_request",
+        label: "Approval request",
+        enabled: Boolean(settings.approvalRequestEnabled),
+        trigger: "job.completed",
+        action: "Queue an in-app approval request when completed work needs sign-off",
+        deliveryMode: settings.deliveryMode,
+      },
+      {
+        key: "review_request",
+        label: "Review request",
+        enabled: Boolean(settings.reviewRequestEnabled),
+        trigger: "payment.received",
+        action: "Queue a review follow-up after payment lands",
+        deliveryMode: settings.deliveryMode,
+      },
+      {
+        key: "job_completion_follow_up",
+        label: "Billing follow-up reminder",
+        enabled: Boolean(settings.jobCompletionFollowUpEnabled),
+        trigger: "job.completed",
+        action: "Create a follow-up reminder when completed work still needs invoice/payment handling",
+        deliveryMode: settings.deliveryMode,
+      },
+    ];
+  }
+
+  async listRuns(tenantId: string, limit = 20) {
+    const rows = await this.prisma.activityEvent.findMany({
+      where: {
+        tenantId,
+        type: { startsWith: "automation." },
+      },
+      orderBy: { at: "desc" },
+      take: Math.max(1, Math.min(limit, 100)),
+    });
+
+    return rows.map((row) => ({
+      id: row.id,
+      type: row.type,
+      label: row.label,
+      at: row.at,
+      jobId: row.jobId,
+      customerId: row.customerId,
+      jobRef: row.jobRef,
+      customerName: row.customerName,
+      status: row.status,
+      payloadJson: row.payloadJson,
+    }));
+  }
+
+  async handleJobCompleted(companyId: string, userId: string | null, job: any) {
+    const settings = await this.getSettings(companyId);
+    if (!settings.jobCompletionFollowUpEnabled) {
+      return { logged: false, reminderCreated: false, reason: "disabled" };
+    }
+
+    const db = this.prisma as any;
+    const reminderAt = job?.invoiceDueAt
+      ? new Date(job.invoiceDueAt)
+      : new Date((job?.completedAt ? new Date(job.completedAt).getTime() : Date.now()) + 24 * 60 * 60 * 1000);
+
+    const existing = await db.jobReminder.findFirst({
+      where: {
+        companyId,
+        jobId: job.id,
+        note: "Automation billing follow-up",
+        completedAt: null,
+      },
+    });
+
+    let reminderCreated = false;
+    if (!existing && !job.invoicePaidAt) {
+      await db.jobReminder.create({
+        data: {
+          companyId,
+          jobId: job.id,
+          remindAt: reminderAt,
+          channel: "in_app",
+          note: "Automation billing follow-up",
+        },
+      });
+      reminderCreated = true;
+    }
+
+    await this.activity.push({
+      tenantId: companyId,
+      type: "automation.job_completion_follow_up",
+      label: reminderCreated
+        ? `Automation created a billing follow-up for ${job.jobRef || job.id}`
+        : `Automation evaluated ${job.jobRef || job.id} with no new follow-up needed`,
+      jobId: job.id,
+      jobRef: job.jobRef || null,
+      customerId: job.customerId || null,
+      customerName: job.customerName || null,
+      status: job.status || null,
+      payloadJson: {
+        automationKey: "job_completion_follow_up",
+        reminderCreated,
+        remindAt: reminderCreated ? reminderAt.toISOString() : existing?.remindAt?.toISOString?.() || null,
+        invoiceDueAt: job.invoiceDueAt ? new Date(job.invoiceDueAt).toISOString() : null,
+        invoicePaidAt: job.invoicePaidAt ? new Date(job.invoicePaidAt).toISOString() : null,
+      },
+    });
+
+    return { logged: true, reminderCreated, reason: reminderCreated ? "created" : "already_exists_or_paid" };
   }
 }
