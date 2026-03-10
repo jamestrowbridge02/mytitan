@@ -1048,6 +1048,48 @@ async function main() {
     status: technicianJob.status,
     technicianId: operator.id,
   });
+  await ensureActivityEvent("e2e-automation-run-overdue-invoice", {
+    type: "automation.rule_run",
+    label: "Rule Add an overdue invoice follow-up automation success",
+    at: addMinutes(now, -25),
+    tenantId: company.id,
+    customerId: customers.issued.id,
+    customerName: customers.issued.name,
+    jobId: issuedJob.id,
+    jobRef: issuedJob.jobRef,
+    status: "success",
+    payloadJson: {
+      automationRuleId: "seeded-overdue-suggestion-example",
+      automationRuleName: "Add an overdue invoice follow-up automation",
+      trigger: "invoice.overdue",
+      actionType: "create_reminder",
+      result: {
+        outcome: "success",
+        reminderId: "e2e-reminder-billing-overdue",
+      },
+    },
+  });
+  await ensureActivityEvent("e2e-automation-run-tech-arrival", {
+    type: "automation.rule_run",
+    label: "Rule Technician arrival office notification skipped",
+    at: addMinutes(now, -11),
+    tenantId: company.id,
+    customerId: customers.technician.id,
+    customerName: customers.technician.name,
+    jobId: technicianJob.id,
+    jobRef: technicianJob.jobRef,
+    status: "skipped",
+    payloadJson: {
+      automationRuleId: "seeded-tech-arrival-example",
+      automationRuleName: "Technician arrival office notification",
+      trigger: "technician.arrived",
+      actionType: "send_internal_notification",
+      result: {
+        outcome: "skipped",
+        reason: "existing_open_reminder",
+      },
+    },
+  });
 
   console.log(`tenant=${company.id} (${company.name})`);
   console.log(`operator_email=${FIXTURE.operator.email}`);

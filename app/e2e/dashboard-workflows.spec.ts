@@ -25,8 +25,7 @@ test.describe("dashboard workflows", () => {
     await convertibleRow.scrollIntoViewIfNeeded();
     await convertibleRow.getByRole("button", { name: /more actions/i }).click();
     await convertibleRow.getByTestId(`booking-convert-${fixtureRefs.convertibleBookingId}`).evaluate((element: HTMLButtonElement) => element.click());
-    await expect(page.getByTestId("operator-notice-success")).toBeVisible();
-    await expect(page.getByTestId("operator-notice-message")).toContainText(/Converted booking|already linked/i);
+    await expect(page.getByTestId("operator-notice-success")).toContainText(/Converted booking|already linked/i);
   });
 
   test("billing readiness page exposes lifecycle controls and state changes", async ({ page, request }) => {
@@ -37,8 +36,7 @@ test.describe("dashboard workflows", () => {
     await expect(page.getByText(fixtureRefs.issuedJobRef)).toBeVisible();
     const invoiceReadyRow = page.locator(".operator-table__row", { hasText: fixtureRefs.invoiceReadyJobRef }).first();
     await invoiceReadyRow.getByTestId(`billing-issue-invoice-${"e2e-job-invoice-ready"}`).evaluate((element: HTMLButtonElement) => element.click());
-    await expect(page.getByTestId("operator-notice-success")).toBeVisible();
-    await expect(page.getByTestId("operator-notice-message")).toContainText(/Invoice issued/i);
+    await expect(page.getByTestId("operator-notice-success")).toContainText(/Invoice issued/i);
     await expect(invoiceReadyRow.getByTestId(`billing-mark-paid-${"e2e-job-invoice-ready"}`)).toBeVisible();
 
     const issuedRow = page.locator(".operator-table__row", { hasText: fixtureRefs.issuedJobRef }).first();
@@ -60,8 +58,7 @@ test.describe("dashboard workflows", () => {
     await expect(expiredRow).toContainText(/expired|Regeneration required/i);
     await expect(page.locator(".operator-table__row").filter({ hasText: "No active link" }).first()).toBeVisible();
     await expiredRow.getByTestId(`portal-regenerate-${"e2e-job-portal-expired"}`).evaluate((element: HTMLButtonElement) => element.click());
-    await expect(page.getByTestId("operator-notice-success")).toBeVisible();
-    await expect(page.getByTestId("operator-notice-message")).toContainText(/Portal link regenerated/i);
+    await expect(page.getByTestId("operator-notice-success")).toContainText(/Portal link regenerated/i);
   });
 
   test("technician page exposes queue actions and checklist context", async ({ page, request }) => {
@@ -79,8 +76,7 @@ test.describe("dashboard workflows", () => {
     const saveNoteButton = page.getByTestId(`technician-note-save-${"e2e-job-technician"}`);
     await saveNoteButton.scrollIntoViewIfNeeded();
     await saveNoteButton.evaluate((element: HTMLButtonElement) => element.click());
-    await expect(page.getByTestId("operator-notice-success")).toBeVisible();
-    await expect(page.getByTestId("operator-notice-message")).toContainText(/Field note saved/i);
+    await expect(page.getByTestId("operator-notice-success")).toContainText(/Field note saved/i);
   });
 
   test("command centre v2 applies defaults and exposes modernized controls", async ({ page, request }) => {

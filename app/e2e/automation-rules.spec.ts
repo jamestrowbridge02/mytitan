@@ -15,16 +15,37 @@ test.describe("automation rules", () => {
     await expect(page.getByTestId(`automation-suggestion-apply-${fixtureRefs.automationSuggestionKey}`)).toBeVisible();
 
     await page.getByTestId(`automation-suggestion-apply-${fixtureRefs.automationSuggestionKey}`).evaluate((element: HTMLButtonElement) => element.click());
-    await expect(page.getByTestId("operator-notice-success")).toBeVisible();
-    await expect(page.getByTestId("operator-notice-message")).toContainText(/Suggested automation applied/i);
+    await expect(page.getByTestId("operator-notice-success")).toContainText(/Suggested automation applied/i);
     await expect(page.getByTestId("automation-rule-list")).toContainText("Add an overdue invoice follow-up automation");
     await expect(page.getByTestId(`automation-suggestion-apply-${fixtureRefs.automationSuggestionKey}`)).toHaveCount(0);
 
     await expect(page.getByTestId(`automation-suggestion-dismiss-${fixtureRefs.dismissedAutomationSuggestionKey}`)).toBeVisible();
     await page.getByTestId(`automation-suggestion-dismiss-${fixtureRefs.dismissedAutomationSuggestionKey}`).evaluate((element: HTMLButtonElement) => element.click());
-    await expect(page.getByTestId("operator-notice-success")).toBeVisible();
-    await expect(page.getByTestId("operator-notice-message")).toContainText(/Suggested automation dismissed/i);
+    await expect(page.getByTestId("operator-notice-success")).toContainText(/Suggested automation dismissed/i);
     await expect(page.getByTestId(`automation-suggestion-dismiss-${fixtureRefs.dismissedAutomationSuggestionKey}`)).toHaveCount(0);
+  });
+
+  test("prefills templates, shows live summaries, validates invalid combinations, and renders seeded runs", async ({ page, request }) => {
+    await installApiProxy(page, request);
+    await page.goto("/dashboard/settings?tab=automation_rules");
+    await expect(page.getByTestId("settings-automation-rules-panel")).toBeVisible();
+
+    await expect(page.getByTestId("automation-run-list")).toContainText("Add an overdue invoice follow-up automation");
+
+    await page.getByTestId("automation-template-overdue-invoice-follow-up").evaluate((element: HTMLButtonElement) => element.click());
+    await expect(page.getByTestId("automation-rule-editor")).toBeVisible();
+    await expect(page.getByTestId("automation-rule-name")).toHaveValue("Overdue invoice follow-up");
+    await expect(page.getByTestId("automation-rule-summary")).toContainText("invoice overdue");
+    await expect(page.getByTestId("automation-rule-summary")).toContainText("invoice is unpaid");
+
+    await page.getByTestId("automation-rule-trigger").selectOption("technician.arrived");
+    await expect(page.getByTestId("automation-rule-validation-error")).toContainText("Invoice conditions can only be used");
+    await expect(page.getByTestId("automation-rule-save")).toBeDisabled();
+
+    await page.getByTestId("automation-template-technician-arrival-office-notification").evaluate((element: HTMLButtonElement) => element.click());
+    await expect(page.getByTestId("automation-rule-summary")).toContainText("technician arrived");
+    await expect(page.getByTestId("automation-rule-validation-error")).toHaveCount(0);
+    await expect(page.getByTestId("automation-rule-save")).toBeEnabled();
   });
 
   test("creates a workspace automation rule and logs a completed run", async ({ page, request }) => {
@@ -69,15 +90,13 @@ test.describe("automation rules", () => {
     await page.getByTestId("automation-rule-note").fill("Playwright automation follow-up");
     await page.getByTestId("automation-rule-save").evaluate((element: HTMLButtonElement) => element.click());
 
-    await expect(page.getByTestId("operator-notice-success")).toBeVisible();
-    await expect(page.getByTestId("operator-notice-message")).toContainText(/Automation rule created/i);
+    await expect(page.getByTestId("operator-notice-success")).toContainText(/Automation rule created/i);
     await expect(page.getByTestId("automation-rule-list")).toContainText(ruleName);
 
     await page.goto("/dashboard/technician");
     await expect(page.getByText(fixtureRefs.automationJobRef)).toBeVisible();
     await page.getByTestId(`technician-complete-${"e2e-job-automation"}`).click();
-    await expect(page.getByTestId("operator-notice-success")).toBeVisible();
-    await expect(page.getByTestId("operator-notice-message")).toContainText(/Job marked completed/i);
+    await expect(page.getByTestId("operator-notice-success")).toContainText(/Job marked completed/i);
 
     await page.goto("/dashboard/settings?tab=automation_rules");
     await expect(page.getByTestId("settings-automation-rules-panel")).toBeVisible();

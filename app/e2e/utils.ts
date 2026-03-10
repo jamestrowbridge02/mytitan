@@ -51,6 +51,9 @@ const apiOrigins = [
   "https://api.mytitan.co.uk",
 ];
 
+const e2eBaseURL = process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:3101";
+const e2eOrigin = new URL(e2eBaseURL).origin;
+
 async function fulfillFromLocalApi(route: Route, request: APIRequestContext) {
   const originalUrl = new URL(route.request().url());
   let response;
@@ -60,14 +63,18 @@ async function fulfillFromLocalApi(route: Route, request: APIRequestContext) {
       headers: {
         ...route.request().headers(),
         host: "127.0.0.1:3000",
-        origin: "http://127.0.0.1:3101",
-        referer: "http://127.0.0.1:3101/",
+        origin: e2eOrigin,
+        referer: `${e2eOrigin}/`,
       },
       data: route.request().postDataBuffer() ?? undefined,
       failOnStatusCode: false,
     });
   } catch (error: any) {
-    if (String(error?.message || "").includes("Request context disposed")) {
+    const message = String(error?.message || "");
+    if (
+      message.includes("Request context disposed") ||
+      message.includes("Target page, context or browser has been closed")
+    ) {
       await route.abort();
       return;
     }
@@ -80,7 +87,7 @@ async function fulfillFromLocalApi(route: Route, request: APIRequestContext) {
     status: response.status(),
     contentType,
     headers: {
-      "access-control-allow-origin": "http://127.0.0.1:3101",
+      "access-control-allow-origin": e2eOrigin,
       "access-control-allow-credentials": "true",
     },
     body: await response.body(),

@@ -1,7 +1,8 @@
 import { defineConfig } from "@playwright/test";
 
-const baseURL = process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:3101";
 const useExistingServer = process.env.PLAYWRIGHT_USE_EXISTING_SERVER === "1";
+const defaultBaseURL = useExistingServer ? "http://127.0.0.1:3001" : "http://127.0.0.1:3101";
+const baseURL = process.env.PLAYWRIGHT_BASE_URL || defaultBaseURL;
 
 export default defineConfig({
   testDir: "./e2e",
