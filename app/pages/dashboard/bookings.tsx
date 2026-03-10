@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
+import { EntityCustomFieldsCard } from "../../components/custom-fields/EntityCustomFieldsCard";
 import { OperatorNotice } from "../../components/feedback/OperatorNotice";
 import { useOperatorNotice } from "../../components/feedback/useOperatorNotice";
 import { DashboardShell } from "../../components/dashboard-shell";
@@ -20,6 +21,7 @@ import {
 } from "../../components/ui/operator-page";
 import { ApiError, apiFetch } from "../../lib/api";
 import { getBusinessTerms } from "../../lib/business-config";
+import { getMissingRequiredCustomFieldKeys, type CustomField, type CustomFieldValue } from "../../lib/custom-fields";
 import { isMarketplaceEnabled } from "../../lib/feature-flags";
 import { useStickyOperatorView } from "../../lib/operator-view-state";
 import { useTenantSettings } from "../../lib/tenant-settings";
@@ -82,6 +84,9 @@ export default function BookingsPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [busyConvertId, setBusyConvertId] = useState<string | null>(null);
   const [savedView, setSavedView] = useStickyOperatorView<BookingSavedView>("mytitan_bookings_saved_view_v1", "all");
+  const [customFields, setCustomFields] = useState<CustomField[]>([]);
+  const [customFieldValues, setCustomFieldValues] = useState<CustomFieldValue[]>([]);
+  const [customFieldBookingId, setCustomFieldBookingId] = useState<string | null>(null);
   const { notice, showError, showSuccess, clearNotice } = useOperatorNotice();
   const marketplaceEnabled = isMarketplaceEnabled();
 
@@ -111,6 +116,27 @@ export default function BookingsPage() {
     void load();
     void loadSettings();
   }, [marketplaceEnabled]);
+
+  useEffect(() => {
+    async function loadCustomFieldData() {
+      if (!bookings.length) {
+        setCustomFieldValues([]);
+        return;
+      }
+      try {
+        const [fieldRows, valueRows] = await Promise.all([
+          apiFetch("/custom-fields?entityType=booking&visible=true"),
+          apiFetch(`/custom-fields/values?entityType=booking&entityIds=${encodeURIComponent(bookings.map((booking) => booking.id).join(","))}`),
+        ]);
+        setCustomFields(Array.isArray(fieldRows) ? fieldRows : []);
+        setCustomFieldValues(Array.isArray(valueRows?.values) ? valueRows.values : []);
+      } catch {
+        setCustomFields([]);
+        setCustomFieldValues([]);
+      }
+    }
+    void loadCustomFieldData();
+  }, [bookings]);
 
   async function onCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -549,6 +575,8 @@ export default function BookingsPage() {
                 const readinessIssues = getConversionIssues(booking);
                 const canConvert = !booking.jobId && readinessIssues.length === 0;
                 const stage = mapStatusToStage(String(booking.status || "PLANNED"), bookingStages);
+                const missingStageFields = getMissingRequiredCustomFieldKeys(stage?.requiredCustomFieldKeys, customFields, customFieldValues, "booking", booking.id);
+                const visibleFieldSummaries = customFieldValues.filter((value) => value.entityId === booking.id && value.field?.visible !== false).slice(0, 2);
                 return (
                   <OperatorDataTableRow key={booking.id} selected={selected}>
                     <div className="operator-table__cell">
@@ -565,6 +593,11 @@ export default function BookingsPage() {
                         <Link href={`/dashboard/bookings/${booking.id}`}>{booking.customerName || booking.id}</Link>
                       </div>
                       <div className="operator-cellSubtle">Booking ID {booking.id}</div>
+                      {visibleFieldSummaries.length ? (
+                        <div className="operator-cellSubtle" style={{ marginTop: 6 }}>
+                          {visibleFieldSummaries.map((value) => `${value.field?.label}: ${String(value.valueJson)}`).join(" | ")}
+                        </div>
+                      ) : null}
                     </div>
                     <div className="operator-table__cell">
                       <div className="operator-cellMeta">
@@ -577,6 +610,7 @@ export default function BookingsPage() {
                         <span><strong data-testid="workflow-stage-label">{stage?.label || booking.status || "PLANNED"}</strong></span>
                         <span>{booking.status || "PLANNED"}</span>
                         <span>{isToday(booking.startsAt) ? "Today" : "Scheduled"}</span>
+                        {missingStageFields.length ? <span data-testid="custom-field-stage-warning">{missingStageFields.join(", ")} required</span> : null}
                       </div>
                     </div>
                     <div className="operator-table__cell">
@@ -627,6 +661,12 @@ export default function BookingsPage() {
                             group: "Tools",
                             onClick: () => void copyText(booking.id, "Booking ID"),
                           },
+                          {
+                            label: "Custom fields",
+                            description: "Review and edit workspace-specific booking fields",
+                            group: "Tools",
+                            onClick: () => setCustomFieldBookingId(booking.id),
+                          },
                         ]}
                       />
                     </div>
@@ -645,6 +685,17 @@ export default function BookingsPage() {
             />
           ) : null}
         </section>
+
+        {customFieldBookingId ? (
+          <EntityCustomFieldsCard
+            title="Booking custom fields"
+            entityType="booking"
+            entityId={customFieldBookingId}
+            onSaved={() => {
+              void load();
+            }}
+          />
+        ) : null}
       </div>
     </DashboardShell>
   );

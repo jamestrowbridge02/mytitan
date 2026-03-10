@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { EntityCustomFieldsCard } from "../../components/custom-fields/EntityCustomFieldsCard";
 import { DashboardShell } from "../../components/dashboard-shell";
 import {
   OperatorActiveFilters,
@@ -17,6 +18,7 @@ import {
 } from "../../components/ui/operator-page";
 import { apiFetch } from "../../lib/api";
 import { getBusinessTerms, getCommandCentreHref } from "../../lib/business-config";
+import type { CustomFieldValue } from "../../lib/custom-fields";
 import { useStickyOperatorView } from "../../lib/operator-view-state";
 import { useTenantSettings } from "../../lib/tenant-settings";
 
@@ -51,6 +53,8 @@ export default function CustomersPage() {
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [savedView, setSavedView] = useStickyOperatorView<CustomerSavedView>("mytitan_customers_saved_view_v1", "all");
+  const [customFieldValues, setCustomFieldValues] = useState<CustomFieldValue[]>([]);
+  const [customFieldCustomerId, setCustomFieldCustomerId] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -67,6 +71,22 @@ export default function CustomersPage() {
     };
     void load();
   }, []);
+
+  useEffect(() => {
+    async function loadCustomFieldValues() {
+      if (!customers.length) {
+        setCustomFieldValues([]);
+        return;
+      }
+      try {
+        const valueRows = await apiFetch(`/custom-fields/values?entityType=customer&entityIds=${encodeURIComponent(customers.map((customer) => customer.id).join(","))}`);
+        setCustomFieldValues(Array.isArray(valueRows?.values) ? valueRows.values : []);
+      } catch {
+        setCustomFieldValues([]);
+      }
+    }
+    void loadCustomFieldValues();
+  }, [customers]);
 
   function pushNotice(message: string) {
     setNotice(message);
@@ -345,6 +365,7 @@ export default function CustomersPage() {
               {filteredCustomers.map((customer) => {
                 const href = getTimelineHref(customer);
                 const selected = selectedIds.includes(customer.id);
+                const visibleFieldSummaries = customFieldValues.filter((value) => value.entityId === customer.id && value.field?.visible !== false).slice(0, 2);
                 return (
                   <OperatorDataTableRow key={customer.id} selected={selected}>
                     <div className="operator-table__cell">
@@ -364,6 +385,11 @@ export default function CustomersPage() {
                       <div className="operator-cellSubtle">
                         {customer.email || customer.phone ? "Direct contact available" : "Needs contact detail"}
                       </div>
+                      {visibleFieldSummaries.length ? (
+                        <div className="operator-cellSubtle" style={{ marginTop: 6 }}>
+                          {visibleFieldSummaries.map((value) => `${value.field?.label}: ${String(value.valueJson)}`).join(" | ")}
+                        </div>
+                      ) : null}
                     </div>
                     <div className="operator-table__cell">
                       <div className="operator-cellMeta">
@@ -429,6 +455,12 @@ export default function CustomersPage() {
                             group: "Tools",
                             onClick: () => void copyText(customer.email || customer.phone || customer.name, "Customer contact"),
                           },
+                          {
+                            label: "Custom fields",
+                            description: "Review and edit workspace-specific customer fields",
+                            group: "Tools",
+                            onClick: () => setCustomFieldCustomerId(customer.id),
+                          },
                         ]}
                       />
                     </div>
@@ -447,6 +479,15 @@ export default function CustomersPage() {
             />
           )}
         </section>
+
+        {customFieldCustomerId ? (
+          <EntityCustomFieldsCard
+            title="Customer custom fields"
+            entityType="customer"
+            entityId={customFieldCustomerId}
+            onSaved={() => undefined}
+          />
+        ) : null}
       </div>
     </DashboardShell>
   );

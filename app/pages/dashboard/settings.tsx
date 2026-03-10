@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
+import { CustomFieldManager } from '../../components/custom-fields/CustomFieldManager';
 import { OperatorNotice } from '../../components/feedback/OperatorNotice';
 import { useOperatorNotice } from '../../components/feedback/useOperatorNotice';
 import { DashboardShell } from '../../components/dashboard-shell';
@@ -8,11 +9,12 @@ import { OperatorPageHeader } from '../../components/ui/operator-page';
 import { apiFetch } from '../../lib/api';
 import { getBusinessConfig, getBusinessTerms } from '../../lib/business-config';
 import { useBilling } from '../../lib/billing';
+import type { CustomField } from '../../lib/custom-fields';
 import { isAutomationsV1Enabled, isGuidedSetupV2Enabled, isNotificationsV1Enabled } from '../../lib/feature-flags';
 import { TenantSettings, useTenantSettings } from '../../lib/tenant-settings';
 import { getBookingStages, getJobStages, getTechnicianStages, type WorkflowStage } from '../../lib/workflow-config';
 
-type TabKey = 'branding' | 'email' | 'pricing' | 'features' | 'workflow' | 'automation_rules' | 'ai';
+type TabKey = 'branding' | 'email' | 'pricing' | 'features' | 'workflow' | 'custom_fields' | 'automation_rules' | 'ai';
 
 const TABS: Array<{ key: TabKey; label: string }> = [
   { key: 'branding', label: 'Branding' },
@@ -20,6 +22,7 @@ const TABS: Array<{ key: TabKey; label: string }> = [
   { key: 'pricing', label: 'Pricing Defaults' },
   { key: 'features', label: 'Feature Toggles' },
   { key: 'workflow', label: 'Workflow' },
+  { key: 'custom_fields', label: 'Custom Fields' },
   { key: 'automation_rules', label: 'Automation Rules' },
   { key: 'ai', label: 'AI' },
 ];
@@ -91,6 +94,9 @@ type AutomationConditionDraft = {
   invoiceIssued?: boolean | null;
   invoicePaid?: boolean | null;
   hasAssignedUser?: boolean | null;
+  customFieldEquals?: { entityType: 'job' | 'booking' | 'customer' | 'technician'; key: string; value: string } | null;
+  customFieldExists?: { entityType: 'job' | 'booking' | 'customer' | 'technician'; key: string } | null;
+  customFieldNotExists?: { entityType: 'job' | 'booking' | 'customer' | 'technician'; key: string } | null;
 };
 
 type AutomationActionDraft =
@@ -270,6 +276,15 @@ function buildRuleSummary(ruleDraft: AutomationRuleDraft) {
   if (ruleDraft.conditionJson.invoicePaid === false) conditionParts.push('invoice is unpaid');
   if (ruleDraft.conditionJson.hasAssignedUser === true) conditionParts.push('an assigned user exists');
   if (ruleDraft.conditionJson.hasAssignedUser === false) conditionParts.push('no assigned user exists');
+  if (ruleDraft.conditionJson.customFieldEquals?.key) {
+    conditionParts.push(`${ruleDraft.conditionJson.customFieldEquals.entityType} field ${ruleDraft.conditionJson.customFieldEquals.key} equals ${ruleDraft.conditionJson.customFieldEquals.value}`);
+  }
+  if (ruleDraft.conditionJson.customFieldExists?.key) {
+    conditionParts.push(`${ruleDraft.conditionJson.customFieldExists.entityType} field ${ruleDraft.conditionJson.customFieldExists.key} exists`);
+  }
+  if (ruleDraft.conditionJson.customFieldNotExists?.key) {
+    conditionParts.push(`${ruleDraft.conditionJson.customFieldNotExists.entityType} field ${ruleDraft.conditionJson.customFieldNotExists.key} is missing`);
+  }
 
   let actionSummary = 'record an action';
   if (ruleDraft.actionJson.type === 'create_reminder') {
@@ -316,6 +331,13 @@ function getRuleDraftValidationError(ruleDraft: AutomationRuleDraft) {
   ) {
     return 'Assigned-user conditions can only be used with booking, job, or technician workflow triggers.';
   }
+  const matcher = ruleDraft.conditionJson.customFieldEquals || ruleDraft.conditionJson.customFieldExists || ruleDraft.conditionJson.customFieldNotExists;
+  if (matcher && !String(matcher.key || '').trim()) {
+    return 'Choose a custom field before saving the rule.';
+  }
+  if (ruleDraft.conditionJson.customFieldEquals?.key && !String(ruleDraft.conditionJson.customFieldEquals.value || '').trim()) {
+    return 'Custom field equals conditions require a value.';
+  }
   return '';
 }
 
@@ -341,6 +363,8 @@ export default function SettingsPage() {
   const [ruleDraft, setRuleDraft] = useState<AutomationRuleDraft>(createDefaultRuleDraft());
   const [ruleEditorOpen, setRuleEditorOpen] = useState(false);
   const [savingRule, setSavingRule] = useState(false);
+  const [customFields, setCustomFields] = useState<CustomField[]>([]);
+  const [customFieldsLoading, setCustomFieldsLoading] = useState(false);
   const [deletingRuleId, setDeletingRuleId] = useState<string | null>(null);
   const [applyingSuggestionKey, setApplyingSuggestionKey] = useState<string | null>(null);
   const [dismissingSuggestionKey, setDismissingSuggestionKey] = useState<string | null>(null);
@@ -405,6 +429,11 @@ export default function SettingsPage() {
     void loadAutomationRuns();
   }, [automationsEnabled, tab]);
 
+  useEffect(() => {
+    if (tab !== 'custom_fields' && tab !== 'workflow' && tab !== 'automation_rules') return;
+    void loadCustomFields();
+  }, [tab]);
+
   function updateBusinessConfig(updater: (current: Record<string, any>) => Record<string, any>) {
     setForm((prev: any) => ({
       ...prev,
@@ -422,6 +451,7 @@ export default function SettingsPage() {
           label: stage.label,
           statuses: stage.statuses,
           visible: stage.visible !== false,
+          requiredCustomFieldKeys: Array.isArray(stage.requiredCustomFieldKeys) ? stage.requiredCustomFieldKeys : [],
         })),
       },
     }));
@@ -490,6 +520,18 @@ export default function SettingsPage() {
       setAutomationRuns([]);
     } finally {
       setAutomationRunsLoading(false);
+    }
+  }
+
+  async function loadCustomFields() {
+    setCustomFieldsLoading(true);
+    try {
+      const data = await apiFetch('/custom-fields');
+      setCustomFields(Array.isArray(data) ? data as CustomField[] : []);
+    } catch {
+      setCustomFields([]);
+    } finally {
+      setCustomFieldsLoading(false);
     }
   }
 
@@ -1157,6 +1199,20 @@ export default function SettingsPage() {
                         Show this stage in operator surfaces
                       </label>
 
+                      <label className="settings-premium-label">Required custom field keys</label>
+                      <input
+                        className="input settings-premium-input"
+                        value={Array.isArray(stage.requiredCustomFieldKeys) ? stage.requiredCustomFieldKeys.join(', ') : ''}
+                        onChange={(e) => updateWorkflowStages(sectionKey, stages.map((item) => item.id === stage.id ? {
+                          ...item,
+                          requiredCustomFieldKeys: e.target.value.split(',').map((value) => value.trim().toLowerCase()).filter(Boolean),
+                        } : item))}
+                        placeholder="serial_number, warranty_status"
+                      />
+                      <p className="muted settings-premium-muted" style={{ marginBottom: 10 }}>
+                        Available {sectionKey} keys: {customFields.filter((field) => field.entityType === (sectionKey === 'jobs' ? 'job' : sectionKey === 'bookings' ? 'booking' : 'technician')).map((field) => field.key).join(', ') || 'none yet'}
+                      </p>
+
                       <p className="muted settings-premium-muted" style={{ marginBottom: 0 }}>
                         Canonical statuses: {renderStatuses(stage)}
                       </p>
@@ -1182,6 +1238,19 @@ export default function SettingsPage() {
               </p>
             </div>
           </>
+        )}
+
+        {tab === 'custom_fields' && (
+          customFieldsLoading ? (
+            <div className="card settings-premium-card"><p className="muted settings-premium-muted">Loading custom fields…</p></div>
+          ) : (
+            <CustomFieldManager
+              fields={customFields}
+              onFieldsChange={setCustomFields}
+              showSuccess={showSuccess}
+              showError={showError}
+            />
+          )
         )}
 
         {tab === 'automation_rules' && (
@@ -1361,6 +1430,15 @@ export default function SettingsPage() {
                         {rule.conditionJson?.hasAssignedUser !== null && rule.conditionJson?.hasAssignedUser !== undefined
                           ? ` • Assigned user: ${rule.conditionJson.hasAssignedUser ? 'required' : 'not required'}`
                           : ''}
+                        {(rule.conditionJson as any)?.customFieldEquals?.key
+                          ? ` • ${(rule.conditionJson as any).customFieldEquals.entityType} field ${(rule.conditionJson as any).customFieldEquals.key} equals ${(rule.conditionJson as any).customFieldEquals.value}`
+                          : ''}
+                        {(rule.conditionJson as any)?.customFieldExists?.key
+                          ? ` • ${(rule.conditionJson as any).customFieldExists.entityType} field ${(rule.conditionJson as any).customFieldExists.key} exists`
+                          : ''}
+                        {(rule.conditionJson as any)?.customFieldNotExists?.key
+                          ? ` • ${(rule.conditionJson as any).customFieldNotExists.entityType} field ${(rule.conditionJson as any).customFieldNotExists.key} missing`
+                          : ''}
                       </div>
                     </div>
                   ))
@@ -1472,7 +1550,113 @@ export default function SettingsPage() {
                     </select>
                     <p className="muted settings-premium-muted" style={{ marginTop: 6 }}>Use this for dispatch-oriented workflows where assignment matters.</p>
                   </div>
+
+                  <div>
+                    <label className="settings-premium-label">Condition: custom field</label>
+                    <select
+                      className="input settings-premium-input"
+                      data-testid="automation-rule-custom-field-mode"
+                      value={
+                        ruleDraft.conditionJson.customFieldEquals ? 'equals'
+                          : ruleDraft.conditionJson.customFieldExists ? 'exists'
+                          : ruleDraft.conditionJson.customFieldNotExists ? 'not_exists'
+                          : ''
+                      }
+                      onChange={(e) => setRuleDraft((prev) => ({
+                        ...prev,
+                        conditionJson: {
+                          ...prev.conditionJson,
+                          customFieldEquals: e.target.value === 'equals' ? { entityType: 'job', key: '', value: '' } : null,
+                          customFieldExists: e.target.value === 'exists' ? { entityType: 'job', key: '' } : null,
+                          customFieldNotExists: e.target.value === 'not_exists' ? { entityType: 'job', key: '' } : null,
+                        },
+                      }))}
+                    >
+                      <option value="">None</option>
+                      <option value="equals">Equals</option>
+                      <option value="exists">Exists</option>
+                      <option value="not_exists">Missing</option>
+                    </select>
+                    <p className="muted settings-premium-muted" style={{ marginTop: 6 }}>Reference a tenant-scoped custom field without changing canonical workflow statuses.</p>
+                  </div>
                 </div>
+
+                {ruleDraft.conditionJson.customFieldEquals || ruleDraft.conditionJson.customFieldExists || ruleDraft.conditionJson.customFieldNotExists ? (
+                  <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', marginBottom: 12 }}>
+                    {(() => {
+                      const matcher = ruleDraft.conditionJson.customFieldEquals || ruleDraft.conditionJson.customFieldExists || ruleDraft.conditionJson.customFieldNotExists;
+                      if (!matcher) return null;
+                      const availableFields = customFields.filter((field) => field.entityType === matcher.entityType);
+                      return (
+                        <>
+                          <div>
+                            <label className="settings-premium-label">Custom field entity</label>
+                            <select
+                              className="input settings-premium-input"
+                              value={matcher.entityType}
+                              onChange={(e) => setRuleDraft((prev) => {
+                                const entityType = e.target.value as 'job' | 'booking' | 'customer' | 'technician';
+                                return {
+                                  ...prev,
+                                  conditionJson: {
+                                    ...prev.conditionJson,
+                                    customFieldEquals: prev.conditionJson.customFieldEquals ? { ...prev.conditionJson.customFieldEquals, entityType, key: '' } : null,
+                                    customFieldExists: prev.conditionJson.customFieldExists ? { ...prev.conditionJson.customFieldExists, entityType, key: '' } : null,
+                                    customFieldNotExists: prev.conditionJson.customFieldNotExists ? { ...prev.conditionJson.customFieldNotExists, entityType, key: '' } : null,
+                                  },
+                                };
+                              })}
+                            >
+                              <option value="job">Job</option>
+                              <option value="booking">Booking</option>
+                              <option value="customer">Customer</option>
+                              <option value="technician">Technician</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="settings-premium-label">Field key</label>
+                            <select
+                              className="input settings-premium-input"
+                              data-testid="automation-rule-custom-field-key"
+                              value={matcher.key}
+                              onChange={(e) => setRuleDraft((prev) => ({
+                                ...prev,
+                                conditionJson: {
+                                  ...prev.conditionJson,
+                                  customFieldEquals: prev.conditionJson.customFieldEquals ? { ...prev.conditionJson.customFieldEquals, key: e.target.value } : null,
+                                  customFieldExists: prev.conditionJson.customFieldExists ? { ...prev.conditionJson.customFieldExists, key: e.target.value } : null,
+                                  customFieldNotExists: prev.conditionJson.customFieldNotExists ? { ...prev.conditionJson.customFieldNotExists, key: e.target.value } : null,
+                                },
+                              }))}
+                            >
+                              <option value="">Choose field</option>
+                              {availableFields.map((field) => (
+                                <option key={field.id} value={field.key}>{field.label} ({field.key})</option>
+                              ))}
+                            </select>
+                          </div>
+                          {ruleDraft.conditionJson.customFieldEquals ? (
+                            <div>
+                              <label className="settings-premium-label">Field value</label>
+                              <input
+                                className="input settings-premium-input"
+                                data-testid="automation-rule-custom-field-value"
+                                value={ruleDraft.conditionJson.customFieldEquals.value}
+                                onChange={(e) => setRuleDraft((prev) => ({
+                                  ...prev,
+                                  conditionJson: {
+                                    ...prev.conditionJson,
+                                    customFieldEquals: prev.conditionJson.customFieldEquals ? { ...prev.conditionJson.customFieldEquals, value: e.target.value } : null,
+                                  },
+                                }))}
+                              />
+                            </div>
+                          ) : null}
+                        </>
+                      );
+                    })()}
+                  </div>
+                ) : null}
 
                 <label className="settings-premium-label">Action</label>
                 <select

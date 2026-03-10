@@ -5,6 +5,7 @@ export type WorkflowStage = {
   label: string;
   statuses: string[];
   visible?: boolean;
+  requiredCustomFieldKeys?: string[];
 };
 
 type NormalizedWorkflowStage = {
@@ -12,6 +13,7 @@ type NormalizedWorkflowStage = {
   label: string;
   statuses: string[];
   visible: boolean;
+  requiredCustomFieldKeys: string[];
 };
 
 const DEFAULT_BOOKING_STAGES: WorkflowStage[] = [
@@ -58,6 +60,11 @@ function mergeStages(configStages: unknown, defaults: WorkflowStage[]) {
         label: String(item.label || fallback?.label || item.id),
         statuses,
         visible: item.visible !== false,
+        requiredCustomFieldKeys: Array.isArray(item.requiredCustomFieldKeys)
+          ? item.requiredCustomFieldKeys.map((value) => String(value || "").trim()).filter(Boolean)
+          : Array.isArray(fallback?.requiredCustomFieldKeys)
+            ? fallback.requiredCustomFieldKeys
+            : [],
       } satisfies NormalizedWorkflowStage;
     })
     .filter((item): item is NormalizedWorkflowStage => Boolean(item));

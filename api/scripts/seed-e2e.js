@@ -60,6 +60,13 @@ const FIXTURE = {
     blocked: { id: "e2e-booking-blocked" },
     technician: { id: "e2e-booking-technician" },
   },
+  customFields: {
+    jobSerialNumber: { id: "e2e-field-job-serial-number", key: "serial_number", label: "Serial number", entityType: "JOB", type: "TEXT" },
+    jobWarrantyStatus: { id: "e2e-field-job-warranty-status", key: "warranty_status", label: "Warranty status", entityType: "JOB", type: "SELECT", optionsJson: ["active", "expired", "unknown"] },
+    bookingSource: { id: "e2e-field-booking-source", key: "booking_source", label: "Booking source", entityType: "BOOKING", type: "SELECT", optionsJson: ["phone", "website", "trade"] },
+    customerSiteCode: { id: "e2e-field-customer-site-code", key: "site_code", label: "Site code", entityType: "CUSTOMER", type: "TEXT" },
+    technicianCertification: { id: "e2e-field-technician-certification", key: "certification", label: "Certification", entityType: "TECHNICIAN", type: "TEXT" },
+  },
   tokens: {
     active: "e2e-public-portal-token",
     expired: "e2e-expired-portal-token",
@@ -220,14 +227,14 @@ async function ensureTenantSettings(companyId, defaultLocationId, planId) {
             { id: "cancelled", label: "Cancelled", statuses: ["CANCELLED"], visible: true },
           ],
           jobs: [
-            { id: "ready", label: "Ready for Dispatch", statuses: ["OPEN"], visible: true },
+            { id: "ready", label: "Ready for Dispatch", statuses: ["OPEN"], visible: true, requiredCustomFieldKeys: ["serial_number"] },
             { id: "scheduled", label: "Booked In", statuses: ["SCHEDULED"], visible: true },
             { id: "in_progress", label: "Work Underway", statuses: ["IN_PROGRESS"], visible: true },
-            { id: "completed", label: "Ready to Bill", statuses: ["COMPLETED", "INVOICED"], visible: true },
+            { id: "completed", label: "Ready to Bill", statuses: ["COMPLETED", "INVOICED"], visible: true, requiredCustomFieldKeys: ["warranty_status"] },
             { id: "cancelled", label: "Closed Out", statuses: ["CANCELLED"], visible: true },
           ],
           technician: [
-            { id: "dispatch", label: "Awaiting Arrival", statuses: ["OPEN", "SCHEDULED"], visible: true },
+            { id: "dispatch", label: "Awaiting Arrival", statuses: ["OPEN", "SCHEDULED"], visible: true, requiredCustomFieldKeys: ["certification"] },
             { id: "working", label: "Working On Site", statuses: ["IN_PROGRESS"], visible: true },
             { id: "finished", label: "Field Complete", statuses: ["COMPLETED", "INVOICED"], visible: true },
             { id: "cancelled", label: "Cancelled", statuses: ["CANCELLED"], visible: true },
@@ -266,14 +273,14 @@ async function ensureTenantSettings(companyId, defaultLocationId, planId) {
             { id: "cancelled", label: "Cancelled", statuses: ["CANCELLED"], visible: true },
           ],
           jobs: [
-            { id: "ready", label: "Ready for Dispatch", statuses: ["OPEN"], visible: true },
+            { id: "ready", label: "Ready for Dispatch", statuses: ["OPEN"], visible: true, requiredCustomFieldKeys: ["serial_number"] },
             { id: "scheduled", label: "Booked In", statuses: ["SCHEDULED"], visible: true },
             { id: "in_progress", label: "Work Underway", statuses: ["IN_PROGRESS"], visible: true },
-            { id: "completed", label: "Ready to Bill", statuses: ["COMPLETED", "INVOICED"], visible: true },
+            { id: "completed", label: "Ready to Bill", statuses: ["COMPLETED", "INVOICED"], visible: true, requiredCustomFieldKeys: ["warranty_status"] },
             { id: "cancelled", label: "Closed Out", statuses: ["CANCELLED"], visible: true },
           ],
           technician: [
-            { id: "dispatch", label: "Awaiting Arrival", statuses: ["OPEN", "SCHEDULED"], visible: true },
+            { id: "dispatch", label: "Awaiting Arrival", statuses: ["OPEN", "SCHEDULED"], visible: true, requiredCustomFieldKeys: ["certification"] },
             { id: "working", label: "Working On Site", statuses: ["IN_PROGRESS"], visible: true },
             { id: "finished", label: "Field Complete", statuses: ["COMPLETED", "INVOICED"], visible: true },
             { id: "cancelled", label: "Cancelled", statuses: ["CANCELLED"], visible: true },
@@ -547,6 +554,55 @@ async function ensureActivityEvent(id, payload) {
   });
 }
 
+async function ensureCustomField(companyId, field) {
+  return prisma.customField.upsert({
+    where: {
+      tenantId_entityType_key: {
+        tenantId: companyId,
+        entityType: field.entityType,
+        key: field.key,
+      },
+    },
+    create: {
+      id: field.id,
+      tenantId: companyId,
+      entityType: field.entityType,
+      key: field.key,
+      label: field.label,
+      type: field.type,
+      optionsJson: field.optionsJson || null,
+      visible: true,
+    },
+    update: {
+      label: field.label,
+      type: field.type,
+      optionsJson: field.optionsJson || null,
+      visible: true,
+    },
+  });
+}
+
+async function ensureCustomFieldValue(companyId, fieldId, entityType, entityId, valueJson) {
+  return prisma.customFieldValue.upsert({
+    where: {
+      fieldId_entityId: {
+        fieldId,
+        entityId,
+      },
+    },
+    create: {
+      tenantId: companyId,
+      fieldId,
+      entityType,
+      entityId,
+      valueJson,
+    },
+    update: {
+      valueJson,
+    },
+  });
+}
+
 async function ensureSavedViews(companyId, userId) {
   await prisma.savedBoardView.updateMany({
     where: { companyId, userId },
@@ -594,6 +650,16 @@ async function ensureSavedViews(companyId, userId) {
   });
 }
 
+async function resetCustomFields(companyId) {
+  const baselineIds = Object.values(FIXTURE.customFields).map((field) => field.id);
+  await prisma.customField.deleteMany({
+    where: {
+      tenantId: companyId,
+      id: { notIn: baselineIds },
+    },
+  });
+}
+
 async function main() {
   if (process.env.MYTITAN_ENABLE_E2E_FIXTURES !== "1") {
     console.log("E2E fixture seed skipped. Set MYTITAN_ENABLE_E2E_FIXTURES=1 to run.");
@@ -610,6 +676,7 @@ async function main() {
   await ensureInvoiceCounter(company.id);
   await ensureTenantSettings(company.id, location.id, planId);
   await ensureAutomations(company.id);
+  await resetCustomFields(company.id);
   const service = await ensureService(company.id);
   const customers = await ensureCustomers(company.id);
 
@@ -1011,6 +1078,20 @@ async function main() {
       assignedUserId: operator.id,
     },
   });
+
+  const serialField = await ensureCustomField(company.id, FIXTURE.customFields.jobSerialNumber);
+  const warrantyField = await ensureCustomField(company.id, FIXTURE.customFields.jobWarrantyStatus);
+  const bookingSourceField = await ensureCustomField(company.id, FIXTURE.customFields.bookingSource);
+  const siteCodeField = await ensureCustomField(company.id, FIXTURE.customFields.customerSiteCode);
+  const certificationField = await ensureCustomField(company.id, FIXTURE.customFields.technicianCertification);
+
+  await ensureCustomFieldValue(company.id, serialField.id, "JOB", invoiceReadyJob.id, "INV-READY-SN-001");
+  await ensureCustomFieldValue(company.id, serialField.id, "JOB", automationJob.id, "AUTO-SN-001");
+  await ensureCustomFieldValue(company.id, warrantyField.id, "JOB", automationJob.id, "expired");
+  await ensureCustomFieldValue(company.id, warrantyField.id, "JOB", portalActiveJob.id, "active");
+  await ensureCustomFieldValue(company.id, bookingSourceField.id, "BOOKING", FIXTURE.bookings.convertible.id, "website");
+  await ensureCustomFieldValue(company.id, siteCodeField.id, "CUSTOMER", customers.convertible.id, "SITE-E2E-01");
+  await ensureCustomFieldValue(company.id, certificationField.id, "TECHNICIAN", operator.id, "EV Specialist");
 
   await ensureSavedViews(company.id, operator.id);
 

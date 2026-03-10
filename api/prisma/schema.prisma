@@ -80,6 +80,21 @@ enum BillingInterval {
   ANNUAL
 }
 
+enum CustomFieldEntityType {
+  JOB
+  BOOKING
+  CUSTOMER
+  TECHNICIAN
+}
+
+enum CustomFieldType {
+  TEXT
+  NUMBER
+  SELECT
+  BOOLEAN
+  DATE
+}
+
 enum IntegrationProvider {
   XERO
   QBO
@@ -188,6 +203,8 @@ model Company {
   automationsSetting       AutomationsSetting?
   automationRules          AutomationRule[]
   automationSuggestionStates AutomationSuggestionState[]
+  customFields             CustomField[]
+  customFieldValues        CustomFieldValue[]
 }
 
 model User {
@@ -980,6 +997,40 @@ model AutomationSuggestionState {
 
   @@unique([tenantId, suggestionKey])
   @@index([tenantId, status, updatedAt])
+}
+
+model CustomField {
+  id          String                @id @default(cuid())
+  tenantId    String
+  entityType  CustomFieldEntityType
+  key         String
+  label       String
+  type        CustomFieldType
+  optionsJson Json?
+  visible     Boolean               @default(true)
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  tenant      Company               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  values      CustomFieldValue[]
+
+  @@unique([tenantId, entityType, key])
+  @@index([tenantId, entityType, visible])
+}
+
+model CustomFieldValue {
+  id         String                @id @default(cuid())
+  tenantId   String
+  fieldId    String
+  entityType CustomFieldEntityType
+  entityId   String
+  valueJson  Json?
+  createdAt  DateTime              @default(now())
+  updatedAt  DateTime              @updatedAt
+  tenant     Company               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  field      CustomField           @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+
+  @@unique([fieldId, entityId])
+  @@index([tenantId, entityType, entityId])
 }
 
 model ServiceCatalogItem {

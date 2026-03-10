@@ -38,6 +38,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
 import { AdminModule } from './admin/admin.module';
 import { EventsModule } from './events/events.module';
 import { CustomersModule } from './customers/customers.module';
+import { CustomFieldsModule } from './custom-fields/custom-fields.module';
 import { TechModule } from './tech/tech.module';
 
 @Module({
@@ -88,6 +89,7 @@ import { TechModule } from './tech/tech.module';
     PricingPresetsModule,
     AdminModule,
     CustomersModule,
+    CustomFieldsModule,
     TechModule,
   ],
 })

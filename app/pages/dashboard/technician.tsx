@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { EntityCustomFieldsCard } from "../../components/custom-fields/EntityCustomFieldsCard";
 import { OperatorNotice } from "../../components/feedback/OperatorNotice";
 import { useOperatorNotice } from "../../components/feedback/useOperatorNotice";
 import { DashboardShell } from "../../components/dashboard-shell";
@@ -13,6 +14,7 @@ import {
 } from "../../components/ui/operator-page";
 import { apiFetch } from "../../lib/api";
 import { getBusinessTerms } from "../../lib/business-config";
+import { getMissingRequiredCustomFieldKeys, type CustomField, type CustomFieldValue } from "../../lib/custom-fields";
 import { useTenantSettings } from "../../lib/tenant-settings";
 import { getTechnicianStages, mapStatusToStage } from "../../lib/workflow-config";
 
@@ -61,6 +63,9 @@ export default function TechnicianPage() {
   const [data, setData] = useState<TechQueue | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
+  const [meId, setMeId] = useState<string | null>(null);
+  const [technicianFields, setTechnicianFields] = useState<CustomField[]>([]);
+  const [technicianFieldValues, setTechnicianFieldValues] = useState<CustomFieldValue[]>([]);
   const { notice, showError, showSuccess, clearNotice } = useOperatorNotice();
 
   async function load() {
@@ -75,6 +80,27 @@ export default function TechnicianPage() {
 
   useEffect(() => {
     void load();
+  }, []);
+
+  useEffect(() => {
+    async function loadTechnicianFieldData() {
+      try {
+        const [me, fieldRows] = await Promise.all([
+          apiFetch("/me"),
+          apiFetch("/custom-fields?entityType=technician&visible=true"),
+        ]);
+        const userId = String(me?.sub || "");
+        setMeId(userId || null);
+        setTechnicianFields(Array.isArray(fieldRows) ? fieldRows : []);
+        if (!userId) return;
+        const valueRows = await apiFetch(`/custom-fields/values?entityType=technician&entityId=${encodeURIComponent(userId)}`);
+        setTechnicianFieldValues(Array.isArray(valueRows?.values) ? valueRows.values : []);
+      } catch {
+        setTechnicianFields([]);
+        setTechnicianFieldValues([]);
+      }
+    }
+    void loadTechnicianFieldData();
   }, []);
 
   async function run(jobId: string, action: "start" | "complete") {
@@ -182,11 +208,12 @@ export default function TechnicianPage() {
                 <OperatorDataTableRow key={job.id}>
                   {(() => {
                     const stage = mapStatusToStage(job.status, technicianStages);
+                    const missingStageFields = meId ? getMissingRequiredCustomFieldKeys(stage?.requiredCustomFieldKeys, technicianFields, technicianFieldValues, "technician", meId) : [];
                     return (
                       <>
                   <div className="operator-table__cell">
                     <div className="operator-cellTitle">{job.jobRef}</div>
-                    <div className="operator-cellSubtle">{job.customerName} · {job.serviceName || "Service not set"} · <span data-testid="workflow-stage-label">{stage?.label || job.status}</span> · {job.status}{job.urgency ? ` · ${job.urgency.replace("_", " ")}` : ""}</div>
+                    <div className="operator-cellSubtle">{job.customerName} · {job.serviceName || "Service not set"} · <span data-testid="workflow-stage-label">{stage?.label || job.status}</span> · {job.status}{job.urgency ? ` · ${job.urgency.replace("_", " ")}` : ""}{missingStageFields.length ? ' · ' : ''}{missingStageFields.length ? <span data-testid="custom-field-stage-warning">{missingStageFields.join(", ")} required</span> : null}</div>
                   </div>
                   <div className="operator-table__cell">
                     <div className="operator-cellMeta">
@@ -252,6 +279,15 @@ export default function TechnicianPage() {
             />
           )}
         </section>
+
+        {meId ? (
+          <EntityCustomFieldsCard
+            title={`${terms.technicians.slice(0, -1) || "Technician"} profile fields`}
+            entityType="technician"
+            entityId={meId}
+            onSaved={() => undefined}
+          />
+        ) : null}
 
         <section className="card operator-section">
           <div className="operator-section__header">

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
+import { EntityCustomFieldsCard } from "../../../components/custom-fields/EntityCustomFieldsCard";
 import { DashboardShell } from "../../../components/dashboard-shell";
 import {
   OperatorActiveFilters,
@@ -18,6 +19,7 @@ import {
 } from "../../../components/ui/operator-page";
 import OpsSignalsBar from "../../../components/entity/OpsSignalsBar";
 import { getBusinessTerms, getCommandCentreHref } from "../../../lib/business-config";
+import { getMissingRequiredCustomFieldKeys, type CustomField, type CustomFieldValue } from "../../../lib/custom-fields";
 import { useStickyOperatorView } from "../../../lib/operator-view-state";
 import { apiFetch } from "../../../lib/api";
 import { getJobSignals } from "../../../lib/ops-signals";
@@ -78,6 +80,9 @@ export default function Jobs() {
   const [bulkStatus, setBulkStatus] = useState<JobStatus>("IN_PROGRESS");
   const [savingIds, setSavingIds] = useState<string[]>([]);
   const [savedView, setSavedView] = useStickyOperatorView<JobSavedView>("mytitan_jobs_saved_view_v1", "all");
+  const [customFields, setCustomFields] = useState<CustomField[]>([]);
+  const [customFieldValues, setCustomFieldValues] = useState<CustomFieldValue[]>([]);
+  const [customFieldJobId, setCustomFieldJobId] = useState<string | null>(null);
 
   const load = async () => {
     try {
@@ -92,6 +97,27 @@ export default function Jobs() {
   useEffect(() => {
     void load();
   }, []);
+
+  useEffect(() => {
+    async function loadCustomFieldData() {
+      if (!jobs.length) {
+        setCustomFieldValues([]);
+        return;
+      }
+      try {
+        const [fieldRows, valueRows] = await Promise.all([
+          apiFetch("/custom-fields?entityType=job&visible=true"),
+          apiFetch(`/custom-fields/values?entityType=job&entityIds=${encodeURIComponent(jobs.map((job) => job.id).join(","))}`),
+        ]);
+        setCustomFields(Array.isArray(fieldRows) ? fieldRows : []);
+        setCustomFieldValues(Array.isArray(valueRows?.values) ? valueRows.values : []);
+      } catch {
+        setCustomFields([]);
+        setCustomFieldValues([]);
+      }
+    }
+    void loadCustomFieldData();
+  }, [jobs]);
 
   useEffect(() => {
     if (!router.isReady) return;
@@ -377,6 +403,8 @@ export default function Jobs() {
                 const selected = selectedIds.includes(job.id);
                 const status = String(job.status || "OPEN").toUpperCase();
                 const stage = mapStatusToStage(status, jobStages);
+                const missingStageFields = getMissingRequiredCustomFieldKeys(stage?.requiredCustomFieldKeys, customFields, customFieldValues, "job", job.id);
+                const visibleFieldSummaries = customFieldValues.filter((value) => value.entityId === job.id && value.field?.visible !== false).slice(0, 2);
                 return (
                   <OperatorDataTableRow key={job.id} selected={selected}>
                     <div className="operator-table__cell">
@@ -393,10 +421,16 @@ export default function Jobs() {
                         <Link href={`/dashboard/jobs/${job.id}`}>{job.jobRef || job.id}</Link>
                         <span className="badge" data-testid="workflow-stage-label">{stage?.label || status}</span>
                         {isInvoiceOverdue(job) ? <span className="badge warn">Invoice overdue</span> : null}
+                        {missingStageFields.length ? <span className="badge warn" data-testid="custom-field-stage-warning">{missingStageFields.join(", ")} required</span> : null}
                       </div>
                       <div className="operator-cellSubtle">
                         {[status, job.vehicleReg || null, job.serviceName || null].filter(Boolean).join(" | ") || "No vehicle or service metadata"}
                       </div>
+                      {visibleFieldSummaries.length ? (
+                        <div className="operator-cellSubtle" style={{ marginTop: 6 }}>
+                          {visibleFieldSummaries.map((value) => `${value.field?.label}: ${String(value.valueJson)}`).join(" | ")}
+                        </div>
+                      ) : null}
                       <div style={{ marginTop: 8 }}>
                         <OpsSignalsBar {...getJobSignals(job)} compact />
                       </div>
@@ -431,6 +465,13 @@ export default function Jobs() {
                             onClick: () => void copyText(job.jobRef || job.id, "Job ref"),
                             variant: "secondary",
                           },
+                          {
+                            label: "Custom fields",
+                            description: "Review and edit workspace-specific job fields",
+                            group: "Tools",
+                            onClick: () => setCustomFieldJobId(job.id),
+                            testId: `job-custom-fields-${job.id}`,
+                          },
                           ...(nextStatus
                             ? [{
                                 label: nextStatus === "IN_PROGRESS" ? "Start job" : "Complete job",
@@ -459,6 +500,17 @@ export default function Jobs() {
             />
           ) : null}
         </section>
+
+        {customFieldJobId ? (
+          <EntityCustomFieldsCard
+            title="Job custom fields"
+            entityType="job"
+            entityId={customFieldJobId}
+            onSaved={() => {
+              void load();
+            }}
+          />
+        ) : null}
       </div>
     </DashboardShell>
   );
