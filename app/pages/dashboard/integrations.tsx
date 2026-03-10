@@ -33,6 +33,20 @@ type ConnectionStatus = {
   enabled: boolean;
 };
 
+type IntegrationOps = {
+  summary: { connected: number; ready: number; blocked: number };
+  providers: Array<{
+    provider: string;
+    connected: boolean;
+    allowed: boolean;
+    enabled: boolean;
+    oauthConfigured: boolean;
+    connectedAt?: string | null;
+    nextStep: string;
+    blockers: string[];
+  }>;
+};
+
 type IntegrationScope = "all" | "enabled" | "restricted";
 type ConnectionScope = "all" | "connected" | "ready" | "blocked";
 
@@ -72,6 +86,7 @@ const CONNECTIONS = [
 export default function IntegrationsPage() {
   const [items, setItems] = useState<Integration[]>([]);
   const [connections, setConnections] = useState<Record<string, ConnectionStatus>>({});
+  const [ops, setOps] = useState<IntegrationOps | null>(null);
   const [error, setError] = useState("");
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [moduleSearch, setModuleSearch] = useState("");
@@ -95,6 +110,12 @@ export default function IntegrationsPage() {
         }),
       );
       setConnections(Object.fromEntries(statusEntries));
+      try {
+        const opsData = await apiFetch("/integrations/ops");
+        setOps(opsData);
+      } catch {
+        setOps(null);
+      }
       setError("");
     } catch (err: any) {
       setError(err.message || "Failed to load integrations");
@@ -222,6 +243,31 @@ export default function IntegrationsPage() {
         />
 
         {error ? <p role="alert" style={{ color: "#ff8a8a", marginTop: 0 }}>{error}</p> : null}
+
+        {ops?.providers?.length ? (
+          <section className="card operator-section">
+            <div className="operator-section__header">
+              <div>
+                <h2 className="operator-section__title">Provider readiness</h2>
+                <p className="operator-section__subtitle">Deployment and workspace blockers surfaced before operators try to connect a provider.</p>
+              </div>
+            </div>
+            <OperatorDataTable columns="minmax(180px, 1fr) minmax(220px, 1.2fr) minmax(160px, 0.8fr)">
+              <OperatorDataTableHeader>
+                <div className="operator-table__cell">Provider</div>
+                <div className="operator-table__cell">Readiness</div>
+                <div className="operator-table__cell">State</div>
+              </OperatorDataTableHeader>
+              {ops.providers.map((provider) => (
+                <OperatorDataTableRow key={provider.provider}>
+                  <div className="operator-table__cell"><strong>{provider.provider}</strong></div>
+                  <div className="operator-table__cell">{provider.blockers.length ? provider.blockers.join(" · ") : provider.nextStep}</div>
+                  <div className="operator-table__cell">{provider.connected ? "Connected" : provider.oauthConfigured ? "Ready" : "Deployment setup needed"}</div>
+                </OperatorDataTableRow>
+              ))}
+            </OperatorDataTable>
+          </section>
+        ) : null}
 
         <section className="card operator-section">
           <div className="operator-section__header">

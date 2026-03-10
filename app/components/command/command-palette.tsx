@@ -14,7 +14,12 @@ const ITEMS: PaletteItem[] = [
   { label: "Bookings", href: "/dashboard/bookings" },
   { label: "Calendar", href: "/dashboard/calendar" },
   { label: "Customers", href: "/dashboard/customers" },
+  { label: "Intelligence", href: "/dashboard/intelligence" },
+  { label: "Billing readiness", href: "/dashboard/billing/readiness" },
+  { label: "Portal Ops", href: "/dashboard/portal" },
+  { label: "Technician queue", href: "/dashboard/technician" },
   { label: "Integrations", href: "/dashboard/integrations" },
+  { label: "Automations", href: "/dashboard/settings/automations" },
   { label: "Settings", href: "/dashboard/settings" },
   { label: "Developer Admin", href: "/dev-admin" },
 ];

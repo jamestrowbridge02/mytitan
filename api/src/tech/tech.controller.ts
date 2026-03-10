@@ -28,4 +28,16 @@ export class TechController {
   complete(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Body() body: { note?: string }) {
     return this.tech.advanceAssignedJob(user.companyId, user.sub, id, 'complete', body?.note);
   }
+
+  @Post('jobs/:id/arrive')
+  @Roles('OWNER', 'ADMIN', 'STAFF')
+  arrive(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Body() body: { note?: string }) {
+    return this.tech.arriveAssignedJob(user.companyId, user.sub, id, body?.note);
+  }
+
+  @Post('jobs/:id/note')
+  @Roles('OWNER', 'ADMIN', 'STAFF')
+  note(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Body() body: { note?: string }) {
+    return this.tech.addJobNote(user.companyId, user.sub, id, body?.note || '');
+  }
 }

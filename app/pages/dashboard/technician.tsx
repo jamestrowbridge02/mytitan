@@ -24,6 +24,7 @@ type TechQueue = {
     status: string;
     serviceName?: string | null;
     scheduledAt?: string | null;
+    urgency?: string;
   }>;
   bookings: Array<{
     id: string;
@@ -38,6 +39,7 @@ export default function TechnicianPage() {
   const [data, setData] = useState<TechQueue | null>(null);
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
 
   async function load() {
     try {
@@ -63,6 +65,39 @@ export default function TechnicianPage() {
       await load();
     } catch (err: any) {
       setError(err?.message || `Failed to ${action} job`);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function arrive(jobId: string) {
+    setBusyId(jobId);
+    try {
+      await apiFetch(`/tech/jobs/${jobId}/arrive`, {
+        method: "POST",
+        body: JSON.stringify({ note: "Technician arrived on site" }),
+      });
+      await load();
+    } catch (err: any) {
+      setError(err?.message || "Failed to log arrival");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function saveNote(jobId: string) {
+    const note = String(noteDrafts[jobId] || "").trim();
+    if (!note) return;
+    setBusyId(jobId);
+    try {
+      await apiFetch(`/tech/jobs/${jobId}/note`, {
+        method: "POST",
+        body: JSON.stringify({ note }),
+      });
+      setNoteDrafts((prev) => ({ ...prev, [jobId]: "" }));
+      await load();
+    } catch (err: any) {
+      setError(err?.message || "Failed to save note");
     } finally {
       setBusyId(null);
     }
@@ -121,12 +156,20 @@ export default function TechnicianPage() {
                 <OperatorDataTableRow key={job.id}>
                   <div className="operator-table__cell">
                     <div className="operator-cellTitle">{job.jobRef}</div>
-                    <div className="operator-cellSubtle">{job.customerName} · {job.serviceName || "Service not set"} · {job.status}</div>
+                    <div className="operator-cellSubtle">{job.customerName} · {job.serviceName || "Service not set"} · {job.status}{job.urgency ? ` · ${job.urgency.replace("_", " ")}` : ""}</div>
                   </div>
                   <div className="operator-table__cell">
                     <div className="operator-cellMeta">
                       <span><strong>{job.scheduledAt ? new Date(job.scheduledAt).toLocaleString() : "Not scheduled"}</strong></span>
-                      <span>{job.status === "IN_PROGRESS" ? "Active field work" : "Ready to start"}</span>
+                      <span>
+                        {job.urgency === "overdue"
+                          ? "Late for arrival"
+                          : job.urgency === "due_soon"
+                          ? "Due soon"
+                          : job.status === "IN_PROGRESS"
+                          ? "Active field work"
+                          : "Ready to start"}
+                      </span>
                     </div>
                   </div>
                   <div className="operator-table__cell operator-table__cell--actions">
@@ -135,9 +178,21 @@ export default function TechnicianPage() {
                         ? { label: busyId === job.id ? "Completing..." : "Complete", onClick: () => void run(job.id, "complete"), disabled: busyId === job.id }
                         : { label: busyId === job.id ? "Starting..." : "Start", onClick: () => void run(job.id, "start"), disabled: busyId === job.id }}
                       actions={[
+                        { label: busyId === job.id ? "Arriving..." : "Log arrival", onClick: () => void arrive(job.id), group: "Field actions", description: "Record that the technician has arrived on site", disabled: busyId === job.id },
                         { label: "Open job", href: `/dashboard/jobs/${job.id}`, group: "Internal", description: "Open the full internal job record" },
                       ]}
                     />
+                    <div style={{ display: "grid", gap: 6, marginTop: 10 }}>
+                      <input
+                        className="input"
+                        value={noteDrafts[job.id] || ""}
+                        onChange={(e) => setNoteDrafts((prev) => ({ ...prev, [job.id]: e.target.value }))}
+                        placeholder="Add technician note"
+                      />
+                      <button className="button secondary" type="button" onClick={() => void saveNote(job.id)} disabled={busyId === job.id || !String(noteDrafts[job.id] || "").trim()}>
+                        {busyId === job.id ? "Saving..." : "Save note"}
+                      </button>
+                    </div>
                   </div>
                 </OperatorDataTableRow>
               ))}

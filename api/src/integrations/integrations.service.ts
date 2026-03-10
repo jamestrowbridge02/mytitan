@@ -127,6 +127,51 @@ export class IntegrationsService {
     };
   }
 
+  async getOpsOverview(tenantId: string) {
+    const providers: IntegrationProviderKey[] = ['XERO', 'QBO', 'GOOGLE_CALENDAR'];
+    const rows = await Promise.all(
+      providers.map(async (provider) => {
+        const status = await this.getStatus(tenantId, provider);
+        let oauthConfigured = true;
+        try {
+          this.getProviderConfig(provider);
+        } catch {
+          oauthConfigured = false;
+        }
+
+        const blockers = [
+          !status.allowed ? 'Plan or feature access required' : null,
+          status.allowed && !status.enabled ? 'Enable the product module in settings first' : null,
+          status.allowed && status.enabled && !oauthConfigured ? 'Provider OAuth is not configured on this deployment' : null,
+        ].filter(Boolean) as string[];
+
+        return {
+          provider,
+          connected: status.connected,
+          allowed: status.allowed,
+          enabled: status.enabled,
+          oauthConfigured,
+          connectedAt: status.connectedAt,
+          nextStep: status.connected
+            ? 'Connected'
+            : blockers.length > 0
+            ? blockers[0]
+            : 'Ready to connect',
+          blockers,
+        };
+      }),
+    );
+
+    return {
+      summary: {
+        connected: rows.filter((row) => row.connected).length,
+        ready: rows.filter((row) => !row.connected && row.allowed && row.enabled && row.oauthConfigured).length,
+        blocked: rows.filter((row) => row.blockers.length > 0).length,
+      },
+      providers: rows,
+    };
+  }
+
   async createAuthUrl(tenantId: string, provider: IntegrationProviderKey) {
     const access = await this.getFeatureAccess(tenantId, provider);
     if (!access.allowed) {

@@ -58,6 +58,7 @@ export default function CommandCentreV2Page() {
   const [pendingBulk, setPendingBulk] = useState<{ op: string; payload: Record<string, any>; label: string } | null>(null);
   const [pendingInlineJobId, setPendingInlineJobId] = useState<string>("");
   const [seededDefaults, setSeededDefaults] = useState(false);
+  const [defaultViewApplied, setDefaultViewApplied] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string>("");
   const [isRefreshing, setIsRefreshing] = useState(false);
     const [lastBoardHash, setLastBoardHash] = useState("");
@@ -234,6 +235,15 @@ export default function CommandCentreV2Page() {
     };
     seedDefaults();
   }, [enabled, seededDefaults, views.length]);
+
+  useEffect(() => {
+    if (!enabled || defaultViewApplied || activeViewId || views.length === 0) return;
+    const defaultView = views.find((view) => view?.isDefault);
+    if (!defaultView?.id) return;
+    applyView(defaultView.id);
+    setSaveViewName(String(defaultView.name || ""));
+    setDefaultViewApplied(true);
+  }, [enabled, defaultViewApplied, activeViewId, views]);
 
   const allJobs = useMemo(() => Object.values(board?.grouped || {}).flat() as any[], [board]);
 

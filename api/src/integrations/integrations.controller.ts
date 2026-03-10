@@ -93,6 +93,15 @@ export class IntegrationsController {
     return this.integrations.getStatus(user.companyId, 'GOOGLE_CALENDAR');
   }
 
+  @Get('ops')
+  @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
+  ops(@CurrentUser() user: JwtPayload) {
+    if (!isMarketplaceEnabled()) {
+      return { summary: { connected: 0, ready: 0, blocked: 3 }, providers: [] };
+    }
+    return this.integrations.getOpsOverview(user.companyId);
+  }
+
   @Post('google/connect')
   @Roles('OWNER', 'ADMIN')
   async connectGoogle(@CurrentUser() user: JwtPayload) {

@@ -42,7 +42,17 @@ export class TechService {
         inProgress: jobs.filter((job: any) => job.status === 'IN_PROGRESS').length,
         dueTodayBookings: bookings.length,
       },
-      jobs,
+      jobs: jobs.map((job: any) => ({
+        ...job,
+        urgency:
+          job.status === 'IN_PROGRESS'
+            ? 'active'
+            : job.scheduledAt && new Date(job.scheduledAt).getTime() < now.getTime()
+            ? 'overdue'
+            : job.scheduledAt && new Date(job.scheduledAt).getTime() < now.getTime() + 2 * 60 * 60 * 1000
+            ? 'due_soon'
+            : 'normal',
+      })),
       bookings,
     };
   }
@@ -83,5 +93,73 @@ export class TechService {
     }
 
     return updated;
+  }
+
+  async arriveAssignedJob(companyId: string, userId: string, jobId: string, note?: string) {
+    const db = this.prisma as any;
+    const job = await db.job.findFirst({ where: { id: jobId, companyId } });
+    if (!job) throw new NotFoundException('Job not found');
+    if (job.assignedUserId !== userId) {
+      throw new BadRequestException('Job is not assigned to this technician');
+    }
+
+    await db.jobActivity.create({
+      data: {
+        companyId,
+        jobId,
+        actorUserId: userId,
+        eventType: 'tech.arrived',
+        message: note || 'Technician arrived on site',
+        payloadJson: { source: 'tech_mobile' },
+      },
+    });
+    await this.activity.push({
+      tenantId: companyId,
+      type: 'technician.arrived',
+      label: `Technician arrived for ${job.jobRef || job.id}`,
+      jobId: job.id,
+      jobRef: job.jobRef || null,
+      customerId: job.customerId || null,
+      customerName: job.customerName || null,
+      status: job.status || null,
+      payloadJson: { note: note || null },
+    });
+    return { ok: true };
+  }
+
+  async addJobNote(companyId: string, userId: string, jobId: string, note: string) {
+    const db = this.prisma as any;
+    const job = await db.job.findFirst({ where: { id: jobId, companyId } });
+    if (!job) throw new NotFoundException('Job not found');
+    if (job.assignedUserId !== userId) {
+      throw new BadRequestException('Job is not assigned to this technician');
+    }
+    const clean = String(note || '').trim();
+    if (!clean) {
+      throw new BadRequestException('Note is required');
+    }
+
+    await db.jobActivity.create({
+      data: {
+        companyId,
+        jobId,
+        actorUserId: userId,
+        eventType: 'tech.note',
+        message: clean,
+        payloadJson: { source: 'tech_mobile' },
+      },
+    });
+    await this.activity.push({
+      tenantId: companyId,
+      type: 'technician.note_added',
+      label: `Technician note added for ${job.jobRef || job.id}`,
+      jobId: job.id,
+      jobRef: job.jobRef || null,
+      customerId: job.customerId || null,
+      customerName: job.customerName || null,
+      status: job.status || null,
+      payloadJson: { note: clean },
+    });
+    return { ok: true };
   }
 }
