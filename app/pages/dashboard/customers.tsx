@@ -10,6 +10,7 @@ import {
   OperatorEmptyStateCard,
   OperatorFilterBar,
   OperatorFilterField,
+  OperatorGuidance,
   OperatorPageHeader,
   OperatorRowActions,
   OperatorSavedViews,
@@ -261,6 +262,15 @@ export default function CustomersPage() {
 
           <OperatorActiveFilters chips={activeFilters} onClearAll={activeFilters.length ? clearFilters : undefined} />
 
+          <OperatorGuidance
+            title="CRM workflow tips"
+            items={[
+              "Sticky views keep follow-up and recent-activity slices available between visits on this device.",
+              "Use row selection to copy customer names or contact details before outreach.",
+              "Open a row menu for send, log, and copy actions while keeping the roster compact.",
+            ]}
+          />
+
           <OperatorBulkBar count={selectedIds.length} hint="Bulk actions are non-destructive">
             <button className="button secondary operator-compact-button" type="button" onClick={() => setSelectedIds([])}>
               Clear
@@ -297,8 +307,8 @@ export default function CustomersPage() {
             </button>
           </OperatorBulkBar>
 
-          {error ? <p style={{ color: "#ff8a8a", marginTop: 0 }}>{error}</p> : null}
-          {notice ? <div className="ccv2-toast ccv2-toast--info">{notice}</div> : null}
+          {error ? <p role="alert" style={{ color: "#ff8a8a", marginTop: 0 }}>{error}</p> : null}
+          {notice ? <div aria-live="polite" className="ccv2-toast ccv2-toast--info" role="status">{notice}</div> : null}
 
           {loading ? (
             <div className="operator-note">Loading customers...</div>

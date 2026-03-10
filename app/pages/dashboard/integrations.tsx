@@ -7,6 +7,7 @@ import {
   OperatorDataTableRow,
   OperatorEmptyStateCard,
   OperatorFilterBar,
+  OperatorGuidance,
   OperatorPageHeader,
   OperatorRowActions,
   OperatorSavedViews,
@@ -220,7 +221,7 @@ export default function IntegrationsPage() {
           stats={stats}
         />
 
-        {error ? <p style={{ color: "#ff8a8a", marginTop: 0 }}>{error}</p> : null}
+        {error ? <p role="alert" style={{ color: "#ff8a8a", marginTop: 0 }}>{error}</p> : null}
 
         <section className="card operator-section">
           <div className="operator-section__header">
@@ -251,6 +252,15 @@ export default function IntegrationsPage() {
           />
 
           <OperatorActiveFilters chips={moduleFilterChips} onClearAll={moduleFilterChips.length ? clearModuleFilters : undefined} />
+
+          <OperatorGuidance
+            title="Integration control tips"
+            items={[
+              "Saved views keep enabled or restricted module slices sticky on this device.",
+              "Primary actions stay visible, while lower-frequency module changes sit in the row menu.",
+              "Use reset to clear search and view state together when reviewing the full matrix.",
+            ]}
+          />
 
           {filteredItems.length ? (
             <OperatorDataTable columns="minmax(220px, 1.4fr) minmax(160px, 0.9fr) minmax(160px, 0.9fr) minmax(170px, auto)">

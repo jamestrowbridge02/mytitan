@@ -10,6 +10,7 @@ import {
   OperatorEmptyStateCard,
   OperatorFilterBar,
   OperatorFilterField,
+  OperatorGuidance,
   OperatorPageHeader,
   OperatorRowActions,
   OperatorSavedViews,
@@ -235,8 +236,8 @@ export default function BookingsPage() {
           stats={stats}
         />
 
-        {error ? <p style={{ color: "#ff8a8a", marginTop: 0 }}>{error}</p> : null}
-        {notice ? <div className="ccv2-toast ccv2-toast--info">{notice}</div> : null}
+        {error ? <p role="alert" style={{ color: "#ff8a8a", marginTop: 0 }}>{error}</p> : null}
+        {notice ? <div aria-live="polite" className="ccv2-toast ccv2-toast--info" role="status">{notice}</div> : null}
 
         <div className={marketplaceEnabled && settings ? "operator-split" : "operator-stack"}>
           <section className="card operator-section">
@@ -417,6 +418,15 @@ export default function BookingsPage() {
           </OperatorFilterBar>
 
           <OperatorActiveFilters chips={activeFilters} onClearAll={activeFilters.length ? clearFilters : undefined} />
+
+          <OperatorGuidance
+            title="Booking queue tips"
+            items={[
+              "Saved views keep upcoming, today, and conversion-focused queues sticky on this device.",
+              "Select rows to copy booking references or customer names before dispatch handoff.",
+              "Use the row menu for detail and conversion actions while keeping schedule access as the primary action.",
+            ]}
+          />
 
           <OperatorBulkBar count={selectedIds.length} hint="Bulk tools stay non-destructive on bookings">
             <button className="button secondary operator-compact-button" type="button" onClick={() => setSelectedIds([])}>

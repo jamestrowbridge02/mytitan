@@ -11,6 +11,7 @@ import {
   OperatorEmptyStateCard,
   OperatorFilterBar,
   OperatorFilterField,
+  OperatorGuidance,
   OperatorPageHeader,
   OperatorRowActions,
   OperatorSavedViews,
@@ -303,6 +304,15 @@ export default function Jobs() {
 
           <OperatorActiveFilters chips={activeFilters} onClearAll={activeFilters.length ? clearFilters : undefined} />
 
+          <OperatorGuidance
+            title="Queue shortcuts"
+            items={[
+              "Saved views stay sticky on this device so operators can reopen their working queue quickly.",
+              "Use the row checkboxes to build a selection, then apply bulk status updates from the bulk bar.",
+              "Open a row menu for copy and next-step actions without expanding the table width.",
+            ]}
+          />
+
           <OperatorBulkBar count={selectedIds.length} hint={`${selectedVisibleCount} of ${filteredJobs.length} visible rows selected`}>
             <button className="button secondary operator-compact-button" type="button" onClick={() => setSelectedIds([])}>
               Clear
@@ -327,8 +337,8 @@ export default function Jobs() {
             </button>
           </OperatorBulkBar>
 
-          {error ? <p style={{ color: "#ff8a8a", marginTop: 0 }}>{error}</p> : null}
-          {notice ? <div className="ccv2-toast ccv2-toast--info">{notice}</div> : null}
+          {error ? <p role="alert" style={{ color: "#ff8a8a", marginTop: 0 }}>{error}</p> : null}
+          {notice ? <div aria-live="polite" className="ccv2-toast ccv2-toast--info" role="status">{notice}</div> : null}
 
           {filteredJobs.length ? (
             <OperatorDataTable columns="28px minmax(220px, 1.6fr) minmax(140px, 1fr) minmax(140px, 0.9fr) minmax(160px, 1fr) minmax(170px, auto)">

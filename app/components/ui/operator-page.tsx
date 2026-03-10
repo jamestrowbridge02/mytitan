@@ -232,6 +232,43 @@ export function OperatorActiveFilters({
   );
 }
 
+export function OperatorGuidance({
+  title = "Operator tips",
+  items,
+  defaultOpen = false,
+}: {
+  title?: string;
+  items: string[];
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+
+  if (!items.length) return null;
+
+  return (
+    <section className={`operator-guidance${open ? " is-open" : ""}`}>
+      <button
+        aria-expanded={open}
+        className="operator-guidance__toggle"
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+      >
+        <span>{title}</span>
+        <span className="operator-guidance__toggleMeta">{open ? "Hide" : "Show"}</span>
+      </button>
+      {open ? (
+        <div className="operator-guidance__panel">
+          {items.map((item) => (
+            <div key={item} className="operator-guidance__item">
+              {item}
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 export function OperatorBulkBar({
   count,
   hint,

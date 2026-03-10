@@ -2656,6 +2656,19 @@ body {
   color: #effcf9;
 }
 
+[data-shell="app"] .operator-viewTabs__item:hover {
+  border-color: rgba(148, 163, 184, 0.24);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+[data-shell="app"] .operator-viewTabs__item:active,
+[data-shell="app"] .operator-filterChips__item:active,
+[data-shell="app"] .operator-filterChips__clear:active,
+[data-shell="app"] .operator-rowActions__toggle:active,
+[data-shell="app"] .operator-rowActions__item:active {
+  transform: translateY(1px);
+}
+
 [data-shell="app"] .operator-viewTabs__item:focus-visible,
 [data-shell="app"] .operator-filterChips__item:focus-visible,
 [data-shell="app"] .operator-filterChips__clear:focus-visible,
@@ -2739,6 +2752,9 @@ body {
 [data-shell="app"] .operator-filterbar__results {
   font-size: 12px;
   color: rgba(191, 204, 226, 0.76);
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
 }
 
 [data-shell="app"] .operator-filterbar__actions {
@@ -2757,6 +2773,7 @@ body {
   border-radius: 14px;
   border: 1px solid rgba(94, 234, 212, 0.18);
   background: rgba(20, 184, 166, 0.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 [data-shell="app"] .operator-bulkbar__summary {
@@ -2818,6 +2835,10 @@ body {
   background: rgba(255, 255, 255, 0.06);
 }
 
+[data-shell="app"] .operator-filterChips__item:disabled {
+  opacity: 0.7;
+}
+
 [data-shell="app"] .operator-list {
   display: flex;
   flex-direction: column;
@@ -2864,6 +2885,7 @@ body {
 [data-shell="app"] .operator-table__row.is-selected {
   border-color: rgba(94, 234, 212, 0.34);
   background: rgba(20, 184, 166, 0.08);
+  box-shadow: inset 2px 0 0 rgba(94, 234, 212, 0.72);
 }
 
 [data-shell="app"] .operator-table__row:focus-within {
@@ -3019,6 +3041,7 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(10, 14, 24, 0.98);
   box-shadow: 0 18px 36px rgba(0, 0, 0, 0.35);
+  animation: operator-menu-in 140ms ease;
 }
 
 [data-shell="app"] .operator-rowActions__group {
@@ -3094,6 +3117,70 @@ body {
 [data-shell="app"] .operator-rowActions__item:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+[data-shell="app"] .operator-guidance {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.025);
+  overflow: hidden;
+}
+
+[data-shell="app"] .operator-guidance__toggle {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: none;
+  background: transparent;
+  color: #edf2ff;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-align: left;
+}
+
+[data-shell="app"] .operator-guidance__toggle:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+[data-shell="app"] .operator-guidance__toggleMeta {
+  color: rgba(148, 163, 184, 0.82);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+[data-shell="app"] .operator-guidance__panel {
+  display: grid;
+  gap: 8px;
+  padding: 0 14px 14px;
+}
+
+[data-shell="app"] .operator-guidance__item {
+  font-size: 12px;
+  line-height: 1.5;
+  color: rgba(191, 204, 226, 0.8);
+}
+
+[data-shell="app"] .button:disabled,
+[data-shell="app"] .toggle:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+}
+
+@keyframes operator-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 [data-shell="app"] .operator-empty {
