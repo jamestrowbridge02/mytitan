@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import { DashboardShell } from '../../components/dashboard-shell';
 import { GuidedSetupProgress } from '../../components/guided-setup-progress';
+import { OperatorPageHeader } from '../../components/ui/operator-page';
 import { apiFetch } from '../../lib/api';
 import { useBilling } from '../../lib/billing';
 import { isGuidedSetupV2Enabled, isNotificationsV1Enabled } from '../../lib/feature-flags';
@@ -107,6 +108,21 @@ export default function SettingsPage() {
     };
   }, [form]);
 
+  const stats = useMemo(() => {
+    const enabledFeatures = [
+      Boolean(form.featureBookings),
+      Boolean(form.featureAI),
+      Boolean(form.featureAccounting),
+      Boolean(form.featurePayments),
+      Boolean(form.featureWhatsApp),
+    ].filter(Boolean).length;
+    return [
+      { label: 'Theme', value: themeMode === 'dark' ? 'Dark' : 'Light', hint: 'Operator shell mode' },
+      { label: 'Features on', value: String(enabledFeatures), hint: 'Core tenant toggles enabled' },
+      { label: 'Plan', value: plan?.code || 'STANDARD', hint: 'Billing-controlled capability set' },
+    ];
+  }, [form.featureAI, form.featureAccounting, form.featureBookings, form.featurePayments, form.featureWhatsApp, plan?.code, themeMode]);
+
   async function saveSettings() {
     setStatus('');
     setError('');
@@ -208,6 +224,17 @@ export default function SettingsPage() {
   return (
     <DashboardShell>
   <div className="settings-premium-shell">
+      <OperatorPageHeader
+        eyebrow="Configuration"
+        title="Settings"
+        subtitle="Keep appearance, defaults, and tenant capability controls in one consistent workspace."
+        actions={[
+          { label: 'Integrations', href: '/dashboard/integrations', variant: 'secondary' },
+          { label: 'Run guided setup', onClick: () => void runGuidedSetup() },
+        ]}
+        shortcuts={['Tabs keep configuration areas compact', 'Save once after grouped edits']}
+        stats={stats}
+      />
       <GuidedSetupProgress enabled={guidedSetupEnabled} incomplete={!settings?.guidedSetupCompletedAt} compact />
       <div className="card settings-premium-card">
         <h1 className="settings-premium-title">Tenant Settings</h1>

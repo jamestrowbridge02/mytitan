@@ -8,10 +8,13 @@ type PaletteItem = {
 
 const ITEMS: PaletteItem[] = [
   { label: "Dashboard", href: "/dashboard" },
+  { label: "Command Centre", href: "/dashboard/command-centre-v2" },
   { label: "Jobs", href: "/dashboard/jobs" },
+  { label: "New job", href: "/dashboard/jobs/new" },
   { label: "Bookings", href: "/dashboard/bookings" },
   { label: "Calendar", href: "/dashboard/calendar" },
-  { label: "Customers", href: "/dashboard/trade-accounts" },
+  { label: "Customers", href: "/dashboard/customers" },
+  { label: "Integrations", href: "/dashboard/integrations" },
   { label: "Settings", href: "/dashboard/settings" },
   { label: "Developer Admin", href: "/dev-admin" },
 ];
@@ -61,10 +64,13 @@ export default function CommandPalette() {
         <input
           className="input"
           autoFocus
-          placeholder="Search commands..."
+          placeholder="Search routes and jump"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
+        <div className="operator-note" style={{ marginTop: 4 }}>
+          Jump between core operator screens without using the sidebar.
+        </div>
         <div style={{ marginTop: 10, display: "grid", gap: 8 }}>
           {list.map((item) => (
             <Link

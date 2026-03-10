@@ -86,8 +86,11 @@ export default function Sidebar() {
     { title: "Dashboard", href: "/dashboard" },
     { title: "Command Centre", href: "/dashboard/command-centre-v2" },
     { title: "Jobs", href: "/dashboard/jobs" },
+    { title: "Customers", href: "/dashboard/customers" },
+    { title: "Calendar", href: "/dashboard/calendar" },
+    { title: "Bookings", href: "/dashboard/bookings" },
     { title: "New job", href: "/dashboard/jobs/new" },
-    { title: "Settings", href: "/dashboard/settings" },
+    { title: "Integrations", href: "/dashboard/integrations" },
   ];
 
   return (
@@ -107,12 +110,14 @@ export default function Sidebar() {
           <div className="mt-3">
             <input
               className="mt-sidebar__search w-full rounded-xl px-3 py-2 text-[13px]"
-              placeholder="Search…"
+              placeholder="Search routes"
               value={q}
               onChange={(e) => setQ(e.target.value)}
               aria-label="Search navigation"
             />
           </div>
+
+          <div className="mt-2 text-[11px] text-white/45">Ctrl K opens global command search.</div>
 
           <div className="mt-sidebar__quick mt-3">
             {primaryQuickLinks.map((item) => {

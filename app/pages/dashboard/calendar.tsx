@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { DashboardShell } from '../../components/dashboard-shell';
 import { Skeleton } from '../../components/ui/Skeleton';
+import { OperatorPageHeader } from '../../components/ui/operator-page';
 import { ErrorState } from '../../components/states/ErrorState';
 import { LoadingState } from '../../components/states/LoadingState';
 import { ApiError, apiFetch } from '../../lib/api';
@@ -683,6 +685,16 @@ export default function CalendarPage() {
       return true;
     });
   }, [technicians]);
+  const calendarStats = useMemo(() => {
+    const bookingCount = data?.blocks?.length || 0;
+    const warningCount = data?.blocks?.filter((block) => (block.warnings ?? []).length > 0).length || 0;
+    const activeTechs = technicians.filter((tech) => tech.id !== '__unassigned__').length;
+    return [
+      { label: 'Week range', value: `${days[0]?.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) || '-'} to ${days[6]?.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) || '-'}`, hint: 'Current planning window' },
+      { label: 'Bookings', value: String(bookingCount), hint: warningCount ? `${warningCount} with warnings` : 'No schedule warnings' },
+      { label: 'Technicians', value: String(activeTechs), hint: hasUnassigned ? 'Includes unassigned lane' : 'Assigned lanes only' },
+    ];
+  }, [data?.blocks, days, hasUnassigned, technicians]);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 900);
@@ -1201,20 +1213,36 @@ export default function CalendarPage() {
   return (
     <>
       <DashboardShell>
-        <div className="card">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-            <div>
-              <h1 style={{ marginBottom: 6 }}>Calendar</h1>
-              <p className="muted" style={{ margin: 0 }}>Week view with technician lanes (08:00 - 18:00).</p>
-            </div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button className="button secondary" type="button" onClick={() => setWeekStart((prev) => addDays(prev, -7))}>Prev week</button>
-              <button className="button secondary" type="button" onClick={() => setWeekStart(startOfWeekMonday(new Date()))}>Current week</button>
-              <button className="button secondary" type="button" onClick={() => setWeekStart((prev) => addDays(prev, 7))}>Next week</button>
-            </div>
-          </div>
+        <div className="operator-stack">
+          <OperatorPageHeader
+            eyebrow="Scheduling"
+            title="Calendar"
+            subtitle="Weekly technician lanes with drag rescheduling, schedule overlays, and conflict visibility kept in one operational view."
+            actions={[
+              { label: 'Bookings', href: '/dashboard/bookings', variant: 'secondary' },
+              { label: 'Current week', onClick: () => setWeekStart(startOfWeekMonday(new Date())) },
+            ]}
+            shortcuts={['Drag bookings to reschedule', 'Filter by technician, location, or status']}
+            stats={calendarStats}
+          />
 
-        <div style={{ marginTop: 16, display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+          <div className="card operator-section">
+            <div className="operator-section__header">
+              <div>
+                <h2 className="operator-section__title">Weekly planner</h2>
+                <p className="operator-section__subtitle">Week view with technician lanes from 08:00 to 18:00.</p>
+              </div>
+              <div className="operator-inline-actions">
+                <button className="button secondary operator-compact-button" type="button" onClick={() => setWeekStart((prev) => addDays(prev, -7))}>Prev week</button>
+                <button className="button secondary operator-compact-button" type="button" onClick={() => setWeekStart(startOfWeekMonday(new Date()))}>Current week</button>
+                <button className="button secondary operator-compact-button" type="button" onClick={() => setWeekStart((prev) => addDays(prev, 7))}>Next week</button>
+                <Link className="button secondary operator-compact-button" href="/dashboard/bookings">
+                  Booking queue
+                </Link>
+              </div>
+            </div>
+
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
           <label style={{ display: 'flex', flexDirection: 'column', fontSize: 12 }}>
               Filter tech
               <select className="input" value={selectedTechId} onChange={(event) => setSelectedTechId(event.target.value)}>
@@ -1797,6 +1825,7 @@ export default function CalendarPage() {
               </div>
             </>
           ) : null}
+          </div>
         </div>
       </DashboardShell>
       <style jsx global>{`

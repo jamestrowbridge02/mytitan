@@ -61,7 +61,7 @@ export const NAV_GROUPS: NavGroup[] = [
     title: "Settings",
     items: [
       { title: "Settings", href: "/dashboard/settings" },
-      { title: "Integrations", href: "/dashboard/settings/integrations" },
+      { title: "Integrations", href: "/dashboard/integrations" },
     ],
   },
   {
