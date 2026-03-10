@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { OperatorNotice } from "../../components/feedback/OperatorNotice";
+import { useOperatorNotice } from "../../components/feedback/useOperatorNotice";
 import { DashboardShell } from "../../components/dashboard-shell";
 import {
   OperatorDataTable,
@@ -51,18 +53,17 @@ type TechQueue = {
 
 export default function TechnicianPage() {
   const [data, setData] = useState<TechQueue | null>(null);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
+  const { notice, showError, showSuccess, clearNotice } = useOperatorNotice();
 
   async function load() {
     try {
       const res = await apiFetch("/tech/queue");
       setData(res);
-      setError("");
+      if (notice?.kind === "error") clearNotice();
     } catch (err: any) {
-      setError(err?.message || "Failed to load technician queue");
+      showError(err?.message || "Failed to load technician queue");
     }
   }
 
@@ -70,25 +71,17 @@ export default function TechnicianPage() {
     void load();
   }, []);
 
-  useEffect(() => {
-    if (!notice) return;
-    const timer = window.setTimeout(() => setNotice(""), 2200);
-    return () => window.clearTimeout(timer);
-  }, [notice]);
-
   async function run(jobId: string, action: "start" | "complete") {
     setBusyId(jobId);
-    setError("");
     try {
       await apiFetch(`/tech/jobs/${jobId}/${action}`, {
         method: "POST",
         body: JSON.stringify({ note: action === "start" ? "Technician started assigned work" : "Technician completed assigned work" }),
       });
-      setNotice(action === "start" ? "Technician moved into active work" : "Job marked completed");
+      showSuccess(action === "start" ? "Technician moved into active work" : "Job marked completed");
       await load();
     } catch (err: any) {
-      setNotice("");
-      setError(err?.message || `Failed to ${action} job`);
+      showError(err?.message || `Failed to ${action} job`);
     } finally {
       setBusyId(null);
     }
@@ -96,17 +89,15 @@ export default function TechnicianPage() {
 
   async function arrive(jobId: string) {
     setBusyId(jobId);
-    setError("");
     try {
       await apiFetch(`/tech/jobs/${jobId}/arrive`, {
         method: "POST",
         body: JSON.stringify({ note: "Technician arrived on site" }),
       });
-      setNotice("Arrival logged");
+      showSuccess("Arrival logged");
       await load();
     } catch (err: any) {
-      setNotice("");
-      setError(err?.message || "Failed to log arrival");
+      showError(err?.message || "Failed to log arrival");
     } finally {
       setBusyId(null);
     }
@@ -116,18 +107,16 @@ export default function TechnicianPage() {
     const note = String(noteDrafts[jobId] || "").trim();
     if (!note) return;
     setBusyId(jobId);
-    setError("");
     try {
       await apiFetch(`/tech/jobs/${jobId}/note`, {
         method: "POST",
         body: JSON.stringify({ note }),
       });
       setNoteDrafts((prev) => ({ ...prev, [jobId]: "" }));
-      setNotice("Field note saved");
+      showSuccess("Field note saved");
       await load();
     } catch (err: any) {
-      setNotice("");
-      setError(err?.message || "Failed to save note");
+      showError(err?.message || "Failed to save note");
     } finally {
       setBusyId(null);
     }
@@ -167,8 +156,7 @@ export default function TechnicianPage() {
           ]}
         />
 
-        {error ? <p role="alert" style={{ color: "#ff8a8a", marginTop: 0 }}>{error}</p> : null}
-        {notice ? <div aria-live="polite" className="ccv2-toast ccv2-toast--info" role="status">{notice}</div> : null}
+        <OperatorNotice notice={notice} onDismiss={clearNotice} />
 
         <section className="card operator-section">
           <div className="operator-section__header">

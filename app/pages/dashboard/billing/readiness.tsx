@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { OperatorNotice } from "../../../components/feedback/OperatorNotice";
+import { useOperatorNotice } from "../../../components/feedback/useOperatorNotice";
 import { DashboardShell } from "../../../components/dashboard-shell";
 import {
   OperatorDataTable,
@@ -59,17 +61,16 @@ function money(cents: number, currency: string) {
 
 export default function BillingReadinessPage() {
   const [data, setData] = useState<BillingReadiness | null>(null);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const [busyJobId, setBusyJobId] = useState<string | null>(null);
+  const { notice, showError, showSuccess, clearNotice } = useOperatorNotice();
 
   const load = async () => {
     try {
       const res = await apiFetch("/billing/readiness");
       setData(res);
-      setError("");
+      if (notice?.kind === "error") clearNotice();
     } catch (err: any) {
-      setError(err?.message || "Failed to load billing readiness");
+      showError(err?.message || "Failed to load billing readiness");
     }
   };
 
@@ -77,18 +78,11 @@ export default function BillingReadinessPage() {
     void load();
   }, []);
 
-  useEffect(() => {
-    if (!notice) return;
-    const timer = window.setTimeout(() => setNotice(""), 2200);
-    return () => window.clearTimeout(timer);
-  }, [notice]);
-
   async function run(jobId: string, action: "issue-invoice" | "mark-paid" | "queue-follow-up" | "escalate-follow-up") {
     setBusyJobId(jobId);
-    setError("");
     try {
       await apiFetch(`/billing/jobs/${jobId}/${action}`, { method: "POST" });
-      setNotice(
+      showSuccess(
         action === "issue-invoice"
           ? "Invoice issued"
           : action === "mark-paid"
@@ -99,8 +93,7 @@ export default function BillingReadinessPage() {
       );
       await load();
     } catch (err: any) {
-      setNotice("");
-      setError(err?.message || `Failed to ${action}`);
+      showError(err?.message || `Failed to ${action}`);
     } finally {
       setBusyJobId(null);
     }
@@ -144,8 +137,7 @@ export default function BillingReadinessPage() {
           ]}
         />
 
-        {error ? <p role="alert" style={{ color: "#ff8a8a", marginTop: 0 }}>{error}</p> : null}
-        {notice ? <div aria-live="polite" className="ccv2-toast ccv2-toast--info" role="status">{notice}</div> : null}
+        <OperatorNotice notice={notice} onDismiss={clearNotice} />
 
         <section className="card operator-section">
           <div className="operator-section__header">

@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { OperatorNotice } from "../../components/feedback/OperatorNotice";
+import { useOperatorNotice } from "../../components/feedback/useOperatorNotice";
 import { DashboardShell } from "../../components/dashboard-shell";
 import {
   OperatorDataTable,
@@ -50,17 +52,16 @@ type PortalOverview = {
 
 export default function PortalOpsPage() {
   const [data, setData] = useState<PortalOverview | null>(null);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const [busyJobId, setBusyJobId] = useState<string | null>(null);
+  const { notice, showError, showSuccess, clearNotice } = useOperatorNotice();
 
   async function load() {
     try {
       const res = await apiFetch("/portal/overview");
       setData(res);
-      setError("");
+      if (notice?.kind === "error") clearNotice();
     } catch (err: any) {
-      setError(err?.message || "Failed to load portal operations");
+      showError(err?.message || "Failed to load portal operations");
     }
   }
 
@@ -68,22 +69,14 @@ export default function PortalOpsPage() {
     void load();
   }, []);
 
-  useEffect(() => {
-    if (!notice) return;
-    const timer = window.setTimeout(() => setNotice(""), 2200);
-    return () => window.clearTimeout(timer);
-  }, [notice]);
-
   async function provisionLink(jobId: string) {
     setBusyJobId(jobId);
-    setError("");
     try {
       await apiFetch(`/portal/jobs/${jobId}/link`, { method: "POST" });
-      setNotice("Portal link prepared");
+      showSuccess("Portal link prepared");
       await load();
     } catch (err: any) {
-      setNotice("");
-      setError(err?.message || "Failed to prepare portal link");
+      showError(err?.message || "Failed to prepare portal link");
     } finally {
       setBusyJobId(null);
     }
@@ -91,7 +84,6 @@ export default function PortalOpsPage() {
 
   async function run(jobId: string, action: "link" | "revoke" | "regenerate") {
     setBusyJobId(jobId);
-    setError("");
     try {
       const endpoint =
         action === "link"
@@ -100,7 +92,7 @@ export default function PortalOpsPage() {
           ? `/portal/jobs/${jobId}/revoke`
           : `/portal/jobs/${jobId}/regenerate`;
       await apiFetch(endpoint, { method: "POST" });
-      setNotice(
+      showSuccess(
         action === "revoke"
           ? "Portal link revoked. Existing customer access is now blocked."
           : action === "regenerate"
@@ -109,8 +101,7 @@ export default function PortalOpsPage() {
       );
       await load();
     } catch (err: any) {
-      setNotice("");
-      setError(err?.message || `Failed to ${action} portal link`);
+      showError(err?.message || `Failed to ${action} portal link`);
     } finally {
       setBusyJobId(null);
     }
@@ -151,8 +142,7 @@ export default function PortalOpsPage() {
           ]}
         />
 
-        {error ? <p role="alert" style={{ color: "#ff8a8a", marginTop: 0 }}>{error}</p> : null}
-        {notice ? <div aria-live="polite" className="ccv2-toast ccv2-toast--info" role="status">{notice}</div> : null}
+        <OperatorNotice notice={notice} onDismiss={clearNotice} />
 
         <section className="card operator-section">
           <div className="operator-section__header">

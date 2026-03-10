@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
+import { OperatorNotice } from '../../components/feedback/OperatorNotice';
+import { useOperatorNotice } from '../../components/feedback/useOperatorNotice';
 import { DashboardShell } from '../../components/dashboard-shell';
 import { apiFetch } from '../../lib/api';
 import { isCommandCentreV2Enabled, isDemoPolishV1Enabled } from '../../lib/feature-flags';
@@ -27,9 +29,6 @@ export default function CommandCentreV2Page() {
   const [selected, setSelected] = useState<string[]>([]);
   const [bulkStatus, setBulkStatus] = useState('IN_PROGRESS');
   const [bulkLocation, setBulkLocation] = useState('all');
-  const [toast, setToast] = useState('');
-  const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('info');
-  const [error, setError] = useState('');
   const [locations, setLocations] = useState<any[]>([]);
   const [views, setViews] = useState<any[]>([]);
   const [technicians, setTechnicians] = useState<any[]>([]);
@@ -64,6 +63,7 @@ export default function CommandCentreV2Page() {
     const [lastBoardHash, setLastBoardHash] = useState("");
     const [liveNotice, setLiveNotice] = useState("");
   const [activityItems, setActivityItems] = useState<any[]>([]);
+  const { notice, showSuccess, showError, clearNotice } = useOperatorNotice();
 
   const defaultViews = [
     { name: 'All Open', filters: { status: 'OPEN', locationIds: ['all'], search: '', viewType: 'kanban' }, viewType: 'kanban' },
@@ -89,7 +89,7 @@ export default function CommandCentreV2Page() {
       const data = await apiFetch(`/jobs/board-v2?${q.toString()}`);
         const nextHash = JSON.stringify(data || {});
       setBoard(data || { grouped: {}, counts: {} });
-      setError('');
+      if (notice?.kind === 'error') clearNotice();
         if (lastBoardHash && lastBoardHash !== nextHash) {
           setLiveNotice("Board updated");
           window.setTimeout(() => setLiveNotice(""), 2200);
@@ -97,8 +97,7 @@ export default function CommandCentreV2Page() {
         setLastBoardHash(nextHash);
         setLastUpdated(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
     } catch (err: any) {
-      setToastType('error');
-        setError(err?.message || 'Failed to load board');
+      showError(err?.message || 'Failed to load board');
     }
   }
 
@@ -296,12 +295,11 @@ export default function CommandCentreV2Page() {
           }),
         });
       }
-      setToastType('success');
-        setToast('View saved');
+      showSuccess('View saved');
       setShowSaveView(false);
       await loadViews();
     } catch (err: any) {
-      setError(err?.message || 'Failed to save view');
+      showError(err?.message || 'Failed to save view');
     }
   }
 
@@ -313,12 +311,11 @@ export default function CommandCentreV2Page() {
         method: 'POST',
         body: JSON.stringify({ jobIds: ids, operation, ...payload }),
       });
-      setToastType('success');
-        setToast(`Updated ${res?.successCount || 0} jobs. Undo available.`);
+      showSuccess(`Updated ${res?.successCount || 0} jobs. Undo available.`);
       setSelected([]);
       await loadBoard();
     } catch (err: any) {
-      setError(err?.message || 'Bulk operation failed');
+      showError(err?.message || 'Bulk operation failed');
     }
   }
 
@@ -421,9 +418,8 @@ export default function CommandCentreV2Page() {
       setOpenedJob((prev: any) => ({ ...(prev || {}), ...event }));
     }
 
-    setToastType("info");
-    setToast(event?.label || "Live update received");
-    window.setTimeout(() => setToast(""), 1800);
+    setLiveNotice(event?.label || "Live update received");
+    window.setTimeout(() => setLiveNotice(""), 1800);
   }
 
   async function patchJob(jobId: string, payload: Record<string, any>) {
@@ -431,13 +427,11 @@ export default function CommandCentreV2Page() {
     try {
       applyOptimisticJobUpdate(jobId, payload);
       await apiFetch(`/jobs/${jobId}`, { method: 'PATCH', body: JSON.stringify(payload) });
-      setToastType('success');
-      setToast('Job updated');
+      showSuccess('Job updated');
       await loadBoard(true);
     } catch (err: any) {
       setBoard(snapshot);
-      setToastType('error');
-      setError(err?.message || 'Inline update failed');
+      showError(err?.message || 'Inline update failed');
     }
   }
 
@@ -567,8 +561,7 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
           <span className="ccv2-status-pill ccv2-status-pill--in_progress">IN_PROGRESS</span>
           <span className="ccv2-status-pill ccv2-status-pill--completed">COMPLETED</span>
         </div>
-        {error ? <p role="alert" style={{ color: '#ff8a8a' }}>{error}</p> : null}
-        {toast ? <div aria-live="polite" className={`ccv2-toast ccv2-toast--${toastType}`} role="status">{toast}</div> : null}
+        <OperatorNotice notice={notice} onDismiss={clearNotice} />
         {liveNotice ? <div aria-live="polite" className="ccv2-live-notice" role="status">{liveNotice}</div> : null}
       </div>
 

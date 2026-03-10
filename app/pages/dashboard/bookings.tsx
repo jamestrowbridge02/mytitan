@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
+import { OperatorNotice } from "../../components/feedback/OperatorNotice";
+import { useOperatorNotice } from "../../components/feedback/useOperatorNotice";
 import { DashboardShell } from "../../components/dashboard-shell";
 import {
   OperatorActiveFilters,
@@ -60,7 +62,6 @@ export default function BookingsPage() {
   const [startsAt, setStartsAt] = useState("");
   const [endsAt, setEndsAt] = useState("");
   const [jobId, setJobId] = useState("");
-  const [error, setError] = useState("");
   const [settings, setSettings] = useState<BookingSettings | null>(null);
   const [publicEnabled, setPublicEnabled] = useState(false);
   const [startHour, setStartHour] = useState("09:00");
@@ -73,18 +74,18 @@ export default function BookingsPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [timingFilter, setTimingFilter] = useState<TimingFilter>("all");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [notice, setNotice] = useState("");
   const [busyConvertId, setBusyConvertId] = useState<string | null>(null);
   const [savedView, setSavedView] = useStickyOperatorView<BookingSavedView>("mytitan_bookings_saved_view_v1", "all");
+  const { notice, showError, showSuccess, clearNotice } = useOperatorNotice();
   const marketplaceEnabled = isMarketplaceEnabled();
 
   const load = async () => {
     try {
       const data = await apiFetch("/bookings");
       setBookings(Array.isArray(data) ? data : []);
-      setError("");
+      if (notice?.kind === "error") clearNotice();
     } catch (err: any) {
-      setError(err.message || "Failed to load bookings");
+      showError(err.message || "Failed to load bookings");
     }
   };
 
@@ -105,15 +106,8 @@ export default function BookingsPage() {
     void loadSettings();
   }, [marketplaceEnabled]);
 
-  function pushNotice(message: string) {
-    setError("");
-    setNotice(message);
-    window.setTimeout(() => setNotice(""), 2200);
-  }
-
   async function onCreate(e: React.FormEvent) {
     e.preventDefault();
-    setError("");
 
     try {
       await apiFetch("/bookings", {
@@ -127,17 +121,15 @@ export default function BookingsPage() {
       setStartsAt("");
       setEndsAt("");
       setJobId("");
-      pushNotice("Booking created");
+      showSuccess("Booking created");
       await load();
     } catch (err: any) {
-      setNotice("");
-      setError(err.message || "Failed to create booking");
+      showError(err.message || "Failed to create booking");
     }
   }
 
   async function saveSettings() {
     setSaving(true);
-    setError("");
     try {
       const [startH, startM] = startHour.split(":").map(Number);
       const [endH, endM] = endHour.split(":").map(Number);
@@ -154,10 +146,9 @@ export default function BookingsPage() {
         }),
       });
       setSettings(updated);
-      pushNotice("Booking settings saved");
+      showSuccess("Booking settings saved");
     } catch (err: any) {
-      setNotice("");
-      setError(err.message || "Failed to update booking settings");
+      showError(err.message || "Failed to update booking settings");
     } finally {
       setSaving(false);
     }
@@ -166,9 +157,9 @@ export default function BookingsPage() {
   async function copyText(value: string, label: string) {
     try {
       await navigator.clipboard.writeText(value);
-      pushNotice(`${label} copied`);
+      showSuccess(`${label} copied`);
     } catch {
-      pushNotice(`Could not copy ${label.toLowerCase()}`);
+      showError(`Could not copy ${label.toLowerCase()}`);
     }
   }
 
@@ -176,18 +167,17 @@ export default function BookingsPage() {
     const booking = bookings.find((item) => item.id === bookingId);
     const readinessIssues = getConversionIssues(booking);
     if (readinessIssues.length) {
-      setError(`Booking cannot be converted yet. Missing: ${readinessIssues.join(", ")}`);
+      showError(`Booking cannot be converted yet. Missing: ${readinessIssues.join(", ")}`);
       return;
     }
     setBusyConvertId(bookingId);
-    setError("");
     try {
       const res = await apiFetch(`/bookings/${bookingId}/convert`, { method: "POST" });
       const jobId = res?.job?.id;
       const jobRef = res?.job?.jobRef || jobId;
       const dispatchFollowUpCreated = Boolean(res?.conversion?.dispatchFollowUpCreated);
       const duplicatePrevented = Boolean(res?.conversion?.duplicatePrevented);
-      pushNotice(
+      showSuccess(
         res?.alreadyLinked
           ? duplicatePrevented
             ? `Duplicate conversion prevented. Booking is linked to ${jobRef}`
@@ -201,7 +191,6 @@ export default function BookingsPage() {
         void router.push(`/dashboard/jobs/${jobId}`);
       }
     } catch (err: any) {
-      setNotice("");
       if (err instanceof ApiError && err.payload && typeof err.payload === "object" && (err.payload as any).code === "BOOKING_CONVERSION_NOT_READY") {
         const issues = Array.isArray((err.payload as any).issues) ? (err.payload as any).issues : [];
         const labels = issues.map((issue: string) =>
@@ -211,9 +200,9 @@ export default function BookingsPage() {
             ? "time window"
             : issue,
         );
-        setError(`Booking cannot be converted yet. Missing: ${labels.join(", ")}`);
+        showError(`Booking cannot be converted yet. Missing: ${labels.join(", ")}`);
       } else {
-        setError(err?.message || "Failed to convert booking");
+        showError(err?.message || "Failed to convert booking");
       }
     } finally {
       setBusyConvertId(null);
@@ -297,8 +286,7 @@ export default function BookingsPage() {
           stats={stats}
         />
 
-        {error ? <p role="alert" style={{ color: "#ff8a8a", marginTop: 0 }}>{error}</p> : null}
-        {notice ? <div aria-live="polite" className="ccv2-toast ccv2-toast--info" role="status">{notice}</div> : null}
+        <OperatorNotice notice={notice} onDismiss={clearNotice} />
 
         <div className={marketplaceEnabled && settings ? "operator-split" : "operator-stack"}>
           <section className="card operator-section">
@@ -635,7 +623,7 @@ export default function BookingsPage() {
                 );
               })}
             </OperatorDataTable>
-          ) : !error ? (
+          ) : !notice || notice.kind !== "error" ? (
             <OperatorEmptyStateCard
               title="No bookings match this view"
               description="Clear the filters, open the calendar, or create a fresh booking from this page."

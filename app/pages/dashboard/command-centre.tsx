@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import OnboardingCoach from '../../components/coach/OnboardingCoach';
+import { OperatorNotice } from '../../components/feedback/OperatorNotice';
+import { useOperatorNotice } from '../../components/feedback/useOperatorNotice';
 import { DashboardShell } from '../../components/dashboard-shell';
 import JobQuickActions from '../../components/command-centre/JobQuickActions';
 import { ApiError, apiFetch } from '../../lib/api';
@@ -43,8 +45,6 @@ export default function CommandCentrePage() {
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
   const [bulkStatus, setBulkStatus] = useState('IN_PROGRESS');
   const [bulkLocation, setBulkLocation] = useState('all');
-  const [toast, setToast] = useState('');
-  const [error, setError] = useState('');
   const [locations, setLocations] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [views, setViews] = useState<SavedView[]>([]);
@@ -53,6 +53,7 @@ export default function CommandCentrePage() {
   const [showSaveView, setShowSaveView] = useState(false);
   const [saveViewName, setSaveViewName] = useState('');
   const [openedJob, setOpenedJob] = useState<any>(null);
+  const { notice, showSuccess, showError, clearNotice } = useOperatorNotice();
 
   useEffect(() => {
     const t = setTimeout(() => setSearch(searchInput.trim()), 300);
@@ -91,9 +92,9 @@ export default function CommandCentrePage() {
       if (selectedLocationIds.length > 0) q.set('locationIds', selectedLocationIds.join(','));
       const data = await apiFetch(`/jobs/board?${q.toString()}`);
       setBoard(data || { grouped: {}, counts: {} });
-      setError('');
+      if (notice?.kind === 'error') clearNotice();
     } catch (err: any) {
-      setError(err?.message || 'Failed to load board');
+      showError(err?.message || 'Failed to load board');
     }
   }
 
@@ -174,13 +175,13 @@ export default function CommandCentrePage() {
     try {
       const res = await apiFetch('/jobs/undo-last', { method: 'POST' });
       if (res?.ok) {
-        setToast(`Undid ${res?.count || 0} updates`);
+        showSuccess(`Undid ${res?.count || 0} updates`);
         await load();
       } else {
-        setToast(res?.message || 'Nothing to undo');
+        showSuccess(res?.message || 'Nothing to undo');
       }
     } catch (err: any) {
-      setError(err?.message || 'Undo failed');
+      showError(err?.message || 'Undo failed');
     }
   }
 
@@ -197,11 +198,11 @@ export default function CommandCentrePage() {
         method: 'POST',
         body: JSON.stringify({ jobIds: ids, operation, ...payload }),
       });
-      setToast(`Updated ${res?.successCount || 0} jobs. Undo?`);
+      showSuccess(`Updated ${res?.successCount || 0} jobs. Undo?`);
       setSelected([]);
       await load();
     } catch (err: any) {
-      setError(err?.message || 'Bulk operation failed');
+      showError(err?.message || 'Bulk operation failed');
     }
   }
 
@@ -227,9 +228,9 @@ export default function CommandCentrePage() {
       const data = await apiFetch('/command-centre/views');
       setViews(Array.isArray(data) ? data : []);
       setShowSaveView(false);
-      setToast('View saved');
+      showSuccess('View saved');
     } catch (err: any) {
-      setError(err?.message || 'Failed to save view');
+      showError(err?.message || 'Failed to save view');
     }
   }
 
@@ -251,36 +252,33 @@ export default function CommandCentrePage() {
       await apiFetch(`/command-centre/views/${activeViewId}`, { method: 'DELETE' });
       setViews((prev) => prev.filter((v) => v.id !== activeViewId));
       setActiveViewId('');
-      setToast('View deleted');
+      showSuccess('View deleted');
     } catch (err: any) {
-      setError(err?.message || 'Failed to delete view');
+      showError(err?.message || 'Failed to delete view');
     }
   }
 
   async function patchJob(jobId: string, payload: Record<string, any>) {
     try {
       await apiFetch(`/jobs/${jobId}`, { method: 'PATCH', body: JSON.stringify(payload) });
-      setToast('Job updated. Undo?');
+      showSuccess('Job updated. Undo?');
       await load();
       if (openedJob?.id === jobId) {
         const fresh = allJobs.find((j: any) => j.id === jobId);
         if (fresh) setOpenedJob(fresh);
       }
     } catch (err: any) {
-      setError(err?.message || 'Update failed');
+      showError(err?.message || 'Update failed');
     }
   }
 
   async function updateJobStatus(jobId: string, nextStatus: string) {
     try {
       await apiFetch(`/jobs/${jobId}/status`, { method: 'PATCH', body: JSON.stringify({ status: nextStatus }) });
-      setToast(`Job moved to ${nextStatus}`);
+      showSuccess(`Job moved to ${nextStatus}`);
       await load();
     } catch (err: any) {
-      setError(err?.message || 'Status update failed');
-      if (err instanceof ApiError && err.requestId) {
-        setToast(`Support code: ${err.requestId}`);
-      }
+      showError(err instanceof ApiError && err.requestId ? `Status update failed. Support code: ${err.requestId}` : (err?.message || 'Status update failed'));
     }
   }
 
@@ -297,8 +295,11 @@ export default function CommandCentrePage() {
       <div className="card" style={{ marginBottom: 14 }}>
         <h1 style={{ marginTop: 0 }}>Job Command Centre</h1>
         <p className="muted">Manage many jobs quickly from one screen.</p>
-        {error ? <p role="alert" style={{ color: '#ff8a8a' }}>{error}</p> : null}
-        {toast ? <p aria-live="polite" role="status" style={{ color: '#5eead4' }}>{toast} {premiumEnabled ? <button className="button secondary" type="button" onClick={undoLastChange}>Undo</button> : null}</p> : null}
+        <OperatorNotice
+          notice={notice}
+          onDismiss={clearNotice}
+          actions={premiumEnabled && notice?.kind === 'success' && notice.message.includes('Undo') ? <button className="button secondary" type="button" onClick={undoLastChange}>Undo</button> : undefined}
+        />
       </div>
 
       <OnboardingCoach

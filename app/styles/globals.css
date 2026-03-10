@@ -3173,6 +3173,66 @@ body {
   color: rgba(191, 204, 226, 0.8);
 }
 
+[data-shell="app"] .operator-notice {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.22);
+}
+
+[data-shell="app"] .operator-notice.success {
+  border-color: rgba(94, 234, 212, 0.32);
+  background: linear-gradient(135deg, rgba(18, 44, 46, 0.96), rgba(11, 20, 28, 0.96));
+}
+
+[data-shell="app"] .operator-notice.error {
+  border-color: rgba(248, 113, 113, 0.34);
+  background: linear-gradient(135deg, rgba(55, 24, 29, 0.96), rgba(23, 14, 20, 0.96));
+}
+
+[data-shell="app"] .operator-notice__body {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+[data-shell="app"] .operator-notice__message {
+  color: #edf2ff;
+  font-size: 13px;
+  line-height: 1.5;
+  font-weight: 600;
+}
+
+[data-shell="app"] .operator-notice__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+[data-shell="app"] .operator-notice__dismiss {
+  border: none;
+  background: transparent;
+  color: rgba(191, 204, 226, 0.84);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+[data-shell="app"] .operator-notice__dismiss:hover {
+  color: #ffffff;
+}
+
+[data-shell="app"] .operator-notice__dismiss:focus-visible {
+  outline: 2px solid rgba(94, 234, 212, 0.9);
+  outline-offset: 2px;
+}
+
 [data-shell="app"] .button:disabled,
 [data-shell="app"] .toggle:disabled {
   opacity: 0.58;
