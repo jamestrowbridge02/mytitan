@@ -87,6 +87,7 @@ export default function TechnicianPage() {
       setNotice(action === "start" ? "Technician moved into active work" : "Job marked completed");
       await load();
     } catch (err: any) {
+      setNotice("");
       setError(err?.message || `Failed to ${action} job`);
     } finally {
       setBusyId(null);
@@ -104,6 +105,7 @@ export default function TechnicianPage() {
       setNotice("Arrival logged");
       await load();
     } catch (err: any) {
+      setNotice("");
       setError(err?.message || "Failed to log arrival");
     } finally {
       setBusyId(null);
@@ -124,6 +126,7 @@ export default function TechnicianPage() {
       setNotice("Field note saved");
       await load();
     } catch (err: any) {
+      setNotice("");
       setError(err?.message || "Failed to save note");
     } finally {
       setBusyId(null);

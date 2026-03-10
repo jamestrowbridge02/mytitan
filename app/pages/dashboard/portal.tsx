@@ -82,6 +82,7 @@ export default function PortalOpsPage() {
       setNotice("Portal link prepared");
       await load();
     } catch (err: any) {
+      setNotice("");
       setError(err?.message || "Failed to prepare portal link");
     } finally {
       setBusyJobId(null);
@@ -108,6 +109,7 @@ export default function PortalOpsPage() {
       );
       await load();
     } catch (err: any) {
+      setNotice("");
       setError(err?.message || `Failed to ${action} portal link`);
     } finally {
       setBusyJobId(null);

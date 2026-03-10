@@ -175,6 +175,7 @@ export default function PublicJobPortal() {
 
   async function refreshPaymentStatus() {
     if (!tokenValue || !marketplaceEnabled) return;
+    setError('');
     setPendingAction('refresh-payment');
     try {
       const suffix = sessionIdValue ? `?session_id=${sessionIdValue}` : '';
@@ -372,7 +373,7 @@ export default function PublicJobPortal() {
   }
 
   if (!job && !error) {
-    return <div className="container">Loading...</div>;
+    return <div className="container" role="status" aria-live="polite">Loading...</div>;
   }
 
   if (!portalPolishV1Enabled) {
@@ -441,10 +442,10 @@ export default function PublicJobPortal() {
               <div className="card" style={{ padding: 16, marginTop: 16 }}>
                 <h3>1) Approve or decline</h3>
                 <label>Name</label>
-                <input className="input" value={signatureName} onChange={(e) => setSignatureName(e.target.value)} />
+                <input className="input" value={signatureName} onChange={(e) => setSignatureName(e.target.value)} disabled={pendingAction !== ''} />
 
                 <label>Decline reason (optional)</label>
-                <input className="input" value={declineReason} onChange={(e) => setDeclineReason(e.target.value)} />
+                <input className="input" value={declineReason} onChange={(e) => setDeclineReason(e.target.value)} disabled={pendingAction !== ''} />
 
                 <div style={{ marginTop: 8 }}>
                   <button className="button" type="button" onClick={approve} disabled={pendingAction !== ''} style={{ marginRight: 8 }}>
@@ -687,11 +688,11 @@ export default function PublicJobPortal() {
           summary={approvalDone ? approvalSummary : null}
         >
           <label>Name</label>
-          <input className="input" value={signatureName} onChange={(e) => setSignatureName(e.target.value)} />
+          <input className="input" value={signatureName} onChange={(e) => setSignatureName(e.target.value)} disabled={pendingAction !== ''} />
           {marketplaceEnabled ? (
             <>
               <label>Decline reason (optional)</label>
-              <input className="input" value={declineReason} onChange={(e) => setDeclineReason(e.target.value)} />
+              <input className="input" value={declineReason} onChange={(e) => setDeclineReason(e.target.value)} disabled={pendingAction !== ''} />
             </>
           ) : null}
           <div style={{ display: 'grid', gap: 10, marginTop: 10 }}>

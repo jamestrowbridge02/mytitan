@@ -106,6 +106,7 @@ export default function BookingsPage() {
   }, [marketplaceEnabled]);
 
   function pushNotice(message: string) {
+    setError("");
     setNotice(message);
     window.setTimeout(() => setNotice(""), 2200);
   }
@@ -129,6 +130,7 @@ export default function BookingsPage() {
       pushNotice("Booking created");
       await load();
     } catch (err: any) {
+      setNotice("");
       setError(err.message || "Failed to create booking");
     }
   }
@@ -154,6 +156,7 @@ export default function BookingsPage() {
       setSettings(updated);
       pushNotice("Booking settings saved");
     } catch (err: any) {
+      setNotice("");
       setError(err.message || "Failed to update booking settings");
     } finally {
       setSaving(false);
@@ -198,6 +201,7 @@ export default function BookingsPage() {
         void router.push(`/dashboard/jobs/${jobId}`);
       }
     } catch (err: any) {
+      setNotice("");
       if (err instanceof ApiError && err.payload && typeof err.payload === "object" && (err.payload as any).code === "BOOKING_CONVERSION_NOT_READY") {
         const issues = Array.isArray((err.payload as any).issues) ? (err.payload as any).issues : [];
         const labels = issues.map((issue: string) =>

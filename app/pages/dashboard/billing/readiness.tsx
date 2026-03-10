@@ -99,6 +99,7 @@ export default function BillingReadinessPage() {
       );
       await load();
     } catch (err: any) {
+      setNotice("");
       setError(err?.message || `Failed to ${action}`);
     } finally {
       setBusyJobId(null);
