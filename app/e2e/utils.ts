@@ -18,9 +18,14 @@ export const fixtureRefs = {
   technicianJobRef: "E2E-TECH-001",
   automationJobRef: "E2E-AUTO-001",
   commandCentreJobRef: "E2E-OPEN-001",
+  commandCentreJobId: "e2e-job-open",
+  automationJobId: "e2e-job-automation",
   portalToken: "e2e-public-portal-token",
   automationSuggestionKey: "invoice-overdue-follow-up",
   dismissedAutomationSuggestionKey: "technician-arrival-office-notify",
+  customFieldJobSerialKey: "serial_number",
+  customFieldWarrantyKey: "warranty_status",
+  customFieldCustomerSiteCode: "site_code",
 };
 
 export type E2EMetadata = {
@@ -82,6 +87,21 @@ async function fulfillFromLocalApi(route: Route, request: APIRequestContext) {
   }
   const headers = response.headers();
   const contentType = headers["content-type"] || "application/json; charset=utf-8";
+  let body: Buffer;
+  try {
+    body = await response.body();
+  } catch (error: any) {
+    const message = String(error?.message || "");
+    if (
+      message.includes("Request context disposed") ||
+      message.includes("Response has been disposed") ||
+      message.includes("Target page, context or browser has been closed")
+    ) {
+      await route.abort();
+      return;
+    }
+    throw error;
+  }
 
   await route.fulfill({
     status: response.status(),
@@ -90,7 +110,7 @@ async function fulfillFromLocalApi(route: Route, request: APIRequestContext) {
       "access-control-allow-origin": e2eOrigin,
       "access-control-allow-credentials": "true",
     },
-    body: await response.body(),
+    body,
   });
 }
 

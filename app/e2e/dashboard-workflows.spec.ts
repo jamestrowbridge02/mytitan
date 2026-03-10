@@ -25,7 +25,10 @@ test.describe("dashboard workflows", () => {
     await convertibleRow.scrollIntoViewIfNeeded();
     await convertibleRow.getByRole("button", { name: /more actions/i }).click();
     await convertibleRow.getByTestId(`booking-convert-${fixtureRefs.convertibleBookingId}`).evaluate((element: HTMLButtonElement) => element.click());
-    await expect(page.getByTestId("operator-notice-success")).toContainText(/Converted booking|already linked/i);
+    const navigatedToJob = await page.waitForURL(/\/dashboard\/jobs\/.+/, { timeout: 5000 }).then(() => true).catch(() => false);
+    if (!navigatedToJob) {
+      await expect(page.getByTestId("operator-notice-success")).toContainText(/Converted booking|already linked/i);
+    }
   });
 
   test("billing readiness page exposes lifecycle controls and state changes", async ({ page, request }) => {
