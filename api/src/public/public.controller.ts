@@ -99,6 +99,7 @@ export class PublicController {
         currency: record.job.currency,
         invoicePdfUrl: record.job.invoicePdfUrl,
         invoiceIssuedAt: record.job.invoiceIssuedAt,
+        invoiceDueAt: record.job.invoiceDueAt,
         invoicePaidAt: record.job.invoicePaidAt,
         paymentLinkUrl: paymentsEnabled ? record.job.paymentLinkUrl : null,
         approvedAt: record.job.approvedAt,
@@ -138,6 +139,7 @@ export class PublicController {
           signedAt: record.job.signedAt,
           signatureName: record.job.signatureName,
           invoiceIssuedAt: record.job.invoiceIssuedAt,
+          invoiceDueAt: record.job.invoiceDueAt,
           invoicePaidAt: record.job.invoicePaidAt,
           totalCents: record.job.totalCents,
           currency: record.job.currency,
@@ -146,7 +148,7 @@ export class PublicController {
           pdfReady,
         },
         timeline: (record.job.activities || [])
-          .filter((item: any) => ['job.status', 'job.reminder.create', 'job.reminder.completed', 'tech.note', 'tech.arrived', 'booking.converted'].includes(String(item.eventType || '')))
+          .filter((item: any) => ['job.status', 'job.reminder.create', 'job.reminder.completed', 'tech.note', 'tech.arrived', 'booking.converted', 'billing.invoice.issued', 'billing.payment.received'].includes(String(item.eventType || '')))
           .map((item: any) => ({
             eventType: item.eventType,
             message: item.message,

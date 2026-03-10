@@ -34,10 +34,12 @@ type PortalOverview = {
     status: string;
     approvedAt?: string | null;
     invoiceIssuedAt?: string | null;
+    invoiceDueAt?: string | null;
     invoicePaidAt?: string | null;
     portalTokenActive: boolean;
     portalExpiresAt?: string | null;
     portalUrl?: string | null;
+    invoiceOverdue?: boolean;
     paymentReady: boolean;
   }>;
 };
@@ -160,6 +162,7 @@ export default function PortalOpsPage() {
                   <div className="operator-table__cell">
                     <div className="operator-cellMeta">
                       <span><strong>{job.invoicePaidAt ? "Paid" : job.invoiceIssuedAt ? "Invoice issued" : "Pre-invoice"}</strong></span>
+                      {job.invoiceDueAt ? <span>{job.invoiceOverdue ? `Payment overdue since ${new Date(job.invoiceDueAt).toLocaleDateString()}` : `Payment due ${new Date(job.invoiceDueAt).toLocaleDateString()}`}</span> : null}
                       <span>{job.paymentReady ? "Payment-capable portal" : "Portal-only / payment disabled"}</span>
                     </div>
                   </div>

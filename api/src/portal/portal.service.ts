@@ -58,10 +58,12 @@ export class PortalService {
         status: job.status,
         approvedAt: job.approvedAt,
         invoiceIssuedAt: job.invoiceIssuedAt,
+        invoiceDueAt: job.invoiceDueAt,
         invoicePaidAt: job.invoicePaidAt,
         portalTokenActive: Boolean(token),
         portalExpiresAt: token?.expiresAt || null,
         portalUrl: token?.token ? this.buildPortalUrl(token.token) : null,
+        invoiceOverdue: Boolean(job.invoiceDueAt && !job.invoicePaidAt && new Date(job.invoiceDueAt).getTime() < now.getTime()),
         paymentReady: Boolean(settings?.paymentsEnabled && this.billing.isStripeConfigured() && (job.totalCents || 0) > 0),
       };
     });

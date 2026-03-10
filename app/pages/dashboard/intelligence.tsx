@@ -26,7 +26,9 @@ type IntelligenceData = {
     agedUnlinkedBookings: number;
     technicianCompletionQueue: number;
     portalLinksExpiringSoon: number;
+    overdueInvoices: number;
   };
+  attentionQueue: Array<{ key: string; label: string; count: number; href: string; hint: string }>;
   alerts: Array<{ key: string; severity: string; label: string; count: number; href: string }>;
   trends: {
     completedLast7Days: number;
@@ -52,7 +54,9 @@ const EMPTY: IntelligenceData = {
     agedUnlinkedBookings: 0,
     technicianCompletionQueue: 0,
     portalLinksExpiringSoon: 0,
+    overdueInvoices: 0,
   },
+  attentionQueue: [],
   alerts: [],
   trends: {
     completedLast7Days: 0,
@@ -87,6 +91,7 @@ export default function IntelligencePage() {
       { label: "Upcoming bookings", value: String(data.summary.upcomingBookingsNext7Days), hint: "Next 7 days of schedule load" },
       { label: "Follow-up load", value: String(data.summary.customersNeedingFollowUp), hint: "Customers without recent activity" },
       { label: "Billing ready", value: String(data.summary.billingReadyJobs), hint: "Completed work not yet invoiced" },
+      { label: "Overdue invoices", value: String(data.summary.overdueInvoices), hint: "Issued invoices already past due" },
       { label: "Portal ready", value: String(data.summary.portalReadyJobs), hint: "Jobs with active customer access" },
       { label: "Converted", value: String(data.summary.bookingsConvertedLast7Days), hint: "Bookings turned into jobs in the last 7 days" },
       { label: "Completion delta", value: data.trends.completionDelta >= 0 ? `+${data.trends.completionDelta}` : String(data.trends.completionDelta), hint: "Last 7 days vs previous 7 days" },
@@ -120,6 +125,33 @@ export default function IntelligencePage() {
 
         {error ? <p role="alert" style={{ color: "#ff8a8a", marginTop: 0 }}>{error}</p> : null}
         {loading ? <div className="operator-note">Loading intelligence...</div> : null}
+
+        {data.attentionQueue.length ? (
+          <section className="card operator-section">
+            <div className="operator-section__header">
+              <div>
+                <h2 className="operator-section__title">Needs attention now</h2>
+                <p className="operator-section__subtitle">The next set of operational queues most likely to create revenue, dispatch, or customer-experience debt.</p>
+              </div>
+            </div>
+            <OperatorDataTable columns="minmax(220px, 1fr) minmax(100px, 0.5fr) minmax(220px, 1fr) minmax(160px, auto)">
+              <OperatorDataTableHeader>
+                <div className="operator-table__cell">Queue</div>
+                <div className="operator-table__cell">Count</div>
+                <div className="operator-table__cell">Why it matters</div>
+                <div className="operator-table__cell">Action</div>
+              </OperatorDataTableHeader>
+              {data.attentionQueue.map((item) => (
+                <OperatorDataTableRow key={item.key}>
+                  <div className="operator-table__cell"><strong>{item.label}</strong></div>
+                  <div className="operator-table__cell">{item.count}</div>
+                  <div className="operator-table__cell">{item.hint}</div>
+                  <div className="operator-table__cell"><a href={item.href}>Open queue</a></div>
+                </OperatorDataTableRow>
+              ))}
+            </OperatorDataTable>
+          </section>
+        ) : null}
 
         {data.alerts.length ? (
           <section className="card operator-section">
@@ -172,6 +204,7 @@ export default function IntelligencePage() {
               ["Aged unlinked bookings", data.summary.agedUnlinkedBookings, "Bookings that have been waiting for conversion for more than 48 hours"],
               ["Technician completion queue", data.summary.technicianCompletionQueue, "Assigned field jobs currently in progress"],
               ["Portal links expiring soon", data.summary.portalLinksExpiringSoon, "Customer access links that need refresh before they go stale"],
+              ["Overdue invoices", data.summary.overdueInvoices, "Issued invoices already past their due date without payment"],
             ].map(([label, value, meaning]) => (
               <OperatorDataTableRow key={String(label)}>
                 <div className="operator-table__cell"><strong>{label}</strong></div>

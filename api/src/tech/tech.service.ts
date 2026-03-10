@@ -25,7 +25,7 @@ export class TechService {
         include: {
           activities: {
             orderBy: { createdAt: 'desc' },
-            take: 1,
+            take: 4,
           },
         },
         orderBy: [{ scheduledAt: 'asc' }, { createdAt: 'desc' }],
@@ -58,6 +58,19 @@ export class TechService {
               createdAt: job.activities[0].createdAt,
             }
           : null,
+        recentFieldEvents: (job.activities || []).slice(0, 3).map((activity: any) => ({
+          eventType: activity.eventType,
+          message: activity.message,
+          createdAt: activity.createdAt,
+        })),
+        nextStep:
+          job.status === 'IN_PROGRESS'
+            ? 'Complete work and capture final field note'
+            : job.activities?.some((activity: any) => activity.eventType === 'tech.arrived')
+            ? 'Start assigned work'
+            : job.scheduledAt && new Date(job.scheduledAt).getTime() < now.getTime()
+            ? 'Log arrival or update dispatch'
+            : 'Review handoff and head to site',
         urgency:
           job.status === 'IN_PROGRESS'
             ? 'active'

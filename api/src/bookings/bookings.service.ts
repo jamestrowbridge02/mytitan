@@ -279,6 +279,7 @@ export class BookingsService {
     });
 
     let dispatchFollowUpCreated = false;
+    let dispatchReminderId: string | null = null;
     if (!patchedJob.assignedUserId) {
       const existingDispatchReminder = await db.jobReminder.findFirst({
         where: {
@@ -299,6 +300,7 @@ export class BookingsService {
           },
         });
         dispatchFollowUpCreated = true;
+        dispatchReminderId = reminder.id;
         await db.jobActivity.create({
           data: {
             companyId,
@@ -312,7 +314,7 @@ export class BookingsService {
       }
     }
 
-    await db.jobActivity.create({
+    const conversionActivity = await db.jobActivity.create({
       data: {
         companyId,
         jobId: patchedJob.id,
@@ -357,6 +359,8 @@ export class BookingsService {
       conversion: {
         linkedAt: linkedBooking.updatedAt,
         dispatchFollowUpCreated,
+        dispatchReminderId,
+        activityId: conversionActivity.id,
         readinessIssues: [],
       },
     };

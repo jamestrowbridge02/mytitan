@@ -306,6 +306,14 @@ export class AutomationsService {
         deliveryMode: "metadata_only",
       },
       {
+        key: "dispatch_follow_up",
+        label: "Dispatch follow-up",
+        enabled: true,
+        trigger: "booking.converted_unassigned",
+        action: "Create an in-app follow-up when converted work still has no assigned technician",
+        deliveryMode: "metadata_only",
+      },
+      {
         key: "portal_lifecycle_audit",
         label: "Portal lifecycle audit",
         enabled: true,
@@ -344,7 +352,7 @@ export class AutomationsService {
     const db = this.prisma as any;
     const now = new Date();
     const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const [rules, pendingRuns, pendingBillingFollowUps, pendingDispatchFollowUps, contactGapJobs, staleUnassignedJobs, publicBookingsAwaitingConversion, recentBookingConversions, recentPortalLifecycleEvents] = await Promise.all([
+    const [rules, pendingRuns, pendingBillingFollowUps, overdueBillingFollowUps, pendingDispatchFollowUps, contactGapJobs, staleUnassignedJobs, publicBookingsAwaitingConversion, recentBookingConversions, recentPortalLifecycleEvents] = await Promise.all([
       this.listRules(tenantId),
       this.listRuns(tenantId, 12),
       db.jobReminder.count({
@@ -352,6 +360,14 @@ export class AutomationsService {
           companyId: tenantId,
           completedAt: null,
           note: "Automation billing follow-up",
+        },
+      }),
+      db.jobReminder.count({
+        where: {
+          companyId: tenantId,
+          completedAt: null,
+          note: "Automation billing follow-up",
+          remindAt: { lt: now },
         },
       }),
       db.jobReminder.count({
@@ -407,6 +423,7 @@ export class AutomationsService {
         enabledRules: rules.filter((rule) => rule.enabled).length,
         totalRules: rules.length,
         pendingBillingFollowUps,
+        overdueBillingFollowUps,
         pendingDispatchFollowUps,
         contactGapJobs,
         staleUnassignedJobs,
@@ -449,6 +466,15 @@ export class AutomationsService {
               label: "Converted jobs still need dispatch follow-up",
               count: pendingDispatchFollowUps,
               href: "/dashboard/bookings",
+            }
+          : null,
+        overdueBillingFollowUps > 0
+          ? {
+              key: "billing_follow_up_overdue",
+              severity: "warn",
+              label: "Billing follow-ups overdue",
+              count: overdueBillingFollowUps,
+              href: "/dashboard/billing/readiness",
             }
           : null,
       ].filter(Boolean),

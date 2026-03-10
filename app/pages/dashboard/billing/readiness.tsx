@@ -32,10 +32,13 @@ type BillingReadiness = {
     currency: string;
     completedAt?: string | null;
     invoiceIssuedAt?: string | null;
+    invoiceDueAt?: string | null;
     invoicePaidAt?: string | null;
     invoiceReady: boolean;
     paymentReady: boolean;
     portalReady: boolean;
+    invoiceOverdue?: boolean;
+    lifecycleState?: string;
     billingFollowUpAt?: string | null;
     billingFollowUpOverdue?: boolean;
     portalUrl?: string | null;
@@ -156,6 +159,9 @@ export default function BillingReadinessPage() {
                     <div className="operator-cellMeta">
                       <span><strong>{job.invoiceIssuedAt ? "Invoice issued" : job.invoiceReady ? "Invoice ready" : "Not ready"}</strong></span>
                       <span>{job.invoicePaidAt ? "Paid" : job.paymentReady ? "Payment-capable" : "Payment not ready"}</span>
+                      {job.invoiceDueAt ? (
+                        <span>{job.invoiceOverdue ? `Payment overdue since ${new Date(job.invoiceDueAt).toLocaleDateString()}` : `Payment due ${new Date(job.invoiceDueAt).toLocaleDateString()}`}</span>
+                      ) : null}
                       <span>{job.portalReady ? "Portal ready" : "Portal link missing"}</span>
                       {job.billingFollowUpAt ? (
                         <span>{job.billingFollowUpOverdue ? `Follow-up overdue since ${new Date(job.billingFollowUpAt).toLocaleDateString()}` : `Follow-up due ${new Date(job.billingFollowUpAt).toLocaleDateString()}`}</span>

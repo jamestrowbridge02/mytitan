@@ -86,6 +86,7 @@ type AutomationDiagnostics = {
     enabledRules: number;
     totalRules: number;
     pendingBillingFollowUps: number;
+    overdueBillingFollowUps: number;
     pendingDispatchFollowUps: number;
     contactGapJobs: number;
     staleUnassignedJobs: number;
@@ -494,6 +495,7 @@ export default function AutomationsSettingsPage() {
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <span className="badge">Enabled rules {diagnostics.summary.enabledRules}/{diagnostics.summary.totalRules}</span>
               <span className="badge">Billing follow-ups {diagnostics.summary.pendingBillingFollowUps}</span>
+              <span className="badge">Billing overdue {diagnostics.summary.overdueBillingFollowUps}</span>
               <span className="badge">Dispatch follow-ups {diagnostics.summary.pendingDispatchFollowUps}</span>
               <span className="badge">Contact gaps {diagnostics.summary.contactGapJobs}</span>
               <span className="badge">Unassigned backlog {diagnostics.summary.staleUnassignedJobs}</span>

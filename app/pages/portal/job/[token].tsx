@@ -26,6 +26,7 @@ type PortalInfo = {
     signedAt?: string | null;
     signatureName?: string | null;
     invoiceIssuedAt?: string | null;
+    invoiceDueAt?: string | null;
     invoicePaidAt?: string | null;
     totalCents?: number | null;
     currency?: string | null;
@@ -542,6 +543,7 @@ export default function PublicJobPortal() {
     : paymentsConfigured
       ? 'Payment pending'
       : 'Payments not enabled';
+  const dueTime = formatDateTime(portal?.summary?.invoiceDueAt);
   const nextStepMessage = declined
     ? 'This job is currently declined. Contact support if you need the scope corrected before continuing.'
     : !approved
@@ -549,7 +551,9 @@ export default function PublicJobPortal() {
       : !signed
         ? 'Add your signature to confirm the approved work.'
         : paymentsConfigured && !paid
-          ? 'Payment is the next step. Once payment is complete, your receipt and PDF will be available here.'
+          ? dueTime
+            ? `Payment is the next step. The current invoice is due by ${dueTime}. Once payment is complete, your receipt and PDF will be available here.`
+            : 'Payment is the next step. Once payment is complete, your receipt and PDF will be available here.'
           : !step5Done
             ? 'Your PDF will unlock once the remaining steps complete.'
             : 'Everything is complete. You can download the PDF or contact support if you need anything else.';

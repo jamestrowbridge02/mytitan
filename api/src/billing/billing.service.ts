@@ -89,6 +89,20 @@ export class BillingService {
     return openReminders.length;
   }
 
+  private async logBillingActivity(companyId: string, jobId: string, actorUserId: string | null, eventType: string, message: string, payloadJson?: any) {
+    const db = this.prisma as any;
+    await db.jobActivity.create({
+      data: {
+        companyId,
+        jobId,
+        actorUserId: actorUserId || null,
+        eventType,
+        message,
+        payloadJson: payloadJson ?? null,
+      },
+    });
+  }
+
   isStripeConfigured() {
     return Boolean(this.stripe);
   }
@@ -310,14 +324,21 @@ export class BillingService {
     }
 
     if (session.payment_status === 'paid' && !job.invoicePaidAt) {
+      const paidAt = new Date();
       await db.job.update({
         where: { id: jobId },
         data: {
-          invoicePaidAt: new Date(),
+          invoicePaidAt: paidAt,
+          invoiceIssuedAt: job.invoiceIssuedAt ?? paidAt,
           paymentReceiptUrl: receiptUrl,
         },
       });
       await this.audit.log(tenantId, 'portal.payment.complete', `Payment received for job ${job.jobRef}`, null);
+      await this.logBillingActivity(tenantId, jobId, null, 'billing.payment.received', 'Payment received through the customer portal', {
+        receiptUrl,
+        source: 'portal_payment_status',
+      });
+      await this.resolveBillingFollowUp(tenantId, null, jobId, 'payment_received');
       if (isNotificationsV1Enabled()) {
         await this.notifications.notifyPaymentReceived(tenantId, jobId);
       }
@@ -409,6 +430,17 @@ export class BillingService {
       const paymentReady = Boolean(settings?.paymentsEnabled && this.isStripeConfigured() && (job.totalCents || 0) > 0);
       const portalReady = Boolean((settings?.featureCustomerPortal || settings?.paymentsEnabled) && token);
       const billingFollowUpAt = job.reminders?.[0]?.remindAt || null;
+      const invoiceDueAt = job.invoiceDueAt || null;
+      const invoiceOverdue = Boolean(invoiceDueAt && !job.invoicePaidAt && new Date(invoiceDueAt).getTime() < now.getTime());
+      const lifecycleState = job.invoicePaidAt
+        ? 'paid'
+        : job.invoiceIssuedAt
+        ? invoiceOverdue
+          ? 'invoice_overdue'
+          : 'invoice_issued'
+        : invoiceReady
+        ? 'invoice_ready'
+        : 'pre_billing';
       return {
         id: job.id,
         jobRef: job.jobRef,
@@ -418,10 +450,13 @@ export class BillingService {
         currency: job.currency,
         completedAt: job.completedAt,
         invoiceIssuedAt: job.invoiceIssuedAt,
+        invoiceDueAt,
         invoicePaidAt: job.invoicePaidAt,
         invoiceReady,
         paymentReady,
         portalReady,
+        invoiceOverdue,
+        lifecycleState,
         billingFollowUpAt,
         billingFollowUpOverdue: Boolean(billingFollowUpAt && new Date(billingFollowUpAt).getTime() < now.getTime()),
         portalUrl: token ? `${appUrl}/portal/job/${token}` : null,
@@ -460,10 +495,15 @@ export class BillingService {
       data: {
         status: 'INVOICED',
         invoiceIssuedAt: job.invoiceIssuedAt ?? new Date(),
+        invoiceDueAt: job.invoiceDueAt ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
         completedAt: job.completedAt ?? new Date(),
       },
     });
     await this.audit.log(tenantId, 'billing.invoice.issue', `Invoice issued for ${job.jobRef || job.id}`, userId);
+    await this.logBillingActivity(tenantId, job.id, userId, 'billing.invoice.issued', 'Invoice issued and moved into collections workflow', {
+      invoiceIssuedAt: updated.invoiceIssuedAt,
+      invoiceDueAt: updated.invoiceDueAt,
+    });
     await this.resolveBillingFollowUp(tenantId, userId, job.id, 'invoice_issued');
     return updated;
   }
@@ -491,6 +531,11 @@ export class BillingService {
       },
     });
     await this.audit.log(tenantId, 'billing.invoice.mark_paid', `Offline payment recorded for ${job.jobRef || job.id}`, userId);
+    await this.logBillingActivity(tenantId, job.id, userId, 'billing.payment.received', 'Offline payment recorded against issued invoice', {
+      source: 'manual_offline',
+      invoiceIssuedAt: updated.invoiceIssuedAt,
+      invoicePaidAt: updated.invoicePaidAt,
+    });
     await this.resolveBillingFollowUp(tenantId, userId, job.id, 'payment_received');
     if (isNotificationsV1Enabled()) {
       await this.notifications.notifyPaymentReceived(tenantId, job.id);
@@ -612,10 +657,15 @@ export class BillingService {
           where: { id: job.id },
           data: {
             invoicePaidAt: job.invoicePaidAt ?? new Date(),
+            invoiceIssuedAt: job.invoiceIssuedAt ?? new Date(),
             paymentReceiptUrl: receiptUrl,
           },
         });
         await this.audit.log(job.companyId, 'portal.payment.complete', `Payment received for job ${job.jobRef}`, null);
+        await this.logBillingActivity(job.companyId, job.id, null, 'billing.payment.received', 'Payment received through Stripe checkout', {
+          receiptUrl,
+          source: 'stripe_webhook',
+        });
         await this.resolveBillingFollowUp(job.companyId, null, job.id, 'payment_received');
         if (isNotificationsV1Enabled()) {
           await this.notifications.notifyPaymentReceived(job.companyId, job.id);

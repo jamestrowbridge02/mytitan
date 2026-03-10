@@ -31,6 +31,12 @@ type TechQueue = {
       message?: string | null;
       createdAt?: string | null;
     } | null;
+    recentFieldEvents?: Array<{
+      eventType?: string | null;
+      message?: string | null;
+      createdAt?: string | null;
+    }>;
+    nextStep?: string;
   }>;
   bookings: Array<{
     id: string;
@@ -44,6 +50,7 @@ type TechQueue = {
 export default function TechnicianPage() {
   const [data, setData] = useState<TechQueue | null>(null);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
 
@@ -61,6 +68,12 @@ export default function TechnicianPage() {
     void load();
   }, []);
 
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(""), 2200);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+
   async function run(jobId: string, action: "start" | "complete") {
     setBusyId(jobId);
     try {
@@ -68,6 +81,7 @@ export default function TechnicianPage() {
         method: "POST",
         body: JSON.stringify({ note: action === "start" ? "Technician started assigned work" : "Technician completed assigned work" }),
       });
+      setNotice(action === "start" ? "Technician moved into active work" : "Job marked completed");
       await load();
     } catch (err: any) {
       setError(err?.message || `Failed to ${action} job`);
@@ -83,6 +97,7 @@ export default function TechnicianPage() {
         method: "POST",
         body: JSON.stringify({ note: "Technician arrived on site" }),
       });
+      setNotice("Arrival logged");
       await load();
     } catch (err: any) {
       setError(err?.message || "Failed to log arrival");
@@ -101,6 +116,7 @@ export default function TechnicianPage() {
         body: JSON.stringify({ note }),
       });
       setNoteDrafts((prev) => ({ ...prev, [jobId]: "" }));
+      setNotice("Field note saved");
       await load();
     } catch (err: any) {
       setError(err?.message || "Failed to save note");
@@ -144,6 +160,7 @@ export default function TechnicianPage() {
         />
 
         {error ? <p role="alert" style={{ color: "#ff8a8a", marginTop: 0 }}>{error}</p> : null}
+        {notice ? <div aria-live="polite" className="ccv2-toast ccv2-toast--info" role="status">{notice}</div> : null}
 
         <section className="card operator-section">
           <div className="operator-section__header">
@@ -180,6 +197,10 @@ export default function TechnicianPage() {
                       {job.lastFieldEvent?.createdAt ? (
                         <span>{job.lastFieldEvent.message || job.lastFieldEvent.eventType} · {new Date(job.lastFieldEvent.createdAt).toLocaleString()}</span>
                       ) : null}
+                      {job.nextStep ? <span>{job.nextStep}</span> : null}
+                      {job.recentFieldEvents?.slice(0, 2).map((event, index) => (
+                        <span key={`${job.id}-${event.createdAt || index}`}>{event.message || event.eventType} · {event.createdAt ? new Date(event.createdAt).toLocaleString() : "Recent"}</span>
+                      ))}
                     </div>
                   </div>
                   <div className="operator-table__cell operator-table__cell--actions">
