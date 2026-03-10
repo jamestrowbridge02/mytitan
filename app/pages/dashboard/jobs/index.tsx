@@ -22,6 +22,7 @@ import { useStickyOperatorView } from "../../../lib/operator-view-state";
 import { apiFetch } from "../../../lib/api";
 import { getJobSignals } from "../../../lib/ops-signals";
 import { useTenantSettings } from "../../../lib/tenant-settings";
+import { getJobStages, mapStatusToStage } from "../../../lib/workflow-config";
 
 type JobStatus = "OPEN" | "SCHEDULED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
 type DateBucket = "all" | "upcoming" | "overdue" | "completed";
@@ -65,6 +66,7 @@ export default function Jobs() {
   const { settings } = useTenantSettings();
   const terms = getBusinessTerms(settings);
   const commandCentreHref = getCommandCentreHref(settings);
+  const jobStages = getJobStages(settings);
   const [jobs, setJobs] = useState<any[]>([]);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -374,6 +376,7 @@ export default function Jobs() {
                 const nextStatus = resolveNextStatus(job);
                 const selected = selectedIds.includes(job.id);
                 const status = String(job.status || "OPEN").toUpperCase();
+                const stage = mapStatusToStage(status, jobStages);
                 return (
                   <OperatorDataTableRow key={job.id} selected={selected}>
                     <div className="operator-table__cell">
@@ -388,11 +391,11 @@ export default function Jobs() {
                     <div className="operator-table__cell">
                       <div className="operator-cellTitle">
                         <Link href={`/dashboard/jobs/${job.id}`}>{job.jobRef || job.id}</Link>
-                        <span className="badge">{status}</span>
+                        <span className="badge" data-testid="workflow-stage-label">{stage?.label || status}</span>
                         {isInvoiceOverdue(job) ? <span className="badge warn">Invoice overdue</span> : null}
                       </div>
                       <div className="operator-cellSubtle">
-                        {[job.vehicleReg || null, job.serviceName || null].filter(Boolean).join(" | ") || "No vehicle or service metadata"}
+                        {[status, job.vehicleReg || null, job.serviceName || null].filter(Boolean).join(" | ") || "No vehicle or service metadata"}
                       </div>
                       <div style={{ marginTop: 8 }}>
                         <OpsSignalsBar {...getJobSignals(job)} compact />

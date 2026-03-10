@@ -1,4 +1,9 @@
 export type BusinessConfig = {
+  workflowStages?: {
+    bookings?: Array<{ id: string; label?: string | null; statuses?: string[] | null; visible?: boolean | null }> | null;
+    jobs?: Array<{ id: string; label?: string | null; statuses?: string[] | null; visible?: boolean | null }> | null;
+    technician?: Array<{ id: string; label?: string | null; statuses?: string[] | null; visible?: boolean | null }> | null;
+  } | null;
   terminology?: {
     jobs?: string | null;
     bookings?: string | null;

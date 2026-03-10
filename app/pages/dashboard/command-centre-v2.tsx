@@ -8,20 +8,23 @@ import { getBusinessTerms } from '../../lib/business-config';
 import { getCommandCentreRealtimeMode, getCommandCentreSseUrl, isCommandCentreRealtimeDisabled } from '../../lib/command-centre-realtime';
 import { isCommandCentreV2Enabled, isDemoPolishV1Enabled } from '../../lib/feature-flags';
 import { useTenantSettings } from '../../lib/tenant-settings';
+import { getJobStages, getStageStatus, getVisibleStages, mapStatusToStage } from '../../lib/workflow-config';
 
-const STATUS_LABELS: Array<{ key: string; label: string }> = [
-  { key: 'OPEN', label: 'New' },
-  { key: 'SCHEDULED', label: 'Booked' },
-  { key: 'IN_PROGRESS', label: 'In Progress' },
-  { key: 'COMPLETED', label: 'Awaiting Approval' },
+const STATUS_FILTER_OPTIONS: Array<{ key: string; label: string }> = [
+  { key: 'OPEN', label: 'Open' },
+  { key: 'SCHEDULED', label: 'Scheduled' },
+  { key: 'IN_PROGRESS', label: 'In progress' },
+  { key: 'COMPLETED', label: 'Completed' },
   { key: 'INVOICED', label: 'Invoiced' },
-  { key: 'CANCELLED', label: 'Closed' },
+  { key: 'CANCELLED', label: 'Cancelled' },
 ];
 
 export default function CommandCentreV2Page() {
   const router = useRouter();
   const { settings } = useTenantSettings();
   const terms = getBusinessTerms(settings);
+  const jobStages = getJobStages(settings);
+  const visibleJobStages = getVisibleStages(jobStages);
   const enabled = isCommandCentreV2Enabled();
   const demoPolishEnabled = isDemoPolishV1Enabled();
   const searchRef = useRef<HTMLInputElement | null>(null);
@@ -259,6 +262,24 @@ export default function CommandCentreV2Page() {
   }, [enabled, defaultViewApplied, activeViewId, views]);
 
   const allJobs = useMemo(() => Object.values(board?.grouped || {}).flat() as any[], [board]);
+  const stageBoardGrouped = useMemo(() => {
+    const grouped: Record<string, any[]> = {};
+    for (const stage of visibleJobStages) grouped[stage.id] = [];
+    for (const job of allJobs) {
+      const stage = mapStatusToStage(job?.status, jobStages);
+      if (!stage || stage.visible === false) continue;
+      grouped[stage.id] = [...(grouped[stage.id] || []), job];
+    }
+    return grouped;
+  }, [allJobs, jobStages, visibleJobStages]);
+  const stageCounts = useMemo(() => {
+    return Object.fromEntries(
+      visibleJobStages.map((stage) => [
+        stage.id,
+        allJobs.filter((job) => mapStatusToStage(job?.status, jobStages)?.id === stage.id).length,
+      ]),
+    );
+  }, [allJobs, jobStages, visibleJobStages]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -504,7 +525,8 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
 
   function InlineStatusActions({ job }: { job: any }) {
     const current = String(job?.status || "");
-    const nextOptions = STATUS_LABELS.filter((s) => s.key !== current).slice(0, 3);
+    const currentStage = mapStatusToStage(current, jobStages);
+    const nextOptions = visibleJobStages.filter((stage) => stage.id !== currentStage?.id).slice(0, 3);
 
     if (!nextOptions.length) return null;
 
@@ -512,11 +534,11 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
       <div className="ccv2-inline-actions">
         {nextOptions.map((opt) => (
           <button
-            key={opt.key}
+            key={opt.id}
             type="button"
             className="button secondary ccv2-button ccv2-inline-action"
             disabled={pendingInlineJobId === job.id}
-            onClick={() => void inlineSetStatus(job.id, opt.key)}
+            onClick={() => void inlineSetStatus(job.id, getStageStatus(opt))}
           >
             {pendingInlineJobId === job.id ? "Updating..." : opt.label}
           </button>
@@ -558,10 +580,10 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
         <h1 className="ccv2-title" style={{ marginTop: 0 }}>Command Centre</h1>
         <p className="muted ccv2-subtitle">Operations brain for {terms.jobs.toLowerCase()}, bulk actions, reminders, and inline updates.</p>
                   <div className="ccv2-count-strip">
-          {STATUS_LABELS.map((row) => (
-            <div key={row.key} className="ccv2-count-pill">
+          {visibleJobStages.map((row) => (
+            <div key={row.id} className="ccv2-count-pill">
               <span className="ccv2-count-pill__label">{row.label}</span>
-              <strong className="ccv2-count-pill__value">{Number(board?.counts?.[row.key] || 0)}</strong>
+              <strong className="ccv2-count-pill__value">{Number(stageCounts?.[row.id] || 0)}</strong>
             </div>
           ))}
         </div>
@@ -578,9 +600,9 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
             </button>
           </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
-          <span className="ccv2-status-pill ccv2-status-pill--open">OPEN</span>
-          <span className="ccv2-status-pill ccv2-status-pill--in_progress">IN_PROGRESS</span>
-          <span className="ccv2-status-pill ccv2-status-pill--completed">COMPLETED</span>
+          {visibleJobStages.slice(0, 3).map((stage) => (
+            <span key={stage.id} className="ccv2-status-pill ccv2-status-pill--open">{stage.label}</span>
+          ))}
         </div>
         <OperatorNotice notice={notice} onDismiss={clearNotice} />
         {liveNotice ? <div aria-live="polite" className="ccv2-live-notice" role="status">{liveNotice}</div> : null}
@@ -623,7 +645,7 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
             <label>Status</label>
             <select className="input ccv2-input" value={status} onChange={(e) => setStatus(e.target.value)}>
               <option value="">All</option>
-              {STATUS_LABELS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+              {STATUS_FILTER_OPTIONS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
             </select>
           </div>
           <div>
@@ -673,9 +695,9 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
         <p className="muted" data-testid="ccv2-selected-count">Selected: {selected.length}</p>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <select className="input" data-testid="ccv2-bulk-status-select" style={{ margin: 0, width: 170 }} value={bulkStatus} onChange={(e) => setBulkStatus(e.target.value)}>
-            {STATUS_LABELS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+            {STATUS_FILTER_OPTIONS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
           </select>
-          <button className="button secondary ccv2-button" data-testid="ccv2-bulk-status-action" type="button" disabled={bulkBusy || !selected.length} onClick={() => triggerBulk('setStatus', { status: bulkStatus }, `Set status to ${bulkStatus}`)}>Status</button>
+          <button className="button secondary ccv2-button" data-testid="ccv2-bulk-status-action" type="button" disabled={bulkBusy || !selected.length} onClick={() => triggerBulk('setStatus', { status: bulkStatus }, `Set stage to ${mapStatusToStage(bulkStatus, jobStages)?.label || bulkStatus}`)}>Status</button>
           <select className="input" data-testid="ccv2-bulk-location-select" style={{ margin: 0, width: 220 }} value={bulkLocation} onChange={(e) => setBulkLocation(e.target.value)}>
             <option value="all">All / none</option>
             {locations.map((loc) => <option key={loc.id} value={loc.id}>{loc.name}</option>)}
@@ -706,6 +728,7 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
                   <input data-testid={`ccv2-select-${job.id}`} type="checkbox" checked={selected.includes(job.id)} onChange={(e) => { e.stopPropagation(); setSelected((prev) => prev.includes(job.id) ? prev.filter((x) => x !== job.id) : [...prev, job.id]); }} />
                   <strong>{job.jobRef}</strong>
                 </label>
+                <div className="muted" data-testid="workflow-stage-label">{mapStatusToStage(job?.status, jobStages)?.label || job.status}</div>
                 <div>
                   <button className="button secondary ccv2-button" data-testid={`ccv2-open-${job.id}`} type="button" onClick={(e) => { e.stopPropagation(); setOpenedJob(job); }}>Open</button>
                 </div>
@@ -717,18 +740,18 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 10 }}>
-            {Object.entries(board.grouped || {}).map(([col, jobs]: [string, any]) => (
+            {visibleJobStages.map((stage) => (
               <div
-                key={col}
-                className={`card ccv2-card ${dragStatusTarget === col ? "ccv2-dropzone-active" : ""}`}
+                key={stage.id}
+                className={`card ccv2-card ${dragStatusTarget === stage.id ? "ccv2-dropzone-active" : ""}`}
                 style={{ padding: 12 }}
-                onDragOver={(e) => { e.preventDefault(); setDragStatusTarget(col); }}
+                onDragOver={(e) => { e.preventDefault(); setDragStatusTarget(stage.id); }}
                 onDragLeave={() => setDragStatusTarget("")}
-                onDrop={() => { if (dragJobId) void moveJobToStatus(dragJobId, col); }}
+                onDrop={() => { if (dragJobId) void moveJobToStatus(dragJobId, getStageStatus(stage)); }}
               >
-                <strong>{col} ({Array.isArray(jobs) ? jobs.length : 0})</strong>
+                <strong>{stage.label} ({Array.isArray(stageBoardGrouped[stage.id]) ? stageBoardGrouped[stage.id].length : 0})</strong>
                 <div className="list" style={{ marginTop: 8 }}>
-                  {(jobs || []).map((job: any) => (
+                  {(stageBoardGrouped[stage.id] || []).map((job: any) => (
                     <div
                       key={job.id}
                       className="integration-card"
@@ -739,6 +762,7 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
                       <button data-testid={`ccv2-card-open-${job.id}`} type="button" onClick={() => setOpenedJob(job)} style={{ width: '100%', textAlign: 'left', background: 'transparent', border: 0, padding: 0 }}>
                         <span>{job.jobRef}</span>
                         <span className="muted">{job.customerName || 'Customer'}</span>
+                        <span className="muted" data-testid="workflow-stage-label">{stage.label}</span>
                       </button>
                       <InlineStatusActions job={job} />
                     </div>
@@ -784,6 +808,7 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
               <div className="ccv2-sidepanel-sectionTitle">Vehicle</div>
               <div className="ccv2-sidepanel-kv"><span>Registration</span><strong>{openedJob.vehicleReg || openedJob.registration || "-"}</strong></div>
               <div className="ccv2-sidepanel-kv"><span>Make / Model</span><strong>{[openedJob.vehicleMake, openedJob.vehicleModel].filter(Boolean).join(" ") || "-"}</strong></div>
+              <div className="ccv2-sidepanel-kv"><span>Stage</span><strong>{mapStatusToStage(openedJob.status, jobStages)?.label || openedJob.status || "-"}</strong></div>
               <div className="ccv2-sidepanel-kv"><span>Status</span><strong>{openedJob.status || "-"}</strong></div>
             </div>
 
@@ -864,15 +889,16 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
 
           <div className="ccv2-sidepanel-actions">
             <div className="ccv2-sidepanel-status-actions">
-              {STATUS_LABELS.filter((s) => s.key !== String(openedJob?.status || "")).slice(0, 4).map((opt) => (
+              {visibleJobStages.filter((stage) => stage.id !== mapStatusToStage(openedJob?.status, jobStages)?.id).slice(0, 4).map((opt) => (
                 <button
-                  key={opt.key}
+                  key={opt.id}
                   type="button"
                   className="button secondary ccv2-button ccv2-sidepanel-action"
                   disabled={pendingInlineJobId === openedJob.id}
                   onClick={async () => {
-                    await inlineSetStatus(openedJob.id, opt.key);
-                    setOpenedJob({ ...openedJob, status: opt.key });
+                    const nextStatus = getStageStatus(opt);
+                    await inlineSetStatus(openedJob.id, nextStatus);
+                    setOpenedJob({ ...openedJob, status: nextStatus });
                   }}
                 >
                   {pendingInlineJobId === openedJob.id ? "Updating..." : opt.label}

@@ -10,6 +10,7 @@ import { getBusinessConfig, getBusinessTerms } from '../../lib/business-config';
 import { useBilling } from '../../lib/billing';
 import { isGuidedSetupV2Enabled, isNotificationsV1Enabled } from '../../lib/feature-flags';
 import { TenantSettings, useTenantSettings } from '../../lib/tenant-settings';
+import { getBookingStages, getJobStages, getTechnicianStages, type WorkflowStage } from '../../lib/workflow-config';
 
 type TabKey = 'branding' | 'email' | 'pricing' | 'features' | 'workflow' | 'ai';
 
@@ -77,6 +78,17 @@ function pickSettingsPayload(input: Record<string, any>) {
   return out;
 }
 
+type StageSectionKey = 'bookings' | 'jobs' | 'technician';
+type StageSectionConfig = {
+  key: StageSectionKey;
+  title: string;
+  stages: WorkflowStage[];
+};
+
+function renderStatuses(stage: WorkflowStage) {
+  return stage.statuses.join(', ');
+}
+
 export default function SettingsPage() {
   const { settings, refresh, setLocalSettings } = useTenantSettings();
   const { features, plan } = useBilling();
@@ -122,12 +134,59 @@ export default function SettingsPage() {
 
   const workflowConfig = useMemo(() => getBusinessConfig(form), [form]);
   const workflowTerms = useMemo(() => getBusinessTerms(form), [form]);
+  const bookingStages = useMemo(() => getBookingStages(form), [form]);
+  const jobStages = useMemo(() => getJobStages(form), [form]);
+  const technicianStages = useMemo(() => getTechnicianStages(form), [form]);
+  const stageSections: StageSectionConfig[] = useMemo(() => [
+    { key: 'bookings', title: 'Bookings workflow', stages: bookingStages },
+    { key: 'jobs', title: 'Jobs workflow', stages: jobStages },
+    { key: 'technician', title: 'Technician workflow', stages: technicianStages },
+  ], [bookingStages, jobStages, technicianStages]);
 
   function updateBusinessConfig(updater: (current: Record<string, any>) => Record<string, any>) {
     setForm((prev: any) => ({
       ...prev,
       businessConfigJson: updater((prev?.businessConfigJson && typeof prev.businessConfigJson === 'object') ? prev.businessConfigJson : {}),
     }));
+  }
+
+  function updateWorkflowStages(section: StageSectionKey, stages: WorkflowStage[]) {
+    updateBusinessConfig((current) => ({
+      ...current,
+      workflowStages: {
+        ...(current.workflowStages || {}),
+        [section]: stages.map((stage) => ({
+          id: stage.id,
+          label: stage.label,
+          statuses: stage.statuses,
+          visible: stage.visible !== false,
+        })),
+      },
+    }));
+  }
+
+  function updateStageLabel(section: StageSectionKey, stageId: string, label: string, stages: WorkflowStage[]) {
+    updateWorkflowStages(
+      section,
+      stages.map((stage) => (stage.id === stageId ? { ...stage, label } : stage)),
+    );
+  }
+
+  function toggleStageVisibility(section: StageSectionKey, stageId: string, stages: WorkflowStage[]) {
+    updateWorkflowStages(
+      section,
+      stages.map((stage) => (stage.id === stageId ? { ...stage, visible: stage.visible === false } : stage)),
+    );
+  }
+
+  function moveStage(section: StageSectionKey, stageId: string, direction: -1 | 1, stages: WorkflowStage[]) {
+    const index = stages.findIndex((stage) => stage.id === stageId);
+    const nextIndex = index + direction;
+    if (index === -1 || nextIndex < 0 || nextIndex >= stages.length) return;
+    const nextStages = [...stages];
+    const [stage] = nextStages.splice(index, 1);
+    nextStages.splice(nextIndex, 0, stage);
+    updateWorkflowStages(section, nextStages);
   }
 
   const stats = useMemo(() => {
@@ -617,10 +676,66 @@ export default function SettingsPage() {
               />
             </div>
 
+            {stageSections.map(({ key: sectionKey, title, stages }) => (
+              <div className="card settings-premium-card" key={sectionKey} style={{ marginBottom: 12 }}>
+                <h3 style={{ marginTop: 0 }}>{title}</h3>
+                <p className="muted settings-premium-muted">Rename, reorder, and hide UI stages while keeping canonical statuses intact.</p>
+
+                <div style={{ display: 'grid', gap: 12 }}>
+                  {stages.map((stage, index) => (
+                    <div key={`${sectionKey}-${stage.id}`} style={{ border: '1px solid rgba(148,163,184,0.18)', borderRadius: 14, padding: 12 }}>
+                      <div style={{ display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                        <strong>{stage.id}</strong>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button className="button secondary settings-premium-button" type="button" onClick={() => moveStage(sectionKey, stage.id, -1, stages)} disabled={index === 0}>
+                            Up
+                          </button>
+                          <button className="button secondary settings-premium-button" type="button" onClick={() => moveStage(sectionKey, stage.id, 1, stages)} disabled={index === stages.length - 1}>
+                            Down
+                          </button>
+                        </div>
+                      </div>
+
+                      <label className="settings-premium-label">Stage label</label>
+                      <input
+                        className="input settings-premium-input"
+                        data-testid={`settings-stage-label-${sectionKey}-${stage.id}`}
+                        value={stage.label}
+                        onChange={(e) => updateStageLabel(sectionKey, stage.id, e.target.value, stages)}
+                      />
+
+                      <label style={{ display: 'block', marginBottom: 10 }}>
+                        <input
+                          type="checkbox"
+                          checked={stage.visible !== false}
+                          onChange={() => toggleStageVisibility(sectionKey, stage.id, stages)}
+                          style={{ marginRight: 8 }}
+                        />
+                        Show this stage in operator surfaces
+                      </label>
+
+                      <p className="muted settings-premium-muted" style={{ marginBottom: 0 }}>
+                        Canonical statuses: {renderStatuses(stage)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+
             <div className="theme-preview" data-testid="settings-workflow-preview">
               <strong>Workflow preview</strong>
               <p className="muted" style={{ margin: '8px 0 0' }}>
                 {workflowTerms.jobs}, {workflowTerms.bookings}, {workflowTerms.customers}, and {workflowTerms.technicians} will update across key operator surfaces after save.
+              </p>
+              <p className="muted" style={{ margin: '8px 0 0' }}>
+                Bookings stages: {bookingStages.filter((stage) => stage.visible !== false).map((stage) => stage.label).join(' → ') || 'Hidden'}
+              </p>
+              <p className="muted" style={{ margin: '8px 0 0' }}>
+                {workflowTerms.jobs} stages: {jobStages.filter((stage) => stage.visible !== false).map((stage) => stage.label).join(' → ') || 'Hidden'}
+              </p>
+              <p className="muted" style={{ margin: '8px 0 0' }}>
+                {workflowTerms.technicians} stages: {technicianStages.filter((stage) => stage.visible !== false).map((stage) => stage.label).join(' → ') || 'Hidden'}
               </p>
             </div>
           </>

@@ -23,6 +23,7 @@ import { getBusinessTerms } from "../../lib/business-config";
 import { isMarketplaceEnabled } from "../../lib/feature-flags";
 import { useStickyOperatorView } from "../../lib/operator-view-state";
 import { useTenantSettings } from "../../lib/tenant-settings";
+import { getBookingStages, mapStatusToStage } from "../../lib/workflow-config";
 
 type BookingSettings = {
   publicEnabled: boolean;
@@ -62,6 +63,7 @@ export default function BookingsPage() {
   const router = useRouter();
   const { settings: tenantSettings } = useTenantSettings();
   const terms = getBusinessTerms(tenantSettings);
+  const bookingStages = getBookingStages(tenantSettings);
   const [bookings, setBookings] = useState<any[]>([]);
   const [startsAt, setStartsAt] = useState("");
   const [endsAt, setEndsAt] = useState("");
@@ -546,6 +548,7 @@ export default function BookingsPage() {
                 const selected = selectedIds.includes(booking.id);
                 const readinessIssues = getConversionIssues(booking);
                 const canConvert = !booking.jobId && readinessIssues.length === 0;
+                const stage = mapStatusToStage(String(booking.status || "PLANNED"), bookingStages);
                 return (
                   <OperatorDataTableRow key={booking.id} selected={selected}>
                     <div className="operator-table__cell">
@@ -571,7 +574,8 @@ export default function BookingsPage() {
                     </div>
                     <div className="operator-table__cell">
                       <div className="operator-cellMeta">
-                        <span><strong>{booking.status || "PLANNED"}</strong></span>
+                        <span><strong data-testid="workflow-stage-label">{stage?.label || booking.status || "PLANNED"}</strong></span>
+                        <span>{booking.status || "PLANNED"}</span>
                         <span>{isToday(booking.startsAt) ? "Today" : "Scheduled"}</span>
                       </div>
                     </div>

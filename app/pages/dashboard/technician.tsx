@@ -14,6 +14,7 @@ import {
 import { apiFetch } from "../../lib/api";
 import { getBusinessTerms } from "../../lib/business-config";
 import { useTenantSettings } from "../../lib/tenant-settings";
+import { getTechnicianStages, mapStatusToStage } from "../../lib/workflow-config";
 
 type TechQueue = {
   summary: {
@@ -56,6 +57,7 @@ type TechQueue = {
 export default function TechnicianPage() {
   const { settings } = useTenantSettings();
   const terms = getBusinessTerms(settings);
+  const technicianStages = getTechnicianStages(settings);
   const [data, setData] = useState<TechQueue | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
@@ -178,9 +180,13 @@ export default function TechnicianPage() {
               </OperatorDataTableHeader>
               {data.jobs.map((job) => (
                 <OperatorDataTableRow key={job.id}>
+                  {(() => {
+                    const stage = mapStatusToStage(job.status, technicianStages);
+                    return (
+                      <>
                   <div className="operator-table__cell">
                     <div className="operator-cellTitle">{job.jobRef}</div>
-                    <div className="operator-cellSubtle">{job.customerName} · {job.serviceName || "Service not set"} · {job.status}{job.urgency ? ` · ${job.urgency.replace("_", " ")}` : ""}</div>
+                    <div className="operator-cellSubtle">{job.customerName} · {job.serviceName || "Service not set"} · <span data-testid="workflow-stage-label">{stage?.label || job.status}</span> · {job.status}{job.urgency ? ` · ${job.urgency.replace("_", " ")}` : ""}</div>
                   </div>
                   <div className="operator-table__cell">
                     <div className="operator-cellMeta">
@@ -232,6 +238,9 @@ export default function TechnicianPage() {
                       </button>
                     </div>
                   </div>
+                      </>
+                    );
+                  })()}
                 </OperatorDataTableRow>
               ))}
             </OperatorDataTable>
