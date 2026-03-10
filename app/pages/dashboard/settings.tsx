@@ -8,11 +8,11 @@ import { OperatorPageHeader } from '../../components/ui/operator-page';
 import { apiFetch } from '../../lib/api';
 import { getBusinessConfig, getBusinessTerms } from '../../lib/business-config';
 import { useBilling } from '../../lib/billing';
-import { isGuidedSetupV2Enabled, isNotificationsV1Enabled } from '../../lib/feature-flags';
+import { isAutomationsV1Enabled, isGuidedSetupV2Enabled, isNotificationsV1Enabled } from '../../lib/feature-flags';
 import { TenantSettings, useTenantSettings } from '../../lib/tenant-settings';
 import { getBookingStages, getJobStages, getTechnicianStages, type WorkflowStage } from '../../lib/workflow-config';
 
-type TabKey = 'branding' | 'email' | 'pricing' | 'features' | 'workflow' | 'ai';
+type TabKey = 'branding' | 'email' | 'pricing' | 'features' | 'workflow' | 'automation_rules' | 'ai';
 
 const TABS: Array<{ key: TabKey; label: string }> = [
   { key: 'branding', label: 'Branding' },
@@ -20,6 +20,7 @@ const TABS: Array<{ key: TabKey; label: string }> = [
   { key: 'pricing', label: 'Pricing Defaults' },
   { key: 'features', label: 'Feature Toggles' },
   { key: 'workflow', label: 'Workflow' },
+  { key: 'automation_rules', label: 'Automation Rules' },
   { key: 'ai', label: 'AI' },
 ];
 
@@ -85,6 +86,101 @@ type StageSectionConfig = {
   stages: WorkflowStage[];
 };
 
+type AutomationConditionDraft = {
+  currentStatus?: string | null;
+  invoiceIssued?: boolean | null;
+  invoicePaid?: boolean | null;
+  hasAssignedUser?: boolean | null;
+};
+
+type AutomationActionDraft =
+  | {
+      type: 'create_reminder';
+      delayDays?: number | null;
+      note?: string | null;
+      channel?: string | null;
+    }
+  | {
+      type: 'send_internal_notification';
+      title?: string | null;
+      body?: string | null;
+    }
+  | {
+      type: 'advance_job_stage';
+      targetStatus?: string | null;
+    }
+  | {
+      type: 'send_customer_message';
+      subject?: string | null;
+      body?: string | null;
+    };
+
+type AutomationRuleDraft = {
+  id?: string | null;
+  name: string;
+  trigger: string;
+  enabled: boolean;
+  conditionJson: AutomationConditionDraft;
+  actionJson: AutomationActionDraft;
+};
+
+type WorkspaceAutomationRule = {
+  id: string;
+  name: string;
+  trigger: string;
+  enabled: boolean;
+  conditionJson?: AutomationConditionDraft | null;
+  actionJson: AutomationActionDraft;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+};
+
+type AutomationRun = {
+  id: string;
+  type: string;
+  label: string;
+  status?: string | null;
+  at?: string | null;
+  jobRef?: string | null;
+  payloadJson?: {
+    automationRuleId?: string | null;
+    automationRuleName?: string | null;
+    trigger?: string | null;
+    actionType?: string | null;
+    result?: Record<string, any> | null;
+  } | null;
+};
+
+const AUTOMATION_TRIGGER_OPTIONS = [
+  { value: 'booking.converted', label: 'Booking converted' },
+  { value: 'job.created', label: 'Job created' },
+  { value: 'job.completed', label: 'Job completed' },
+  { value: 'invoice.issued', label: 'Invoice issued' },
+  { value: 'invoice.overdue', label: 'Invoice overdue' },
+  { value: 'technician.arrived', label: 'Technician arrived' },
+  { value: 'portal.document_signed', label: 'Portal document signed' },
+];
+
+const AUTOMATION_ACTION_OPTIONS = [
+  { value: 'create_reminder', label: 'Create reminder' },
+  { value: 'send_internal_notification', label: 'Send internal notification' },
+  { value: 'advance_job_stage', label: 'Advance job stage' },
+  { value: 'send_customer_message', label: 'Queue customer message' },
+];
+
+const AUTOMATION_STATUS_OPTIONS = ['OPEN', 'SCHEDULED', 'IN_PROGRESS', 'COMPLETED', 'INVOICED', 'CANCELLED'];
+
+function createDefaultRuleDraft(): AutomationRuleDraft {
+  return {
+    id: null,
+    name: '',
+    trigger: 'job.completed',
+    enabled: true,
+    conditionJson: {},
+    actionJson: { type: 'create_reminder', delayDays: 3, note: 'Follow up after completion', channel: 'in_app' },
+  };
+}
+
 function renderStatuses(stage: WorkflowStage) {
   return stage.statuses.join(', ');
 }
@@ -95,10 +191,20 @@ export default function SettingsPage() {
   const router = useRouter();
   const guidedSetupEnabled = isGuidedSetupV2Enabled();
   const notificationsEnabled = isNotificationsV1Enabled();
+  const automationsEnabled = isAutomationsV1Enabled();
   const [tab, setTab] = useState<TabKey>('branding');
   const [form, setForm] = useState<any>({});
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [notificationPrefs, setNotificationPrefs] = useState<any>(null);
+  const [automationRules, setAutomationRules] = useState<WorkspaceAutomationRule[]>([]);
+  const [automationRuns, setAutomationRuns] = useState<AutomationRun[]>([]);
+  const [automationRulesLoading, setAutomationRulesLoading] = useState(false);
+  const [automationRunsLoading, setAutomationRunsLoading] = useState(false);
+  const [automationRulesError, setAutomationRulesError] = useState('');
+  const [ruleDraft, setRuleDraft] = useState<AutomationRuleDraft>(createDefaultRuleDraft());
+  const [ruleEditorOpen, setRuleEditorOpen] = useState(false);
+  const [savingRule, setSavingRule] = useState(false);
+  const [deletingRuleId, setDeletingRuleId] = useState<string | null>(null);
   const { notice, showSuccess, showError, clearNotice } = useOperatorNotice();
 
   useEffect(() => {
@@ -142,6 +248,12 @@ export default function SettingsPage() {
     { key: 'jobs', title: 'Jobs workflow', stages: jobStages },
     { key: 'technician', title: 'Technician workflow', stages: technicianStages },
   ], [bookingStages, jobStages, technicianStages]);
+
+  useEffect(() => {
+    if (!automationsEnabled || tab !== 'automation_rules') return;
+    void loadAutomationRules();
+    void loadAutomationRuns();
+  }, [automationsEnabled, tab]);
 
   function updateBusinessConfig(updater: (current: Record<string, any>) => Record<string, any>) {
     setForm((prev: any) => ({
@@ -187,6 +299,120 @@ export default function SettingsPage() {
     const [stage] = nextStages.splice(index, 1);
     nextStages.splice(nextIndex, 0, stage);
     updateWorkflowStages(section, nextStages);
+  }
+
+  async function loadAutomationRules() {
+    if (!automationsEnabled) return;
+    setAutomationRulesLoading(true);
+    setAutomationRulesError('');
+    try {
+      const data = await apiFetch('/automations/workspace-rules');
+      setAutomationRules(Array.isArray(data) ? data as WorkspaceAutomationRule[] : []);
+    } catch (err: any) {
+      setAutomationRulesError(err?.message || 'Failed to load automation rules');
+    } finally {
+      setAutomationRulesLoading(false);
+    }
+  }
+
+  async function loadAutomationRuns() {
+    if (!automationsEnabled) return;
+    setAutomationRunsLoading(true);
+    try {
+      const data = await apiFetch('/automations/runs?limit=20');
+      setAutomationRuns(Array.isArray(data) ? data as AutomationRun[] : []);
+    } catch {
+      setAutomationRuns([]);
+    } finally {
+      setAutomationRunsLoading(false);
+    }
+  }
+
+  function openNewRuleEditor() {
+    setRuleDraft(createDefaultRuleDraft());
+    setRuleEditorOpen(true);
+  }
+
+  function openEditRule(rule: WorkspaceAutomationRule) {
+    setRuleDraft({
+      id: rule.id,
+      name: rule.name,
+      trigger: rule.trigger,
+      enabled: rule.enabled,
+      conditionJson: rule.conditionJson || {},
+      actionJson: rule.actionJson,
+    });
+    setRuleEditorOpen(true);
+  }
+
+  async function saveAutomationRule() {
+    if (!automationsEnabled) return;
+    clearNotice();
+    setSavingRule(true);
+    setAutomationRulesError('');
+    try {
+      const payload = {
+        name: ruleDraft.name,
+        trigger: ruleDraft.trigger,
+        enabled: ruleDraft.enabled,
+        conditionJson: ruleDraft.conditionJson,
+        actionJson: ruleDraft.actionJson,
+      };
+      if (ruleDraft.id) {
+        await apiFetch(`/automations/workspace-rules/${ruleDraft.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify(payload),
+        });
+        showSuccess('Automation rule updated');
+      } else {
+        await apiFetch('/automations/workspace-rules', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+        showSuccess('Automation rule created');
+      }
+      setRuleEditorOpen(false);
+      setRuleDraft(createDefaultRuleDraft());
+      await Promise.all([loadAutomationRules(), loadAutomationRuns()]);
+    } catch (err: any) {
+      showError(err?.message || 'Failed to save automation rule');
+    } finally {
+      setSavingRule(false);
+    }
+  }
+
+  async function toggleAutomationRule(rule: WorkspaceAutomationRule) {
+    if (!automationsEnabled) return;
+    clearNotice();
+    try {
+      await apiFetch(`/automations/workspace-rules/${rule.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ enabled: !rule.enabled }),
+      });
+      showSuccess(rule.enabled ? 'Automation rule disabled' : 'Automation rule enabled');
+      await loadAutomationRules();
+    } catch (err: any) {
+      showError(err?.message || 'Failed to update automation rule');
+    }
+  }
+
+  async function deleteAutomationRule(ruleId: string) {
+    if (!automationsEnabled) return;
+    clearNotice();
+    setDeletingRuleId(ruleId);
+    try {
+      await apiFetch(`/automations/workspace-rules/${ruleId}`, { method: 'DELETE' });
+      showSuccess('Automation rule deleted');
+      if (ruleDraft.id === ruleId) {
+        setRuleEditorOpen(false);
+        setRuleDraft(createDefaultRuleDraft());
+      }
+      await Promise.all([loadAutomationRules(), loadAutomationRuns()]);
+    } catch (err: any) {
+      showError(err?.message || 'Failed to delete automation rule');
+    } finally {
+      setDeletingRuleId(null);
+    }
   }
 
   const stats = useMemo(() => {
@@ -737,6 +963,374 @@ export default function SettingsPage() {
               <p className="muted" style={{ margin: '8px 0 0' }}>
                 {workflowTerms.technicians} stages: {technicianStages.filter((stage) => stage.visible !== false).map((stage) => stage.label).join(' → ') || 'Hidden'}
               </p>
+            </div>
+          </>
+        )}
+
+        {tab === 'automation_rules' && (
+          <>
+            <div className="card settings-premium-card" data-testid="settings-automation-rules-panel" style={{ marginBottom: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 12 }}>
+                <div>
+                  <h3 style={{ marginTop: 0, marginBottom: 6 }}>Automation rules</h3>
+                  <p className="muted settings-premium-muted" style={{ marginBottom: 0 }}>
+                    Create safe declarative rules that react to real workflow events without changing canonical business logic.
+                  </p>
+                </div>
+                <button
+                  className="button settings-premium-button"
+                  type="button"
+                  data-testid="automation-rule-new"
+                  onClick={openNewRuleEditor}
+                  disabled={!automationsEnabled}
+                >
+                  New rule
+                </button>
+              </div>
+
+              {!automationsEnabled ? (
+                <p className="muted settings-premium-muted">Automations are disabled for this runtime.</p>
+              ) : null}
+
+              {automationRulesError ? <p style={{ color: '#fca5a5' }}>{automationRulesError}</p> : null}
+
+              <div data-testid="automation-rule-list" style={{ display: 'grid', gap: 12 }}>
+                {automationRulesLoading ? (
+                  <p className="muted settings-premium-muted">Loading automation rules…</p>
+                ) : automationRules.length ? (
+                  automationRules.map((rule) => (
+                    <div
+                      key={rule.id}
+                      style={{
+                        border: '1px solid rgba(148,163,184,0.18)',
+                        borderRadius: 14,
+                        padding: 14,
+                        display: 'grid',
+                        gap: 8,
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
+                        <div>
+                          <strong>{rule.name}</strong>
+                          <div className="muted settings-premium-muted" style={{ marginTop: 4 }}>
+                            Trigger: {rule.trigger} • Action: {rule.actionJson.type.replace(/_/g, ' ')}
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button
+                            className="button secondary settings-premium-button"
+                            type="button"
+                            data-testid={`automation-rule-toggle-${rule.id}`}
+                            onClick={() => void toggleAutomationRule(rule)}
+                          >
+                            {rule.enabled ? 'Disable' : 'Enable'}
+                          </button>
+                          <button
+                            className="button secondary settings-premium-button"
+                            type="button"
+                            data-testid={`automation-rule-edit-${rule.id}`}
+                            onClick={() => openEditRule(rule)}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className="button secondary settings-premium-button"
+                            type="button"
+                            data-testid={`automation-rule-delete-${rule.id}`}
+                            onClick={() => void deleteAutomationRule(rule.id)}
+                            disabled={deletingRuleId === rule.id}
+                          >
+                            {deletingRuleId === rule.id ? 'Deleting…' : 'Delete'}
+                          </button>
+                        </div>
+                      </div>
+                      <div className="muted settings-premium-muted">
+                        {rule.conditionJson?.currentStatus ? `Status is ${rule.conditionJson.currentStatus}` : 'No status condition'}
+                        {rule.conditionJson?.invoiceIssued !== null && rule.conditionJson?.invoiceIssued !== undefined
+                          ? ` • Invoice issued: ${rule.conditionJson.invoiceIssued ? 'yes' : 'no'}`
+                          : ''}
+                        {rule.conditionJson?.hasAssignedUser !== null && rule.conditionJson?.hasAssignedUser !== undefined
+                          ? ` • Assigned user: ${rule.conditionJson.hasAssignedUser ? 'required' : 'not required'}`
+                          : ''}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="muted settings-premium-muted">No workspace automation rules yet.</p>
+                )}
+              </div>
+            </div>
+
+            {ruleEditorOpen ? (
+              <div className="card settings-premium-card" data-testid="automation-rule-editor" style={{ marginBottom: 12 }}>
+                <h3 style={{ marginTop: 0 }}>{ruleDraft.id ? 'Edit automation rule' : 'Create automation rule'}</h3>
+
+                <label className="settings-premium-label">Rule name</label>
+                <input
+                  className="input settings-premium-input"
+                  data-testid="automation-rule-name"
+                  value={ruleDraft.name}
+                  onChange={(e) => setRuleDraft((prev) => ({ ...prev, name: e.target.value }))}
+                  placeholder="Completed jobs need a billing reminder"
+                />
+
+                <label className="settings-premium-label">Trigger</label>
+                <select
+                  className="input settings-premium-input"
+                  data-testid="automation-rule-trigger"
+                  value={ruleDraft.trigger}
+                  onChange={(e) => setRuleDraft((prev) => ({ ...prev, trigger: e.target.value }))}
+                >
+                  {AUTOMATION_TRIGGER_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+
+                <label style={{ display: 'block', marginBottom: 12 }}>
+                  <input
+                    type="checkbox"
+                    checked={ruleDraft.enabled}
+                    onChange={(e) => setRuleDraft((prev) => ({ ...prev, enabled: e.target.checked }))}
+                    style={{ marginRight: 8 }}
+                  />
+                  Enable this rule immediately
+                </label>
+
+                <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', marginBottom: 12 }}>
+                  <div>
+                    <label className="settings-premium-label">Condition: current status</label>
+                    <select
+                      className="input settings-premium-input"
+                      value={ruleDraft.conditionJson.currentStatus || ''}
+                      onChange={(e) => setRuleDraft((prev) => ({
+                        ...prev,
+                        conditionJson: { ...prev.conditionJson, currentStatus: e.target.value || null },
+                      }))}
+                    >
+                      <option value="">Any status</option>
+                      {AUTOMATION_STATUS_OPTIONS.map((status) => (
+                        <option key={status} value={status}>
+                          {status}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="settings-premium-label">Condition: invoice issued</label>
+                    <select
+                      className="input settings-premium-input"
+                      value={ruleDraft.conditionJson.invoiceIssued === true ? 'true' : ruleDraft.conditionJson.invoiceIssued === false ? 'false' : ''}
+                      onChange={(e) => setRuleDraft((prev) => ({
+                        ...prev,
+                        conditionJson: {
+                          ...prev.conditionJson,
+                          invoiceIssued: e.target.value === '' ? null : e.target.value === 'true',
+                        },
+                      }))}
+                    >
+                      <option value="">Any</option>
+                      <option value="true">Yes</option>
+                      <option value="false">No</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="settings-premium-label">Condition: assigned user</label>
+                    <select
+                      className="input settings-premium-input"
+                      value={ruleDraft.conditionJson.hasAssignedUser === true ? 'true' : ruleDraft.conditionJson.hasAssignedUser === false ? 'false' : ''}
+                      onChange={(e) => setRuleDraft((prev) => ({
+                        ...prev,
+                        conditionJson: {
+                          ...prev.conditionJson,
+                          hasAssignedUser: e.target.value === '' ? null : e.target.value === 'true',
+                        },
+                      }))}
+                    >
+                      <option value="">Any</option>
+                      <option value="true">Assigned</option>
+                      <option value="false">Unassigned</option>
+                    </select>
+                  </div>
+                </div>
+
+                <label className="settings-premium-label">Action</label>
+                <select
+                  className="input settings-premium-input"
+                  data-testid="automation-rule-action"
+                  value={ruleDraft.actionJson.type}
+                  onChange={(e) => {
+                    const nextType = e.target.value as AutomationActionDraft['type'];
+                    const nextAction =
+                      nextType === 'create_reminder'
+                        ? { type: nextType, delayDays: 3, note: 'Automation follow-up', channel: 'in_app' }
+                        : nextType === 'send_internal_notification'
+                        ? { type: nextType, title: 'Dispatch review needed', body: '' }
+                        : nextType === 'advance_job_stage'
+                        ? { type: nextType, targetStatus: 'INVOICED' }
+                        : { type: nextType, subject: 'Follow-up from MyTitan', body: 'We have an update for your job.' };
+                    setRuleDraft((prev) => ({ ...prev, actionJson: nextAction }));
+                  }}
+                >
+                  {AUTOMATION_ACTION_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+
+                {ruleDraft.actionJson.type === 'create_reminder' ? (
+                  <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+                    <div>
+                      <label className="settings-premium-label">Delay days</label>
+                      <input
+                        className="input settings-premium-input"
+                        data-testid="automation-rule-delay-days"
+                        type="number"
+                        min={0}
+                        max={30}
+                        value={ruleDraft.actionJson.delayDays ?? 1}
+                        onChange={(e) => setRuleDraft((prev) => ({
+                          ...prev,
+                          actionJson: { ...prev.actionJson, delayDays: Number(e.target.value || 0) },
+                        }))}
+                      />
+                    </div>
+                    <div>
+                      <label className="settings-premium-label">Reminder note</label>
+                      <input
+                        className="input settings-premium-input"
+                        data-testid="automation-rule-note"
+                        value={ruleDraft.actionJson.note || ''}
+                        onChange={(e) => setRuleDraft((prev) => ({
+                          ...prev,
+                          actionJson: { ...prev.actionJson, note: e.target.value },
+                        }))}
+                      />
+                    </div>
+                  </div>
+                ) : null}
+
+                {ruleDraft.actionJson.type === 'send_internal_notification' ? (
+                  <>
+                    <label className="settings-premium-label">Notification title</label>
+                    <input
+                      className="input settings-premium-input"
+                      value={ruleDraft.actionJson.title || ''}
+                      onChange={(e) => setRuleDraft((prev) => ({
+                        ...prev,
+                        actionJson: { ...prev.actionJson, title: e.target.value },
+                      }))}
+                    />
+                    <label className="settings-premium-label">Notification body</label>
+                    <textarea
+                      className="input settings-premium-input"
+                      rows={3}
+                      value={ruleDraft.actionJson.body || ''}
+                      onChange={(e) => setRuleDraft((prev) => ({
+                        ...prev,
+                        actionJson: { ...prev.actionJson, body: e.target.value },
+                      }))}
+                    />
+                  </>
+                ) : null}
+
+                {ruleDraft.actionJson.type === 'advance_job_stage' ? (
+                  <>
+                    <label className="settings-premium-label">Target status</label>
+                    <select
+                      className="input settings-premium-input"
+                      value={ruleDraft.actionJson.targetStatus || 'INVOICED'}
+                      onChange={(e) => setRuleDraft((prev) => ({
+                        ...prev,
+                        actionJson: { ...prev.actionJson, targetStatus: e.target.value },
+                      }))}
+                    >
+                      {AUTOMATION_STATUS_OPTIONS.map((status) => (
+                        <option key={status} value={status}>
+                          {status}
+                        </option>
+                      ))}
+                    </select>
+                  </>
+                ) : null}
+
+                {ruleDraft.actionJson.type === 'send_customer_message' ? (
+                  <>
+                    <label className="settings-premium-label">Message subject</label>
+                    <input
+                      className="input settings-premium-input"
+                      value={ruleDraft.actionJson.subject || ''}
+                      onChange={(e) => setRuleDraft((prev) => ({
+                        ...prev,
+                        actionJson: { ...prev.actionJson, subject: e.target.value },
+                      }))}
+                    />
+                    <label className="settings-premium-label">Message body</label>
+                    <textarea
+                      className="input settings-premium-input"
+                      rows={4}
+                      value={ruleDraft.actionJson.body || ''}
+                      onChange={(e) => setRuleDraft((prev) => ({
+                        ...prev,
+                        actionJson: { ...prev.actionJson, body: e.target.value },
+                      }))}
+                    />
+                    <p className="muted settings-premium-muted" style={{ marginTop: 0 }}>
+                      Customer messages are queued as metadata-only activity in this MVP. Delivery execution remains a future integration seam.
+                    </p>
+                  </>
+                ) : null}
+
+                <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+                  <button
+                    className="button settings-premium-button"
+                    type="button"
+                    data-testid="automation-rule-save"
+                    onClick={() => void saveAutomationRule()}
+                    disabled={savingRule}
+                  >
+                    {savingRule ? 'Saving…' : 'Save rule'}
+                  </button>
+                  <button
+                    className="button secondary settings-premium-button"
+                    type="button"
+                    onClick={() => {
+                      setRuleEditorOpen(false);
+                      setRuleDraft(createDefaultRuleDraft());
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            <div className="card settings-premium-card">
+              <h3 style={{ marginTop: 0 }}>Recent automation runs</h3>
+              <p className="muted settings-premium-muted">Use recent runs to confirm rules executed, skipped, or failed against real workflow events.</p>
+              <div style={{ display: 'grid', gap: 10 }}>
+                {automationRunsLoading ? (
+                  <p className="muted settings-premium-muted">Loading recent automation runs…</p>
+                ) : automationRuns.length ? (
+                  automationRuns.map((run) => (
+                    <div key={run.id} data-testid="automation-run-row" style={{ border: '1px solid rgba(148,163,184,0.16)', borderRadius: 12, padding: 12 }}>
+                      <strong>{run.label}</strong>
+                      <div className="muted settings-premium-muted" style={{ marginTop: 4 }}>
+                        {run.payloadJson?.automationRuleName ? `${run.payloadJson.automationRuleName} • ` : ''}
+                        {run.payloadJson?.trigger || run.type}
+                        {run.jobRef ? ` • ${run.jobRef}` : ''}
+                        {run.status ? ` • ${run.status}` : ''}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="muted settings-premium-muted">No automation runs recorded yet.</p>
+                )}
+              </div>
             </div>
           </>
         )}
