@@ -44,6 +44,7 @@ const FIXTURE = {
     portalExpired: { id: "e2e-customer-portal-expired", slug: "e2e-portal-expired", name: "E2E Portal Expired", email: "portal-expired@mytitan.local", phone: "+447700900106" },
     technician: { id: "e2e-customer-technician", slug: "e2e-technician", name: "E2E Technician Customer", email: "tech@mytitan.local", phone: "+447700900107" },
     open: { id: "e2e-customer-open", slug: "e2e-open", name: "E2E Open Queue Customer", email: "open@mytitan.local", phone: "+447700900108" },
+    automation: { id: "e2e-customer-automation", slug: "e2e-automation", name: "E2E Automation Customer", email: "automation@mytitan.local", phone: "+447700900109" },
   },
   jobs: {
     invoiceReady: { id: "e2e-job-invoice-ready", jobRef: "E2E-INV-READY-001" },
@@ -51,6 +52,7 @@ const FIXTURE = {
     portalActive: { id: "e2e-job-portal-active", jobRef: "E2E-PORTAL-ACTIVE-001" },
     portalExpired: { id: "e2e-job-portal-expired", jobRef: "E2E-PORTAL-EXPIRED-001" },
     technician: { id: "e2e-job-technician", jobRef: "E2E-TECH-001" },
+    automation: { id: "e2e-job-automation", jobRef: "E2E-AUTO-001" },
     open: { id: "e2e-job-open", jobRef: "E2E-OPEN-001" },
   },
   bookings: {
@@ -296,6 +298,35 @@ async function ensureAutomations(companyId) {
       configJson: {
         jobCompletionFollowUpEnabled: true,
         reviewRequestEnabled: true,
+      },
+    },
+  });
+
+  await prisma.automationRule.upsert({
+    where: { id: "e2e-rule-booking-dispatch" },
+    create: {
+      id: "e2e-rule-booking-dispatch",
+      tenantId: companyId,
+      name: "E2E dispatch review on conversion",
+      trigger: "booking.converted",
+      enabled: true,
+      conditionJson: null,
+      actionJson: {
+        type: "send_internal_notification",
+        title: "Dispatch review needed",
+        body: "Converted booking should be reviewed by dispatch.",
+      },
+    },
+    update: {
+      tenantId: companyId,
+      name: "E2E dispatch review on conversion",
+      trigger: "booking.converted",
+      enabled: true,
+      conditionJson: null,
+      actionJson: {
+        type: "send_internal_notification",
+        title: "Dispatch review needed",
+        body: "Converted booking should be reviewed by dispatch.",
       },
     },
   });
@@ -748,6 +779,41 @@ async function main() {
     assignedUserId: operator.id,
   });
 
+  const automationJob = await ensureJob({
+    companyId: company.id,
+    locationId: location.id,
+    userId: operator.id,
+    customerId: customers.automation.id,
+    jobId: FIXTURE.jobs.automation.id,
+    jobRef: FIXTURE.jobs.automation.jobRef,
+    status: "IN_PROGRESS",
+    customerName: customers.automation.name,
+    customerEmail: customers.automation.email,
+    customerPhone: customers.automation.phone,
+    totalCents: 41000,
+    scheduledAt: addMinutes(now, 75),
+    completedAt: null,
+    invoiceIssuedAt: null,
+    invoiceDueAt: null,
+    invoicePaidAt: null,
+    approvedAt: null,
+    approvedByName: null,
+    signedAt: null,
+    signatureName: null,
+    signatureDataUrl: null,
+    paymentLinkUrl: null,
+    paymentReceiptUrl: null,
+    invoicePdfUrl: null,
+    paymentCheckoutSessionId: null,
+    serviceName: "Automation completion check",
+    vehicleMake: "Tesla",
+    vehicleModel: "Model 3",
+    vehicleReg: "E2E006",
+    formData: { selectedWheels: ["Rear right"], services: ["Automation completion check"] },
+    whatsappCompletionLink: null,
+    assignedUserId: operator.id,
+  });
+
   const openJob = await ensureJob({
     companyId: company.id,
     locationId: location.id,
@@ -790,6 +856,7 @@ async function main() {
   await ensureJobActivity(company.id, portalExpiredJob.id, operator.id, "e2e-activity-portal-expired", "billing.payment.received", "Payment received and receipt stored", addMinutes(now, -25));
   await ensureJobActivity(company.id, technicianJob.id, operator.id, "e2e-activity-tech-arrived", "tech.arrived", "Technician arrived on site", addMinutes(now, -15));
   await ensureJobActivity(company.id, technicianJob.id, operator.id, "e2e-activity-tech-note", "tech.note", "Customer requested extra care on the front-right wheel.", addMinutes(now, -10));
+  await ensureJobActivity(company.id, automationJob.id, operator.id, "e2e-activity-auto-work", "tech.note", "Automation test job is active and ready for completion.", addMinutes(now, -8));
   await ensureJobActivity(company.id, openJob.id, operator.id, "e2e-activity-open", "job.status", "New job created in the command centre queue", addMinutes(now, -60));
 
   await ensureReminder("e2e-reminder-billing-overdue", company.id, issuedJob.id, addMinutes(now, -180), "Automation billing follow-up");

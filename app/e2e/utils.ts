@@ -16,6 +16,7 @@ export const fixtureRefs = {
   portalActiveJobRef: "E2E-PORTAL-ACTIVE-001",
   portalExpiredJobRef: "E2E-PORTAL-EXPIRED-001",
   technicianJobRef: "E2E-TECH-001",
+  automationJobRef: "E2E-AUTO-001",
   commandCentreJobRef: "E2E-OPEN-001",
   portalToken: "e2e-public-portal-token",
 };

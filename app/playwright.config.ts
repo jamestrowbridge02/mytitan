@@ -27,6 +27,7 @@ export default defineConfig({
           "NEXT_PUBLIC_MYTITAN_DISABLE_SSE=1 " +
           "NEXT_PUBLIC_MYTITAN_FEATURE_MARKETPLACE=1 " +
           "NEXT_PUBLIC_MYTITAN_FEATURE_COMMAND_CENTRE_V2=1 " +
+          "NEXT_PUBLIC_MYTITAN_FEATURE_AUTOMATIONS_V1=1 " +
           "NEXT_PUBLIC_MYTITAN_FEATURE_PORTAL_POLISH_V1=1 " +
           "npm run dev -- --hostname 127.0.0.1 --port 3101",
         url: baseURL,

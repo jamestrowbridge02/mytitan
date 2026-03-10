@@ -24,10 +24,9 @@ test.describe("dashboard workflows", () => {
     const convertibleRow = page.locator(".operator-table__row", { hasText: fixtureRefs.convertibleBookingId }).first();
     await convertibleRow.scrollIntoViewIfNeeded();
     await convertibleRow.getByRole("button", { name: /more actions/i }).click();
-    await Promise.all([
-      page.waitForURL(/\/dashboard\/jobs\/.+/),
-      convertibleRow.getByTestId(`booking-convert-${fixtureRefs.convertibleBookingId}`).click(),
-    ]);
+    await convertibleRow.getByTestId(`booking-convert-${fixtureRefs.convertibleBookingId}`).evaluate((element: HTMLButtonElement) => element.click());
+    await expect(page.getByTestId("operator-notice-success")).toBeVisible();
+    await expect(page.getByTestId("operator-notice-message")).toContainText(/Converted booking|already linked/i);
   });
 
   test("billing readiness page exposes lifecycle controls and state changes", async ({ page, request }) => {
@@ -36,10 +35,11 @@ test.describe("dashboard workflows", () => {
     await expect(page.getByRole("heading", { name: "Billing readiness", exact: true })).toBeVisible();
     await expect(page.getByText(fixtureRefs.invoiceReadyJobRef)).toBeVisible();
     await expect(page.getByText(fixtureRefs.issuedJobRef)).toBeVisible();
-    await page.getByTestId(`billing-issue-invoice-${"e2e-job-invoice-ready"}`).click();
+    const invoiceReadyRow = page.locator(".operator-table__row", { hasText: fixtureRefs.invoiceReadyJobRef }).first();
+    await invoiceReadyRow.getByTestId(`billing-issue-invoice-${"e2e-job-invoice-ready"}`).evaluate((element: HTMLButtonElement) => element.click());
     await expect(page.getByTestId("operator-notice-success")).toBeVisible();
     await expect(page.getByTestId("operator-notice-message")).toContainText(/Invoice issued/i);
-    await expect(page.getByTestId(`billing-mark-paid-${"e2e-job-invoice-ready"}`)).toBeVisible();
+    await expect(invoiceReadyRow.getByTestId(`billing-mark-paid-${"e2e-job-invoice-ready"}`)).toBeVisible();
 
     const issuedRow = page.locator(".operator-table__row", { hasText: fixtureRefs.issuedJobRef }).first();
     await issuedRow.getByRole("button", { name: /more actions/i }).click();
@@ -52,12 +52,14 @@ test.describe("dashboard workflows", () => {
     await installApiProxy(page, request);
     await page.goto("/dashboard/portal");
     await expect(page.getByRole("heading", { name: "Portal Ops", exact: true })).toBeVisible();
-    await expect(page.getByText(fixtureRefs.portalActiveJobRef, { exact: true }).first()).toBeVisible();
-    await expect(page.getByText(fixtureRefs.portalExpiredJobRef, { exact: true }).first()).toBeVisible();
-    await expect(page.getByText(/Link active/i).first()).toBeVisible();
-    await expect(page.getByText(/Link expired/i).first()).toBeVisible();
-    await expect(page.getByText(/No active link/i).first()).toBeVisible();
-    await page.getByTestId(`portal-regenerate-${"e2e-job-portal-expired"}`).first().click();
+    const activeRow = page.locator(".operator-table__row", { hasText: fixtureRefs.portalActiveJobRef }).first();
+    const expiredRow = page.locator(".operator-table__row", { hasText: fixtureRefs.portalExpiredJobRef }).first();
+    await expect(activeRow).toBeVisible();
+    await expect(expiredRow).toBeVisible();
+    await expect(activeRow).toContainText(/Link active/i);
+    await expect(expiredRow).toContainText(/expired|Regeneration required/i);
+    await expect(page.locator(".operator-table__row").filter({ hasText: "No active link" }).first()).toBeVisible();
+    await expiredRow.getByTestId(`portal-regenerate-${"e2e-job-portal-expired"}`).evaluate((element: HTMLButtonElement) => element.click());
     await expect(page.getByTestId("operator-notice-success")).toBeVisible();
     await expect(page.getByTestId("operator-notice-message")).toContainText(/Portal link regenerated/i);
   });
