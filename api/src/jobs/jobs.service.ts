@@ -94,7 +94,10 @@ export class JobsService {
   }
 
   private async resolveOrCreateCustomer(companyId: string, input: { customerId?: string | null; name?: string | null; email?: string | null; phone?: string | null }) {
-    const db = this.prisma as any;
+    return this.resolveOrCreateCustomerOnClient(this.prisma as any, companyId, input);
+  }
+
+  private async resolveOrCreateCustomerOnClient(db: any, companyId: string, input: { customerId?: string | null; name?: string | null; email?: string | null; phone?: string | null }) {
     const providedId = String(input.customerId || "").trim();
     const name = String(input.name || "").trim();
     const email = String(input.email || "").trim().toLowerCase();
@@ -221,11 +224,97 @@ export class JobsService {
     }
   }
 
-  private async isWheelsFlowEnabled(companyId: string) {
+  private async isWheelsFlowEnabledOnClient(db: any, companyId: string) {
     if (!isWheelsFormV1Enabled()) return false;
-    const db = this.prisma as any;
     const settings = await db.tenantSetting.findUnique({ where: { tenantId: companyId } });
     return settings?.primaryTrade === "WHEELS";
+  }
+
+  async createCoreJobRecord(tx: any, companyId: string, userId: string, dto: CreateJobDto) {
+    const company = await tx.company.findUnique({ where: { id: companyId } });
+    if (!company) {
+      throw new NotFoundException("Company not found");
+    }
+
+    if (dto.locationId && tx.location) {
+      const location = await tx.location.findFirst({ where: { id: dto.locationId, companyId } });
+      if (!location) {
+        throw new BadRequestException("Invalid location for this company");
+      }
+    }
+
+    const settings = await tx.tenantSetting.findUnique({ where: { tenantId: companyId } });
+    const wheelsEnabled = await this.isWheelsFlowEnabledOnClient(tx, companyId);
+    const submittedForm = dto.formData || null;
+
+    const laborCents = dto.laborCents ?? 0;
+    const partsCents = dto.partsCents ?? 0;
+    const miscCents = dto.miscCents ?? 0;
+    const taxRateBps = dto.taxRateBps ?? (settings?.vatEnabledDefault ? Number(settings.vatRateBpsDefault ?? 0) : 0);
+    const currency = settings?.defaultCurrency ?? company.currency ?? "USD";
+
+    const totals = wheelsEnabled && submittedForm
+      ? this.computeWheelsTotals(submittedForm, currency)
+      : this.computeTotals({ laborCents, partsCents, miscCents, taxRateBps }, currency);
+
+    const serviceName =
+      (submittedForm?.serviceName as string | undefined) ??
+      dto.serviceName ??
+      (Array.isArray(settings?.defaultServiceNamePresets) && settings.defaultServiceNamePresets.length > 0
+        ? settings.defaultServiceNamePresets[0]
+        : null);
+    const wheelPricingMode = dto.wheelPricingMode ?? settings?.defaultWheelPricingMode ?? null;
+    const whatsappTemplate = dto.whatsappTemplate ?? settings?.whatsappTemplateDefault ?? null;
+    const jobType = (submittedForm?.jobType as string | undefined) || dto.jobType || null;
+    const tradeCode = (dto.tradeCode || settings?.primaryTrade || null) as string | null;
+    const customerName = ((submittedForm?.customerName as string | undefined) || dto.customerName || "").trim();
+    const customerEmail = ((submittedForm?.customerEmail as string | undefined) || dto.customerEmail || "").trim();
+    const customerPhone = ((submittedForm?.customerPhone as string | undefined) || dto.customerPhone || "").trim();
+    const customerId = await this.resolveOrCreateCustomerOnClient(tx, companyId, {
+      name: customerName || null,
+      email: customerEmail || null,
+      phone: customerPhone || null,
+    });
+    const scheduledAtRaw =
+      (submittedForm?.scheduledAt as string | undefined) ||
+      (submittedForm?.scheduledFor as string | undefined) ||
+      dto.scheduledAt ||
+      null;
+    const scheduledAt =
+      scheduledAtRaw && !Number.isNaN(new Date(scheduledAtRaw).getTime())
+        ? new Date(scheduledAtRaw)
+        : null;
+
+    const jobRef = await this.nextJobRef(tx, companyId);
+    const created = await tx.job.create({
+      data: {
+        companyId,
+        locationId: dto.locationId,
+        customerId: customerId || null,
+        jobRef,
+        status: "OPEN",
+        customerName,
+        customerEmail: customerEmail || null,
+        customerPhone: customerPhone || null,
+        vehicleMake: (submittedForm?.vehicleMake as string | undefined) || dto.vehicleMake,
+        vehicleModel: (submittedForm?.vehicleModel as string | undefined) || dto.vehicleModel,
+        vehicleReg: (submittedForm?.vehicleReg as string | undefined) || dto.vehicleReg,
+        serviceName,
+        wheelPricingMode,
+        whatsappTemplate,
+        whatsappCompletionLink: (submittedForm?.whatsappCompletionLink as string | undefined) || null,
+        invoiceDueAt: dto.invoiceDueAt ? new Date(dto.invoiceDueAt) : null,
+        scheduledAt,
+        invoiceNumber: (submittedForm?.invoiceNumber as string | undefined) || null,
+        tradeCode,
+        jobType,
+        createdByUserId: userId,
+        formData: submittedForm,
+        ...totals,
+      },
+    });
+
+    return { created, wheelsEnabled, submittedForm };
   }
 
   private async recordUndo(companyId: string, userId: string, actionType: string, changes: Array<{ id: string; before: any; after: any }>) {
@@ -607,90 +696,9 @@ export class JobsService {
 
   async create(companyId: string, userId: string, dto: CreateJobDto) {
     const db = this.prisma as any;
-    const company = await db.company.findUnique({ where: { id: companyId } });
-    if (!company) {
-      throw new NotFoundException("Company not found");
-    }
-
-    if (dto.locationId && db.location) {
-      const location = await db.location.findFirst({ where: { id: dto.locationId, companyId } });
-      if (!location) {
-        throw new BadRequestException("Invalid location for this company");
-      }
-    }
-
-    const settings = await db.tenantSetting.findUnique({ where: { tenantId: companyId } });
-    const wheelsEnabled = await this.isWheelsFlowEnabled(companyId);
-    const submittedForm = dto.formData || null;
-
-    const laborCents = dto.laborCents ?? 0;
-    const partsCents = dto.partsCents ?? 0;
-    const miscCents = dto.miscCents ?? 0;
-    const taxRateBps = dto.taxRateBps ?? (settings?.vatEnabledDefault ? Number(settings.vatRateBpsDefault ?? 0) : 0);
-    const currency = settings?.defaultCurrency ?? company.currency ?? "USD";
-
-    const totals = wheelsEnabled && submittedForm
-      ? this.computeWheelsTotals(submittedForm, currency)
-      : this.computeTotals({ laborCents, partsCents, miscCents, taxRateBps }, currency);
-
-    const serviceName =
-      (submittedForm?.serviceName as string | undefined) ??
-      dto.serviceName ??
-      (Array.isArray(settings?.defaultServiceNamePresets) && settings.defaultServiceNamePresets.length > 0
-        ? settings.defaultServiceNamePresets[0]
-        : null);
-    const wheelPricingMode = dto.wheelPricingMode ?? settings?.defaultWheelPricingMode ?? null;
-    const whatsappTemplate = dto.whatsappTemplate ?? settings?.whatsappTemplateDefault ?? null;
-    const jobType = (submittedForm?.jobType as string | undefined) || dto.jobType || null;
-    const tradeCode = (dto.tradeCode || settings?.primaryTrade || null) as string | null;
-    const customerName = ((submittedForm?.customerName as string | undefined) || dto.customerName || "").trim();
-    const customerEmail = ((submittedForm?.customerEmail as string | undefined) || dto.customerEmail || "").trim();
-    const customerPhone = ((submittedForm?.customerPhone as string | undefined) || dto.customerPhone || "").trim();
-    const customerId = await this.resolveOrCreateCustomer(companyId, {
-      name: customerName || null,
-      email: customerEmail || null,
-      phone: customerPhone || null,
-    });
-    const scheduledAtRaw =
-      (submittedForm?.scheduledAt as string | undefined) ||
-      (submittedForm?.scheduledFor as string | undefined) ||
-      dto.scheduledAt ||
-      null;
-    const scheduledAt =
-      scheduledAtRaw && !Number.isNaN(new Date(scheduledAtRaw).getTime())
-        ? new Date(scheduledAtRaw)
-        : null;
-
-    const created = await db.$transaction(async (tx: any) => {
-      const jobRef = await this.nextJobRef(tx, companyId);
-      return tx.job.create({
-        data: {
-          companyId,
-          locationId: dto.locationId,
-          customerId: customerId || null,
-          jobRef,
-          status: "OPEN",
-          customerName,
-          customerEmail: customerEmail || null,
-          customerPhone: customerPhone || null,
-          vehicleMake: (submittedForm?.vehicleMake as string | undefined) || dto.vehicleMake,
-          vehicleModel: (submittedForm?.vehicleModel as string | undefined) || dto.vehicleModel,
-          vehicleReg: (submittedForm?.vehicleReg as string | undefined) || dto.vehicleReg,
-          serviceName,
-          wheelPricingMode,
-          whatsappTemplate,
-          whatsappCompletionLink: (submittedForm?.whatsappCompletionLink as string | undefined) || null,
-          invoiceDueAt: dto.invoiceDueAt ? new Date(dto.invoiceDueAt) : null,
-          scheduledAt,
-          invoiceNumber: (submittedForm?.invoiceNumber as string | undefined) || null,
-          tradeCode,
-          jobType,
-          createdByUserId: userId,
-          formData: submittedForm,
-          ...totals,
-        },
-      });
-    });
+    const { created, wheelsEnabled, submittedForm } = await db.$transaction((tx: any) =>
+      this.createCoreJobRecord(tx, companyId, userId, dto),
+    );
 
     await this.audit.log(companyId, "job.create", `Created job ${created.jobRef ?? created.id}`, userId);
     await this.logActivity(companyId, created.id, userId, "job.create", `Job ${created.jobRef ?? created.id} created`);

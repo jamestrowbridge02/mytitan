@@ -4,10 +4,10 @@ import { AuditService } from '../audit/audit.service';
 import { AutomationsService } from '../automations/automations.service';
 import { isAutomationsV1Enabled, isBookingProV1Enabled, isLocationsAdvancedV1Enabled } from '../common/feature-flags';
 import { ActivityService } from '../events/activity.service';
-import { JobsService } from '../jobs/jobs.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { acquireTechnicianLock } from '../common/advisory-lock';
+import { BookingConversionService } from './booking-conversion.service';
 import {
   BookingAvailabilityQueryDto,
   CreateBookingDto,
@@ -26,7 +26,7 @@ export class BookingsService {
     private readonly notifications: NotificationsService,
     private readonly automations: AutomationsService,
     private readonly activity: ActivityService,
-    private readonly jobs: JobsService,
+    private readonly conversion: BookingConversionService,
   ) {}
   private readonly logger = new Logger(BookingsService.name);
 
@@ -201,226 +201,7 @@ export class BookingsService {
   }
 
   async convertToJob(companyId: string, userId: string, bookingId: string) {
-    const db = this.prisma as any;
-    const booking = await db.booking.findFirst({
-      where: { id: bookingId, companyId },
-      include: {
-        job: true,
-        service: { select: { id: true, name: true } },
-        proService: { select: { id: true, name: true } },
-      },
-    });
-
-    if (!booking) {
-      throw new BadRequestException('Booking not found');
-    }
-
-    const readinessIssues = [];
-    if (!String(booking.customerName || '').trim()) readinessIssues.push('customer_name_missing');
-    if (!booking.startsAt || !booking.endsAt) readinessIssues.push('time_window_missing');
-    if (readinessIssues.length > 0) {
-      throw new BadRequestException({
-        code: 'BOOKING_CONVERSION_NOT_READY',
-        issues: readinessIssues,
-      });
-    }
-
-    if (booking.jobId && booking.job) {
-      return {
-        booking,
-        job: booking.job,
-        alreadyLinked: true,
-        conversion: {
-          linkedAt: booking.updatedAt,
-          dispatchFollowUpCreated: false,
-          dispatchReminderId: null,
-          activityId: null,
-          duplicatePrevented: false,
-          readinessIssues: [],
-        },
-      };
-    }
-
-    const created = await this.jobs.create(companyId, userId, {
-      locationId: booking.locationId || undefined,
-      customerName: String(booking.customerName || '').trim() || 'Booking customer',
-      customerEmail: String(booking.customerEmail || '').trim() || undefined,
-      customerPhone: String(booking.customerPhone || '').trim() || undefined,
-      serviceName: booking.proService?.name || booking.service?.name || undefined,
-      scheduledAt: booking.startsAt ? new Date(booking.startsAt).toISOString() : undefined,
-      formData: {
-        sourceBookingId: booking.id,
-        bookingSource: booking.source,
-        bookingStatus: booking.status,
-        scheduledAt: booking.startsAt ? new Date(booking.startsAt).toISOString() : null,
-        customerName: booking.customerName || null,
-        customerEmail: booking.customerEmail || null,
-        customerPhone: booking.customerPhone || null,
-      },
-    });
-
-    const nextStatus =
-      booking.status === 'IN_PROGRESS'
-        ? 'IN_PROGRESS'
-        : booking.status === 'COMPLETED'
-        ? 'COMPLETED'
-        : 'SCHEDULED';
-
-    const patchedJob = await this.jobs.patchPartial(companyId, userId, created.id, {
-      status: nextStatus as any,
-      assignedUserId: booking.assignedUserId || undefined,
-      scheduledAt: booking.startsAt ? new Date(booking.startsAt).toISOString() : undefined,
-      locationId: booking.locationId || undefined,
-    });
-
-    const linkData = {
-      jobId: patchedJob.id,
-      status: booking.status === 'PENDING' || booking.status === 'PLANNED' ? 'CONFIRMED' : booking.status,
-    };
-    const linked = await db.booking.updateMany({
-      where: {
-        id: booking.id,
-        companyId,
-        jobId: null,
-      },
-      data: linkData,
-    });
-
-    if (linked.count === 0) {
-      const latestBooking = await db.booking.findFirst({
-        where: { id: booking.id, companyId },
-        include: { job: true },
-      });
-      if (latestBooking?.jobId && latestBooking.jobId !== patchedJob.id) {
-        await db.job.update({
-          where: { id: patchedJob.id },
-          data: { status: 'CANCELLED' },
-        });
-        await db.jobActivity.create({
-          data: {
-            companyId,
-            jobId: patchedJob.id,
-            actorUserId: userId,
-            eventType: 'booking.convert.duplicate_prevented',
-            message: `Duplicate conversion prevented after booking ${booking.id} linked to ${latestBooking.job?.jobRef || latestBooking.jobId}`,
-            payloadJson: {
-              bookingId: booking.id,
-              supersedingJobId: latestBooking.jobId,
-            },
-          },
-        });
-        await this.audit.log(companyId, 'booking.convert.duplicate', `Prevented duplicate conversion for booking ${booking.id}`, userId);
-        return {
-          booking: latestBooking,
-          job: latestBooking.job,
-          alreadyLinked: true,
-          conversion: {
-            linkedAt: latestBooking.updatedAt,
-            dispatchFollowUpCreated: false,
-            dispatchReminderId: null,
-            activityId: null,
-            duplicatePrevented: true,
-            readinessIssues: [],
-          },
-        };
-      }
-      throw new BadRequestException('Booking conversion could not acquire a stable link');
-    }
-
-    const linkedBooking = await db.booking.findFirst({
-      where: { id: booking.id, companyId },
-    });
-    if (!linkedBooking) {
-      throw new BadRequestException('Booking link could not be confirmed');
-    }
-
-    let dispatchFollowUpCreated = false;
-    let dispatchReminderId: string | null = null;
-    if (!patchedJob.assignedUserId) {
-      const existingDispatchReminder = await db.jobReminder.findFirst({
-        where: {
-          companyId,
-          jobId: patchedJob.id,
-          completedAt: null,
-          note: 'Automation dispatch follow-up',
-        },
-      });
-      if (!existingDispatchReminder) {
-        const reminder = await db.jobReminder.create({
-          data: {
-            companyId,
-            jobId: patchedJob.id,
-            remindAt: new Date(Date.now() + 4 * 60 * 60 * 1000),
-            channel: 'in_app',
-            note: 'Automation dispatch follow-up',
-          },
-        });
-        dispatchFollowUpCreated = true;
-        dispatchReminderId = reminder.id;
-        await db.jobActivity.create({
-          data: {
-            companyId,
-            jobId: patchedJob.id,
-            actorUserId: userId,
-            eventType: 'job.reminder.create',
-            message: 'Dispatch follow-up created after booking conversion',
-            payloadJson: { remindAt: reminder.remindAt, note: reminder.note },
-          },
-        });
-      }
-    }
-
-    const conversionActivity = await db.jobActivity.create({
-      data: {
-        companyId,
-        jobId: patchedJob.id,
-        actorUserId: userId,
-        eventType: 'booking.converted',
-        message: `Booking ${booking.id} converted into ${patchedJob.jobRef || patchedJob.id}`,
-        payloadJson: {
-          bookingId: booking.id,
-          bookingSource: booking.source,
-          bookingStartsAt: booking.startsAt,
-        },
-      },
-    });
-
-    await this.activity.push({
-      tenantId: companyId,
-      type: 'booking.converted',
-      label: `Booking ${booking.id} converted to ${patchedJob.jobRef || patchedJob.id}`,
-      jobId: patchedJob.id,
-      jobRef: patchedJob.jobRef || null,
-      customerId: patchedJob.customerId || null,
-      customerName: patchedJob.customerName || booking.customerName || null,
-      status: patchedJob.status || null,
-      technicianId: patchedJob.assignedUserId || booking.assignedUserId || null,
-      payloadJson: {
-        bookingId: booking.id,
-        bookingSource: booking.source,
-        bookingStatus: booking.status,
-      },
-    });
-
-    if (isAutomationsV1Enabled()) {
-      await this.automations.handleBookingConverted(companyId, userId, linkedBooking, patchedJob);
-    }
-
-    await this.audit.log(companyId, 'booking.convert', `Converted booking ${booking.id} into ${patchedJob.jobRef || patchedJob.id}`, userId);
-
-    return {
-      booking: linkedBooking,
-      job: patchedJob,
-      alreadyLinked: false,
-      conversion: {
-        linkedAt: linkedBooking.updatedAt,
-        dispatchFollowUpCreated,
-        dispatchReminderId,
-        activityId: conversionActivity.id,
-        duplicatePrevented: false,
-        readinessIssues: [],
-      },
-    };
+    return this.conversion.convert(companyId, userId, bookingId);
   }
 
   private async ensureBusinessHours(tenantId: string) {
