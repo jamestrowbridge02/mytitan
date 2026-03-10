@@ -12,6 +12,8 @@ import {
   OperatorRowActions,
 } from "../../components/ui/operator-page";
 import { apiFetch } from "../../lib/api";
+import { getBusinessTerms } from "../../lib/business-config";
+import { useTenantSettings } from "../../lib/tenant-settings";
 
 type TechQueue = {
   summary: {
@@ -52,6 +54,8 @@ type TechQueue = {
 };
 
 export default function TechnicianPage() {
+  const { settings } = useTenantSettings();
+  const terms = getBusinessTerms(settings);
   const [data, setData] = useState<TechQueue | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
@@ -137,8 +141,8 @@ export default function TechnicianPage() {
       <div className="operator-stack">
         <OperatorPageHeader
           eyebrow="Field OS"
-          title="Technician queue"
-          subtitle="A first technician-facing surface for assigned work, mobile-friendly triage, and simple status handoff from dispatch."
+          title={`${terms.technicians} queue`}
+          subtitle={`A first ${terms.technicians.toLowerCase()}-facing surface for assigned work, mobile-friendly triage, and simple status handoff from dispatch.`}
           actions={[
             { label: "Calendar", href: "/dashboard/calendar", variant: "secondary" },
             { label: "Jobs", href: "/dashboard/jobs" },
@@ -150,7 +154,7 @@ export default function TechnicianPage() {
         <OperatorGuidance
           title="Field workflow guidance"
           items={[
-            "This route is intentionally simplified for technician use and mobile scanning.",
+            `This route is intentionally simplified for ${terms.technicians.toLowerCase()} use and mobile scanning.`,
             "Status actions here reuse the existing job lifecycle so audit, activity, and automation hooks stay intact.",
             "Dispatch remains in Command Centre and Calendar; this page is for technician handoff and execution.",
           ]}
@@ -161,14 +165,14 @@ export default function TechnicianPage() {
         <section className="card operator-section">
           <div className="operator-section__header">
             <div>
-              <h2 className="operator-section__title">Assigned jobs</h2>
-              <p className="operator-section__subtitle">A simplified queue of active work owned by the current technician.</p>
+              <h2 className="operator-section__title">Assigned {terms.jobs.toLowerCase()}</h2>
+              <p className="operator-section__subtitle">A simplified queue of active work owned by the current {terms.technicians.slice(0, -1).toLowerCase() || "technician"}.</p>
             </div>
           </div>
           {data?.jobs?.length ? (
             <OperatorDataTable columns="minmax(220px, 1.4fr) minmax(150px, 0.9fr) minmax(170px, auto)">
               <OperatorDataTableHeader>
-                <div className="operator-table__cell">Job</div>
+                <div className="operator-table__cell">{terms.jobs.slice(0, -1) || "Job"}</div>
                 <div className="operator-table__cell">Timing</div>
                 <div className="operator-table__cell">Actions</div>
               </OperatorDataTableHeader>
@@ -233,8 +237,8 @@ export default function TechnicianPage() {
             </OperatorDataTable>
           ) : (
             <OperatorEmptyStateCard
-              title="No assigned jobs"
-              description="Assigned field work will appear here once dispatch hands jobs over to this technician."
+              title={`No assigned ${terms.jobs.toLowerCase()}`}
+              description={`Assigned field work will appear here once dispatch hands ${terms.jobs.toLowerCase()} over to this ${terms.technicians.slice(0, -1).toLowerCase() || "technician"}.`}
               actions={[{ label: "Open calendar", href: "/dashboard/calendar", variant: "secondary" }]}
             />
           )}

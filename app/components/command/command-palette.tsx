@@ -1,32 +1,41 @@
 import Link from "next/link";
 import React from "react";
+import { getBusinessTerms, getCommandCentreHref, getOptionalModuleVisibility } from "../../lib/business-config";
+import { useTenantSettings } from "../../lib/tenant-settings";
 
 type PaletteItem = {
   label: string;
   href: string;
 };
 
-const ITEMS: PaletteItem[] = [
-  { label: "Dashboard", href: "/dashboard" },
-  { label: "Command Centre", href: "/dashboard/command-centre-v2" },
-  { label: "Jobs", href: "/dashboard/jobs" },
-  { label: "New job", href: "/dashboard/jobs/new" },
-  { label: "Bookings", href: "/dashboard/bookings" },
-  { label: "Calendar", href: "/dashboard/calendar" },
-  { label: "Customers", href: "/dashboard/customers" },
-  { label: "Intelligence", href: "/dashboard/intelligence" },
-  { label: "Billing readiness", href: "/dashboard/billing/readiness" },
-  { label: "Portal Ops", href: "/dashboard/portal" },
-  { label: "Technician queue", href: "/dashboard/technician" },
-  { label: "Integrations", href: "/dashboard/integrations" },
-  { label: "Automations", href: "/dashboard/settings/automations" },
-  { label: "Settings", href: "/dashboard/settings" },
-  { label: "Developer Admin", href: "/dev-admin" },
-];
-
 export default function CommandPalette() {
+  const { settings } = useTenantSettings();
+  const terms = getBusinessTerms(settings);
+  const commandCentreHref = getCommandCentreHref(settings);
+  const moduleVisibility = getOptionalModuleVisibility(settings);
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
+  const items: PaletteItem[] = React.useMemo(
+    () =>
+      [
+        { label: "Dashboard", href: "/dashboard" },
+        { label: "Command Centre", href: commandCentreHref },
+        { label: terms.jobs, href: "/dashboard/jobs" },
+        { label: `New ${terms.jobs.slice(0, -1) || "Job"}`, href: "/dashboard/jobs/new" },
+        { label: terms.bookings, href: "/dashboard/bookings" },
+        { label: "Calendar", href: "/dashboard/calendar" },
+        { label: terms.customers, href: "/dashboard/customers" },
+        moduleVisibility.showIntelligence ? { label: "Intelligence", href: "/dashboard/intelligence" } : null,
+        { label: "Billing readiness", href: "/dashboard/billing/readiness" },
+        moduleVisibility.showPortalOps ? { label: "Portal Ops", href: "/dashboard/portal" } : null,
+        moduleVisibility.showTechnicianQueue ? { label: `${terms.technicians} queue`, href: "/dashboard/technician" } : null,
+        { label: "Integrations", href: "/dashboard/integrations" },
+        { label: "Automations", href: "/dashboard/settings/automations" },
+        { label: "Settings", href: "/dashboard/settings" },
+        { label: "Developer Admin", href: "/dev-admin" },
+      ].filter((item): item is PaletteItem => Boolean(item)),
+    [commandCentreHref, moduleVisibility.showIntelligence, moduleVisibility.showPortalOps, moduleVisibility.showTechnicianQueue, terms.bookings, terms.customers, terms.jobs, terms.technicians],
+  );
 
   React.useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -43,7 +52,7 @@ export default function CommandPalette() {
   if (!open) return null;
 
   const q = query.trim().toLowerCase();
-  const list = q ? ITEMS.filter((item) => item.label.toLowerCase().includes(q)) : ITEMS;
+  const list = q ? items.filter((item) => item.label.toLowerCase().includes(q)) : items;
 
   return (
     <div

@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { ActivityService } from '../events/activity.service';
 import { JobsService } from '../jobs/jobs.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { getTechnicianChecklist } from '../common/business-config';
 
 @Injectable()
 export class TechService {
@@ -15,7 +16,7 @@ export class TechService {
     const db = this.prisma as any;
     const now = new Date();
     const dayEnd = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-    const [jobs, bookings] = await Promise.all([
+    const [jobs, bookings, settings] = await Promise.all([
       db.job.findMany({
         where: {
           companyId,
@@ -40,7 +41,9 @@ export class TechService {
         orderBy: { startsAt: 'asc' },
         take: 20,
       }),
+      db.tenantSetting.findUnique({ where: { tenantId: companyId } }),
     ]);
+    const customChecklist = getTechnicianChecklist(settings);
 
     return {
       summary: {
@@ -72,7 +75,9 @@ export class TechService {
             ? 'Log arrival or update dispatch'
             : 'Review handoff and head to site',
         workflowChecklist:
-          job.status === 'IN_PROGRESS'
+          customChecklist.length
+            ? customChecklist
+            : job.status === 'IN_PROGRESS'
             ? ['Capture progress note if scope changed', 'Complete work and close out final note']
             : job.activities?.some((activity: any) => activity.eventType === 'tech.arrived')
             ? ['Start assigned work', 'Add note if parts, access, or scope changed']

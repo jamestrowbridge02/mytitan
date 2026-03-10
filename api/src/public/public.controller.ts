@@ -19,6 +19,7 @@ import { JwtService } from "@nestjs/jwt";
 import { AuditService } from "../audit/audit.service";
 import { BillingService } from "../billing/billing.service";
 import { isMarketplaceEnabled, isMediaSignatureV1Enabled, requireMarketplaceEnabled } from "../common/feature-flags";
+import { getPortalCopy } from "../common/business-config";
 import { PrismaService } from "../prisma/prisma.service";
 import { ApproveJobDto, DeclineJobDto, SignJobDto } from "./public.dto";
 
@@ -73,6 +74,7 @@ export class PublicController {
     const paymentsEnabled = Boolean(settings?.paymentsEnabled);
     const portalEnabled = Boolean(settings?.featureCustomerPortal || settings?.paymentsEnabled);
     const stripeReady = this.billingService.isStripeConfigured();
+    const portalCopy = getPortalCopy(settings);
 
     await this.audit.log(record.job.companyId, "portal.view", `Portal view for job ${record.job.jobRef}`, null);
 
@@ -98,15 +100,15 @@ export class PublicController {
       : !record.job.signedAt
       ? 'Add your signature to confirm the approved work.'
       : record.job.invoicePaidAt
-      ? 'Payment is complete. Your receipt and PDF are available below.'
+      ? String(portalCopy.paidMessage || 'Payment is complete. Your receipt and PDF are available below.')
       : record.job.invoiceIssuedAt
       ? invoiceOverdue
-        ? 'Your invoice is overdue. Please complete payment or contact support if anything is unclear.'
+        ? String(portalCopy.invoiceOverdueMessage || 'Your invoice is overdue. Please complete payment or contact support if anything is unclear.')
         : paymentAvailable
-        ? 'Your invoice is ready for payment. You can pay securely from this portal.'
-        : 'Your invoice is ready. Contact support to complete payment.'
+        ? String(portalCopy.invoiceReadyMessage || 'Your invoice is ready for payment. You can pay securely from this portal.')
+        : String(portalCopy.paymentUnavailableMessage || 'Your invoice is ready. Contact support to complete payment.')
       : record.job.status === 'COMPLETED' || record.job.status === 'INVOICED'
-      ? 'The job is complete. We are preparing the billing step now.'
+      ? String(portalCopy.preInvoiceMessage || 'The job is complete. We are preparing the billing step now.')
       : 'Track progress here while the job is still moving through service delivery.';
 
     return {

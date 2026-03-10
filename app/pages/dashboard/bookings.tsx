@@ -19,8 +19,10 @@ import {
   OperatorSavedViews,
 } from "../../components/ui/operator-page";
 import { ApiError, apiFetch } from "../../lib/api";
+import { getBusinessTerms } from "../../lib/business-config";
 import { isMarketplaceEnabled } from "../../lib/feature-flags";
 import { useStickyOperatorView } from "../../lib/operator-view-state";
+import { useTenantSettings } from "../../lib/tenant-settings";
 
 type BookingSettings = {
   publicEnabled: boolean;
@@ -58,6 +60,8 @@ function isToday(value?: string | null) {
 
 export default function BookingsPage() {
   const router = useRouter();
+  const { settings: tenantSettings } = useTenantSettings();
+  const terms = getBusinessTerms(tenantSettings);
   const [bookings, setBookings] = useState<any[]>([]);
   const [startsAt, setStartsAt] = useState("");
   const [endsAt, setEndsAt] = useState("");
@@ -213,7 +217,7 @@ export default function BookingsPage() {
     const linkedJobs = bookings.filter((booking) => booking.jobId).length;
     const upcoming = bookings.filter((booking) => booking.startsAt && new Date(booking.startsAt).getTime() >= Date.now()).length;
     return [
-      { label: "Bookings", value: String(bookings.length), hint: `${linkedJobs} linked to jobs` },
+      { label: terms.bookings, value: String(bookings.length), hint: `${linkedJobs} linked to ${terms.jobs.toLowerCase()}` },
       { label: "Upcoming", value: String(upcoming), hint: "Future schedule load" },
       { label: "Public booking", value: publicEnabled ? "Live" : "Off", hint: publicEnabled ? "Customers can request time" : "Internal only" },
     ];
@@ -276,13 +280,13 @@ export default function BookingsPage() {
       <div className="operator-stack">
         <OperatorPageHeader
           eyebrow="Scheduling"
-          title="Bookings"
-          subtitle="A denser booking queue with local filtering, quick conversion to jobs, and safer operator actions around the public calendar."
+          title={terms.bookings}
+          subtitle={`A denser ${terms.bookings.toLowerCase()} queue with local filtering, quick conversion to ${terms.jobs.toLowerCase()}, and safer operator actions around the public calendar.`}
           actions={[
             { label: "Calendar", href: "/dashboard/calendar", variant: "secondary" },
-            { label: "Booking settings", href: "/dashboard/booking/settings" },
+            { label: `${terms.bookings} settings`, href: "/dashboard/booking/settings" },
           ]}
-          shortcuts={["Use filters to isolate today's load or unlinked bookings", "Convert unlinked bookings into jobs from the queue"]}
+          shortcuts={[`Use filters to isolate today's ${terms.bookings.toLowerCase()} load or unlinked items`, `Convert unlinked ${terms.bookings.toLowerCase()} into ${terms.jobs.toLowerCase()} from the queue`]}
           stats={stats}
         />
 
@@ -292,7 +296,7 @@ export default function BookingsPage() {
           <section className="card operator-section">
             <div className="operator-section__header">
               <div>
-                <h2 className="operator-section__title">Create booking</h2>
+                <h2 className="operator-section__title">Create {terms.bookings.slice(0, -1).toLowerCase() || "booking"}</h2>
                 <p className="operator-section__subtitle">Keep manual entry compact and adjacent to the live queue.</p>
               </div>
             </div>
@@ -327,7 +331,7 @@ export default function BookingsPage() {
             <section className="card operator-section">
               <div className="operator-section__header">
                 <div>
-                  <h2 className="operator-section__title">Public booking controls</h2>
+                  <h2 className="operator-section__title">Public {terms.bookings.toLowerCase()} controls</h2>
                   <p className="operator-section__subtitle">Keep the share link, working hours, and blackout dates together.</p>
                 </div>
               </div>
@@ -423,7 +427,7 @@ export default function BookingsPage() {
         <section className="card operator-section">
           <div className="operator-section__header">
             <div>
-              <h2 className="operator-section__title">Booking queue</h2>
+              <h2 className="operator-section__title">{terms.bookings} queue</h2>
               <p className="operator-section__subtitle">Filter the visible queue before you reschedule, convert, or open the booking detail.</p>
             </div>
           </div>
@@ -443,7 +447,7 @@ export default function BookingsPage() {
             searchValue={search}
             onSearchChange={setSearch}
             searchPlaceholder="Search customer, booking id, job id, or status"
-            resultsLabel={`${filteredBookings.length} shown of ${bookings.length} bookings`}
+            resultsLabel={`${filteredBookings.length} shown of ${bookings.length} ${terms.bookings.toLowerCase()}`}
             actions={[
               { label: "Reset filters", variant: "secondary", onClick: clearFilters },
             ]}
@@ -469,7 +473,7 @@ export default function BookingsPage() {
           <OperatorActiveFilters chips={activeFilters} onClearAll={activeFilters.length ? clearFilters : undefined} />
 
           <OperatorGuidance
-            title="Booking queue tips"
+            title={`${terms.bookings} queue tips`}
             items={[
               "Saved views keep upcoming, today, and conversion-focused queues sticky on this device.",
               "Select rows to copy booking references or customer names before dispatch handoff.",
@@ -628,7 +632,7 @@ export default function BookingsPage() {
             </OperatorDataTable>
           ) : !notice || notice.kind !== "error" ? (
             <OperatorEmptyStateCard
-              title="No bookings match this view"
+              title={`No ${terms.bookings.toLowerCase()} match this view`}
               description="Clear the filters, open the calendar, or create a fresh booking from this page."
               actions={[
                 { label: "Reset filters", variant: "secondary", onClick: clearFilters },

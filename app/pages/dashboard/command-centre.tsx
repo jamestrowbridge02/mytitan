@@ -6,9 +6,11 @@ import { useOperatorNotice } from '../../components/feedback/useOperatorNotice';
 import { DashboardShell } from '../../components/dashboard-shell';
 import JobQuickActions from '../../components/command-centre/JobQuickActions';
 import { ApiError, apiFetch } from '../../lib/api';
+import { getBusinessTerms } from '../../lib/business-config';
 import { isCommandCentrePremiumV1Enabled, isCommandCentreV1Enabled } from '../../lib/feature-flags';
 import OpsSignalsBar from '../../components/entity/OpsSignalsBar';
 import { getJobSignals } from '../../lib/ops-signals';
+import { useTenantSettings } from '../../lib/tenant-settings';
 
 const STATUS_LABELS: Array<{ key: string; label: string }> = [
   { key: 'OPEN', label: 'New' },
@@ -31,6 +33,8 @@ function formatMoney(cents: number, currency = 'GBP') {
 }
 
 export default function CommandCentrePage() {
+  const { settings } = useTenantSettings();
+  const terms = getBusinessTerms(settings);
   const enabled = isCommandCentreV1Enabled();
   const premiumEnabled = isCommandCentrePremiumV1Enabled();
   const searchRef = useRef<HTMLInputElement | null>(null);
@@ -303,7 +307,7 @@ export default function CommandCentrePage() {
   return (
     <DashboardShell>
       <div className="card" style={{ marginBottom: 14 }}>
-        <h1 style={{ marginTop: 0 }}>Job Command Centre</h1>
+        <h1 style={{ marginTop: 0 }}>{terms.jobs} Command Centre</h1>
         <p className="muted">Manage many jobs quickly from one screen.</p>
         <OperatorNotice
           notice={notice}

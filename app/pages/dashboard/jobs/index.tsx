@@ -17,9 +17,11 @@ import {
   OperatorSavedViews,
 } from "../../../components/ui/operator-page";
 import OpsSignalsBar from "../../../components/entity/OpsSignalsBar";
+import { getBusinessTerms, getCommandCentreHref } from "../../../lib/business-config";
 import { useStickyOperatorView } from "../../../lib/operator-view-state";
 import { apiFetch } from "../../../lib/api";
 import { getJobSignals } from "../../../lib/ops-signals";
+import { useTenantSettings } from "../../../lib/tenant-settings";
 
 type JobStatus = "OPEN" | "SCHEDULED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
 type DateBucket = "all" | "upcoming" | "overdue" | "completed";
@@ -60,6 +62,9 @@ function resolveNextStatus(job: any): JobStatus | null {
 
 export default function Jobs() {
   const router = useRouter();
+  const { settings } = useTenantSettings();
+  const terms = getBusinessTerms(settings);
+  const commandCentreHref = getCommandCentreHref(settings);
   const [jobs, setJobs] = useState<any[]>([]);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -153,7 +158,7 @@ export default function Jobs() {
     const assigned = jobs.filter((job) => resolveAssignment(job) !== "Unassigned").length;
     const overdue = jobs.filter((job) => isInvoiceOverdue(job)).length;
     return [
-      { label: "Jobs", value: String(jobs.length), hint: `${active} still active` },
+      { label: terms.jobs, value: String(jobs.length), hint: `${active} still active` },
       { label: "Assigned", value: String(assigned), hint: `${Math.max(jobs.length - assigned, 0)} without an owner` },
       { label: "Overdue", value: String(overdue), hint: overdue ? "Invoices need follow-up" : "No overdue invoices" },
     ];
@@ -236,11 +241,11 @@ export default function Jobs() {
       <div className="operator-stack">
         <OperatorPageHeader
           eyebrow="Workflow"
-          title="Jobs"
+          title={terms.jobs}
           subtitle="Dense queue controls, local filtering, and safe bulk actions for daily operator throughput."
           actions={[
-            { label: "Open Command Centre", href: "/dashboard/command-centre-v2", variant: "secondary" },
-            { label: "Create job", href: "/dashboard/jobs/new" },
+            { label: "Open Command Centre", href: commandCentreHref, variant: "secondary" },
+            { label: `Create ${terms.jobs.slice(0, -1) || "Job"}`, href: "/dashboard/jobs/new" },
           ]}
           shortcuts={["Ctrl K for route search", "Bulk status actions use the existing jobs mutation flow"]}
           stats={stats}
@@ -249,7 +254,7 @@ export default function Jobs() {
         <section className="card operator-section">
           <div className="operator-section__header">
             <div>
-              <h2 className="operator-section__title">Job queue</h2>
+              <h2 className="operator-section__title">{terms.jobs} queue</h2>
               <p className="operator-section__subtitle">Tighter rows, clearer status parsing, and filters that match how operators triage work.</p>
             </div>
           </div>
@@ -270,7 +275,7 @@ export default function Jobs() {
             searchValue={search}
             onSearchChange={setSearch}
             searchPlaceholder="Search job ref, customer, reg, service, or owner"
-            resultsLabel={`${filteredJobs.length} shown of ${jobs.length} jobs`}
+            resultsLabel={`${filteredJobs.length} shown of ${jobs.length} ${terms.jobs.toLowerCase()}`}
             actions={[
               { label: "Reset filters", variant: "secondary", onClick: clearFilters },
             ]}
@@ -442,7 +447,7 @@ export default function Jobs() {
             </OperatorDataTable>
           ) : !error ? (
             <OperatorEmptyStateCard
-              title="No jobs match these filters"
+              title={`No ${terms.jobs.toLowerCase()} match these filters`}
               description="Try clearing the filters, open Command Centre for the live board, or create a new job."
               actions={[
                 { label: "Reset filters", variant: "secondary", onClick: clearFilters },

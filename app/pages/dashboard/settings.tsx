@@ -1,20 +1,24 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
+import { OperatorNotice } from '../../components/feedback/OperatorNotice';
+import { useOperatorNotice } from '../../components/feedback/useOperatorNotice';
 import { DashboardShell } from '../../components/dashboard-shell';
 import { GuidedSetupProgress } from '../../components/guided-setup-progress';
 import { OperatorPageHeader } from '../../components/ui/operator-page';
 import { apiFetch } from '../../lib/api';
+import { getBusinessConfig, getBusinessTerms } from '../../lib/business-config';
 import { useBilling } from '../../lib/billing';
 import { isGuidedSetupV2Enabled, isNotificationsV1Enabled } from '../../lib/feature-flags';
 import { TenantSettings, useTenantSettings } from '../../lib/tenant-settings';
 
-type TabKey = 'branding' | 'email' | 'pricing' | 'features' | 'ai';
+type TabKey = 'branding' | 'email' | 'pricing' | 'features' | 'workflow' | 'ai';
 
 const TABS: Array<{ key: TabKey; label: string }> = [
   { key: 'branding', label: 'Branding' },
   { key: 'email', label: 'Email' },
   { key: 'pricing', label: 'Pricing Defaults' },
   { key: 'features', label: 'Feature Toggles' },
+  { key: 'workflow', label: 'Workflow' },
   { key: 'ai', label: 'AI' },
 ];
 
@@ -47,6 +51,7 @@ const TENANT_SETTINGS_ALLOWED_KEYS = [
   'featurePayments',
   'featureSocial',
   'featureWhatsApp',
+  'businessConfigJson',
   'logoUrl',
   'onboardingCompleted',
   'onboardingStep',
@@ -81,15 +86,22 @@ export default function SettingsPage() {
   const [tab, setTab] = useState<TabKey>('branding');
   const [form, setForm] = useState<any>({});
   const [logoFile, setLogoFile] = useState<File | null>(null);
-  const [status, setStatus] = useState('');
-  const [error, setError] = useState('');
   const [notificationPrefs, setNotificationPrefs] = useState<any>(null);
+  const { notice, showSuccess, showError, clearNotice } = useOperatorNotice();
 
   useEffect(() => {
     if (settings) {
       setForm({ ...settings });
     }
   }, [settings]);
+
+  useEffect(() => {
+    if (!router.isReady) return;
+    const queryTab = typeof router.query.tab === 'string' ? router.query.tab : '';
+    if (queryTab && TABS.some((item) => item.key === queryTab)) {
+      setTab(queryTab as TabKey);
+    }
+  }, [router.isReady, router.query.tab]);
 
   useEffect(() => {
     if (!notificationsEnabled) return;
@@ -108,6 +120,16 @@ export default function SettingsPage() {
     };
   }, [form]);
 
+  const workflowConfig = useMemo(() => getBusinessConfig(form), [form]);
+  const workflowTerms = useMemo(() => getBusinessTerms(form), [form]);
+
+  function updateBusinessConfig(updater: (current: Record<string, any>) => Record<string, any>) {
+    setForm((prev: any) => ({
+      ...prev,
+      businessConfigJson: updater((prev?.businessConfigJson && typeof prev.businessConfigJson === 'object') ? prev.businessConfigJson : {}),
+    }));
+  }
+
   const stats = useMemo(() => {
     const enabledFeatures = [
       Boolean(form.featureBookings),
@@ -124,8 +146,7 @@ export default function SettingsPage() {
   }, [form.featureAI, form.featureAccounting, form.featureBookings, form.featurePayments, form.featureWhatsApp, plan?.code, themeMode]);
 
   async function saveSettings() {
-    setStatus('');
-    setError('');
+    clearNotice();
     try {
       const payload = {
         ...form,
@@ -143,16 +164,15 @@ export default function SettingsPage() {
         body: JSON.stringify(pickSettingsPayload(payload)),
       });
       setLocalSettings(updated as TenantSettings);
-      setStatus('Settings saved');
+      showSuccess('Settings saved');
       await refresh();
     } catch (err: any) {
-      setError(err.message || 'Failed to save settings');
+      showError(err.message || 'Failed to save settings');
     }
   }
 
   async function uploadLogo() {
-    setStatus('');
-    setError('');
+    clearNotice();
     try {
       if (logoFile) {
         const formData = new FormData();
@@ -164,27 +184,25 @@ export default function SettingsPage() {
           body: JSON.stringify({ logoUrl: form.logoUrl }),
         });
       }
-      setStatus('Logo updated');
+      showSuccess('Logo updated');
       await refresh();
     } catch (err: any) {
-      setError(err.message || 'Failed to upload logo');
+      showError(err.message || 'Failed to upload logo');
     }
   }
 
   async function runGuidedSetup() {
-    setStatus('');
-    setError('');
+    clearNotice();
     try {
       await apiFetch('/guided-setup/reset', { method: 'POST' });
       router.push('/dashboard/setup-wizard');
     } catch (err: any) {
-      setError(err.message || 'Failed to start guided setup');
+      showError(err.message || 'Failed to start guided setup');
     }
   }
 
   async function updateThemeMode(mode: 'light' | 'dark') {
-    setStatus('');
-    setError('');
+    clearNotice();
     try {
       const updated = await apiFetch('/tenant/settings', {
         method: 'PATCH',
@@ -192,38 +210,38 @@ export default function SettingsPage() {
       });
       setForm((prev: any) => ({ ...prev, themeMode: mode }));
       setLocalSettings(updated as TenantSettings);
-      setStatus('Theme updated');
+      showSuccess('Theme updated');
       await refresh();
     } catch (err: any) {
-      setError(err.message || 'Failed to update theme');
+      showError(err.message || 'Failed to update theme');
     }
   }
 
   async function saveNotificationPref(key: string, value: boolean) {
     if (!notificationsEnabled) return;
-    setStatus('');
-    setError('');
+    clearNotice();
     try {
       const updated = await apiFetch('/notifications/preferences', {
         method: 'PATCH',
         body: JSON.stringify({ [key]: value }),
       });
       setNotificationPrefs(updated);
-      setStatus('Notification preferences saved');
+      showSuccess('Notification preferences saved');
     } catch (err: any) {
-      setError(err.message || 'Failed to update notification preferences');
+      showError(err.message || 'Failed to update notification preferences');
     }
   }
 
   function restartDemoTour() {
     if (typeof window === 'undefined') return;
     window.localStorage.removeItem('mytitan_demo_tour_seen_v1');
-    setStatus(' tour reset. Open dashboard to start again.');
+    showSuccess('Tour reset. Open dashboard to start again.');
   }
 
   return (
     <DashboardShell>
   <div className="settings-premium-shell">
+      <OperatorNotice notice={notice} onDismiss={clearNotice} />
       <OperatorPageHeader
         eyebrow="Configuration"
         title="Settings"
@@ -274,6 +292,7 @@ export default function SettingsPage() {
           {TABS.map((item) => (
             <button
               key={item.key}
+              data-testid={`settings-tab-${item.key}`}
               className={`tab-button ${tab === item.key ? 'active' : ''}`}
               onClick={() => setTab(item.key)}
               type="button"
@@ -447,6 +466,166 @@ export default function SettingsPage() {
           </>
         )}
 
+        {tab === 'workflow' && (
+          <>
+            <div className="card settings-premium-card" data-testid="settings-workflow-panel" style={{ marginBottom: 12 }}>
+              <h3 style={{ marginTop: 0 }}>Business terminology</h3>
+              <p className="muted settings-premium-muted">Adapt the language operators and customers see so MyTitan matches your business model.</p>
+
+              <label className="settings-premium-label">Jobs label</label>
+              <input
+                className="input settings-premium-input"
+                data-testid="settings-jobs-label-input"
+                value={workflowConfig.terminology?.jobs || ''}
+                onChange={(e) => updateBusinessConfig((current) => ({
+                  ...current,
+                  terminology: { ...(current.terminology || {}), jobs: e.target.value || null },
+                }))}
+                placeholder="Jobs"
+              />
+
+              <label className="settings-premium-label">Bookings label</label>
+              <input
+                className="input settings-premium-input"
+                data-testid="settings-bookings-label-input"
+                value={workflowConfig.terminology?.bookings || ''}
+                onChange={(e) => updateBusinessConfig((current) => ({
+                  ...current,
+                  terminology: { ...(current.terminology || {}), bookings: e.target.value || null },
+                }))}
+                placeholder="Bookings"
+              />
+
+              <label className="settings-premium-label">Customers label</label>
+              <input
+                className="input settings-premium-input"
+                value={workflowConfig.terminology?.customers || ''}
+                onChange={(e) => updateBusinessConfig((current) => ({
+                  ...current,
+                  terminology: { ...(current.terminology || {}), customers: e.target.value || null },
+                }))}
+                placeholder="Customers"
+              />
+
+              <label className="settings-premium-label">Technicians label</label>
+              <input
+                className="input settings-premium-input"
+                value={workflowConfig.terminology?.technicians || ''}
+                onChange={(e) => updateBusinessConfig((current) => ({
+                  ...current,
+                  terminology: { ...(current.terminology || {}), technicians: e.target.value || null },
+                }))}
+                placeholder="Technicians"
+              />
+            </div>
+
+            <div className="card settings-premium-card" style={{ marginBottom: 12 }}>
+              <h3 style={{ marginTop: 0 }}>Operational defaults</h3>
+              <p className="muted settings-premium-muted">Choose how operators land in Command Centre and which optional destinations stay visible in navigation.</p>
+
+              <label className="settings-premium-label">Default Command Centre experience</label>
+              <select
+                className="input settings-premium-input"
+                data-testid="settings-command-centre-default"
+                value={workflowConfig.defaults?.commandCentreVersion || 'v2'}
+                onChange={(e) => updateBusinessConfig((current) => ({
+                  ...current,
+                  defaults: { ...(current.defaults || {}), commandCentreVersion: e.target.value === 'v1' ? 'v1' : 'v2' },
+                }))}
+              >
+                <option value="v2">Command Centre V2</option>
+                <option value="v1">Command Centre V1</option>
+              </select>
+
+              {[
+                ['showIntelligence', 'Show Intelligence in operator nav'],
+                ['showPortalOps', 'Show Portal Ops in operator nav'],
+                ['showTechnicianQueue', 'Show Technician queue in operator nav'],
+              ].map(([key, label]) => (
+                <label key={key} style={{ display: 'block', marginBottom: 10 }}>
+                  <input
+                    type="checkbox"
+                    checked={workflowConfig.navigation?.[key as 'showIntelligence'] !== false}
+                    onChange={(e) => updateBusinessConfig((current) => ({
+                      ...current,
+                      navigation: { ...(current.navigation || {}), [key]: e.target.checked },
+                    }))}
+                    style={{ marginRight: 8 }}
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+
+            <div className="card settings-premium-card" style={{ marginBottom: 12 }}>
+              <h3 style={{ marginTop: 0 }}>Portal wording</h3>
+              <p className="muted settings-premium-muted">Override key customer-safe billing messages without changing the portal security model.</p>
+
+              <label className="settings-premium-label">Invoice ready message</label>
+              <textarea
+                className="input settings-premium-input"
+                rows={3}
+                value={workflowConfig.portalCopy?.invoiceReadyMessage || ''}
+                onChange={(e) => updateBusinessConfig((current) => ({
+                  ...current,
+                  portalCopy: { ...(current.portalCopy || {}), invoiceReadyMessage: e.target.value || null },
+                }))}
+              />
+
+              <label className="settings-premium-label">Invoice overdue message</label>
+              <textarea
+                className="input settings-premium-input"
+                rows={3}
+                value={workflowConfig.portalCopy?.invoiceOverdueMessage || ''}
+                onChange={(e) => updateBusinessConfig((current) => ({
+                  ...current,
+                  portalCopy: { ...(current.portalCopy || {}), invoiceOverdueMessage: e.target.value || null },
+                }))}
+              />
+
+              <label className="settings-premium-label">Payment unavailable message</label>
+              <textarea
+                className="input settings-premium-input"
+                rows={3}
+                value={workflowConfig.portalCopy?.paymentUnavailableMessage || ''}
+                onChange={(e) => updateBusinessConfig((current) => ({
+                  ...current,
+                  portalCopy: { ...(current.portalCopy || {}), paymentUnavailableMessage: e.target.value || null },
+                }))}
+              />
+            </div>
+
+            <div className="card settings-premium-card" style={{ marginBottom: 12 }}>
+              <h3 style={{ marginTop: 0 }}>Technician prompts</h3>
+              <p className="muted settings-premium-muted">Supply one checklist item per line to tailor the field handoff workflow for your team.</p>
+
+              <label className="settings-premium-label">Checklist prompts</label>
+              <textarea
+                className="input settings-premium-input"
+                rows={5}
+                value={Array.isArray(workflowConfig.technicianPrompts?.checklist) ? workflowConfig.technicianPrompts?.checklist.join('\n') : ''}
+                onChange={(e) => updateBusinessConfig((current) => ({
+                  ...current,
+                  technicianPrompts: {
+                    ...(current.technicianPrompts || {}),
+                    checklist: e.target.value
+                      .split('\n')
+                      .map((value: string) => value.trim())
+                      .filter(Boolean),
+                  },
+                }))}
+              />
+            </div>
+
+            <div className="theme-preview" data-testid="settings-workflow-preview">
+              <strong>Workflow preview</strong>
+              <p className="muted" style={{ margin: '8px 0 0' }}>
+                {workflowTerms.jobs}, {workflowTerms.bookings}, {workflowTerms.customers}, and {workflowTerms.technicians} will update across key operator surfaces after save.
+              </p>
+            </div>
+          </>
+        )}
+
         {tab === 'ai' && (
           <>
             <p className="muted">The tenant AI assistant uses the server-side OpenAI Responses API and never exposes keys to the browser.</p>
@@ -486,13 +665,11 @@ export default function SettingsPage() {
         )}
 
         <div style={{ marginTop: 20 }}>
-          <button className="button settings-premium-button" type="button" onClick={saveSettings}>
+          <button className="button settings-premium-button" data-testid="settings-save-button" type="button" onClick={saveSettings}>
             Save Settings
           </button>
         </div>
 
-        {status && <p style={{ color: '#7bdba5' }}>{status}</p>}
-        {error && <p style={{ color: '#ff8a8a' }}>{error}</p>}
       </div>
       </div>
 </DashboardShell>

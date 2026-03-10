@@ -923,6 +923,7 @@ model TenantSetting {
   featureAI                   Boolean           @default(false)
   featureCustomerPortal       Boolean           @default(false)
   featureWhatsApp             Boolean           @default(false)
+  businessConfigJson          Json?
   bookingPublicEnabled        Boolean           @default(false)
   bookingPublicToken          String?           @unique
   bookingIcsToken             String?           @unique

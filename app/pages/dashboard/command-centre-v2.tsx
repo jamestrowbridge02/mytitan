@@ -4,7 +4,10 @@ import { OperatorNotice } from '../../components/feedback/OperatorNotice';
 import { useOperatorNotice } from '../../components/feedback/useOperatorNotice';
 import { DashboardShell } from '../../components/dashboard-shell';
 import { apiFetch } from '../../lib/api';
+import { getBusinessTerms } from '../../lib/business-config';
+import { getCommandCentreRealtimeMode, getCommandCentreSseUrl, isCommandCentreRealtimeDisabled } from '../../lib/command-centre-realtime';
 import { isCommandCentreV2Enabled, isDemoPolishV1Enabled } from '../../lib/feature-flags';
+import { useTenantSettings } from '../../lib/tenant-settings';
 
 const STATUS_LABELS: Array<{ key: string; label: string }> = [
   { key: 'OPEN', label: 'New' },
@@ -17,6 +20,8 @@ const STATUS_LABELS: Array<{ key: string; label: string }> = [
 
 export default function CommandCentreV2Page() {
   const router = useRouter();
+  const { settings } = useTenantSettings();
+  const terms = getBusinessTerms(settings);
   const enabled = isCommandCentreV2Enabled();
   const demoPolishEnabled = isDemoPolishV1Enabled();
   const searchRef = useRef<HTMLInputElement | null>(null);
@@ -66,6 +71,7 @@ export default function CommandCentreV2Page() {
     const [liveNotice, setLiveNotice] = useState("");
   const [activityItems, setActivityItems] = useState<any[]>([]);
   const { notice, showSuccess, showError, clearNotice } = useOperatorNotice();
+  const realtimeMode = getCommandCentreRealtimeMode();
 
   const defaultViews = [
     { name: 'All Open', filters: { status: 'OPEN', locationIds: ['all'], search: '', viewType: 'kanban' }, viewType: 'kanban' },
@@ -195,9 +201,12 @@ export default function CommandCentreV2Page() {
 
   useEffect(() => {
     if (!enabled || typeof window === 'undefined') return;
+    if (isCommandCentreRealtimeDisabled()) {
+      setLiveNotice("Realtime paused in deterministic mode");
+      return;
+    }
 
-    const base = (window.location.origin || '').replace(':3001', ':3000');
-    const es = new EventSource(`${base}/events/command-centre`, { withCredentials: true });
+    const es = new EventSource(getCommandCentreSseUrl(), { withCredentials: true });
 
     es.onmessage = (msg) => {
       try {
@@ -547,7 +556,7 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
             INLINE_ACTIONS_ENABLED
           </div>
         <h1 className="ccv2-title" style={{ marginTop: 0 }}>Command Centre</h1>
-        <p className="muted ccv2-subtitle">Operations brain: board, bulk actions, reminders, and inline updates.</p>
+        <p className="muted ccv2-subtitle">Operations brain for {terms.jobs.toLowerCase()}, bulk actions, reminders, and inline updates.</p>
                   <div className="ccv2-count-strip">
           {STATUS_LABELS.map((row) => (
             <div key={row.key} className="ccv2-count-pill">
@@ -560,8 +569,8 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
 <div className="ccv2-livebar">
             <div className="ccv2-livebar__meta">
               <span className={`ccv2-live-dot${isRefreshing ? " is-live" : ""}`}></span>
-              <span className="ccv2-live-text">
-                {lastUpdated ? `Updated ${lastUpdated}` : "Live workspace"}
+              <span className="ccv2-live-text" data-testid="ccv2-realtime-state">
+                {realtimeMode === 'fallback' ? 'Realtime paused · deterministic fallback mode' : lastUpdated ? `Updated ${lastUpdated}` : "Live workspace"}
               </span>
             </div>
             <button className="button secondary ccv2-button" data-testid="ccv2-refresh-button" type="button" onClick={() => void loadBoard(true)} disabled={isRefreshing}>
@@ -838,7 +847,7 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
                   Job
                 </button>
                 <button className="button secondary ccv2-button ccv2-sidepanel-chip" onClick={() => router.push(`/dashboard/bookings`)}>
-                  Bookings
+                  {terms.bookings}
                 </button>
                 <button className="button secondary ccv2-button ccv2-sidepanel-chip" onClick={() => router.push(`/dashboard/billing`)}>
                   Billing

@@ -16,6 +16,7 @@ import {
   isGuidedEverywhereV1Enabled,
   isGuidedSetupV2Enabled,
 } from '../../lib/feature-flags';
+import { getCommandCentreHref } from '../../lib/business-config';
 import { useTenantSettings } from '../../lib/tenant-settings';
 import { Skeleton } from '../../components/ui/Skeleton';
 
@@ -53,6 +54,7 @@ function formatMoneyGBP(value: number) {
 export default function Dashboard() {
   const router = useRouter();
   const { settings } = useTenantSettings();
+  const commandCentreHref = getCommandCentreHref(settings);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [me, setMe] = useState<any>(null);
   const [error, setError] = useState('');
@@ -99,14 +101,14 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!router.isReady) return;
-    if (commandCentreV2Enabled) {
+    if (commandCentreHref === '/dashboard/command-centre-v2' && commandCentreV2Enabled) {
       router.replace('/dashboard/command-centre-v2');
       return;
     }
     if (!commandCentreV1Enabled) return;
     if (!settings?.guidedSetupCompletedAt) return;
-    router.replace('/dashboard/command-centre');
-  }, [router, router.isReady, settings?.guidedSetupCompletedAt, commandCentreV1Enabled, commandCentreV2Enabled]);
+    router.replace(commandCentreHref);
+  }, [router, router.isReady, settings?.guidedSetupCompletedAt, commandCentreV1Enabled, commandCentreV2Enabled, commandCentreHref]);
 
   const drafts = useMemo(() => {
     const jobs = summary?.drafts?.jobs || [];

@@ -1,4 +1,5 @@
 import {
+  IsObject,
   IsArray,
   IsBoolean,
   IsEmail,
@@ -182,6 +183,10 @@ export class UpdateTenantSettingsDto {
   @IsOptional()
   @IsBoolean()
   featureWhatsApp?: boolean;
+
+  @IsOptional()
+  @IsObject()
+  businessConfigJson?: Record<string, any>;
 
   @IsOptional()
   @IsBoolean()

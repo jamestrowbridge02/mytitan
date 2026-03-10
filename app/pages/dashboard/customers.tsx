@@ -16,7 +16,9 @@ import {
   OperatorSavedViews,
 } from "../../components/ui/operator-page";
 import { apiFetch } from "../../lib/api";
+import { getBusinessTerms, getCommandCentreHref } from "../../lib/business-config";
 import { useStickyOperatorView } from "../../lib/operator-view-state";
+import { useTenantSettings } from "../../lib/tenant-settings";
 
 type CustomerRow = {
   id: string;
@@ -37,6 +39,9 @@ function getTimelineHref(customer: CustomerRow) {
 }
 
 export default function CustomersPage() {
+  const { settings } = useTenantSettings();
+  const terms = getBusinessTerms(settings);
+  const commandCentreHref = getCommandCentreHref(settings);
   const [customers, setCustomers] = useState<CustomerRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -134,7 +139,7 @@ export default function CustomersPage() {
     const totalActivity = customers.reduce((sum, customer) => sum + Number(customer.activityCount || 0), 0);
     const contactable = customers.filter((customer) => customer.email || customer.phone).length;
     return [
-      { label: "Customers", value: String(customers.length), hint: `${contactable} with direct contact details` },
+      { label: terms.customers, value: String(customers.length), hint: `${contactable} with direct contact details` },
       { label: "Jobs linked", value: String(totalJobs), hint: "Current customer workload" },
       { label: "Timeline events", value: String(totalActivity), hint: "Logged communications and activity" },
     ];
@@ -204,12 +209,12 @@ export default function CustomersPage() {
 
       <div className="operator-stack">
         <OperatorPageHeader
-          eyebrow="Customers"
-          title="CRM"
-          subtitle="Searchable customer records with timeline access, comms shortcuts, and lighter-weight selection tools for operator follow-up."
+          eyebrow={terms.customers}
+          title={`${terms.customers} CRM`}
+          subtitle={`Searchable ${terms.customers.toLowerCase()} records with timeline access, comms shortcuts, and lighter-weight selection tools for operator follow-up.`}
           actions={[
-            { label: "Command Centre", href: "/dashboard/command-centre-v2", variant: "secondary" },
-            { label: "New job", href: "/dashboard/jobs/new" },
+            { label: "Command Centre", href: commandCentreHref, variant: "secondary" },
+            { label: `New ${terms.jobs.slice(0, -1) || "Job"}`, href: "/dashboard/jobs/new" },
           ]}
           shortcuts={["Search by customer name or contact detail", "Timeline and comms actions stay in-row"]}
           stats={stats}
@@ -218,7 +223,7 @@ export default function CustomersPage() {
         <section className="card operator-section">
           <div className="operator-section__header">
             <div>
-              <h2 className="operator-section__title">Customer roster</h2>
+              <h2 className="operator-section__title">{terms.customers} roster</h2>
               <p className="operator-section__subtitle">Table-style rows replace oversized cards so contact state and workload are visible at a glance.</p>
             </div>
           </div>
@@ -238,7 +243,7 @@ export default function CustomersPage() {
             searchValue={search}
             onSearchChange={setSearch}
             searchPlaceholder="Search customer, phone, or email"
-            resultsLabel={`${filteredCustomers.length} shown of ${customers.length} customers`}
+            resultsLabel={`${filteredCustomers.length} shown of ${customers.length} ${terms.customers.toLowerCase()}`}
             actions={[
               { label: "Reset filters", variant: "secondary", onClick: clearFilters },
             ]}
@@ -433,7 +438,7 @@ export default function CustomersPage() {
             </OperatorDataTable>
           ) : (
             <OperatorEmptyStateCard
-              title="No customers match this view"
+              title={`No ${terms.customers.toLowerCase()} match this view`}
               description="Clear the filters, create a job, or log a customer message event to seed the CRM workspace."
               actions={[
                 { label: "Reset filters", variant: "secondary", onClick: clearFilters },

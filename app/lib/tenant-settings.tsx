@@ -44,6 +44,32 @@ export type TenantSettings = {
   featureAI?: boolean;
   featureCustomerPortal?: boolean;
   featureWhatsApp?: boolean;
+  businessConfigJson?: {
+    terminology?: {
+      jobs?: string | null;
+      bookings?: string | null;
+      customers?: string | null;
+      technicians?: string | null;
+    } | null;
+    defaults?: {
+      commandCentreVersion?: "v1" | "v2" | null;
+    } | null;
+    navigation?: {
+      showIntelligence?: boolean;
+      showPortalOps?: boolean;
+      showTechnicianQueue?: boolean;
+    } | null;
+    portalCopy?: {
+      invoiceReadyMessage?: string | null;
+      invoiceOverdueMessage?: string | null;
+      preInvoiceMessage?: string | null;
+      paidMessage?: string | null;
+      paymentUnavailableMessage?: string | null;
+    } | null;
+    technicianPrompts?: {
+      checklist?: string[] | null;
+    } | null;
+  } | null;
   bookingPublicEnabled?: boolean;
   bookingPublicToken?: string | null;
   bookingIcsToken?: string | null;
@@ -96,6 +122,7 @@ const defaultSettings: TenantSettings = {
   featureAI: false,
   featureCustomerPortal: false,
   featureWhatsApp: false,
+  businessConfigJson: null,
   bookingPublicEnabled: false,
   bookingPublicToken: null,
   bookingIcsToken: null,

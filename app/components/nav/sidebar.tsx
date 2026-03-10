@@ -2,6 +2,8 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import React from "react";
 import { NAV_GROUPS, NavItem } from "./nav-config";
+import { getBusinessTerms, getCommandCentreHref, getOptionalModuleVisibility } from "../../lib/business-config";
+import { useTenantSettings } from "../../lib/tenant-settings";
 
 function isActive(pathname: string, href?: string) {
   if (!href) return false;
@@ -34,6 +36,10 @@ function cx(...xs: Array<string | false | null | undefined>) {
 
 export default function Sidebar() {
   const router = useRouter();
+  const { settings } = useTenantSettings();
+  const terms = getBusinessTerms(settings);
+  const commandCentreHref = getCommandCentreHref(settings);
+  const moduleVisibility = getOptionalModuleVisibility(settings);
   const path = router.asPath || router.pathname || "";
 
   const showSidebar = path.startsWith("/dashboard") || path === "/dashboard";
@@ -84,12 +90,12 @@ export default function Sidebar() {
 
   const primaryQuickLinks = [
     { title: "Dashboard", href: "/dashboard" },
-    { title: "Command Centre", href: "/dashboard/command-centre-v2" },
-    { title: "Jobs", href: "/dashboard/jobs" },
-    { title: "Customers", href: "/dashboard/customers" },
+    { title: "Command Centre", href: commandCentreHref },
+    { title: terms.jobs, href: "/dashboard/jobs" },
+    { title: terms.customers, href: "/dashboard/customers" },
     { title: "Calendar", href: "/dashboard/calendar" },
-    { title: "Bookings", href: "/dashboard/bookings" },
-    { title: "New job", href: "/dashboard/jobs/new" },
+    { title: terms.bookings, href: "/dashboard/bookings" },
+    { title: `New ${terms.jobs.slice(0, -1) || "Job"}`, href: "/dashboard/jobs/new" },
     { title: "Integrations", href: "/dashboard/integrations" },
   ];
 
@@ -170,7 +176,19 @@ export default function Sidebar() {
 
         <nav className="mt-3 flex-1 overflow-y-auto px-1 pb-2">
           {NAV_GROUPS.map((g) => {
-            const visibleItems = g.items.filter(canShow);
+            const visibleItems = g.items
+              .filter(canShow)
+              .filter((item) => {
+                if (item.href === "/dashboard/intelligence") return moduleVisibility.showIntelligence;
+                if (item.href === "/dashboard/portal") return moduleVisibility.showPortalOps;
+                if (item.href === "/dashboard/technician") return moduleVisibility.showTechnicianQueue;
+                return true;
+              })
+              .map((item) => {
+                if (item.title === "Command Centre") return { ...item, href: commandCentreHref };
+                if (item.title === "Technician queue") return { ...item, title: `${terms.technicians} queue` };
+                return item;
+              });
             if (!visibleItems.length) return null;
 
             const isCollapsed = Boolean(collapsed[g.title]);
