@@ -16,7 +16,7 @@ import {
   OperatorRowActions,
   OperatorSavedViews,
 } from "../../components/ui/operator-page";
-import { apiFetch } from "../../lib/api";
+import { ApiError, apiFetch } from "../../lib/api";
 import { isMarketplaceEnabled } from "../../lib/feature-flags";
 import { useStickyOperatorView } from "../../lib/operator-view-state";
 
@@ -170,9 +170,12 @@ export default function BookingsPage() {
       const jobId = res?.job?.id;
       const jobRef = res?.job?.jobRef || jobId;
       const dispatchFollowUpCreated = Boolean(res?.conversion?.dispatchFollowUpCreated);
+      const duplicatePrevented = Boolean(res?.conversion?.duplicatePrevented);
       pushNotice(
         res?.alreadyLinked
-          ? `Booking already linked to ${jobRef}`
+          ? duplicatePrevented
+            ? `Duplicate conversion prevented. Booking is linked to ${jobRef}`
+            : `Booking already linked to ${jobRef}`
           : dispatchFollowUpCreated
           ? `Converted booking to ${jobRef} and queued dispatch follow-up`
           : `Converted booking to ${jobRef}`,
@@ -182,7 +185,19 @@ export default function BookingsPage() {
         void router.push(`/dashboard/jobs/${jobId}`);
       }
     } catch (err: any) {
-      setError(err?.message || "Failed to convert booking");
+      if (err instanceof ApiError && err.payload && typeof err.payload === "object" && (err.payload as any).code === "BOOKING_CONVERSION_NOT_READY") {
+        const issues = Array.isArray((err.payload as any).issues) ? (err.payload as any).issues : [];
+        const labels = issues.map((issue: string) =>
+          issue === "customer_name_missing"
+            ? "customer name"
+            : issue === "time_window_missing"
+            ? "time window"
+            : issue,
+        );
+        setError(`Booking cannot be converted yet. Missing: ${labels.join(", ")}`);
+      } else {
+        setError(err?.message || "Failed to convert booking");
+      }
     } finally {
       setBusyConvertId(null);
     }
@@ -552,7 +567,7 @@ export default function BookingsPage() {
                     <div className="operator-table__cell">
                       <div className="operator-cellMeta">
                         <span><strong>{booking.jobId || "Not linked"}</strong></span>
-                        <span>{booking.jobId ? "Existing job linked" : "Needs conversion"}</span>
+                        <span>{booking.jobId ? "Existing job linked" : booking.customerName ? "Needs conversion" : "Add customer name before conversion"}</span>
                       </div>
                     </div>
                     <div className="operator-table__cell operator-table__cell--actions">

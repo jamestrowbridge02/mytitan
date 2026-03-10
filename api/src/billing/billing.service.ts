@@ -544,6 +544,71 @@ export class BillingService {
     return updated;
   }
 
+  async queueBillingFollowUp(tenantId: string, userId: string, jobId: string) {
+    const db = this.prisma as any;
+    const job = await db.job.findFirst({ where: { id: jobId, companyId: tenantId } });
+    if (!job) {
+      throw new BadRequestException('Job not found');
+    }
+    if (job.invoicePaidAt) {
+      throw new BadRequestException('Paid jobs do not need a billing follow-up');
+    }
+    if (!(job.completedAt || job.status === 'COMPLETED' || job.status === 'INVOICED')) {
+      throw new BadRequestException('Only completed or invoiced jobs can enter billing follow-up');
+    }
+
+    const now = Date.now();
+    const targetTime = job.invoiceDueAt
+      ? new Date(job.invoiceDueAt).getTime() < now
+        ? new Date(now + 2 * 60 * 60 * 1000)
+        : new Date(job.invoiceDueAt)
+      : new Date(now + 24 * 60 * 60 * 1000);
+
+    const existing = await db.jobReminder.findFirst({
+      where: {
+        companyId: tenantId,
+        jobId,
+        completedAt: null,
+        note: 'Automation billing follow-up',
+      },
+    });
+
+    let reminder;
+    if (existing) {
+      reminder = await db.jobReminder.update({
+        where: { id: existing.id },
+        data: { remindAt: targetTime, channel: existing.channel || 'in_app' },
+      });
+      await this.logBillingActivity(tenantId, jobId, userId, 'billing.follow_up.requeued', 'Billing follow-up reminder refreshed', {
+        remindAt: reminder.remindAt,
+        reminderId: reminder.id,
+      });
+    } else {
+      reminder = await db.jobReminder.create({
+        data: {
+          companyId: tenantId,
+          jobId,
+          remindAt: targetTime,
+          channel: 'in_app',
+          note: 'Automation billing follow-up',
+        },
+      });
+      await this.logBillingActivity(tenantId, jobId, userId, 'job.reminder.create', 'Billing follow-up reminder queued from billing workflow', {
+        remindAt: reminder.remindAt,
+        reminderId: reminder.id,
+        note: reminder.note,
+      });
+    }
+
+    await this.audit.log(tenantId, 'billing.follow_up.queue', `Billing follow-up queued for ${job.jobRef || job.id}`, userId);
+    return {
+      jobId: job.id,
+      reminderId: reminder.id,
+      remindAt: reminder.remindAt,
+      refreshed: Boolean(existing),
+    };
+  }
+
   private truncateWebhookError(error: unknown) {
     const message = error instanceof Error ? error.message : String(error || 'unknown webhook error');
     return message.slice(0, 500);

@@ -233,6 +233,9 @@ export class BookingsService {
         conversion: {
           linkedAt: booking.updatedAt,
           dispatchFollowUpCreated: false,
+          dispatchReminderId: null,
+          activityId: null,
+          duplicatePrevented: false,
           readinessIssues: [],
         },
       };
@@ -270,13 +273,66 @@ export class BookingsService {
       locationId: booking.locationId || undefined,
     });
 
-    const linkedBooking = await db.booking.update({
-      where: { id: booking.id },
-      data: {
-        jobId: patchedJob.id,
-        status: booking.status === 'PENDING' || booking.status === 'PLANNED' ? 'CONFIRMED' : booking.status,
+    const linkData = {
+      jobId: patchedJob.id,
+      status: booking.status === 'PENDING' || booking.status === 'PLANNED' ? 'CONFIRMED' : booking.status,
+    };
+    const linked = await db.booking.updateMany({
+      where: {
+        id: booking.id,
+        companyId,
+        jobId: null,
       },
+      data: linkData,
     });
+
+    if (linked.count === 0) {
+      const latestBooking = await db.booking.findFirst({
+        where: { id: booking.id, companyId },
+        include: { job: true },
+      });
+      if (latestBooking?.jobId && latestBooking.jobId !== patchedJob.id) {
+        await db.job.update({
+          where: { id: patchedJob.id },
+          data: { status: 'CANCELLED' },
+        });
+        await db.jobActivity.create({
+          data: {
+            companyId,
+            jobId: patchedJob.id,
+            actorUserId: userId,
+            eventType: 'booking.convert.duplicate_prevented',
+            message: `Duplicate conversion prevented after booking ${booking.id} linked to ${latestBooking.job?.jobRef || latestBooking.jobId}`,
+            payloadJson: {
+              bookingId: booking.id,
+              supersedingJobId: latestBooking.jobId,
+            },
+          },
+        });
+        await this.audit.log(companyId, 'booking.convert.duplicate', `Prevented duplicate conversion for booking ${booking.id}`, userId);
+        return {
+          booking: latestBooking,
+          job: latestBooking.job,
+          alreadyLinked: true,
+          conversion: {
+            linkedAt: latestBooking.updatedAt,
+            dispatchFollowUpCreated: false,
+            dispatchReminderId: null,
+            activityId: null,
+            duplicatePrevented: true,
+            readinessIssues: [],
+          },
+        };
+      }
+      throw new BadRequestException('Booking conversion could not acquire a stable link');
+    }
+
+    const linkedBooking = await db.booking.findFirst({
+      where: { id: booking.id, companyId },
+    });
+    if (!linkedBooking) {
+      throw new BadRequestException('Booking link could not be confirmed');
+    }
 
     let dispatchFollowUpCreated = false;
     let dispatchReminderId: string | null = null;
@@ -361,6 +417,7 @@ export class BookingsService {
         dispatchFollowUpCreated,
         dispatchReminderId,
         activityId: conversionActivity.id,
+        duplicatePrevented: false,
         readinessIssues: [],
       },
     };

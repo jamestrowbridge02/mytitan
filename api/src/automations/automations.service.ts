@@ -352,7 +352,7 @@ export class AutomationsService {
     const db = this.prisma as any;
     const now = new Date();
     const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const [rules, pendingRuns, pendingBillingFollowUps, overdueBillingFollowUps, pendingDispatchFollowUps, contactGapJobs, staleUnassignedJobs, publicBookingsAwaitingConversion, recentBookingConversions, recentPortalLifecycleEvents] = await Promise.all([
+    const [rules, pendingRuns, pendingBillingFollowUps, overdueBillingFollowUps, resolvedBillingFollowUpsLast7Days, pendingDispatchFollowUps, resolvedDispatchFollowUpsLast7Days, contactGapJobs, staleUnassignedJobs, publicBookingsAwaitingConversion, recentBookingConversions, recentPortalLifecycleEvents] = await Promise.all([
       this.listRules(tenantId),
       this.listRuns(tenantId, 12),
       db.jobReminder.count({
@@ -370,10 +370,28 @@ export class AutomationsService {
           remindAt: { lt: now },
         },
       }),
+      db.jobActivity.count({
+        where: {
+          companyId: tenantId,
+          eventType: 'job.reminder.completed',
+          createdAt: { gte: last7Days },
+          payloadJson: {
+            path: ['reason'],
+            in: ['invoice_issued', 'payment_received'],
+          },
+        },
+      }),
       db.jobReminder.count({
         where: {
           companyId: tenantId,
           completedAt: null,
+          note: "Automation dispatch follow-up",
+        },
+      }),
+      db.jobReminder.count({
+        where: {
+          companyId: tenantId,
+          completedAt: { gte: last7Days },
           note: "Automation dispatch follow-up",
         },
       }),
@@ -424,7 +442,9 @@ export class AutomationsService {
         totalRules: rules.length,
         pendingBillingFollowUps,
         overdueBillingFollowUps,
+        resolvedBillingFollowUpsLast7Days,
         pendingDispatchFollowUps,
+        resolvedDispatchFollowUpsLast7Days,
         contactGapJobs,
         staleUnassignedJobs,
         publicBookingsAwaitingConversion,

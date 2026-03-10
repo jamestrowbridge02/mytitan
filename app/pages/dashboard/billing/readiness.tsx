@@ -76,11 +76,17 @@ export default function BillingReadinessPage() {
     return () => window.clearTimeout(timer);
   }, [notice]);
 
-  async function run(jobId: string, action: "issue-invoice" | "mark-paid") {
+  async function run(jobId: string, action: "issue-invoice" | "mark-paid" | "queue-follow-up") {
     setBusyJobId(jobId);
     try {
       await apiFetch(`/billing/jobs/${jobId}/${action}`, { method: "POST" });
-      setNotice(action === "issue-invoice" ? "Invoice issued" : "Payment recorded");
+      setNotice(
+        action === "issue-invoice"
+          ? "Invoice issued"
+          : action === "mark-paid"
+          ? "Payment recorded"
+          : "Billing follow-up queued",
+      );
       await load();
     } catch (err: any) {
       setError(err?.message || `Failed to ${action}`);
@@ -178,6 +184,13 @@ export default function BillingReadinessPage() {
                           : { label: "Open job", href: `/dashboard/jobs/${job.id}` }
                       }
                       actions={[
+                        ...(!job.invoicePaidAt ? [{
+                          label: busyJobId === job.id ? "Queuing..." : "Queue follow-up",
+                          onClick: () => void run(job.id, "queue-follow-up"),
+                          group: "Payments",
+                          description: "Create or refresh a billing reminder for this job",
+                          disabled: busyJobId === job.id,
+                        }] : []),
                         { label: "Open job", href: `/dashboard/jobs/${job.id}`, group: "Internal", description: "Open the internal job record" },
                         ...(job.portalUrl ? [{ label: "Open portal", href: job.portalUrl, group: "Customer access", description: "Open the current customer-facing job summary" }] : []),
                         ...(job.paymentLinkUrl ? [{ label: "Open payment link", href: job.paymentLinkUrl, group: "Payments", description: "Open the current payment URL" }] : []),

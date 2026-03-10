@@ -90,6 +90,12 @@ export class BillingController {
   markPaid(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     return this.billing.markPaidOffline(user.companyId, user.sub, id);
   }
+
+  @Post('jobs/:id/queue-follow-up')
+  @Roles('OWNER', 'ADMIN', 'STAFF')
+  queueFollowUp(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.billing.queueBillingFollowUp(user.companyId, user.sub, id);
+  }
 }
 
 @Controller()
