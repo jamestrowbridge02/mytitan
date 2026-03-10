@@ -135,6 +135,18 @@ type WorkspaceAutomationRule = {
   updatedAt?: string | null;
 };
 
+type AutomationSuggestion = {
+  key: string;
+  title: string;
+  description: string;
+  benefit: string;
+  trigger: string;
+  priority: 'high' | 'medium' | 'low';
+  actionSummary: string;
+  whyThisAppeared: string;
+  status?: 'new' | 'applied' | 'dismissed';
+};
+
 type AutomationRun = {
   id: string;
   type: string;
@@ -197,14 +209,19 @@ export default function SettingsPage() {
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [notificationPrefs, setNotificationPrefs] = useState<any>(null);
   const [automationRules, setAutomationRules] = useState<WorkspaceAutomationRule[]>([]);
+  const [automationSuggestions, setAutomationSuggestions] = useState<AutomationSuggestion[]>([]);
   const [automationRuns, setAutomationRuns] = useState<AutomationRun[]>([]);
   const [automationRulesLoading, setAutomationRulesLoading] = useState(false);
+  const [automationSuggestionsLoading, setAutomationSuggestionsLoading] = useState(false);
   const [automationRunsLoading, setAutomationRunsLoading] = useState(false);
   const [automationRulesError, setAutomationRulesError] = useState('');
+  const [automationSuggestionsError, setAutomationSuggestionsError] = useState('');
   const [ruleDraft, setRuleDraft] = useState<AutomationRuleDraft>(createDefaultRuleDraft());
   const [ruleEditorOpen, setRuleEditorOpen] = useState(false);
   const [savingRule, setSavingRule] = useState(false);
   const [deletingRuleId, setDeletingRuleId] = useState<string | null>(null);
+  const [applyingSuggestionKey, setApplyingSuggestionKey] = useState<string | null>(null);
+  const [dismissingSuggestionKey, setDismissingSuggestionKey] = useState<string | null>(null);
   const { notice, showSuccess, showError, clearNotice } = useOperatorNotice();
 
   useEffect(() => {
@@ -252,6 +269,7 @@ export default function SettingsPage() {
   useEffect(() => {
     if (!automationsEnabled || tab !== 'automation_rules') return;
     void loadAutomationRules();
+    void loadAutomationSuggestions();
     void loadAutomationRuns();
   }, [automationsEnabled, tab]);
 
@@ -315,6 +333,21 @@ export default function SettingsPage() {
     }
   }
 
+  async function loadAutomationSuggestions() {
+    if (!automationsEnabled) return;
+    setAutomationSuggestionsLoading(true);
+    setAutomationSuggestionsError('');
+    try {
+      const data = await apiFetch('/automations/suggestions');
+      setAutomationSuggestions(Array.isArray(data) ? data as AutomationSuggestion[] : []);
+    } catch (err: any) {
+      setAutomationSuggestions([]);
+      setAutomationSuggestionsError(err?.message || 'Failed to load suggested automations');
+    } finally {
+      setAutomationSuggestionsLoading(false);
+    }
+  }
+
   async function loadAutomationRuns() {
     if (!automationsEnabled) return;
     setAutomationRunsLoading(true);
@@ -325,6 +358,42 @@ export default function SettingsPage() {
       setAutomationRuns([]);
     } finally {
       setAutomationRunsLoading(false);
+    }
+  }
+
+  async function applyAutomationSuggestion(suggestionKey: string) {
+    if (!automationsEnabled) return;
+    clearNotice();
+    setApplyingSuggestionKey(suggestionKey);
+    setAutomationSuggestionsError('');
+    try {
+      await apiFetch(`/automations/suggestions/${suggestionKey}/apply`, {
+        method: 'POST',
+      });
+      showSuccess('Suggested automation applied');
+      await Promise.all([loadAutomationSuggestions(), loadAutomationRules(), loadAutomationRuns()]);
+    } catch (err: any) {
+      showError(err?.message || 'Failed to apply suggested automation');
+    } finally {
+      setApplyingSuggestionKey(null);
+    }
+  }
+
+  async function dismissAutomationSuggestion(suggestionKey: string) {
+    if (!automationsEnabled) return;
+    clearNotice();
+    setDismissingSuggestionKey(suggestionKey);
+    setAutomationSuggestionsError('');
+    try {
+      await apiFetch(`/automations/suggestions/${suggestionKey}/dismiss`, {
+        method: 'POST',
+      });
+      showSuccess('Suggested automation dismissed');
+      await loadAutomationSuggestions();
+    } catch (err: any) {
+      showError(err?.message || 'Failed to dismiss suggested automation');
+    } finally {
+      setDismissingSuggestionKey(null);
     }
   }
 
@@ -373,7 +442,7 @@ export default function SettingsPage() {
       }
       setRuleEditorOpen(false);
       setRuleDraft(createDefaultRuleDraft());
-      await Promise.all([loadAutomationRules(), loadAutomationRuns()]);
+      await Promise.all([loadAutomationSuggestions(), loadAutomationRules(), loadAutomationRuns()]);
     } catch (err: any) {
       showError(err?.message || 'Failed to save automation rule');
     } finally {
@@ -390,7 +459,7 @@ export default function SettingsPage() {
         body: JSON.stringify({ enabled: !rule.enabled }),
       });
       showSuccess(rule.enabled ? 'Automation rule disabled' : 'Automation rule enabled');
-      await loadAutomationRules();
+      await Promise.all([loadAutomationSuggestions(), loadAutomationRules()]);
     } catch (err: any) {
       showError(err?.message || 'Failed to update automation rule');
     }
@@ -407,7 +476,7 @@ export default function SettingsPage() {
         setRuleEditorOpen(false);
         setRuleDraft(createDefaultRuleDraft());
       }
-      await Promise.all([loadAutomationRules(), loadAutomationRuns()]);
+      await Promise.all([loadAutomationSuggestions(), loadAutomationRules(), loadAutomationRuns()]);
     } catch (err: any) {
       showError(err?.message || 'Failed to delete automation rule');
     } finally {
@@ -969,6 +1038,72 @@ export default function SettingsPage() {
 
         {tab === 'automation_rules' && (
           <>
+            <div className="card settings-premium-card" style={{ marginBottom: 12 }}>
+              <div style={{ marginBottom: 12 }}>
+                <h3 style={{ marginTop: 0, marginBottom: 6 }}>Suggested automations</h3>
+                <p className="muted settings-premium-muted" style={{ marginBottom: 0 }}>
+                  Deterministic suggestions are based on real workspace workflow patterns. Nothing is enabled until you apply it.
+                </p>
+              </div>
+
+              {automationSuggestionsError ? <p style={{ color: '#fca5a5' }}>{automationSuggestionsError}</p> : null}
+
+              <div data-testid="automation-suggestion-list" style={{ display: 'grid', gap: 12 }}>
+                {automationSuggestionsLoading ? (
+                  <p className="muted settings-premium-muted">Loading suggested automations…</p>
+                ) : automationSuggestions.length ? (
+                  automationSuggestions.map((suggestion) => (
+                    <div
+                      key={suggestion.key}
+                      style={{
+                        border: '1px solid rgba(148,163,184,0.18)',
+                        borderRadius: 14,
+                        padding: 14,
+                        display: 'grid',
+                        gap: 8,
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+                        <div>
+                          <strong>{suggestion.title}</strong>
+                          <div className="muted settings-premium-muted" style={{ marginTop: 4 }}>
+                            Priority: {suggestion.priority} • Trigger: {suggestion.trigger} • Action: {suggestion.actionSummary}
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button
+                            className="button settings-premium-button"
+                            type="button"
+                            data-testid={`automation-suggestion-apply-${suggestion.key}`}
+                            onClick={() => void applyAutomationSuggestion(suggestion.key)}
+                            disabled={applyingSuggestionKey === suggestion.key || dismissingSuggestionKey === suggestion.key}
+                          >
+                            {applyingSuggestionKey === suggestion.key ? 'Applying…' : 'Apply'}
+                          </button>
+                          <button
+                            className="button secondary settings-premium-button"
+                            type="button"
+                            data-testid={`automation-suggestion-dismiss-${suggestion.key}`}
+                            onClick={() => void dismissAutomationSuggestion(suggestion.key)}
+                            disabled={dismissingSuggestionKey === suggestion.key || applyingSuggestionKey === suggestion.key}
+                          >
+                            {dismissingSuggestionKey === suggestion.key ? 'Dismissing…' : 'Dismiss'}
+                          </button>
+                        </div>
+                      </div>
+                      <div>{suggestion.description}</div>
+                      <div className="muted settings-premium-muted">{suggestion.benefit}</div>
+                      <div className="muted settings-premium-muted">
+                        Why this appeared: {suggestion.whyThisAppeared}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="muted settings-premium-muted">No suggested automations right now. Apply or create rules as your workflow evolves.</p>
+                )}
+              </div>
+            </div>
+
             <div className="card settings-premium-card" data-testid="settings-automation-rules-panel" style={{ marginBottom: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 12 }}>
                 <div>
