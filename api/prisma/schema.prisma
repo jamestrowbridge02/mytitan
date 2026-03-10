@@ -186,6 +186,7 @@ model Company {
   notificationPreferences  NotificationPreference[]
   jobSignatures            JobSignature[]
   automationsSetting       AutomationsSetting?
+  automationRules          AutomationRule[]
 }
 
 model User {
@@ -948,6 +949,22 @@ model AutomationsSetting {
   tenant     Company  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([updatedAt])
+}
+
+model AutomationRule {
+  id            String   @id @default(cuid())
+  tenantId      String
+  name          String
+  trigger       String
+  conditionJson Json?
+  actionJson    Json
+  enabled       Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  tenant        Company  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, trigger, enabled])
+  @@index([tenantId, createdAt])
 }
 
 model ServiceCatalogItem {

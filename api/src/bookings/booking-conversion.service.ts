@@ -288,6 +288,16 @@ export class BookingConversionService {
 
       if (isAutomationsV1Enabled()) {
         await this.automations.handleBookingConverted(companyId, userId, result.booking, result.job);
+        await this.automations.evaluateRuleTrigger(companyId, "booking.converted", {
+          actorUserId: userId,
+          bookingId: result.booking.id,
+          jobId: result.job.id,
+          jobRef: result.job.jobRef || null,
+          customerId: result.job.customerId || null,
+          customerName: result.job.customerName || result.booking.customerName || null,
+          status: result.job.status || null,
+          assignedUserId: result.job.assignedUserId || null,
+        });
         if (result.contactGapEvaluationNeeded) {
           await this.automations.handleJobContactGap(companyId, userId, result.job);
         }

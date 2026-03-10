@@ -573,6 +573,17 @@ export class BillingService {
       invoiceDueAt: updated.invoiceDueAt,
     });
     await this.resolveBillingFollowUp(tenantId, userId, job.id, 'invoice_issued');
+    await this.automations.evaluateRuleTrigger(tenantId, 'invoice.issued', {
+      actorUserId: userId,
+      jobId: updated.id,
+      jobRef: updated.jobRef || null,
+      customerId: updated.customerId || null,
+      customerName: updated.customerName || null,
+      status: updated.status || null,
+      assignedUserId: updated.assignedUserId || null,
+      invoiceIssuedAt: updated.invoiceIssuedAt || null,
+      invoicePaidAt: updated.invoicePaidAt || null,
+    });
     return updated;
   }
 

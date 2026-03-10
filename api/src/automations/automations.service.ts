@@ -4,7 +4,8 @@ import { AuditService } from "../audit/audit.service";
 import { assertPermission } from "../common/permissions";
 import { ActivityService } from "../events/activity.service";
 import { PrismaService } from "../prisma/prisma.service";
-import { UpdateAutomationsSettingsDto } from "./automations.dto";
+import { CreateAutomationRuleDto, UpdateAutomationRuleDto, UpdateAutomationsSettingsDto } from "./automations.dto";
+import { AUTOMATION_RULE_TRIGGERS, AutomationRuleAction, AutomationRuleEngine } from "./rule-engine";
 
 const DEFAULT_SETTINGS = {
   bookingRemindersEnabled: false,
@@ -21,6 +22,7 @@ export class AutomationsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly activity: ActivityService,
+    private readonly ruleEngine: AutomationRuleEngine,
   ) {}
 
   private normalizeSettings(configJson: any) {
@@ -87,6 +89,108 @@ export class AutomationsService {
 
     await this.audit.log(tenantId, "automations.settings.update", `Automation settings updated`, user.sub);
     return next;
+  }
+
+  private validateTrigger(trigger: string) {
+    if (!AUTOMATION_RULE_TRIGGERS.includes(trigger as any)) {
+      throw new BadRequestException("Unsupported automation trigger");
+    }
+    return trigger;
+  }
+
+  private serializeWorkspaceRule(rule: any) {
+    let actionJson: AutomationRuleAction;
+    try {
+      actionJson = this.ruleEngine.normalizeAction(rule.actionJson);
+    } catch {
+      actionJson = { type: "send_internal_notification", title: "Invalid action" };
+    }
+    const conditionJson = this.ruleEngine.normalizeConditionInput(rule.conditionJson);
+    return {
+      id: rule.id,
+      name: rule.name,
+      trigger: rule.trigger,
+      enabled: Boolean(rule.enabled),
+      conditionJson,
+      actionJson,
+      createdAt: rule.createdAt,
+      updatedAt: rule.updatedAt,
+    };
+  }
+
+  async listWorkspaceRules(tenantId: string) {
+    const rows = await this.prisma.automationRule.findMany({
+      where: { tenantId },
+      orderBy: [{ createdAt: "asc" }],
+    });
+    return rows.map((row) => this.serializeWorkspaceRule(row));
+  }
+
+  async createWorkspaceRule(user: JwtPayload, dto: CreateAutomationRuleDto) {
+    const tenantId = user.companyId;
+    const name = String(dto.name || "").trim();
+    if (!name) {
+      throw new BadRequestException("Rule name is required");
+    }
+    const trigger = this.validateTrigger(String(dto.trigger || ""));
+    const conditionJson = this.ruleEngine.normalizeConditionInput(dto.conditionJson);
+    const actionJson = this.ruleEngine.normalizeAction(dto.actionJson);
+    const created = await this.prisma.automationRule.create({
+      data: {
+        tenantId,
+        name: name.slice(0, 120),
+        trigger,
+        conditionJson,
+        actionJson: actionJson as any,
+        enabled: dto.enabled !== false,
+      },
+    });
+    await this.audit.log(tenantId, "automations.rule.create", `Automation rule created: ${created.name}`, user.sub);
+    return this.serializeWorkspaceRule(created);
+  }
+
+  async updateWorkspaceRule(user: JwtPayload, id: string, dto: UpdateAutomationRuleDto) {
+    const tenantId = user.companyId;
+    const existing = await this.prisma.automationRule.findFirst({ where: { id, tenantId } });
+    if (!existing) {
+      throw new BadRequestException("Automation rule not found");
+    }
+    const data: Record<string, any> = {};
+    if (dto.name !== undefined) {
+      const nextName = String(dto.name || "").trim();
+      if (!nextName) throw new BadRequestException("Rule name is required");
+      data.name = nextName.slice(0, 120);
+    }
+    if (dto.trigger !== undefined) {
+      data.trigger = this.validateTrigger(String(dto.trigger || ""));
+    }
+    if (dto.conditionJson !== undefined) {
+      data.conditionJson = this.ruleEngine.normalizeConditionInput(dto.conditionJson);
+    }
+    if (dto.actionJson !== undefined) {
+      data.actionJson = this.ruleEngine.normalizeAction(dto.actionJson) as any;
+    }
+    if (dto.enabled !== undefined) {
+      data.enabled = Boolean(dto.enabled);
+    }
+
+    const updated = await this.prisma.automationRule.update({
+      where: { id: existing.id },
+      data,
+    });
+    await this.audit.log(tenantId, "automations.rule.update", `Automation rule updated: ${updated.name}`, user.sub);
+    return this.serializeWorkspaceRule(updated);
+  }
+
+  async deleteWorkspaceRule(user: JwtPayload, id: string) {
+    const tenantId = user.companyId;
+    const existing = await this.prisma.automationRule.findFirst({ where: { id, tenantId } });
+    if (!existing) {
+      throw new BadRequestException("Automation rule not found");
+    }
+    await this.prisma.automationRule.delete({ where: { id: existing.id } });
+    await this.audit.log(tenantId, "automations.rule.delete", `Automation rule deleted: ${existing.name}`, user.sub);
+    return { ok: true };
   }
 
   async isApprovalRequestEnabled(tenantId: string) {
@@ -256,7 +360,7 @@ export class AutomationsService {
 
   async listRules(tenantId: string) {
     const settings = await this.getSettings(tenantId);
-    return [
+    const curatedRules = [
       {
         key: "booking_reminders",
         label: "Booking reminders",
@@ -329,6 +433,20 @@ export class AutomationsService {
         action: "Log portal link provisioning, revocation, and regeneration as durable automation runs",
         deliveryMode: "metadata_only",
       },
+    ];
+
+    const workspaceRules = await this.listWorkspaceRules(tenantId);
+    return [
+      ...curatedRules,
+      ...workspaceRules.map((rule) => ({
+        key: rule.id,
+        label: rule.name,
+        enabled: rule.enabled,
+        trigger: rule.trigger,
+        action: (rule.actionJson as AutomationRuleAction).type.replace(/_/g, " "),
+        deliveryMode: "metadata_only",
+        isWorkspaceRule: true,
+      })),
     ];
   }
 
@@ -516,6 +634,10 @@ export class AutomationsService {
       ].filter(Boolean),
       runs: pendingRuns,
     };
+  }
+
+  async evaluateRuleTrigger(tenantId: string, trigger: string, payload: Record<string, any>) {
+    return this.ruleEngine.evaluateAutomationRules(tenantId, trigger, payload);
   }
 
   async handleJobCompleted(companyId: string, userId: string | null, job: any) {

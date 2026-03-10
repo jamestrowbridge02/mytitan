@@ -703,6 +703,17 @@ export class JobsService {
     await this.audit.log(companyId, "job.create", `Created job ${created.jobRef ?? created.id}`, userId);
     await this.logActivity(companyId, created.id, userId, "job.create", `Job ${created.jobRef ?? created.id} created`);
     await this.maybeRunContactGapAutomation(companyId, userId, created.id);
+    await this.automations.evaluateRuleTrigger(companyId, "job.created", {
+      actorUserId: userId,
+      jobId: created.id,
+      jobRef: created.jobRef || null,
+      customerId: created.customerId || null,
+      customerName: created.customerName || null,
+      status: created.status || null,
+      assignedUserId: created.assignedUserId || null,
+      invoiceIssuedAt: created.invoiceIssuedAt || null,
+      invoicePaidAt: created.invoicePaidAt || null,
+    });
 
     if (wheelsEnabled && submittedForm) {
       await this.templatesService.ensureWheelsDefaultTemplate();
@@ -831,6 +842,19 @@ export class JobsService {
       `Job ${updated?.jobRef || updated?.id || id} moved to ${newStatus}`,
     );
     await this.maybeRunCompletionAutomation(companyId, userId, job, updated);
+    if (newStatus === "COMPLETED") {
+      await this.automations.evaluateRuleTrigger(companyId, "job.completed", {
+        actorUserId: userId,
+        jobId: updated.id,
+        jobRef: updated.jobRef || null,
+        customerId: updated.customerId || null,
+        customerName: updated.customerName || null,
+        status: updated.status || null,
+        assignedUserId: updated.assignedUserId || null,
+        invoiceIssuedAt: updated.invoiceIssuedAt || null,
+        invoicePaidAt: updated.invoicePaidAt || null,
+      });
+    }
 
     return updated;
   }

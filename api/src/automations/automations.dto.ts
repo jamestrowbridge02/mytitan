@@ -1,4 +1,5 @@
-import { IsBoolean, IsIn, IsOptional, IsString } from "class-validator";
+import { IsBoolean, IsIn, IsObject, IsOptional, IsString } from "class-validator";
+import { AUTOMATION_RULE_TRIGGERS } from "./rule-engine";
 
 export class UpdateAutomationsSettingsDto {
   @IsOptional()
@@ -29,4 +30,47 @@ export class UpdateAutomationsSettingsDto {
   @IsOptional()
   @IsBoolean()
   confirmLiveSend?: boolean;
+}
+
+export class CreateAutomationRuleDto {
+  @IsString()
+  name!: string;
+
+  @IsString()
+  @IsIn(AUTOMATION_RULE_TRIGGERS)
+  trigger!: (typeof AUTOMATION_RULE_TRIGGERS)[number];
+
+  @IsOptional()
+  @IsObject()
+  conditionJson?: Record<string, any>;
+
+  @IsObject()
+  actionJson!: Record<string, any>;
+
+  @IsOptional()
+  @IsBoolean()
+  enabled?: boolean;
+}
+
+export class UpdateAutomationRuleDto {
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(AUTOMATION_RULE_TRIGGERS)
+  trigger?: (typeof AUTOMATION_RULE_TRIGGERS)[number];
+
+  @IsOptional()
+  @IsObject()
+  conditionJson?: Record<string, any>;
+
+  @IsOptional()
+  @IsObject()
+  actionJson?: Record<string, any>;
+
+  @IsOptional()
+  @IsBoolean()
+  enabled?: boolean;
 }

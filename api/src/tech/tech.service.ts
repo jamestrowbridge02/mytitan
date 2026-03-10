@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { AutomationsService } from '../automations/automations.service';
 import { ActivityService } from '../events/activity.service';
 import { JobsService } from '../jobs/jobs.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -10,6 +11,7 @@ export class TechService {
     private readonly prisma: PrismaService,
     private readonly jobs: JobsService,
     private readonly activity: ActivityService,
+    private readonly automations: AutomationsService,
   ) {}
 
   async getMyQueue(companyId: string, userId: string) {
@@ -169,6 +171,16 @@ export class TechService {
       customerName: job.customerName || null,
       status: job.status || null,
       payloadJson: { note: note || null },
+    });
+    const refreshed = await db.job.findFirst({ where: { id: jobId, companyId } });
+    await this.automations.evaluateRuleTrigger(companyId, 'technician.arrived', {
+      actorUserId: userId,
+      jobId: job.id,
+      jobRef: job.jobRef || null,
+      customerId: job.customerId || null,
+      customerName: job.customerName || null,
+      status: refreshed?.status || job.status || null,
+      assignedUserId: job.assignedUserId || null,
     });
     return { ok: true };
   }

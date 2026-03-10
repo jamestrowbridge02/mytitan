@@ -1,11 +1,11 @@
-import { BadRequestException, Body, Controller, Get, Patch, Query, UseGuards } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import { JwtAuthGuard } from "../auth/auth.guard";
 import { CurrentUser } from "../auth/current-user.decorator";
 import { JwtPayload } from "../auth/auth.types";
 import { requireAutomationsV1Enabled } from "../common/feature-flags";
 import { Roles } from "../common/roles.decorator";
 import { RolesGuard } from "../common/roles.guard";
-import { UpdateAutomationsSettingsDto } from "./automations.dto";
+import { CreateAutomationRuleDto, UpdateAutomationRuleDto, UpdateAutomationsSettingsDto } from "./automations.dto";
 import { AutomationsService } from "./automations.service";
 
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -60,5 +60,33 @@ export class AutomationsController {
   diagnostics(@CurrentUser() user: JwtPayload) {
     requireAutomationsV1Enabled();
     return this.automations.getDiagnostics(user.companyId);
+  }
+
+  @Get("workspace-rules")
+  @Roles("OWNER", "ADMIN", "STAFF", "READ_ONLY")
+  workspaceRules(@CurrentUser() user: JwtPayload) {
+    requireAutomationsV1Enabled();
+    return this.automations.listWorkspaceRules(user.companyId);
+  }
+
+  @Post("workspace-rules")
+  @Roles("OWNER", "ADMIN", "STAFF")
+  createWorkspaceRule(@CurrentUser() user: JwtPayload, @Body() dto: CreateAutomationRuleDto) {
+    requireAutomationsV1Enabled();
+    return this.automations.createWorkspaceRule(user, dto);
+  }
+
+  @Patch("workspace-rules/:id")
+  @Roles("OWNER", "ADMIN", "STAFF")
+  updateWorkspaceRule(@CurrentUser() user: JwtPayload, @Param("id") id: string, @Body() dto: UpdateAutomationRuleDto) {
+    requireAutomationsV1Enabled();
+    return this.automations.updateWorkspaceRule(user, id, dto);
+  }
+
+  @Delete("workspace-rules/:id")
+  @Roles("OWNER", "ADMIN", "STAFF")
+  deleteWorkspaceRule(@CurrentUser() user: JwtPayload, @Param("id") id: string) {
+    requireAutomationsV1Enabled();
+    return this.automations.deleteWorkspaceRule(user, id);
   }
 }

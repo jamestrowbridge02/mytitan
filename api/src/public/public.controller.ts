@@ -16,6 +16,7 @@ import {
 } from "@nestjs/common";
 import type { Request, Response } from "express";
 import { JwtService } from "@nestjs/jwt";
+import { AutomationsService } from "../automations/automations.service";
 import { AuditService } from "../audit/audit.service";
 import { BillingService } from "../billing/billing.service";
 import { isMarketplaceEnabled, isMediaSignatureV1Enabled, requireMarketplaceEnabled } from "../common/feature-flags";
@@ -34,6 +35,7 @@ export class PublicController {
     private readonly audit: AuditService,
     private readonly billingService: BillingService,
     private readonly jwtService: JwtService,
+    private readonly automations: AutomationsService,
   ) {}
 
   private async resolveToken(token: string) {
@@ -301,6 +303,15 @@ export class PublicController {
     }
 
     await this.audit.log(record.job.companyId, "portal.sign", `Signature captured for job ${record.job.jobRef}`, null);
+    await this.automations.evaluateRuleTrigger(record.job.companyId, "portal.document_signed", {
+      actorUserId: null,
+      jobId: updated.id,
+      jobRef: updated.jobRef || null,
+      customerId: updated.customerId || null,
+      customerName: updated.customerName || null,
+      status: updated.status || null,
+      assignedUserId: updated.assignedUserId || null,
+    });
     return { signedAt: updated.signedAt };
   }
 
