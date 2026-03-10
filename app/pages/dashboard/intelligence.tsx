@@ -25,6 +25,7 @@ type IntelligenceData = {
     bookingsConvertedLast7Days: number;
     agedUnlinkedBookings: number;
     technicianCompletionQueue: number;
+    portalLinksExpiringSoon: number;
   };
   alerts: Array<{ key: string; severity: string; label: string; count: number; href: string }>;
   trends: {
@@ -50,6 +51,7 @@ const EMPTY: IntelligenceData = {
     bookingsConvertedLast7Days: 0,
     agedUnlinkedBookings: 0,
     technicianCompletionQueue: 0,
+    portalLinksExpiringSoon: 0,
   },
   alerts: [],
   trends: {
@@ -169,6 +171,7 @@ export default function IntelligencePage() {
               ["Bookings converted last 7 days", data.summary.bookingsConvertedLast7Days, "Real booking-to-job throughput from the scheduling queue"],
               ["Aged unlinked bookings", data.summary.agedUnlinkedBookings, "Bookings that have been waiting for conversion for more than 48 hours"],
               ["Technician completion queue", data.summary.technicianCompletionQueue, "Assigned field jobs currently in progress"],
+              ["Portal links expiring soon", data.summary.portalLinksExpiringSoon, "Customer access links that need refresh before they go stale"],
             ].map(([label, value, meaning]) => (
               <OperatorDataTableRow key={String(label)}>
                 <div className="operator-table__cell"><strong>{label}</strong></div>

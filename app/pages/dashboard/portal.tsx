@@ -19,6 +19,7 @@ type PortalOverview = {
     activeLinks: number;
     awaitingApproval: number;
     paymentReady: number;
+    expiringSoon: number;
   };
   recentActivity: Array<{
     id: string;
@@ -96,6 +97,7 @@ export default function PortalOpsPage() {
       { label: "Active links", value: String(data.summary.activeLinks), hint: "Jobs with portal access live now" },
       { label: "Awaiting approval", value: String(data.summary.awaitingApproval), hint: "Completed work still waiting on sign-off" },
       { label: "Payment ready", value: String(data.summary.paymentReady), hint: data.stripeConfigured ? "Portal can hand off to payment" : "Stripe not configured" },
+      { label: "Expiring soon", value: String(data.summary.expiringSoon), hint: "Portal links expiring within 7 days" },
     ];
   }, [data]);
 
@@ -151,6 +153,7 @@ export default function PortalOpsPage() {
                     <div className="operator-cellMeta">
                       <span><strong>{job.portalTokenActive ? "Link active" : "No active link"}</strong></span>
                       <span>{job.portalExpiresAt ? `Expires ${new Date(job.portalExpiresAt).toLocaleDateString()}` : "No expiry set"}</span>
+                      {job.portalExpiresAt && new Date(job.portalExpiresAt).getTime() < Date.now() + 7 * 24 * 60 * 60 * 1000 ? <span>Refresh recommended</span> : null}
                       <span>{job.approvedAt ? "Approved" : "Awaiting approval state"}</span>
                     </div>
                   </div>

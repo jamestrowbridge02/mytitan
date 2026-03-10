@@ -47,6 +47,7 @@ export class MetricsController {
           bookingsConvertedLast7Days: 0,
           agedUnlinkedBookings: 0,
           technicianCompletionQueue: 0,
+          portalLinksExpiringSoon: 0,
         },
         alerts: [],
         trends: {

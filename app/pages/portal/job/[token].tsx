@@ -542,6 +542,17 @@ export default function PublicJobPortal() {
     : paymentsConfigured
       ? 'Payment pending'
       : 'Payments not enabled';
+  const nextStepMessage = declined
+    ? 'This job is currently declined. Contact support if you need the scope corrected before continuing.'
+    : !approved
+      ? 'Review the scope and approve the job to continue.'
+      : !signed
+        ? 'Add your signature to confirm the approved work.'
+        : paymentsConfigured && !paid
+          ? 'Payment is the next step. Once payment is complete, your receipt and PDF will be available here.'
+          : !step5Done
+            ? 'Your PDF will unlock once the remaining steps complete.'
+            : 'Everything is complete. You can download the PDF or contact support if you need anything else.';
 
   const pdfSummary = step5Done ? (
     <>
@@ -586,6 +597,8 @@ export default function PublicJobPortal() {
           <StatusChip label="Paid" value={paid} />
           <StatusChip label="Completed" value={completed} />
         </div>
+
+        <p className="muted" style={{ marginTop: 12 }}>{nextStepMessage}</p>
 
         {error && <p style={{ color: '#ff8a8a', marginTop: 12 }}>{error}</p>}
         {status && <p style={{ color: '#7bdba5', marginTop: 12 }}>{status}</p>}

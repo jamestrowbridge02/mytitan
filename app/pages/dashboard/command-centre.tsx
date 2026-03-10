@@ -49,6 +49,7 @@ export default function CommandCentrePage() {
   const [users, setUsers] = useState<any[]>([]);
   const [views, setViews] = useState<SavedView[]>([]);
   const [activeViewId, setActiveViewId] = useState('');
+  const [defaultViewApplied, setDefaultViewApplied] = useState(false);
   const [showSaveView, setShowSaveView] = useState(false);
   const [saveViewName, setSaveViewName] = useState('');
   const [openedJob, setOpenedJob] = useState<any>(null);
@@ -70,6 +71,15 @@ export default function CommandCentrePage() {
         .catch(() => setViews([]));
     }
   }, [enabled, premiumEnabled]);
+
+  useEffect(() => {
+    if (!enabled || !premiumEnabled || defaultViewApplied || activeViewId || views.length === 0) return;
+    const defaultView = views.find((view) => view?.isDefault);
+    if (!defaultView?.id) return;
+    applyView(defaultView.id);
+    setSaveViewName(String(defaultView.name || ''));
+    setDefaultViewApplied(true);
+  }, [enabled, premiumEnabled, defaultViewApplied, activeViewId, views]);
 
   async function load() {
     if (!enabled) return;

@@ -305,6 +305,14 @@ export class AutomationsService {
         action: "Log a durable automation run when a booking becomes a scheduled job",
         deliveryMode: "metadata_only",
       },
+      {
+        key: "portal_lifecycle_audit",
+        label: "Portal lifecycle audit",
+        enabled: true,
+        trigger: "portal.link_changed",
+        action: "Log portal link provisioning, revocation, and regeneration as durable automation runs",
+        deliveryMode: "metadata_only",
+      },
     ];
   }
 
@@ -336,7 +344,7 @@ export class AutomationsService {
     const db = this.prisma as any;
     const now = new Date();
     const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const [rules, pendingRuns, pendingBillingFollowUps, contactGapJobs, staleUnassignedJobs, publicBookingsAwaitingConversion, recentBookingConversions] = await Promise.all([
+    const [rules, pendingRuns, pendingBillingFollowUps, pendingDispatchFollowUps, contactGapJobs, staleUnassignedJobs, publicBookingsAwaitingConversion, recentBookingConversions, recentPortalLifecycleEvents] = await Promise.all([
       this.listRules(tenantId),
       this.listRuns(tenantId, 12),
       db.jobReminder.count({
@@ -344,6 +352,13 @@ export class AutomationsService {
           companyId: tenantId,
           completedAt: null,
           note: "Automation billing follow-up",
+        },
+      }),
+      db.jobReminder.count({
+        where: {
+          companyId: tenantId,
+          completedAt: null,
+          note: "Automation dispatch follow-up",
         },
       }),
       db.job.count({
@@ -378,6 +393,13 @@ export class AutomationsService {
           at: { gte: last7Days },
         },
       }),
+      db.activityEvent.count({
+        where: {
+          tenantId,
+          type: "automation.portal_lifecycle",
+          at: { gte: last7Days },
+        },
+      }),
     ]);
 
     return {
@@ -385,10 +407,12 @@ export class AutomationsService {
         enabledRules: rules.filter((rule) => rule.enabled).length,
         totalRules: rules.length,
         pendingBillingFollowUps,
+        pendingDispatchFollowUps,
         contactGapJobs,
         staleUnassignedJobs,
         publicBookingsAwaitingConversion,
         bookingConversionsLast7Days: recentBookingConversions,
+        portalLifecycleEventsLast7Days: recentPortalLifecycleEvents,
       },
       alerts: [
         contactGapJobs > 0
@@ -415,6 +439,15 @@ export class AutomationsService {
               severity: "info",
               label: "Public bookings awaiting conversion",
               count: publicBookingsAwaitingConversion,
+              href: "/dashboard/bookings",
+            }
+          : null,
+        pendingDispatchFollowUps > 0
+          ? {
+              key: "dispatch_follow_up",
+              severity: "info",
+              label: "Converted jobs still need dispatch follow-up",
+              count: pendingDispatchFollowUps,
               href: "/dashboard/bookings",
             }
           : null,
@@ -556,6 +589,27 @@ export class AutomationsService {
         bookingStartsAt: booking?.startsAt ? new Date(booking.startsAt).toISOString() : null,
         linkedJobId: job?.id || null,
         linkedJobRef: job?.jobRef || null,
+      },
+    });
+
+    return { logged: true };
+  }
+
+  async handlePortalLifecycle(companyId: string, userId: string | null, job: any, action: 'ensured' | 'revoked' | 'regenerated', portalUrl?: string | null, expiresAt?: Date | string | null) {
+    await this.activity.push({
+      tenantId: companyId,
+      type: 'automation.portal_lifecycle',
+      label: `Automation recorded portal link ${action} for ${job?.jobRef || job?.id}`,
+      jobId: job?.id || null,
+      jobRef: job?.jobRef || null,
+      customerId: job?.customerId || null,
+      customerName: job?.customerName || null,
+      status: job?.status || null,
+      payloadJson: {
+        automationKey: 'portal_lifecycle_audit',
+        action,
+        portalUrl: portalUrl || null,
+        expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null,
       },
     });
 

@@ -50,6 +50,7 @@ function money(cents: number, currency: string) {
 export default function BillingReadinessPage() {
   const [data, setData] = useState<BillingReadiness | null>(null);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [busyJobId, setBusyJobId] = useState<string | null>(null);
 
   const load = async () => {
@@ -66,10 +67,17 @@ export default function BillingReadinessPage() {
     void load();
   }, []);
 
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(""), 2200);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+
   async function run(jobId: string, action: "issue-invoice" | "mark-paid") {
     setBusyJobId(jobId);
     try {
       await apiFetch(`/billing/jobs/${jobId}/${action}`, { method: "POST" });
+      setNotice(action === "issue-invoice" ? "Invoice issued" : "Payment recorded");
       await load();
     } catch (err: any) {
       setError(err?.message || `Failed to ${action}`);
@@ -114,6 +122,7 @@ export default function BillingReadinessPage() {
         />
 
         {error ? <p role="alert" style={{ color: "#ff8a8a", marginTop: 0 }}>{error}</p> : null}
+        {notice ? <div aria-live="polite" className="ccv2-toast ccv2-toast--info" role="status">{notice}</div> : null}
 
         <section className="card operator-section">
           <div className="operator-section__header">

@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { randomBytes } from 'crypto';
+import { AutomationsService } from '../automations/automations.service';
 import { AuditService } from '../audit/audit.service';
 import { BillingService } from '../billing/billing.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -10,6 +11,7 @@ export class PortalService {
     private readonly prisma: PrismaService,
     private readonly billing: BillingService,
     private readonly audit: AuditService,
+    private readonly automations: AutomationsService,
   ) {}
 
   private buildPortalUrl(token: string) {
@@ -72,6 +74,7 @@ export class PortalService {
         activeLinks: rows.filter((row) => row.portalTokenActive).length,
         awaitingApproval: rows.filter((row) => row.status === 'COMPLETED' && !row.approvedAt).length,
         paymentReady: rows.filter((row) => row.paymentReady).length,
+        expiringSoon: rows.filter((row) => row.portalExpiresAt && new Date(row.portalExpiresAt).getTime() < now.getTime() + 7 * 24 * 60 * 60 * 1000).length,
       },
       jobs: rows,
       recentActivity: recentActivity.map((event: any) => ({
@@ -114,6 +117,7 @@ export class PortalService {
       data: { whatsappCompletionLink: portalUrl },
     });
     await this.audit.log(companyId, 'portal.link.ensure', `Portal link prepared for ${job.jobRef}`, userId);
+    await this.automations.handlePortalLifecycle(companyId, userId, job, 'ensured', portalUrl, token.expiresAt);
 
     return {
       jobId: job.id,
@@ -137,6 +141,7 @@ export class PortalService {
       data: { whatsappCompletionLink: null },
     });
     await this.audit.log(companyId, 'portal.link.revoke', `Portal link revoked for ${job.jobRef}`, userId);
+    await this.automations.handlePortalLifecycle(companyId, userId, job, 'revoked', null, null);
     return { ok: true };
   }
 

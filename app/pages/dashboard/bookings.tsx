@@ -169,7 +169,14 @@ export default function BookingsPage() {
       const res = await apiFetch(`/bookings/${bookingId}/convert`, { method: "POST" });
       const jobId = res?.job?.id;
       const jobRef = res?.job?.jobRef || jobId;
-      pushNotice(res?.alreadyLinked ? `Booking already linked to ${jobRef}` : `Converted booking to ${jobRef}`);
+      const dispatchFollowUpCreated = Boolean(res?.conversion?.dispatchFollowUpCreated);
+      pushNotice(
+        res?.alreadyLinked
+          ? `Booking already linked to ${jobRef}`
+          : dispatchFollowUpCreated
+          ? `Converted booking to ${jobRef} and queued dispatch follow-up`
+          : `Converted booking to ${jobRef}`,
+      );
       await load();
       if (jobId) {
         void router.push(`/dashboard/jobs/${jobId}`);

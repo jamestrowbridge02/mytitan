@@ -83,6 +83,7 @@ export class MetricsService {
       bookingsConvertedLast7Days,
       agedUnlinkedBookings,
       inProgressTechnicianJobs,
+      portalLinksExpiringSoon,
       completedLast7Days,
       completedPrevious7Days,
       recentCompletedByTechnician,
@@ -196,6 +197,15 @@ export class MetricsService {
           status: 'IN_PROGRESS',
         },
       }),
+      db.publicJobToken.count({
+        where: {
+          job: { companyId: tenantId },
+          expiresAt: {
+            gt: now,
+            lte: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
+          },
+        },
+      }),
       db.job.count({
         where: {
           companyId: tenantId,
@@ -269,6 +279,7 @@ export class MetricsService {
         bookingsConvertedLast7Days,
         agedUnlinkedBookings,
         technicianCompletionQueue: inProgressTechnicianJobs,
+        portalLinksExpiringSoon,
       },
       alerts: [
         stalledJobs > 0 ? { key: 'stalled_jobs', severity: 'warn', label: 'Stalled active jobs', count: stalledJobs, href: '/dashboard/jobs' } : null,
@@ -276,6 +287,7 @@ export class MetricsService {
         overdueBillingFollowUps > 0 ? { key: 'overdue_followups', severity: 'warn', label: 'Overdue reminders', count: overdueBillingFollowUps, href: '/dashboard/billing/readiness' } : null,
         publicUnlinkedBookings > 0 ? { key: 'public_conversion', severity: 'info', label: 'Public bookings awaiting conversion', count: publicUnlinkedBookings, href: '/dashboard/bookings' } : null,
         agedUnlinkedBookings > 0 ? { key: 'stale_booking_conversion', severity: 'warn', label: 'Unlinked bookings older than 48h', count: agedUnlinkedBookings, href: '/dashboard/bookings' } : null,
+        portalLinksExpiringSoon > 0 ? { key: 'portal_links_expiring', severity: 'info', label: 'Portal links expiring within 7 days', count: portalLinksExpiringSoon, href: '/dashboard/portal' } : null,
       ].filter(Boolean),
       trends: {
         completedLast7Days,

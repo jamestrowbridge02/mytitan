@@ -146,7 +146,7 @@ export class PublicController {
           pdfReady,
         },
         timeline: (record.job.activities || [])
-          .filter((item: any) => ['job.status', 'job.reminder.create', 'tech.note'].includes(String(item.eventType || '')))
+          .filter((item: any) => ['job.status', 'job.reminder.create', 'job.reminder.completed', 'tech.note', 'tech.arrived', 'booking.converted'].includes(String(item.eventType || '')))
           .map((item: any) => ({
             eventType: item.eventType,
             message: item.message,

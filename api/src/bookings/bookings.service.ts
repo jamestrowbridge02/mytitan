@@ -215,11 +215,26 @@ export class BookingsService {
       throw new BadRequestException('Booking not found');
     }
 
+    const readinessIssues = [];
+    if (!String(booking.customerName || '').trim()) readinessIssues.push('customer_name_missing');
+    if (!booking.startsAt || !booking.endsAt) readinessIssues.push('time_window_missing');
+    if (readinessIssues.length > 0) {
+      throw new BadRequestException({
+        code: 'BOOKING_CONVERSION_NOT_READY',
+        issues: readinessIssues,
+      });
+    }
+
     if (booking.jobId && booking.job) {
       return {
         booking,
         job: booking.job,
         alreadyLinked: true,
+        conversion: {
+          linkedAt: booking.updatedAt,
+          dispatchFollowUpCreated: false,
+          readinessIssues: [],
+        },
       };
     }
 
@@ -263,6 +278,40 @@ export class BookingsService {
       },
     });
 
+    let dispatchFollowUpCreated = false;
+    if (!patchedJob.assignedUserId) {
+      const existingDispatchReminder = await db.jobReminder.findFirst({
+        where: {
+          companyId,
+          jobId: patchedJob.id,
+          completedAt: null,
+          note: 'Automation dispatch follow-up',
+        },
+      });
+      if (!existingDispatchReminder) {
+        const reminder = await db.jobReminder.create({
+          data: {
+            companyId,
+            jobId: patchedJob.id,
+            remindAt: new Date(Date.now() + 4 * 60 * 60 * 1000),
+            channel: 'in_app',
+            note: 'Automation dispatch follow-up',
+          },
+        });
+        dispatchFollowUpCreated = true;
+        await db.jobActivity.create({
+          data: {
+            companyId,
+            jobId: patchedJob.id,
+            actorUserId: userId,
+            eventType: 'job.reminder.create',
+            message: 'Dispatch follow-up created after booking conversion',
+            payloadJson: { remindAt: reminder.remindAt, note: reminder.note },
+          },
+        });
+      }
+    }
+
     await db.jobActivity.create({
       data: {
         companyId,
@@ -305,6 +354,11 @@ export class BookingsService {
       booking: linkedBooking,
       job: patchedJob,
       alreadyLinked: false,
+      conversion: {
+        linkedAt: linkedBooking.updatedAt,
+        dispatchFollowUpCreated,
+        readinessIssues: [],
+      },
     };
   }
 

@@ -86,10 +86,12 @@ type AutomationDiagnostics = {
     enabledRules: number;
     totalRules: number;
     pendingBillingFollowUps: number;
+    pendingDispatchFollowUps: number;
     contactGapJobs: number;
     staleUnassignedJobs: number;
     publicBookingsAwaitingConversion: number;
     bookingConversionsLast7Days: number;
+    portalLifecycleEventsLast7Days: number;
   };
   alerts: Array<{ key: string; severity: string; label: string; count: number; href: string }>;
 };
@@ -492,10 +494,12 @@ export default function AutomationsSettingsPage() {
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <span className="badge">Enabled rules {diagnostics.summary.enabledRules}/{diagnostics.summary.totalRules}</span>
               <span className="badge">Billing follow-ups {diagnostics.summary.pendingBillingFollowUps}</span>
+              <span className="badge">Dispatch follow-ups {diagnostics.summary.pendingDispatchFollowUps}</span>
               <span className="badge">Contact gaps {diagnostics.summary.contactGapJobs}</span>
               <span className="badge">Unassigned backlog {diagnostics.summary.staleUnassignedJobs}</span>
               <span className="badge">Public conversion backlog {diagnostics.summary.publicBookingsAwaitingConversion}</span>
               <span className="badge">Conversions 7d {diagnostics.summary.bookingConversionsLast7Days}</span>
+              <span className="badge">Portal lifecycle 7d {diagnostics.summary.portalLifecycleEventsLast7Days}</span>
             </div>
             {diagnostics.alerts.length ? (
               <div style={{ display: "grid", gap: 10 }}>

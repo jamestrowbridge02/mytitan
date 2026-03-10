@@ -56,6 +56,39 @@ export class BillingService {
     });
   }
 
+  private async resolveBillingFollowUp(companyId: string, userId: string | null, jobId: string, reason: 'invoice_issued' | 'payment_received') {
+    const db = this.prisma as any;
+    const openReminders = await db.jobReminder.findMany({
+      where: {
+        companyId,
+        jobId,
+        completedAt: null,
+        note: { in: ['Automation billing follow-up', 'Automation dispatch follow-up'] },
+      },
+    });
+    if (!openReminders.length) return 0;
+
+    const completedAt = new Date();
+    await db.jobReminder.updateMany({
+      where: { id: { in: openReminders.map((row: any) => row.id) } },
+      data: { completedAt },
+    });
+    await db.jobActivity.create({
+      data: {
+        companyId,
+        jobId,
+        actorUserId: userId,
+        eventType: 'job.reminder.completed',
+        message: reason === 'payment_received' ? 'Billing follow-up resolved after payment' : 'Billing follow-up resolved after invoice issue',
+        payloadJson: {
+          reason,
+          reminderIds: openReminders.map((row: any) => row.id),
+        },
+      },
+    });
+    return openReminders.length;
+  }
+
   isStripeConfigured() {
     return Boolean(this.stripe);
   }
@@ -431,6 +464,7 @@ export class BillingService {
       },
     });
     await this.audit.log(tenantId, 'billing.invoice.issue', `Invoice issued for ${job.jobRef || job.id}`, userId);
+    await this.resolveBillingFollowUp(tenantId, userId, job.id, 'invoice_issued');
     return updated;
   }
 
@@ -457,6 +491,7 @@ export class BillingService {
       },
     });
     await this.audit.log(tenantId, 'billing.invoice.mark_paid', `Offline payment recorded for ${job.jobRef || job.id}`, userId);
+    await this.resolveBillingFollowUp(tenantId, userId, job.id, 'payment_received');
     if (isNotificationsV1Enabled()) {
       await this.notifications.notifyPaymentReceived(tenantId, job.id);
     }
@@ -581,6 +616,7 @@ export class BillingService {
           },
         });
         await this.audit.log(job.companyId, 'portal.payment.complete', `Payment received for job ${job.jobRef}`, null);
+        await this.resolveBillingFollowUp(job.companyId, null, job.id, 'payment_received');
         if (isNotificationsV1Enabled()) {
           await this.notifications.notifyPaymentReceived(job.companyId, job.id);
         }
