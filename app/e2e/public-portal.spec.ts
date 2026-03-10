@@ -23,7 +23,8 @@ test.describe("public portal workflow", () => {
       await expect(refreshButton).toBeDisabled();
       await expect(refreshButton).toHaveText(/Refreshing/i);
     } else {
-      await expect(page.getByText(/Payments not configured|Payment availability/i)).toBeVisible();
+      await expect(page.getByTestId("public-portal-billing-progress")).toContainText(/Payment availability/i);
+      await expect(page.getByText(/Secure payment is unavailable|Payments not configured/i).first()).toBeVisible();
     }
   });
 });

@@ -176,6 +176,7 @@ export default function PublicJobPortal() {
   async function refreshPaymentStatus() {
     if (!tokenValue || !marketplaceEnabled) return;
     setError('');
+    setStatus('');
     setPendingAction('refresh-payment');
     try {
       const suffix = sessionIdValue ? `?session_id=${sessionIdValue}` : '';
@@ -183,14 +184,26 @@ export default function PublicJobPortal() {
       const data = await res.json();
       if (!res.ok) {
         setPaymentStatus(null);
+        setCheckoutHint('');
         setError(data?.message || 'Failed to refresh payment status');
         return;
       }
       setPaymentStatus(data?.status || 'unknown');
       setReceiptUrl(data?.receiptUrl || null);
       setPaymentConfigured(data?.configured !== false);
+      if (data?.configured === false) {
+        setCheckoutHint('Secure payment updates are unavailable in this environment. Contact support to confirm payment status.');
+        setStatus('Payment status cannot be refreshed here.');
+        return;
+      }
+      setCheckoutHint(data?.status === 'paid' ? 'Payment confirmed. A receipt will appear here when available.' : '');
+      if (data?.status === 'paid') {
+        setStatus('Payment status refreshed.');
+      }
     } catch {
       setPaymentStatus('unknown');
+      setCheckoutHint('');
+      setError('Failed to refresh payment status');
     } finally {
       setPendingAction('');
     }
@@ -347,7 +360,7 @@ export default function PublicJobPortal() {
       if (!res.ok) {
         const message =
           res.status === 503 || res.status === 400
-            ? 'Payments not configured'
+            ? 'Secure payment is unavailable for this job right now. Please contact support to complete payment.'
             : data?.message || 'Payment failed to start';
         setError(message);
         setPaymentConfigured(false);
@@ -363,7 +376,7 @@ export default function PublicJobPortal() {
         setPaymentConfigured(true);
         return;
       }
-      setError('Payments not configured');
+      setError('Secure payment is unavailable for this job right now. Please contact support to complete payment.');
       setPaymentConfigured(false);
     } catch {
       setError('Payment failed to start');
@@ -802,7 +815,11 @@ export default function PublicJobPortal() {
               ) : null}
             </div>
           ) : (
-            <p className="muted" style={{ margin: 0 }}>Payments not configured.</p>
+            <p className="muted" style={{ margin: 0 }}>
+              {portal?.enabled && portal?.paymentsEnabled
+                ? 'Secure payment is unavailable for this workspace right now. Contact support to complete payment.'
+                : 'Secure payment is not enabled for this job.'}
+            </p>
           )}
         </StepCard>
 

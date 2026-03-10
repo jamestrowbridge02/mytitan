@@ -13,6 +13,19 @@ export class BillingService {
   private readonly stripe: Stripe | null;
   private readonly logger = new Logger(BillingService.name);
 
+  private resolveStripeSecretKey(rawValue?: string | null) {
+    const value = rawValue?.trim();
+    if (!value) return null;
+    if (/^(sk|rk)_(test|live)_/.test(value)) {
+      return value;
+    }
+    if (/^pk_(test|live)_/.test(value)) {
+      this.logger.warn('STRIPE_SECRET_KEY is set to a publishable key. Stripe server-side features will remain disabled until a secret key is configured.');
+      return null;
+    }
+    this.logger.warn('STRIPE_SECRET_KEY does not look like a valid Stripe secret key. Stripe server-side features will remain disabled.');
+    return null;
+  }
 
   constructor(
     private readonly prisma: PrismaService,
@@ -20,7 +33,7 @@ export class BillingService {
     private readonly notifications: NotificationsService,
     private readonly automations: AutomationsService,
   ) {
-    const secret = process.env.STRIPE_SECRET_KEY?.trim();
+    const secret = this.resolveStripeSecretKey(process.env.STRIPE_SECRET_KEY);
     this.stripe = secret ? new Stripe(secret, { apiVersion: '2023-10-16' }) : null;
   }
 

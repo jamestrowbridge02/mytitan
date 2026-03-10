@@ -74,6 +74,12 @@ function startOfDay(date) {
   return value;
 }
 
+function setUtcTime(date, hours, minutes) {
+  const value = new Date(date);
+  value.setUTCHours(hours, minutes, 0, 0);
+  return value;
+}
+
 async function ensurePlan() {
   const plan = await prisma.plan.findFirst({ where: { code: "SOLE_TRADER" } });
   return plan?.id || null;
@@ -512,6 +518,7 @@ async function main() {
   const customers = await ensureCustomers(company.id);
 
   const now = new Date();
+  const bookingBase = setUtcTime(now, 9, 0);
   const today = startOfDay(now);
 
   const invoiceReadyJob = await ensureJob({
@@ -789,8 +796,8 @@ async function main() {
       customerName: customers.convertible.name,
       customerEmail: customers.convertible.email,
       customerPhone: customers.convertible.phone,
-      startsAt: addMinutes(now, 120),
-      endsAt: addMinutes(now, 210),
+      startsAt: addMinutes(bookingBase, 120),
+      endsAt: addMinutes(bookingBase, 180),
       status: "CONFIRMED",
       source: "INTERNAL",
       assignedUserId: operator.id,
@@ -802,8 +809,8 @@ async function main() {
       customerName: customers.convertible.name,
       customerEmail: customers.convertible.email,
       customerPhone: customers.convertible.phone,
-      startsAt: addMinutes(now, 120),
-      endsAt: addMinutes(now, 210),
+      startsAt: addMinutes(bookingBase, 120),
+      endsAt: addMinutes(bookingBase, 180),
       status: "CONFIRMED",
       source: "INTERNAL",
       assignedUserId: operator.id,
@@ -820,8 +827,8 @@ async function main() {
       customerName: null,
       customerEmail: customers.blocked.email,
       customerPhone: customers.blocked.phone,
-      startsAt: addMinutes(now, 240),
-      endsAt: addMinutes(now, 300),
+      startsAt: addMinutes(bookingBase, 240),
+      endsAt: addMinutes(bookingBase, 300),
       status: "PLANNED",
       source: "INTERNAL",
       assignedUserId: operator.id,
@@ -833,8 +840,8 @@ async function main() {
       customerName: null,
       customerEmail: customers.blocked.email,
       customerPhone: customers.blocked.phone,
-      startsAt: addMinutes(now, 240),
-      endsAt: addMinutes(now, 300),
+      startsAt: addMinutes(bookingBase, 240),
+      endsAt: addMinutes(bookingBase, 300),
       status: "PLANNED",
       source: "INTERNAL",
       assignedUserId: operator.id,
@@ -852,8 +859,8 @@ async function main() {
       customerName: customers.technician.name,
       customerEmail: customers.technician.email,
       customerPhone: customers.technician.phone,
-      startsAt: addMinutes(now, 30),
-      endsAt: addMinutes(now, 90),
+      startsAt: addMinutes(bookingBase, 30),
+      endsAt: addMinutes(bookingBase, 90),
       status: "CONFIRMED",
       source: "INTERNAL",
       assignedUserId: operator.id,
@@ -865,8 +872,8 @@ async function main() {
       customerName: customers.technician.name,
       customerEmail: customers.technician.email,
       customerPhone: customers.technician.phone,
-      startsAt: addMinutes(now, 30),
-      endsAt: addMinutes(now, 90),
+      startsAt: addMinutes(bookingBase, 30),
+      endsAt: addMinutes(bookingBase, 90),
       status: "CONFIRMED",
       source: "INTERNAL",
       assignedUserId: operator.id,
