@@ -21,6 +21,7 @@ import { OnboardingModule } from './onboarding/onboarding.module';
 import { GuidedSetupModule } from './guided-setup/guided-setup.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { PublicModule } from './public/public.module';
+import { PortalModule } from './portal/portal.module';
 import { PricingPresetsModule } from './pricing-presets/pricing-presets.module';
 import { RedisModule } from './redis/redis.module';
 import { TenantModule } from './tenant/tenant.module';
@@ -37,6 +38,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
 import { AdminModule } from './admin/admin.module';
 import { EventsModule } from './events/events.module';
 import { CustomersModule } from './customers/customers.module';
+import { TechModule } from './tech/tech.module';
 
 @Module({
   imports: [
@@ -82,9 +84,11 @@ import { CustomersModule } from './customers/customers.module';
     AnalyticsModule,
     UsageModule,
     PublicModule,
+    PortalModule,
     PricingPresetsModule,
     AdminModule,
     CustomersModule,
+    TechModule,
   ],
 })
 export class AppModule {}
