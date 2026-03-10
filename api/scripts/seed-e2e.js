@@ -285,6 +285,19 @@ async function ensureTenantSettings(companyId, defaultLocationId, planId) {
 }
 
 async function ensureAutomations(companyId) {
+  await prisma.automationSuggestionState.deleteMany({
+    where: { tenantId: companyId },
+  });
+
+  await prisma.automationRule.deleteMany({
+    where: {
+      tenantId: companyId,
+      id: {
+        notIn: ["e2e-rule-booking-dispatch"],
+      },
+    },
+  });
+
   await prisma.automationsSetting.upsert({
     where: { tenantId: companyId },
     create: {

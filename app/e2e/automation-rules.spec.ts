@@ -6,6 +6,27 @@ test.use({ storageState: authFile });
 test.describe("automation rules", () => {
   test.skip(!hasDashboardAuth(), "Seed the E2E fixtures or provide dashboard credentials before running authenticated workflow tests.");
 
+  test("renders automation suggestions and supports apply + dismiss flows", async ({ page, request }) => {
+    await installApiProxy(page, request);
+    await page.goto("/dashboard/settings?tab=automation_rules");
+    await expect(page.getByTestId("settings-automation-rules-panel")).toBeVisible();
+
+    await expect(page.getByTestId("automation-suggestion-list")).toContainText("Add an overdue invoice follow-up automation");
+    await expect(page.getByTestId(`automation-suggestion-apply-${fixtureRefs.automationSuggestionKey}`)).toBeVisible();
+
+    await page.getByTestId(`automation-suggestion-apply-${fixtureRefs.automationSuggestionKey}`).evaluate((element: HTMLButtonElement) => element.click());
+    await expect(page.getByTestId("operator-notice-success")).toBeVisible();
+    await expect(page.getByTestId("operator-notice-message")).toContainText(/Suggested automation applied/i);
+    await expect(page.getByTestId("automation-rule-list")).toContainText("Add an overdue invoice follow-up automation");
+    await expect(page.getByTestId(`automation-suggestion-apply-${fixtureRefs.automationSuggestionKey}`)).toHaveCount(0);
+
+    await expect(page.getByTestId(`automation-suggestion-dismiss-${fixtureRefs.dismissedAutomationSuggestionKey}`)).toBeVisible();
+    await page.getByTestId(`automation-suggestion-dismiss-${fixtureRefs.dismissedAutomationSuggestionKey}`).evaluate((element: HTMLButtonElement) => element.click());
+    await expect(page.getByTestId("operator-notice-success")).toBeVisible();
+    await expect(page.getByTestId("operator-notice-message")).toContainText(/Suggested automation dismissed/i);
+    await expect(page.getByTestId(`automation-suggestion-dismiss-${fixtureRefs.dismissedAutomationSuggestionKey}`)).toHaveCount(0);
+  });
+
   test("creates a workspace automation rule and logs a completed run", async ({ page, request }) => {
     await installApiProxy(page, request);
     await page.goto("/dashboard/settings?tab=automation_rules");

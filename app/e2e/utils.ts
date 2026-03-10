@@ -19,6 +19,8 @@ export const fixtureRefs = {
   automationJobRef: "E2E-AUTO-001",
   commandCentreJobRef: "E2E-OPEN-001",
   portalToken: "e2e-public-portal-token",
+  automationSuggestionKey: "invoice-overdue-follow-up",
+  dismissedAutomationSuggestionKey: "technician-arrival-office-notify",
 };
 
 export type E2EMetadata = {
@@ -51,17 +53,26 @@ const apiOrigins = [
 
 async function fulfillFromLocalApi(route: Route, request: APIRequestContext) {
   const originalUrl = new URL(route.request().url());
-  const response = await request.fetch(`http://127.0.0.1:3000${originalUrl.pathname}${originalUrl.search}`, {
-    method: route.request().method(),
-    headers: {
-      ...route.request().headers(),
-      host: "127.0.0.1:3000",
-      origin: "http://127.0.0.1:3101",
-      referer: "http://127.0.0.1:3101/",
-    },
-    data: route.request().postDataBuffer() ?? undefined,
-    failOnStatusCode: false,
-  });
+  let response;
+  try {
+    response = await request.fetch(`http://127.0.0.1:3000${originalUrl.pathname}${originalUrl.search}`, {
+      method: route.request().method(),
+      headers: {
+        ...route.request().headers(),
+        host: "127.0.0.1:3000",
+        origin: "http://127.0.0.1:3101",
+        referer: "http://127.0.0.1:3101/",
+      },
+      data: route.request().postDataBuffer() ?? undefined,
+      failOnStatusCode: false,
+    });
+  } catch (error: any) {
+    if (String(error?.message || "").includes("Request context disposed")) {
+      await route.abort();
+      return;
+    }
+    throw error;
+  }
   const headers = response.headers();
   const contentType = headers["content-type"] || "application/json; charset=utf-8";
 
