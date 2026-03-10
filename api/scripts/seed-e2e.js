@@ -209,6 +209,28 @@ async function ensureTenantSettings(companyId, defaultLocationId, planId) {
       businessConfigJson: {
         defaults: { commandCentreVersion: "v2" },
         navigation: { showIntelligence: true, showPortalOps: true, showTechnicianQueue: true },
+        workflowStages: {
+          bookings: [
+            { id: "lead", label: "Lead Intake", statuses: ["PENDING", "PLANNED"], visible: true },
+            { id: "scheduled", label: "Confirmed Visit", statuses: ["CONFIRMED"], visible: true },
+            { id: "working", label: "On Site", statuses: ["IN_PROGRESS"], visible: true },
+            { id: "completed", label: "Finished", statuses: ["COMPLETED"], visible: true },
+            { id: "cancelled", label: "Cancelled", statuses: ["CANCELLED"], visible: true },
+          ],
+          jobs: [
+            { id: "ready", label: "Ready for Dispatch", statuses: ["OPEN"], visible: true },
+            { id: "scheduled", label: "Booked In", statuses: ["SCHEDULED"], visible: true },
+            { id: "in_progress", label: "Work Underway", statuses: ["IN_PROGRESS"], visible: true },
+            { id: "completed", label: "Ready to Bill", statuses: ["COMPLETED", "INVOICED"], visible: true },
+            { id: "cancelled", label: "Closed Out", statuses: ["CANCELLED"], visible: true },
+          ],
+          technician: [
+            { id: "dispatch", label: "Awaiting Arrival", statuses: ["OPEN", "SCHEDULED"], visible: true },
+            { id: "working", label: "Working On Site", statuses: ["IN_PROGRESS"], visible: true },
+            { id: "finished", label: "Field Complete", statuses: ["COMPLETED", "INVOICED"], visible: true },
+            { id: "cancelled", label: "Cancelled", statuses: ["CANCELLED"], visible: true },
+          ],
+        },
       },
     },
     update: {
@@ -233,6 +255,28 @@ async function ensureTenantSettings(companyId, defaultLocationId, planId) {
       businessConfigJson: {
         defaults: { commandCentreVersion: "v2" },
         navigation: { showIntelligence: true, showPortalOps: true, showTechnicianQueue: true },
+        workflowStages: {
+          bookings: [
+            { id: "lead", label: "Lead Intake", statuses: ["PENDING", "PLANNED"], visible: true },
+            { id: "scheduled", label: "Confirmed Visit", statuses: ["CONFIRMED"], visible: true },
+            { id: "working", label: "On Site", statuses: ["IN_PROGRESS"], visible: true },
+            { id: "completed", label: "Finished", statuses: ["COMPLETED"], visible: true },
+            { id: "cancelled", label: "Cancelled", statuses: ["CANCELLED"], visible: true },
+          ],
+          jobs: [
+            { id: "ready", label: "Ready for Dispatch", statuses: ["OPEN"], visible: true },
+            { id: "scheduled", label: "Booked In", statuses: ["SCHEDULED"], visible: true },
+            { id: "in_progress", label: "Work Underway", statuses: ["IN_PROGRESS"], visible: true },
+            { id: "completed", label: "Ready to Bill", statuses: ["COMPLETED", "INVOICED"], visible: true },
+            { id: "cancelled", label: "Closed Out", statuses: ["CANCELLED"], visible: true },
+          ],
+          technician: [
+            { id: "dispatch", label: "Awaiting Arrival", statuses: ["OPEN", "SCHEDULED"], visible: true },
+            { id: "working", label: "Working On Site", statuses: ["IN_PROGRESS"], visible: true },
+            { id: "finished", label: "Field Complete", statuses: ["COMPLETED", "INVOICED"], visible: true },
+            { id: "cancelled", label: "Cancelled", statuses: ["CANCELLED"], visible: true },
+          ],
+        },
       },
     },
   });

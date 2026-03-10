@@ -126,6 +126,16 @@ test.describe("dashboard workflows", () => {
     await expect(page.getByTestId("settings-workflow-panel")).toBeVisible();
     const token = await page.evaluate(() => window.localStorage.getItem("mytitan_token"));
     expect(token).toBeTruthy();
+    const settingsResponse = await request.get("http://127.0.0.1:3000/tenant/settings", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    expect(settingsResponse.ok()).toBeTruthy();
+    const currentSettings = await settingsResponse.json();
+    const currentBusinessConfig = currentSettings?.businessConfigJson && typeof currentSettings.businessConfigJson === "object"
+      ? currentSettings.businessConfigJson
+      : {};
     const updateResponse = await request.put("http://127.0.0.1:3000/tenant/settings", {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -133,14 +143,18 @@ test.describe("dashboard workflows", () => {
       },
       data: {
         businessConfigJson: {
+          ...currentBusinessConfig,
           terminology: {
+            ...(currentBusinessConfig?.terminology || {}),
             jobs: "Work Orders",
             bookings: "Requests",
           },
           defaults: {
+            ...(currentBusinessConfig?.defaults || {}),
             commandCentreVersion: "v2",
           },
           navigation: {
+            ...(currentBusinessConfig?.navigation || {}),
             showIntelligence: true,
             showPortalOps: true,
             showTechnicianQueue: true,
@@ -159,6 +173,26 @@ test.describe("dashboard workflows", () => {
 
     await page.goto("/dashboard/command-centre-v2");
     await expect(page.getByText(/Operations brain for work orders/i)).toBeVisible();
+  });
+
+  test("configured workflow stages render across operator surfaces", async ({ page, request }) => {
+    await installApiProxy(page, request);
+
+    await page.goto("/dashboard/bookings");
+    const bookingRow = page.locator(".operator-table__row", { hasText: fixtureRefs.convertibleBookingId }).first();
+    await expect(bookingRow.getByTestId("workflow-stage-label")).toContainText("Confirmed Visit");
+
+    await page.goto("/dashboard/jobs");
+    const jobRow = page.locator(".operator-table__row", { hasText: fixtureRefs.commandCentreJobRef }).first();
+    await expect(jobRow.getByTestId("workflow-stage-label")).toContainText("Ready for Dispatch");
+
+    await page.goto("/dashboard/technician");
+    const techRow = page.locator(".operator-table__row", { hasText: fixtureRefs.technicianJobRef }).first();
+    await expect(techRow.getByTestId("workflow-stage-label")).toContainText(/Awaiting Arrival|Working On Site|Field Complete/);
+
+    await page.goto("/dashboard/command-centre-v2");
+    await expect(page.getByText(/Ready for Dispatch/i).first()).toBeVisible();
+    await expect(page.getByText(/Booked In|Work Underway|Ready to Bill/i).first()).toBeVisible();
   });
 
   test("intelligence page loads its attention queue", async ({ page, request }) => {
