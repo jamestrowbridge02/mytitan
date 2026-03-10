@@ -3,7 +3,14 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { DashboardShell } from '../../components/dashboard-shell';
 import { Skeleton } from '../../components/ui/Skeleton';
-import { OperatorPageHeader } from '../../components/ui/operator-page';
+import {
+  OperatorDataTable,
+  OperatorDataTableHeader,
+  OperatorDataTableRow,
+  OperatorFilterBar,
+  OperatorFilterField,
+  OperatorPageHeader,
+} from '../../components/ui/operator-page';
 import { ErrorState } from '../../components/states/ErrorState';
 import { LoadingState } from '../../components/states/LoadingState';
 import { ApiError, apiFetch } from '../../lib/api';
@@ -449,6 +456,7 @@ export default function CalendarPage() {
   const [error, setError] = useState('');
   const [requestId, setRequestId] = useState<string | undefined>(undefined);
   const [statusFilter, setStatusFilter] = useState<StatusFilterKey>('ALL');
+  const [search, setSearch] = useState('');
   const [selectedTechId, setSelectedTechId] = useState('ALL');
   const [selectedLocationId, setSelectedLocationId] = useState('ALL');
   const [isMobile, setIsMobile] = useState(false);
@@ -1186,7 +1194,20 @@ export default function CalendarPage() {
 
   const filteredBlocks = useMemo(() => {
     if (!data) return [] as CalendarBlock[];
+    const normalizedSearch = search.trim().toLowerCase();
     return data.blocks.filter((block) => {
+      const searchable = [
+        block.jobSummary?.jobRef,
+        block.customer?.name,
+        block.customer?.email,
+        block.technician?.name,
+        block.location?.name,
+        block.status,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      if (normalizedSearch && !searchable.includes(normalizedSearch)) return false;
       if (statusFilter === 'UNASSIGNED' && block.technician?.id) return false;
       if (statusFilter === 'CONFIRMED' && block.status !== 'CONFIRMED') return false;
       if (statusFilter === 'IN_PROGRESS' && block.status !== 'IN_PROGRESS') return false;
@@ -1202,13 +1223,18 @@ export default function CalendarPage() {
       }
       return true;
     });
-  }, [data, selectedTechId, selectedLocationId, statusFilter]);
+  }, [data, search, selectedTechId, selectedLocationId, statusFilter]);
 
   const visibleTechnicians = useMemo(() => {
     if (!isMobile) return technicians;
     const techId = selectedTechId === 'ALL' ? technicians[0]?.id ?? '__unassigned__' : selectedTechId;
     return technicians.filter((tech) => tech.id === techId);
   }, [isMobile, selectedTechId, technicians]);
+  const visibleQueue = useMemo(() => {
+    return [...filteredBlocks]
+      .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime())
+      .slice(0, 10);
+  }, [filteredBlocks]);
 
   return (
     <>
@@ -1242,46 +1268,99 @@ export default function CalendarPage() {
               </div>
             </div>
 
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-          <label style={{ display: 'flex', flexDirection: 'column', fontSize: 12 }}>
-              Filter tech
-              <select className="input" value={selectedTechId} onChange={(event) => setSelectedTechId(event.target.value)}>
-                <option value="ALL">All technicians</option>
-                {technicianFilterOptions.map((tech) => (
-                  <option key={tech.id} value={tech.id}>{tech.name || tech.email}</option>
+        <OperatorFilterBar
+          searchValue={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Search customer, job ref, technician, or location"
+          resultsLabel={`${filteredBlocks.length} visible bookings`}
+          actions={[
+            {
+              label: 'Reset filters',
+              variant: 'secondary',
+              onClick: () => {
+                setSearch('');
+                setSelectedTechId('ALL');
+                setSelectedLocationId('ALL');
+                setStatusFilter('ALL');
+              },
+            },
+          ]}
+        >
+          <OperatorFilterField label="Technician">
+            <select className="input" value={selectedTechId} onChange={(event) => setSelectedTechId(event.target.value)}>
+              <option value="ALL">All technicians</option>
+              {technicianFilterOptions.map((tech) => (
+                <option key={tech.id} value={tech.id}>{tech.name || tech.email}</option>
+              ))}
+            </select>
+          </OperatorFilterField>
+          {locationOptions.length > 0 ? (
+            <OperatorFilterField label="Location">
+              <select className="input" value={selectedLocationId} onChange={(event) => setSelectedLocationId(event.target.value)}>
+                <option value="ALL">All locations</option>
+                {locationOptions.map((loc) => (
+                  <option key={loc.id} value={loc.id}>{loc.label}</option>
                 ))}
               </select>
-            </label>
-            {locationOptions.length > 0 ? (
-              <label style={{ display: 'flex', flexDirection: 'column', fontSize: 12 }}>
-                Filter location
-                <select className="input" value={selectedLocationId} onChange={(event) => setSelectedLocationId(event.target.value)}>
-                  <option value="ALL">All locations</option>
-                  {locationOptions.map((loc) => (
-                    <option key={loc.id} value={loc.id}>{loc.label}</option>
-                  ))}
-                </select>
-              </label>
-            ) : null}
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {STATUS_FILTERS.map((filter) => (
-              <button
-                key={filter.key}
-                type="button"
-                className={`button secondary${statusFilter === filter.key ? ' active' : ''}`}
-                onClick={() => setStatusFilter(filter.key)}
-                style={{ height: 32, fontSize: 12 }}
-              >
-                {filter.label}
-              </button>
-            ))}
-          </div>
-        </div>
+            </OperatorFilterField>
+          ) : null}
+          <OperatorFilterField label="Status">
+            <select className="input" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as StatusFilterKey)}>
+              {STATUS_FILTERS.map((filter) => (
+                <option key={filter.key} value={filter.key}>{filter.label}</option>
+              ))}
+            </select>
+          </OperatorFilterField>
+        </OperatorFilterBar>
         {schedulingEnabled && scheduleLoading ? (
           <p className="muted" style={{ marginTop: 6, fontSize: 12 }}>Loading schedules…</p>
         ) : null}
         {schedulingEnabled && scheduleError ? (
           <p className="muted" style={{ marginTop: 6, fontSize: 12 }}>Schedule overlay: {scheduleError}</p>
+        ) : null}
+        {visibleQueue.length ? (
+          <div style={{ marginTop: 12 }}>
+            <OperatorDataTable columns="minmax(220px, 1.5fr) minmax(170px, 1fr) minmax(130px, 0.8fr) minmax(150px, auto)">
+              <OperatorDataTableHeader>
+                <div className="operator-table__cell">Visible booking</div>
+                <div className="operator-table__cell">Time</div>
+                <div className="operator-table__cell">Technician</div>
+                <div className="operator-table__cell">Actions</div>
+              </OperatorDataTableHeader>
+              {visibleQueue.map((block) => {
+                const warningCount = (block.warnings ?? []).length;
+                return (
+                  <OperatorDataTableRow key={`queue-${block.id}`}>
+                    <div className="operator-table__cell">
+                      <div className="operator-cellTitle">
+                        {block.jobSummary?.jobRef || block.customer?.name || `Booking ${block.id.slice(0, 6)}`}
+                        <span className="badge">{block.status}</span>
+                        {warningCount ? <span className="badge warn">{warningCount} warning{warningCount > 1 ? 's' : ''}</span> : null}
+                      </div>
+                      <div className="operator-cellSubtle">{block.customer?.name || block.customer?.email || 'No customer attached'}</div>
+                    </div>
+                    <div className="operator-table__cell">
+                      <div className="operator-cellMeta">
+                        <span><strong>{new Date(block.startsAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</strong></span>
+                        <span>Ends {new Date(block.endsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
+                    </div>
+                    <div className="operator-table__cell">
+                      <div className="operator-cellMeta">
+                        <span><strong>{block.technician?.name || 'Unassigned'}</strong></span>
+                        <span>{block.location?.name || 'No location'}</span>
+                      </div>
+                    </div>
+                    <div className="operator-table__cell operator-table__cell--actions">
+                      <Link className="button secondary operator-compact-button" href={`/dashboard/bookings/${block.id}`}>
+                        Open
+                      </Link>
+                    </div>
+                  </OperatorDataTableRow>
+                );
+              })}
+            </OperatorDataTable>
+          </div>
         ) : null}
         {toastState ? (
           <div

@@ -1,7 +1,16 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { DashboardShell } from "../../components/dashboard-shell";
-import { OperatorPageHeader } from "../../components/ui/operator-page";
+import {
+  OperatorBulkBar,
+  OperatorDataTable,
+  OperatorDataTableHeader,
+  OperatorDataTableRow,
+  OperatorEmptyStateCard,
+  OperatorFilterBar,
+  OperatorFilterField,
+  OperatorPageHeader,
+} from "../../components/ui/operator-page";
 import { apiFetch } from "../../lib/api";
 import { isMarketplaceEnabled } from "../../lib/feature-flags";
 
@@ -13,6 +22,23 @@ type BookingSettings = {
   blackoutDates: Array<{ date: string; reason?: string | null }>;
   slotMinutes: number;
 };
+
+type TimingFilter = "all" | "upcoming" | "today" | "unlinked";
+
+function formatDateTime(value?: string | null) {
+  if (!value) return "Unscheduled";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Unscheduled";
+  return date.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+function isToday(value?: string | null) {
+  if (!value) return false;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return false;
+  const now = new Date();
+  return date.toDateString() === now.toDateString();
+}
 
 export default function BookingsPage() {
   const [bookings, setBookings] = useState<any[]>([]);
@@ -28,29 +54,44 @@ export default function BookingsPage() {
   const [newBlackoutDate, setNewBlackoutDate] = useState("");
   const [newBlackoutReason, setNewBlackoutReason] = useState("");
   const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [timingFilter, setTimingFilter] = useState<TimingFilter>("all");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [notice, setNotice] = useState("");
   const marketplaceEnabled = isMarketplaceEnabled();
 
-  const load = () => {
-    apiFetch("/bookings")
-      .then((data) => setBookings(Array.isArray(data) ? data : []))
-      .catch((err) => setError(err.message || "Failed to load bookings"));
+  const load = async () => {
+    try {
+      const data = await apiFetch("/bookings");
+      setBookings(Array.isArray(data) ? data : []);
+      setError("");
+    } catch (err: any) {
+      setError(err.message || "Failed to load bookings");
+    }
   };
 
-  const loadSettings = () => {
+  const loadSettings = async () => {
     if (!marketplaceEnabled) return;
-    apiFetch("/bookings/settings")
-      .then((data) => {
-        setSettings(data);
-        setPublicEnabled(Boolean(data.publicEnabled));
-        setBlackoutDates(Array.isArray(data.blackoutDates) ? data.blackoutDates : []);
-      })
-      .catch(() => undefined);
+    try {
+      const data = await apiFetch("/bookings/settings");
+      setSettings(data);
+      setPublicEnabled(Boolean(data.publicEnabled));
+      setBlackoutDates(Array.isArray(data.blackoutDates) ? data.blackoutDates : []);
+    } catch {
+      return undefined;
+    }
   };
 
   useEffect(() => {
-    load();
-    loadSettings();
+    void load();
+    void loadSettings();
   }, [marketplaceEnabled]);
+
+  function pushNotice(message: string) {
+    setNotice(message);
+    window.setTimeout(() => setNotice(""), 2200);
+  }
 
   async function onCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -68,7 +109,8 @@ export default function BookingsPage() {
       setStartsAt("");
       setEndsAt("");
       setJobId("");
-      load();
+      pushNotice("Booking created");
+      await load();
     } catch (err: any) {
       setError(err.message || "Failed to create booking");
     }
@@ -93,6 +135,7 @@ export default function BookingsPage() {
         }),
       });
       setSettings(updated);
+      pushNotice("Booking settings saved");
     } catch (err: any) {
       setError(err.message || "Failed to update booking settings");
     } finally {
@@ -100,14 +143,43 @@ export default function BookingsPage() {
     }
   }
 
+  async function copyText(value: string, label: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      pushNotice(`${label} copied`);
+    } catch {
+      pushNotice(`Could not copy ${label.toLowerCase()}`);
+    }
+  }
+
   const stats = useMemo(() => {
     const linkedJobs = bookings.filter((booking) => booking.jobId).length;
+    const upcoming = bookings.filter((booking) => booking.startsAt && new Date(booking.startsAt).getTime() >= Date.now()).length;
     return [
       { label: "Bookings", value: String(bookings.length), hint: `${linkedJobs} linked to jobs` },
+      { label: "Upcoming", value: String(upcoming), hint: "Future schedule load" },
       { label: "Public booking", value: publicEnabled ? "Live" : "Off", hint: publicEnabled ? "Customers can request time" : "Internal only" },
-      { label: "Blackouts", value: String(blackoutDates.length), hint: "Protected unavailable dates" },
     ];
-  }, [blackoutDates.length, bookings, publicEnabled]);
+  }, [bookings, publicEnabled]);
+
+  const statusOptions = useMemo(() => Array.from(new Set(bookings.map((booking) => String(booking.status || "PLANNED")))).sort(), [bookings]);
+
+  const filteredBookings = useMemo(() => {
+    const normalizedSearch = search.trim().toLowerCase();
+    return bookings.filter((booking) => {
+      const searchable = [booking.customerName, booking.status, booking.jobId, booking.id].filter(Boolean).join(" ").toLowerCase();
+      const startsAt = booking?.startsAt ? new Date(booking.startsAt) : null;
+
+      if (normalizedSearch && !searchable.includes(normalizedSearch)) return false;
+      if (statusFilter !== "all" && String(booking.status || "PLANNED") !== statusFilter) return false;
+      if (timingFilter === "upcoming" && (!startsAt || Number.isNaN(startsAt.getTime()) || startsAt.getTime() < Date.now())) return false;
+      if (timingFilter === "today" && !isToday(booking.startsAt)) return false;
+      if (timingFilter === "unlinked" && booking.jobId) return false;
+      return true;
+    });
+  }, [bookings, search, statusFilter, timingFilter]);
+
+  const allVisibleSelected = filteredBookings.length > 0 && filteredBookings.every((booking) => selectedIds.includes(booking.id));
 
   return (
     <DashboardShell>
@@ -115,23 +187,24 @@ export default function BookingsPage() {
         <OperatorPageHeader
           eyebrow="Scheduling"
           title="Bookings"
-          subtitle="Handle manual bookings, keep the public link under control, and move straight into the live calendar when timings change."
+          subtitle="A denser booking queue with local filtering, quick conversion to jobs, and safer operator actions around the public calendar."
           actions={[
             { label: "Calendar", href: "/dashboard/calendar", variant: "secondary" },
             { label: "Booking settings", href: "/dashboard/booking/settings" },
           ]}
-          shortcuts={["Public booking link and blackout controls stay on this page", "Use Calendar for drag rescheduling"]}
+          shortcuts={["Use filters to isolate today's load or unlinked bookings", "Convert unlinked bookings into jobs from the queue"]}
           stats={stats}
         />
 
         {error ? <p style={{ color: "#ff8a8a", marginTop: 0 }}>{error}</p> : null}
+        {notice ? <div className="ccv2-toast ccv2-toast--info">{notice}</div> : null}
 
         <div className={marketplaceEnabled && settings ? "operator-split" : "operator-stack"}>
           <section className="card operator-section">
             <div className="operator-section__header">
               <div>
                 <h2 className="operator-section__title">Create booking</h2>
-                <p className="operator-section__subtitle">Keep manual entry compact and close to the live queue.</p>
+                <p className="operator-section__subtitle">Keep manual entry compact and adjacent to the live queue.</p>
               </div>
             </div>
 
@@ -166,7 +239,7 @@ export default function BookingsPage() {
               <div className="operator-section__header">
                 <div>
                   <h2 className="operator-section__title">Public booking controls</h2>
-                  <p className="operator-section__subtitle">Keep the share link, working window, and blackout dates together.</p>
+                  <p className="operator-section__subtitle">Keep the share link, working hours, and blackout dates together.</p>
                 </div>
               </div>
 
@@ -215,6 +288,11 @@ export default function BookingsPage() {
                     >
                       Add blackout date
                     </button>
+                    {settings.publicUrl ? (
+                      <button className="button secondary" type="button" onClick={() => void copyText(settings.publicUrl || "", "Public booking link")}>
+                        Copy link
+                      </button>
+                    ) : null}
                   </div>
                 </div>
 
@@ -256,50 +334,161 @@ export default function BookingsPage() {
         <section className="card operator-section">
           <div className="operator-section__header">
             <div>
-              <h2 className="operator-section__title">Recent bookings</h2>
-              <p className="operator-section__subtitle">Compact queue for immediate schedule checks and customer context.</p>
+              <h2 className="operator-section__title">Booking queue</h2>
+              <p className="operator-section__subtitle">Filter the visible queue before you reschedule, convert, or open the booking detail.</p>
             </div>
           </div>
 
-          {bookings.length ? (
-            <div className="operator-list">
-              {bookings.map((booking) => (
-                <article key={booking.id} className="operator-row">
-                  <div className="operator-row__main">
-                    <div className="operator-row__title">
-                      <Link href={`/dashboard/bookings/${booking.id}`}>{new Date(booking.startsAt).toLocaleString()}</Link>
-                      <span className="badge">{booking.status}</span>
-                    </div>
-                    <div className="operator-row__subtitle">{booking.customerName || "Customer not attached"}</div>
-                  </div>
+          <OperatorFilterBar
+            searchValue={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search customer, booking id, job id, or status"
+            resultsLabel={`${filteredBookings.length} shown of ${bookings.length} bookings`}
+            actions={[
+              { label: "Reset filters", variant: "secondary", onClick: () => { setSearch(""); setStatusFilter("all"); setTimingFilter("all"); } },
+            ]}
+          >
+            <OperatorFilterField label="Status">
+              <select className="input" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+                <option value="all">All statuses</option>
+                {statusOptions.map((status) => (
+                  <option key={status} value={status}>{status}</option>
+                ))}
+              </select>
+            </OperatorFilterField>
+            <OperatorFilterField label="Timing">
+              <select className="input" value={timingFilter} onChange={(event) => setTimingFilter(event.target.value as TimingFilter)}>
+                <option value="all">All bookings</option>
+                <option value="upcoming">Upcoming</option>
+                <option value="today">Today</option>
+                <option value="unlinked">Not linked to a job</option>
+              </select>
+            </OperatorFilterField>
+          </OperatorFilterBar>
 
-                  <div className="operator-row__meta">
-                    <div className="operator-row__metaLine">
-                      Ends: <strong>{new Date(booking.endsAt).toLocaleString()}</strong>
-                    </div>
-                    <div className="operator-row__metaLine">
-                      Job: <strong>{booking.jobId || "Not linked"}</strong>
-                    </div>
-                  </div>
+          <OperatorBulkBar count={selectedIds.length} hint="Bulk tools stay non-destructive on bookings">
+            <button className="button secondary operator-compact-button" type="button" onClick={() => setSelectedIds([])}>
+              Clear
+            </button>
+            <button
+              className="button secondary operator-compact-button"
+              type="button"
+              onClick={() =>
+                void copyText(
+                  bookings
+                    .filter((booking) => selectedIds.includes(booking.id))
+                    .map((booking) => booking.id)
+                    .join(", "),
+                  "Booking IDs",
+                )
+              }
+            >
+              Copy IDs
+            </button>
+            <button
+              className="button secondary operator-compact-button"
+              type="button"
+              onClick={() =>
+                void copyText(
+                  bookings
+                    .filter((booking) => selectedIds.includes(booking.id))
+                    .map((booking) => booking.customerName || booking.id)
+                    .join(", "),
+                  "Booking customers",
+                )
+              }
+            >
+              Copy customers
+            </button>
+          </OperatorBulkBar>
 
-                  <div className="operator-row__actions">
-                    <Link className="button secondary operator-compact-button" href={`/dashboard/bookings/${booking.id}`}>
-                      Open
-                    </Link>
-                  </div>
-                </article>
-              ))}
-            </div>
+          {filteredBookings.length ? (
+            <OperatorDataTable columns="28px minmax(220px, 1.5fr) minmax(170px, 1fr) minmax(140px, 0.8fr) minmax(140px, 0.8fr) minmax(170px, auto)">
+              <OperatorDataTableHeader>
+                <div className="operator-table__cell">
+                  <input
+                    className="operator-checkbox"
+                    type="checkbox"
+                    checked={allVisibleSelected}
+                    onChange={(event) => {
+                      if (event.target.checked) {
+                        setSelectedIds(Array.from(new Set([...selectedIds, ...filteredBookings.map((booking) => booking.id)])));
+                        return;
+                      }
+                      setSelectedIds((prev) => prev.filter((id) => !filteredBookings.some((booking) => booking.id === id)));
+                    }}
+                  />
+                </div>
+                <div className="operator-table__cell">Booking</div>
+                <div className="operator-table__cell">Schedule</div>
+                <div className="operator-table__cell">Status</div>
+                <div className="operator-table__cell">Job link</div>
+                <div className="operator-table__cell">Actions</div>
+              </OperatorDataTableHeader>
+
+              {filteredBookings.map((booking) => {
+                const selected = selectedIds.includes(booking.id);
+                const convertHref = `/dashboard/jobs/new?bookingId=${encodeURIComponent(booking.id)}&customerName=${encodeURIComponent(booking.customerName || "")}`;
+                return (
+                  <OperatorDataTableRow key={booking.id} selected={selected}>
+                    <div className="operator-table__cell">
+                      <input
+                        className="operator-checkbox"
+                        type="checkbox"
+                        checked={selected}
+                        onChange={() => setSelectedIds((prev) => prev.includes(booking.id) ? prev.filter((id) => id !== booking.id) : [...prev, booking.id])}
+                      />
+                    </div>
+                    <div className="operator-table__cell">
+                      <div className="operator-cellTitle">
+                        <Link href={`/dashboard/bookings/${booking.id}`}>{booking.customerName || booking.id}</Link>
+                      </div>
+                      <div className="operator-cellSubtle">Booking ID {booking.id}</div>
+                    </div>
+                    <div className="operator-table__cell">
+                      <div className="operator-cellMeta">
+                        <span><strong>{formatDateTime(booking.startsAt)}</strong></span>
+                        <span>Ends {formatDateTime(booking.endsAt)}</span>
+                      </div>
+                    </div>
+                    <div className="operator-table__cell">
+                      <div className="operator-cellMeta">
+                        <span><strong>{booking.status || "PLANNED"}</strong></span>
+                        <span>{isToday(booking.startsAt) ? "Today" : "Scheduled"}</span>
+                      </div>
+                    </div>
+                    <div className="operator-table__cell">
+                      <div className="operator-cellMeta">
+                        <span><strong>{booking.jobId || "Not linked"}</strong></span>
+                        <span>{booking.jobId ? "Existing job linked" : "Needs conversion"}</span>
+                      </div>
+                    </div>
+                    <div className="operator-table__cell operator-table__cell--actions">
+                      {!booking.jobId ? (
+                        <Link className="button secondary operator-compact-button" href={convertHref}>
+                          Convert
+                        </Link>
+                      ) : null}
+                      <Link className="button secondary operator-compact-button" href={`/dashboard/bookings/${booking.id}`}>
+                        Open
+                      </Link>
+                      <Link className="button operator-compact-button" href="/dashboard/calendar">
+                        Schedule
+                      </Link>
+                    </div>
+                  </OperatorDataTableRow>
+                );
+              })}
+            </OperatorDataTable>
           ) : !error ? (
-            <div className="operator-empty">
-              <h3>No bookings yet</h3>
-              <p className="muted">Create the first slot here or move into Calendar once the schedule is live.</p>
-              <div className="operator-empty__actions">
-                <Link className="button" href="/dashboard/calendar">
-                  Open calendar
-                </Link>
-              </div>
-            </div>
+            <OperatorEmptyStateCard
+              title="No bookings match this view"
+              description="Clear the filters, open the calendar, or create a fresh booking from this page."
+              actions={[
+                { label: "Reset filters", variant: "secondary", onClick: () => { setSearch(""); setStatusFilter("all"); setTimingFilter("all"); } },
+                { label: "Open calendar", href: "/dashboard/calendar" },
+              ]}
+            />
           ) : null}
         </section>
       </div>

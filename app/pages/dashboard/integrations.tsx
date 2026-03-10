@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { DashboardShell } from "../../components/dashboard-shell";
-import { OperatorPageHeader } from "../../components/ui/operator-page";
+import {
+  OperatorDataTable,
+  OperatorDataTableHeader,
+  OperatorDataTableRow,
+  OperatorEmptyStateCard,
+  OperatorFilterBar,
+  OperatorFilterField,
+  OperatorPageHeader,
+} from "../../components/ui/operator-page";
 import { apiFetch } from "../../lib/api";
 import { isMarketplaceEnabled } from "../../lib/feature-flags";
 
@@ -20,6 +28,9 @@ type ConnectionStatus = {
   allowed: boolean;
   enabled: boolean;
 };
+
+type IntegrationScope = "all" | "enabled" | "restricted";
+type ConnectionScope = "all" | "connected" | "ready" | "blocked";
 
 const CONNECTIONS = [
   {
@@ -59,6 +70,10 @@ export default function IntegrationsPage() {
   const [connections, setConnections] = useState<Record<string, ConnectionStatus>>({});
   const [error, setError] = useState("");
   const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [moduleSearch, setModuleSearch] = useState("");
+  const [moduleScope, setModuleScope] = useState<IntegrationScope>("all");
+  const [connectionSearch, setConnectionSearch] = useState("");
+  const [connectionScope, setConnectionScope] = useState<ConnectionScope>("all");
   const marketplaceEnabled = isMarketplaceEnabled();
 
   const load = async () => {
@@ -76,6 +91,7 @@ export default function IntegrationsPage() {
         }),
       );
       setConnections(Object.fromEntries(statusEntries));
+      setError("");
     } catch (err: any) {
       setError(err.message || "Failed to load integrations");
     }
@@ -142,18 +158,42 @@ export default function IntegrationsPage() {
     ];
   }, [connections, items]);
 
+  const filteredItems = useMemo(() => {
+    const normalizedSearch = moduleSearch.trim().toLowerCase();
+    return items.filter((item) => {
+      const searchable = `${item.name} ${item.description} ${item.key}`.toLowerCase();
+      if (normalizedSearch && !searchable.includes(normalizedSearch)) return false;
+      if (moduleScope === "enabled" && !item.enabled) return false;
+      if (moduleScope === "restricted" && item.allowed) return false;
+      return true;
+    });
+  }, [items, moduleScope, moduleSearch]);
+
+  const filteredConnections = useMemo(() => {
+    const normalizedSearch = connectionSearch.trim().toLowerCase();
+    return CONNECTIONS.filter((conn) => {
+      const status = connections[conn.key];
+      const searchable = `${conn.name} ${conn.description} ${conn.benefits}`.toLowerCase();
+      if (normalizedSearch && !searchable.includes(normalizedSearch)) return false;
+      if (connectionScope === "connected" && !status?.connected) return false;
+      if (connectionScope === "ready" && !(status?.allowed && status?.enabled && !status?.connected)) return false;
+      if (connectionScope === "blocked" && status?.allowed) return false;
+      return true;
+    });
+  }, [connectionScope, connectionSearch, connections]);
+
   return (
     <DashboardShell>
       <div className="operator-stack">
         <OperatorPageHeader
           eyebrow="Platform"
           title="Integrations"
-          subtitle="Enable core product modules, then connect finance and calendar providers from the same operational page."
+          subtitle="Structured activation and connection tables so this page behaves like a control surface instead of a placeholder settings list."
           actions={[
             { label: "Settings", href: "/dashboard/settings", variant: "secondary" },
             { label: "Bookings", href: "/dashboard/bookings" },
           ]}
-          shortcuts={["Configure first, connect second", "Unavailable tools show workspace gating immediately"]}
+          shortcuts={["Search modules locally", "Activation and connection states are separated cleanly"]}
           stats={stats}
         />
 
@@ -163,85 +203,166 @@ export default function IntegrationsPage() {
           <div className="operator-section__header">
             <div>
               <h2 className="operator-section__title">Product modules</h2>
-              <p className="operator-section__subtitle">Activation state and configuration stay visible in one scan.</p>
+              <p className="operator-section__subtitle">Activation state, access level, and next action stay aligned in one table.</p>
             </div>
           </div>
-          <div className="operator-list">
-            {items.map((item) => (
-              <article key={item.key} className="operator-row">
-                <div className="operator-row__main">
-                  <div className="operator-row__title">
-                    {item.name}
-                    {!item.allowed ? <span className="badge warn">Restricted</span> : item.enabled ? <span className="operator-tag">Enabled</span> : null}
+
+          <OperatorFilterBar
+            searchValue={moduleSearch}
+            onSearchChange={setModuleSearch}
+            searchPlaceholder="Search module, description, or key"
+            resultsLabel={`${filteredItems.length} shown of ${items.length} modules`}
+            actions={[
+              { label: "Reset filters", variant: "secondary", onClick: () => { setModuleSearch(""); setModuleScope("all"); } },
+            ]}
+          >
+            <OperatorFilterField label="Scope">
+              <select className="input" value={moduleScope} onChange={(event) => setModuleScope(event.target.value as IntegrationScope)}>
+                <option value="all">All modules</option>
+                <option value="enabled">Enabled only</option>
+                <option value="restricted">Restricted only</option>
+              </select>
+            </OperatorFilterField>
+          </OperatorFilterBar>
+
+          {filteredItems.length ? (
+            <OperatorDataTable columns="minmax(220px, 1.4fr) minmax(160px, 0.9fr) minmax(160px, 0.9fr) minmax(170px, auto)">
+              <OperatorDataTableHeader>
+                <div className="operator-table__cell">Module</div>
+                <div className="operator-table__cell">Access</div>
+                <div className="operator-table__cell">State</div>
+                <div className="operator-table__cell">Actions</div>
+              </OperatorDataTableHeader>
+
+              {filteredItems.map((item) => (
+                <OperatorDataTableRow key={item.key}>
+                  <div className="operator-table__cell">
+                    <div className="operator-cellTitle">
+                      {item.name}
+                      {!item.allowed ? <span className="badge warn">Restricted</span> : item.enabled ? <span className="operator-tag">Enabled</span> : null}
+                    </div>
+                    <div className="operator-cellSubtle">{item.description}</div>
                   </div>
-                  <div className="operator-row__subtitle">{item.description}</div>
-                </div>
-
-                <div className="operator-row__meta">
-                  <div className="operator-row__metaLine">Setup time: <strong>2-5 min</strong></div>
-                  <div className="operator-row__metaLine">Access: <strong>{item.allowed ? "Allowed" : "Workspace gated"}</strong></div>
-                </div>
-
-                <div className="operator-row__actions">
-                  <a className="button secondary operator-compact-button" href={item.configureUrl}>
-                    Configure
-                  </a>
-                  <button
-                    className={`toggle ${item.enabled ? "on" : ""}`}
-                    type="button"
-                    onClick={() => void toggle(item)}
-                    disabled={!item.allowed || savingKey === item.key}
-                  >
-                    {item.enabled ? "Enabled" : "Disabled"}
-                  </button>
-                </div>
-              </article>
-            ))}
-          </div>
+                  <div className="operator-table__cell">
+                    <div className="operator-cellMeta">
+                      <span><strong>{item.allowed ? "Allowed" : "Workspace gated"}</strong></span>
+                      <span>{item.allowed ? "Ready to configure" : "Plan or policy restricted"}</span>
+                    </div>
+                  </div>
+                  <div className="operator-table__cell">
+                    <div className="operator-cellMeta">
+                      <span><strong>{item.enabled ? "Enabled" : "Disabled"}</strong></span>
+                      <span>Setup time 2-5 min</span>
+                    </div>
+                  </div>
+                  <div className="operator-table__cell operator-table__cell--actions">
+                    <a className="button secondary operator-compact-button" href={item.configureUrl}>
+                      Configure
+                    </a>
+                    <button
+                      className={`toggle ${item.enabled ? "on" : ""}`}
+                      type="button"
+                      onClick={() => void toggle(item)}
+                      disabled={!item.allowed || savingKey === item.key}
+                    >
+                      {item.enabled ? "Enabled" : "Disabled"}
+                    </button>
+                  </div>
+                </OperatorDataTableRow>
+              ))}
+            </OperatorDataTable>
+          ) : (
+            <OperatorEmptyStateCard
+              title="No modules match this filter"
+              description="Clear the search or scope filter to review the full activation matrix."
+              actions={[{ label: "Reset filters", variant: "secondary", onClick: () => { setModuleSearch(""); setModuleScope("all"); } }]}
+            />
+          )}
         </section>
 
         <section className="card operator-section">
           <div className="operator-section__header">
             <div>
               <h2 className="operator-section__title">Accounting and calendars</h2>
-              <p className="operator-section__subtitle">Connection state, setup time, and next action stay aligned.</p>
+              <p className="operator-section__subtitle">Connection readiness and provider status now read like a real integration control table.</p>
             </div>
           </div>
-          <div className="operator-list">
-            {CONNECTIONS.map((conn) => {
-              const status = connections[conn.key];
-              const canConnect = status?.allowed && status?.enabled;
-              return (
-                <article key={conn.key} className="operator-row">
-                  <div className="operator-row__main">
-                    <div className="operator-row__title">
-                      {conn.name}
-                      {status?.connected ? <span className="operator-tag">Connected</span> : <span className="badge warn">Not connected</span>}
+
+          <OperatorFilterBar
+            searchValue={connectionSearch}
+            onSearchChange={setConnectionSearch}
+            searchPlaceholder="Search provider or benefit"
+            resultsLabel={`${filteredConnections.length} shown of ${CONNECTIONS.length} providers`}
+            actions={[
+              { label: "Reset filters", variant: "secondary", onClick: () => { setConnectionSearch(""); setConnectionScope("all"); } },
+            ]}
+          >
+            <OperatorFilterField label="Connection state">
+              <select className="input" value={connectionScope} onChange={(event) => setConnectionScope(event.target.value as ConnectionScope)}>
+                <option value="all">All providers</option>
+                <option value="connected">Connected</option>
+                <option value="ready">Ready to connect</option>
+                <option value="blocked">Blocked</option>
+              </select>
+            </OperatorFilterField>
+          </OperatorFilterBar>
+
+          {filteredConnections.length ? (
+            <OperatorDataTable columns="minmax(220px, 1.4fr) minmax(160px, 0.9fr) minmax(180px, 1fr) minmax(170px, auto)">
+              <OperatorDataTableHeader>
+                <div className="operator-table__cell">Provider</div>
+                <div className="operator-table__cell">Connection</div>
+                <div className="operator-table__cell">Readiness</div>
+                <div className="operator-table__cell">Actions</div>
+              </OperatorDataTableHeader>
+
+              {filteredConnections.map((conn) => {
+                const status = connections[conn.key];
+                const canConnect = status?.allowed && status?.enabled;
+                return (
+                  <OperatorDataTableRow key={conn.key}>
+                    <div className="operator-table__cell">
+                      <div className="operator-cellTitle">
+                        {conn.name}
+                        {status?.connected ? <span className="operator-tag">Connected</span> : <span className="badge warn">Not connected</span>}
+                      </div>
+                      <div className="operator-cellSubtle">{conn.description}</div>
                     </div>
-                    <div className="operator-row__subtitle">{conn.description}</div>
-                  </div>
-
-                  <div className="operator-row__meta">
-                    <div className="operator-row__metaLine">Setup time: <strong>{conn.time}</strong></div>
-                    <div className="operator-row__metaLine">Benefit: <strong>{conn.benefits}</strong></div>
-                  </div>
-
-                  <div className="operator-row__actions">
-                    {!status?.allowed ? <span className="badge warn">Restricted</span> : null}
-                    {status?.connected ? (
-                      <button className="button secondary operator-compact-button" type="button" onClick={() => void disconnect(conn.key)} disabled={savingKey === conn.key}>
-                        Disconnect
-                      </button>
-                    ) : (
-                      <button className="button operator-compact-button" type="button" onClick={() => void connect(conn.key)} disabled={!canConnect || savingKey === conn.key}>
-                        Connect
-                      </button>
-                    )}
-                  </div>
-                </article>
-              );
-            })}
-          </div>
+                    <div className="operator-table__cell">
+                      <div className="operator-cellMeta">
+                        <span><strong>{status?.connected ? "Connected" : "Not connected"}</strong></span>
+                        <span>{status?.connectedAt ? new Date(status.connectedAt).toLocaleString() : "No connection timestamp"}</span>
+                      </div>
+                    </div>
+                    <div className="operator-table__cell">
+                      <div className="operator-cellMeta">
+                        <span><strong>{status?.allowed ? (status?.enabled ? "Ready" : "Module disabled") : "Blocked"}</strong></span>
+                        <span>{conn.benefits}</span>
+                      </div>
+                    </div>
+                    <div className="operator-table__cell operator-table__cell--actions">
+                      {!status?.allowed ? <span className="badge warn">Restricted</span> : null}
+                      {status?.connected ? (
+                        <button className="button secondary operator-compact-button" type="button" onClick={() => void disconnect(conn.key)} disabled={savingKey === conn.key}>
+                          Disconnect
+                        </button>
+                      ) : (
+                        <button className="button operator-compact-button" type="button" onClick={() => void connect(conn.key)} disabled={!canConnect || savingKey === conn.key}>
+                          Connect
+                        </button>
+                      )}
+                    </div>
+                  </OperatorDataTableRow>
+                );
+              })}
+            </OperatorDataTable>
+          ) : (
+            <OperatorEmptyStateCard
+              title="No providers match this filter"
+              description="Clear the search or scope filter to review the full provider connection matrix."
+              actions={[{ label: "Reset filters", variant: "secondary", onClick: () => { setConnectionSearch(""); setConnectionScope("all"); } }]}
+            />
+          )}
         </section>
       </div>
     </DashboardShell>

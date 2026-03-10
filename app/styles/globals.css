@@ -2616,10 +2616,217 @@ body {
   gap: 8px;
 }
 
+[data-shell="app"] .operator-filterbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+[data-shell="app"] .operator-filterbar__main {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex: 1 1 620px;
+  flex-wrap: wrap;
+}
+
+[data-shell="app"] .operator-filterbar__search {
+  min-width: min(280px, 100%);
+  flex: 1 1 280px;
+}
+
+[data-shell="app"] .operator-filterbar__filters {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex: 999 1 420px;
+  flex-wrap: wrap;
+}
+
+[data-shell="app"] .operator-filterbar__field {
+  min-width: 140px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+[data-shell="app"] .operator-filterbar__label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(148, 163, 184, 0.82);
+}
+
+[data-shell="app"] .operator-filterbar__input,
+[data-shell="app"] .operator-filterbar select,
+[data-shell="app"] .operator-filterbar input {
+  margin: 0;
+  min-height: 38px;
+  border-radius: 12px;
+}
+
+[data-shell="app"] .operator-filterbar__aside {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex: 1 1 220px;
+  flex-wrap: wrap;
+}
+
+[data-shell="app"] .operator-filterbar__results {
+  font-size: 12px;
+  color: rgba(191, 204, 226, 0.76);
+}
+
+[data-shell="app"] .operator-filterbar__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+[data-shell="app"] .operator-bulkbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(94, 234, 212, 0.18);
+  background: rgba(20, 184, 166, 0.08);
+}
+
+[data-shell="app"] .operator-bulkbar__summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+[data-shell="app"] .operator-bulkbar__count {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #def7f3;
+}
+
+[data-shell="app"] .operator-bulkbar__hint {
+  font-size: 12px;
+  color: rgba(222, 247, 243, 0.72);
+}
+
+[data-shell="app"] .operator-bulkbar__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 [data-shell="app"] .operator-list {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+[data-shell="app"] .operator-table {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+[data-shell="app"] .operator-table__header,
+[data-shell="app"] .operator-table__row {
+  display: grid;
+  grid-template-columns: var(--operator-table-columns);
+  gap: 12px;
+  align-items: center;
+}
+
+[data-shell="app"] .operator-table__header {
+  padding: 0 12px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(148, 163, 184, 0.82);
+}
+
+[data-shell="app"] .operator-table__row {
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.025);
+  transition: border-color 120ms ease, background 120ms ease, transform 120ms ease;
+}
+
+[data-shell="app"] .operator-table__row:hover {
+  border-color: rgba(148, 163, 184, 0.22);
+  background: rgba(255, 255, 255, 0.04);
+  transform: translateY(-1px);
+}
+
+[data-shell="app"] .operator-table__row.is-selected {
+  border-color: rgba(94, 234, 212, 0.34);
+  background: rgba(20, 184, 166, 0.08);
+}
+
+[data-shell="app"] .operator-table__cell {
+  min-width: 0;
+}
+
+[data-shell="app"] .operator-table__cell--actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+[data-shell="app"] .operator-checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: #5eead4;
+}
+
+[data-shell="app"] .operator-cellTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+[data-shell="app"] .operator-cellTitle a {
+  color: #f8fafc;
+}
+
+[data-shell="app"] .operator-cellSubtle {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: rgba(191, 204, 226, 0.76);
+}
+
+[data-shell="app"] .operator-cellMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: rgba(191, 204, 226, 0.76);
+}
+
+[data-shell="app"] .operator-cellMeta strong {
+  color: #f8fafc;
 }
 
 [data-shell="app"] .operator-row {
@@ -2749,6 +2956,22 @@ body {
 }
 
 @media (max-width: 960px) {
+  [data-shell="app"] .operator-filterbar__aside {
+    justify-content: flex-start;
+  }
+
+  [data-shell="app"] .operator-table__header {
+    display: none;
+  }
+
+  [data-shell="app"] .operator-table__row {
+    grid-template-columns: 1fr;
+  }
+
+  [data-shell="app"] .operator-table__cell--actions {
+    justify-content: flex-start;
+  }
+
   [data-shell="app"] .operator-split {
     grid-template-columns: 1fr;
   }

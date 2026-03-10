@@ -1,7 +1,16 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { DashboardShell } from "../../components/dashboard-shell";
-import { OperatorPageHeader } from "../../components/ui/operator-page";
+import {
+  OperatorBulkBar,
+  OperatorDataTable,
+  OperatorDataTableHeader,
+  OperatorDataTableRow,
+  OperatorEmptyStateCard,
+  OperatorFilterBar,
+  OperatorFilterField,
+  OperatorPageHeader,
+} from "../../components/ui/operator-page";
 import { apiFetch } from "../../lib/api";
 
 type CustomerRow = {
@@ -14,17 +23,29 @@ type CustomerRow = {
   activityCount?: number;
 };
 
+type ContactFilter = "all" | "email" | "phone" | "missing";
+type ActivityFilter = "all" | "active" | "quiet";
+
+function getTimelineHref(customer: CustomerRow) {
+  return `/dashboard/customers/${encodeURIComponent(customer.slug || customer.id)}?name=${encodeURIComponent(customer.name)}`;
+}
+
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<CustomerRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [search, setSearch] = useState("");
+  const [contactFilter, setContactFilter] = useState<ContactFilter>("all");
+  const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   useEffect(() => {
     const load = async () => {
       try {
         const rows = await apiFetch("/customers?limit=100");
         setCustomers(Array.isArray(rows) ? rows : []);
+        setError("");
       } catch (err: any) {
         setError(err?.message || "Failed to load customers");
         setCustomers([]);
@@ -34,6 +55,11 @@ export default function CustomersPage() {
     };
     void load();
   }, []);
+
+  function pushNotice(message: string) {
+    setNotice(message);
+    window.setTimeout(() => setNotice(""), 1800);
+  }
 
   async function createMessageEvent(customer: CustomerRow, kind: "sms.sent" | "email.sent" | "portal.viewed") {
     try {
@@ -55,11 +81,9 @@ export default function CustomersPage() {
         }),
       });
 
-      setNotice(label);
-      window.setTimeout(() => setNotice(""), 1800);
+      pushNotice(label);
     } catch {
-      setNotice("Could not create messaging event");
-      window.setTimeout(() => setNotice(""), 1800);
+      pushNotice("Could not create messaging event");
     }
   }
 
@@ -83,11 +107,18 @@ export default function CustomersPage() {
         }),
       });
 
-      setNotice(res?.label || `${channel.toUpperCase()} sent`);
-      window.setTimeout(() => setNotice(""), 1800);
+      pushNotice(res?.label || `${channel.toUpperCase()} sent`);
     } catch {
-      setNotice(`Could not send ${channel.toUpperCase()}`);
-      window.setTimeout(() => setNotice(""), 1800);
+      pushNotice(`Could not send ${channel.toUpperCase()}`);
+    }
+  }
+
+  async function copyText(value: string, label: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      pushNotice(`${label} copied`);
+    } catch {
+      pushNotice(`Could not copy ${label.toLowerCase()}`);
     }
   }
 
@@ -102,6 +133,26 @@ export default function CustomersPage() {
     ];
   }, [customers]);
 
+  const filteredCustomers = useMemo(() => {
+    const normalizedSearch = search.trim().toLowerCase();
+    return customers.filter((customer) => {
+      const searchable = [customer.name, customer.email, customer.phone].filter(Boolean).join(" ").toLowerCase();
+      const hasEmail = Boolean(customer.email);
+      const hasPhone = Boolean(customer.phone);
+      const activityCount = Number(customer.activityCount || 0);
+
+      if (normalizedSearch && !searchable.includes(normalizedSearch)) return false;
+      if (contactFilter === "email" && !hasEmail) return false;
+      if (contactFilter === "phone" && !hasPhone) return false;
+      if (contactFilter === "missing" && (hasEmail || hasPhone)) return false;
+      if (activityFilter === "active" && activityCount <= 0) return false;
+      if (activityFilter === "quiet" && activityCount > 0) return false;
+      return true;
+    });
+  }, [activityFilter, contactFilter, customers, search]);
+
+  const allVisibleSelected = filteredCustomers.length > 0 && filteredCustomers.every((customer) => selectedIds.includes(customer.id));
+
   return (
     <DashboardShell>
       <div data-customer-comms="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>
@@ -115,12 +166,12 @@ export default function CustomersPage() {
         <OperatorPageHeader
           eyebrow="Customers"
           title="CRM"
-          subtitle="Customer records, messaging events, and timeline shortcuts from one operator-ready workspace."
+          subtitle="Searchable customer records with timeline access, comms shortcuts, and lighter-weight selection tools for operator follow-up."
           actions={[
             { label: "Command Centre", href: "/dashboard/command-centre-v2", variant: "secondary" },
             { label: "New job", href: "/dashboard/jobs/new" },
           ]}
-          shortcuts={["Log contact events inline", "Open any customer timeline in one click"]}
+          shortcuts={["Search by customer name or contact detail", "Timeline and comms actions stay in-row"]}
           stats={stats}
         />
 
@@ -128,75 +179,175 @@ export default function CustomersPage() {
           <div className="operator-section__header">
             <div>
               <h2 className="operator-section__title">Customer roster</h2>
-              <p className="operator-section__subtitle">Compact rows keep messaging actions, workload, and timeline entry points visible.</p>
+              <p className="operator-section__subtitle">Table-style rows replace oversized cards so contact state and workload are visible at a glance.</p>
             </div>
           </div>
+
+          <OperatorFilterBar
+            searchValue={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search customer, phone, or email"
+            resultsLabel={`${filteredCustomers.length} shown of ${customers.length} customers`}
+            actions={[
+              { label: "Reset filters", variant: "secondary", onClick: () => { setSearch(""); setContactFilter("all"); setActivityFilter("all"); } },
+            ]}
+          >
+            <OperatorFilterField label="Contact">
+              <select className="input" value={contactFilter} onChange={(event) => setContactFilter(event.target.value as ContactFilter)}>
+                <option value="all">All contacts</option>
+                <option value="email">Has email</option>
+                <option value="phone">Has phone</option>
+                <option value="missing">Missing contact</option>
+              </select>
+            </OperatorFilterField>
+            <OperatorFilterField label="Activity">
+              <select className="input" value={activityFilter} onChange={(event) => setActivityFilter(event.target.value as ActivityFilter)}>
+                <option value="all">All activity</option>
+                <option value="active">Has activity</option>
+                <option value="quiet">No activity yet</option>
+              </select>
+            </OperatorFilterField>
+          </OperatorFilterBar>
+
+          <OperatorBulkBar count={selectedIds.length} hint="Bulk actions are non-destructive">
+            <button className="button secondary operator-compact-button" type="button" onClick={() => setSelectedIds([])}>
+              Clear
+            </button>
+            <button
+              className="button secondary operator-compact-button"
+              type="button"
+              onClick={() =>
+                void copyText(
+                  customers
+                    .filter((customer) => selectedIds.includes(customer.id))
+                    .map((customer) => customer.name)
+                    .join(", "),
+                  "Customer names",
+                )
+              }
+            >
+              Copy names
+            </button>
+            <button
+              className="button secondary operator-compact-button"
+              type="button"
+              onClick={() =>
+                void copyText(
+                  customers
+                    .filter((customer) => selectedIds.includes(customer.id))
+                    .map((customer) => customer.email || customer.phone || customer.name)
+                    .join(", "),
+                  "Customer contacts",
+                )
+              }
+            >
+              Copy contacts
+            </button>
+          </OperatorBulkBar>
 
           {error ? <p style={{ color: "#ff8a8a", marginTop: 0 }}>{error}</p> : null}
           {notice ? <div className="ccv2-toast ccv2-toast--info">{notice}</div> : null}
 
           {loading ? (
             <div className="operator-note">Loading customers...</div>
-          ) : customers.length === 0 ? (
-            <div className="operator-empty">
-              <h3>No customers found yet</h3>
-              <p className="muted">Create a job or log a message event and the CRM workspace will populate automatically.</p>
-              <div className="operator-empty__actions">
-                <Link className="button" href="/dashboard/jobs/new">
-                  Create job
-                </Link>
-                <Link className="button secondary" href="/dashboard/command-centre-v2">
-                  Open Command Centre
-                </Link>
-              </div>
-            </div>
-          ) : (
-            <div className="operator-list">
-              {customers.map((customer) => {
-                const href = `/dashboard/customers/${encodeURIComponent(customer.slug || customer.id)}?name=${encodeURIComponent(customer.name)}`;
+          ) : filteredCustomers.length ? (
+            <OperatorDataTable columns="28px minmax(220px, 1.5fr) minmax(160px, 1fr) minmax(130px, 0.8fr) minmax(150px, 0.8fr) minmax(170px, auto)">
+              <OperatorDataTableHeader>
+                <div className="operator-table__cell">
+                  <input
+                    className="operator-checkbox"
+                    type="checkbox"
+                    checked={allVisibleSelected}
+                    onChange={(event) => {
+                      if (event.target.checked) {
+                        setSelectedIds(Array.from(new Set([...selectedIds, ...filteredCustomers.map((customer) => customer.id)])));
+                        return;
+                      }
+                      setSelectedIds((prev) => prev.filter((id) => !filteredCustomers.some((customer) => customer.id === id)));
+                    }}
+                  />
+                </div>
+                <div className="operator-table__cell">Customer</div>
+                <div className="operator-table__cell">Contact</div>
+                <div className="operator-table__cell">Workload</div>
+                <div className="operator-table__cell">Activity</div>
+                <div className="operator-table__cell">Actions</div>
+              </OperatorDataTableHeader>
+
+              {filteredCustomers.map((customer) => {
+                const href = getTimelineHref(customer);
+                const selected = selectedIds.includes(customer.id);
                 return (
-                  <article key={customer.id} className="operator-row">
-                    <div className="operator-row__main">
-                      <div className="operator-row__title">
+                  <OperatorDataTableRow key={customer.id} selected={selected}>
+                    <div className="operator-table__cell">
+                      <input
+                        className="operator-checkbox"
+                        type="checkbox"
+                        checked={selected}
+                        onChange={() => setSelectedIds((prev) => prev.includes(customer.id) ? prev.filter((id) => id !== customer.id) : [...prev, customer.id])}
+                      />
+                    </div>
+                    <div className="operator-table__cell">
+                      <div className="operator-cellTitle">
                         <Link href={href}>{customer.name}</Link>
                         <span className="operator-tag">{Number(customer.jobCount || 0)} jobs</span>
                       </div>
-                      <div className="operator-row__subtitle">{customer.email || customer.phone || "No contact details recorded"}</div>
-                    </div>
-
-                    <div className="operator-row__meta">
-                      <div className="operator-row__metaLine">
-                        Activity: <strong>{Number(customer.activityCount || 0)} events</strong>
+                      <div className="operator-cellSubtle">
+                        <button className="button secondary operator-compact-button" type="button" onClick={() => void createMessageEvent(customer, "sms.sent")}>
+                          Log SMS
+                        </button>
+                        {" "}
+                        <button className="button secondary operator-compact-button" type="button" onClick={() => void createMessageEvent(customer, "email.sent")}>
+                          Log email
+                        </button>
+                        {" "}
+                        <button className="button secondary operator-compact-button" type="button" onClick={() => void createMessageEvent(customer, "portal.viewed")}>
+                          Log portal
+                        </button>
                       </div>
-                      <div className="operator-row__metaLine">
-                        Contact: <strong>{customer.email ? "Email" : customer.phone ? "Phone" : "Missing"}</strong>
+                    </div>
+                    <div className="operator-table__cell">
+                      <div className="operator-cellMeta">
+                        <span><strong>{customer.email || "No email"}</strong></span>
+                        <span>{customer.phone || "No phone"}</span>
                       </div>
                     </div>
-
-                    <div className="operator-row__actions">
-                      <button className="button secondary operator-compact-button" onClick={() => void createMessageEvent(customer, "sms.sent")}>
-                        Log SMS
-                      </button>
-                      <button className="button secondary operator-compact-button" onClick={() => void createMessageEvent(customer, "email.sent")}>
-                        Log email
-                      </button>
-                      <button className="button secondary operator-compact-button" onClick={() => void createMessageEvent(customer, "portal.viewed")}>
-                        Log portal
-                      </button>
-                      <button className="button secondary operator-compact-button" onClick={() => void sendQuickCommunication(customer, "sms")}>
+                    <div className="operator-table__cell">
+                      <div className="operator-cellMeta">
+                        <span><strong>{Number(customer.jobCount || 0)} jobs</strong></span>
+                        <span>{Number(customer.jobCount || 0) > 0 ? "Linked workload" : "No jobs yet"}</span>
+                      </div>
+                    </div>
+                    <div className="operator-table__cell">
+                      <div className="operator-cellMeta">
+                        <span><strong>{Number(customer.activityCount || 0)} events</strong></span>
+                        <span>{Number(customer.activityCount || 0) > 0 ? "Timeline active" : "Quiet record"}</span>
+                      </div>
+                    </div>
+                    <div className="operator-table__cell operator-table__cell--actions">
+                      <button className="button secondary operator-compact-button" type="button" onClick={() => void sendQuickCommunication(customer, "sms")}>
                         Send SMS
                       </button>
-                      <button className="button secondary operator-compact-button" onClick={() => void sendQuickCommunication(customer, "email")}>
+                      <button className="button secondary operator-compact-button" type="button" onClick={() => void sendQuickCommunication(customer, "email")}>
                         Send email
                       </button>
                       <Link href={href} className="button operator-compact-button">
                         Open timeline
                       </Link>
                     </div>
-                  </article>
+                  </OperatorDataTableRow>
                 );
               })}
-            </div>
+            </OperatorDataTable>
+          ) : (
+            <OperatorEmptyStateCard
+              title="No customers match this view"
+              description="Clear the filters, create a job, or log a customer message event to seed the CRM workspace."
+              actions={[
+                { label: "Reset filters", variant: "secondary", onClick: () => { setSearch(""); setContactFilter("all"); setActivityFilter("all"); } },
+                { label: "Create job", href: "/dashboard/jobs/new" },
+              ]}
+            />
           )}
         </section>
       </div>
