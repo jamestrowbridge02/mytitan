@@ -24,6 +24,7 @@ export default defineConfig({
     : {
         command:
           "NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:3000 " +
+          "NEXT_PUBLIC_MYTITAN_DISABLE_SSE=1 " +
           "NEXT_PUBLIC_MYTITAN_FEATURE_MARKETPLACE=1 " +
           "NEXT_PUBLIC_MYTITAN_FEATURE_COMMAND_CENTRE_V2=1 " +
           "NEXT_PUBLIC_MYTITAN_FEATURE_PORTAL_POLISH_V1=1 " +

@@ -206,6 +206,10 @@ async function ensureTenantSettings(companyId, defaultLocationId, planId) {
       brandPrimaryColor: "#4fd1c5",
       supportPhone: "+44 20 7946 0101",
       primaryTrade: "WHEELS",
+      businessConfigJson: {
+        defaults: { commandCentreVersion: "v2" },
+        navigation: { showIntelligence: true, showPortalOps: true, showTechnicianQueue: true },
+      },
     },
     update: {
       planId,
@@ -226,6 +230,10 @@ async function ensureTenantSettings(companyId, defaultLocationId, planId) {
       brandPrimaryColor: "#4fd1c5",
       supportPhone: "+44 20 7946 0101",
       primaryTrade: "WHEELS",
+      businessConfigJson: {
+        defaults: { commandCentreVersion: "v2" },
+        navigation: { showIntelligence: true, showPortalOps: true, showTechnicianQueue: true },
+      },
     },
   });
 }

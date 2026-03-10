@@ -25,7 +25,7 @@ test.describe("public portal workflow", () => {
       await expect(refreshButton).toHaveText(/Refreshing/i);
     } else {
       await expect(page.getByTestId("public-portal-billing-progress")).toContainText(/Payment availability/i);
-      await expect(page.getByText(/Secure payment is unavailable|Payments not configured/i).first()).toBeVisible();
+      await expect(page.getByText(/Secure payment is unavailable|Payments not configured|Payment handoff not enabled/i).first()).toBeVisible();
     }
 
     const approveButton = page.getByTestId("public-portal-approve");
