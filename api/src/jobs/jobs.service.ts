@@ -60,6 +60,14 @@ export class JobsService {
     await this.automations.handleJobCompleted(companyId, userId, current);
   }
 
+  private async maybeRunContactGapAutomation(companyId: string, userId: string, jobId: string) {
+    if (!isAutomationsV1Enabled()) return;
+    const db = this.prisma as any;
+    const current = await db.job.findFirst({ where: { id: jobId, companyId } });
+    if (!current) return;
+    await this.automations.handleJobContactGap(companyId, userId, current);
+  }
+
 
   constructor(
     private readonly events: EventsService,
@@ -686,6 +694,7 @@ export class JobsService {
 
     await this.audit.log(companyId, "job.create", `Created job ${created.jobRef ?? created.id}`, userId);
     await this.logActivity(companyId, created.id, userId, "job.create", `Job ${created.jobRef ?? created.id} created`);
+    await this.maybeRunContactGapAutomation(companyId, userId, created.id);
 
     if (wheelsEnabled && submittedForm) {
       await this.templatesService.ensureWheelsDefaultTemplate();
@@ -891,6 +900,7 @@ export class JobsService {
       `Job ${updated?.jobRef || updated?.id || id} updated`,
     );
     await this.maybeRunCompletionAutomation(companyId, userId, job, updated);
+    await this.maybeRunContactGapAutomation(companyId, userId, updated.id);
     return updated;
   }
 

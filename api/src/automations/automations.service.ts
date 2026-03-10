@@ -11,6 +11,7 @@ const DEFAULT_SETTINGS = {
   approvalRequestEnabled: false,
   reviewRequestEnabled: false,
   jobCompletionFollowUpEnabled: false,
+  jobContactGapEnabled: false,
   deliveryMode: "metadata_only" as const,
 };
 
@@ -29,6 +30,7 @@ export class AutomationsService {
       approvalRequestEnabled: Boolean(v1.approvalRequestEnabled),
       reviewRequestEnabled: Boolean(v1.reviewRequestEnabled),
       jobCompletionFollowUpEnabled: Boolean(v1.jobCompletionFollowUpEnabled),
+      jobContactGapEnabled: Boolean(v1.jobContactGapEnabled),
       deliveryMode: v1.deliveryMode === "live_send" ? "live_send" : "metadata_only",
     };
   }
@@ -66,6 +68,7 @@ export class AutomationsService {
       approvalRequestEnabled: dto.approvalRequestEnabled ?? current.approvalRequestEnabled,
       reviewRequestEnabled: dto.reviewRequestEnabled ?? current.reviewRequestEnabled,
       jobCompletionFollowUpEnabled: dto.jobCompletionFollowUpEnabled ?? current.jobCompletionFollowUpEnabled,
+      jobContactGapEnabled: dto.jobContactGapEnabled ?? current.jobContactGapEnabled,
       deliveryMode: nextDeliveryMode,
     };
     const configJson = {
@@ -286,6 +289,14 @@ export class AutomationsService {
         action: "Create a follow-up reminder when completed work still needs invoice/payment handling",
         deliveryMode: settings.deliveryMode,
       },
+      {
+        key: "job_contact_gap",
+        label: "Missing contact follow-up",
+        enabled: Boolean(settings.jobContactGapEnabled),
+        trigger: "job.created_or_updated",
+        action: "Create a follow-up reminder when a job cannot be reached by email or phone",
+        deliveryMode: settings.deliveryMode,
+      },
     ];
   }
 
@@ -311,6 +322,89 @@ export class AutomationsService {
       status: row.status,
       payloadJson: row.payloadJson,
     }));
+  }
+
+  async getDiagnostics(tenantId: string) {
+    const db = this.prisma as any;
+    const now = new Date();
+    const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const [rules, pendingRuns, pendingBillingFollowUps, contactGapJobs, staleUnassignedJobs, publicBookingsAwaitingConversion] = await Promise.all([
+      this.listRules(tenantId),
+      this.listRuns(tenantId, 12),
+      db.jobReminder.count({
+        where: {
+          companyId: tenantId,
+          completedAt: null,
+          note: "Automation billing follow-up",
+        },
+      }),
+      db.job.count({
+        where: {
+          companyId: tenantId,
+          status: { in: ["OPEN", "SCHEDULED", "IN_PROGRESS", "COMPLETED"] },
+          customerEmail: null,
+          customerPhone: null,
+        },
+      }),
+      db.job.count({
+        where: {
+          companyId: tenantId,
+          assignedUserId: null,
+          status: { in: ["OPEN", "SCHEDULED"] },
+          createdAt: { lt: new Date(now.getTime() - 48 * 60 * 60 * 1000) },
+        },
+      }),
+      db.booking.count({
+        where: {
+          companyId: tenantId,
+          source: "PUBLIC",
+          jobId: null,
+          status: { in: ["PENDING", "PLANNED", "CONFIRMED"] },
+          createdAt: { gte: last7Days },
+        },
+      }),
+    ]);
+
+    return {
+      summary: {
+        enabledRules: rules.filter((rule) => rule.enabled).length,
+        totalRules: rules.length,
+        pendingBillingFollowUps,
+        contactGapJobs,
+        staleUnassignedJobs,
+        publicBookingsAwaitingConversion,
+      },
+      alerts: [
+        contactGapJobs > 0
+          ? {
+              key: "job_contact_gap",
+              severity: "warn",
+              label: "Jobs missing customer contact",
+              count: contactGapJobs,
+              href: "/dashboard/jobs",
+            }
+          : null,
+        staleUnassignedJobs > 0
+          ? {
+              key: "stale_unassigned_jobs",
+              severity: "warn",
+              label: "Unassigned jobs older than 48h",
+              count: staleUnassignedJobs,
+              href: "/dashboard/jobs",
+            }
+          : null,
+        publicBookingsAwaitingConversion > 0
+          ? {
+              key: "public_booking_conversion",
+              severity: "info",
+              label: "Public bookings awaiting conversion",
+              count: publicBookingsAwaitingConversion,
+              href: "/dashboard/bookings",
+            }
+          : null,
+      ].filter(Boolean),
+      runs: pendingRuns,
+    };
   }
 
   async handleJobCompleted(companyId: string, userId: string | null, job: any) {
@@ -368,5 +462,62 @@ export class AutomationsService {
     });
 
     return { logged: true, reminderCreated, reason: reminderCreated ? "created" : "already_exists_or_paid" };
+  }
+
+  async handleJobContactGap(companyId: string, userId: string | null, job: any) {
+    const settings = await this.getSettings(companyId);
+    if (!settings.jobContactGapEnabled) {
+      return { logged: false, reminderCreated: false, reason: "disabled" };
+    }
+
+    const hasContact = Boolean(String(job?.customerEmail || "").trim() || String(job?.customerPhone || "").trim());
+    if (hasContact) {
+      return { logged: false, reminderCreated: false, reason: "contact_present" };
+    }
+
+    const db = this.prisma as any;
+    const existing = await db.jobReminder.findFirst({
+      where: {
+        companyId,
+        jobId: job.id,
+        note: "Automation customer contact follow-up",
+        completedAt: null,
+      },
+    });
+
+    let reminderCreated = false;
+    if (!existing) {
+      await db.jobReminder.create({
+        data: {
+          companyId,
+          jobId: job.id,
+          remindAt: new Date(Date.now() + 12 * 60 * 60 * 1000),
+          channel: "in_app",
+          note: "Automation customer contact follow-up",
+        },
+      });
+      reminderCreated = true;
+    }
+
+    await this.activity.push({
+      tenantId: companyId,
+      type: "automation.job_contact_gap",
+      label: reminderCreated
+        ? `Automation flagged a customer contact gap for ${job.jobRef || job.id}`
+        : `Automation re-evaluated contact coverage for ${job.jobRef || job.id}`,
+      jobId: job.id,
+      jobRef: job.jobRef || null,
+      customerId: job.customerId || null,
+      customerName: job.customerName || null,
+      status: job.status || null,
+      payloadJson: {
+        automationKey: "job_contact_gap",
+        reminderCreated,
+        customerEmail: job.customerEmail || null,
+        customerPhone: job.customerPhone || null,
+      },
+    });
+
+    return { logged: true, reminderCreated, reason: reminderCreated ? "created" : "already_exists" };
   }
 }

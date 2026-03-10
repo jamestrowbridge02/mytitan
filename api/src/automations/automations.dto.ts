@@ -18,6 +18,10 @@ export class UpdateAutomationsSettingsDto {
   jobCompletionFollowUpEnabled?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  jobContactGapEnabled?: boolean;
+
+  @IsOptional()
   @IsString()
   @IsIn(["metadata_only", "live_send"])
   deliveryMode?: "metadata_only" | "live_send";

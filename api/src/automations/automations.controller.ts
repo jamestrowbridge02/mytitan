@@ -54,4 +54,11 @@ export class AutomationsController {
     const clamped = Number.isNaN(parsed) ? 20 : Math.max(1, Math.min(100, Math.floor(parsed)));
     return this.automations.listRuns(user.companyId, clamped);
   }
+
+  @Get("diagnostics")
+  @Roles("OWNER", "ADMIN", "STAFF", "READ_ONLY")
+  diagnostics(@CurrentUser() user: JwtPayload) {
+    requireAutomationsV1Enabled();
+    return this.automations.getDiagnostics(user.companyId);
+  }
 }

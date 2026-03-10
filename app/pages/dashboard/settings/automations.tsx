@@ -12,6 +12,7 @@ type AutomationSettings = {
   approvalRequestEnabled: boolean;
   reviewRequestEnabled: boolean;
   jobCompletionFollowUpEnabled: boolean;
+  jobContactGapEnabled: boolean;
   deliveryMode?: "metadata_only" | "live_send";
 };
 
@@ -80,11 +81,24 @@ type PreviewData = {
 
 type ActivityFilter = "all" | "reminders" | "approval" | "reviews";
 
+type AutomationDiagnostics = {
+  summary: {
+    enabledRules: number;
+    totalRules: number;
+    pendingBillingFollowUps: number;
+    contactGapJobs: number;
+    staleUnassignedJobs: number;
+    publicBookingsAwaitingConversion: number;
+  };
+  alerts: Array<{ key: string; severity: string; label: string; count: number; href: string }>;
+};
+
 const DEFAULT_SETTINGS: AutomationSettings = {
   bookingRemindersEnabled: false,
   approvalRequestEnabled: false,
   reviewRequestEnabled: false,
   jobCompletionFollowUpEnabled: false,
+  jobContactGapEnabled: false,
   deliveryMode: "metadata_only",
 };
 
@@ -141,6 +155,9 @@ export default function AutomationsSettingsPage() {
   const [runs, setRuns] = useState<AutomationRun[]>([]);
   const [runsLoading, setRunsLoading] = useState(false);
   const [runsError, setRunsError] = useState("");
+  const [diagnostics, setDiagnostics] = useState<AutomationDiagnostics | null>(null);
+  const [diagnosticsLoading, setDiagnosticsLoading] = useState(false);
+  const [diagnosticsError, setDiagnosticsError] = useState("");
 
   async function load() {
     if (!enabled) return;
@@ -256,6 +273,21 @@ export default function AutomationsSettingsPage() {
     }
   }
 
+  async function loadDiagnostics() {
+    if (!enabled) return;
+    setDiagnosticsLoading(true);
+    setDiagnosticsError("");
+    try {
+      const data = await apiFetch("/automations/diagnostics");
+      setDiagnostics(data as AutomationDiagnostics);
+    } catch (err: any) {
+      setDiagnostics(null);
+      setDiagnosticsError(err?.message || "Failed to load automation diagnostics");
+    } finally {
+      setDiagnosticsLoading(false);
+    }
+  }
+
   useEffect(() => {
     load();
     loadActivity(filter);
@@ -263,6 +295,7 @@ export default function AutomationsSettingsPage() {
     loadPreview();
     loadRules();
     loadRuns();
+    loadDiagnostics();
   }, [enabled]);
 
   async function updateSetting(key: keyof AutomationSettings, value: boolean) {
@@ -426,7 +459,59 @@ export default function AutomationsSettingsPage() {
               <p className="muted" style={{ margin: 0 }}>Create a durable follow-up reminder when completed work still needs invoice or payment handling.</p>
             </div>
           </label>
+
+          <label style={{ display: "flex", gap: 12, alignItems: "center" }}>
+            <input
+              type="checkbox"
+              checked={current.jobContactGapEnabled}
+              onChange={(e) => updateSetting("jobContactGapEnabled", e.target.checked)}
+              disabled={savingKey === "jobContactGapEnabled"}
+            />
+            <div>
+              <strong>Missing contact follow-up</strong>
+              <p className="muted" style={{ margin: 0 }}>Create a follow-up reminder when jobs are created without an email or phone contact path.</p>
+            </div>
+          </label>
         </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", justifyContent: "space-between" }}>
+          <div>
+            <h2 style={{ marginTop: 0 }}>Diagnostics</h2>
+            <p className="muted" style={{ marginTop: 4 }}>Operational automation alerts backed by current jobs, bookings, and reminders.</p>
+          </div>
+          <button type="button" className="button secondary" onClick={() => void loadDiagnostics()} disabled={diagnosticsLoading}>
+            {diagnosticsLoading ? "Refreshing..." : "Refresh diagnostics"}
+          </button>
+        </div>
+        {diagnosticsError ? <p className="muted">{diagnosticsError}</p> : null}
+        {diagnostics ? (
+          <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <span className="badge">Enabled rules {diagnostics.summary.enabledRules}/{diagnostics.summary.totalRules}</span>
+              <span className="badge">Billing follow-ups {diagnostics.summary.pendingBillingFollowUps}</span>
+              <span className="badge">Contact gaps {diagnostics.summary.contactGapJobs}</span>
+              <span className="badge">Unassigned backlog {diagnostics.summary.staleUnassignedJobs}</span>
+              <span className="badge">Public conversion backlog {diagnostics.summary.publicBookingsAwaitingConversion}</span>
+            </div>
+            {diagnostics.alerts.length ? (
+              <div style={{ display: "grid", gap: 10 }}>
+                {diagnostics.alerts.map((alert) => (
+                  <div key={alert.key} style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", padding: "12px 14px", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, background: "rgba(255,255,255,0.02)" }}>
+                    <div>
+                      <strong>{alert.label}</strong>
+                      <p className="muted" style={{ margin: "4px 0 0" }}>Count: {alert.count}</p>
+                    </div>
+                    <Link className="button secondary" href={alert.href}>Open queue</Link>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="muted" style={{ marginBottom: 0 }}>No automation alerts are currently active.</p>
+            )}
+          </div>
+        ) : null}
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
