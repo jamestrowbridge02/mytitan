@@ -21,6 +21,7 @@ type BillingReadiness = {
     paid: number;
     paymentReady: number;
     portalReady: number;
+    overdueBillingFollowUps: number;
   };
   jobs: Array<{
     id: string;
@@ -35,6 +36,8 @@ type BillingReadiness = {
     invoiceReady: boolean;
     paymentReady: boolean;
     portalReady: boolean;
+    billingFollowUpAt?: string | null;
+    billingFollowUpOverdue?: boolean;
     portalUrl?: string | null;
     paymentLinkUrl?: string | null;
   }>;
@@ -82,6 +85,7 @@ export default function BillingReadinessPage() {
       { label: "Issued", value: String(data.summary.invoiceIssued), hint: "Invoice already issued" },
       { label: "Paid", value: String(data.summary.paid), hint: "Paid jobs tracked by current billing fields" },
       { label: "Payment-ready", value: String(data.summary.paymentReady), hint: data.stripeConfigured ? "Stripe can attach later" : "Stripe not configured" },
+      { label: "Overdue follow-ups", value: String(data.summary.overdueBillingFollowUps), hint: "Billing reminders already past due" },
     ];
   }, [data]);
 
@@ -144,6 +148,9 @@ export default function BillingReadinessPage() {
                       <span><strong>{job.invoiceIssuedAt ? "Invoice issued" : job.invoiceReady ? "Invoice ready" : "Not ready"}</strong></span>
                       <span>{job.invoicePaidAt ? "Paid" : job.paymentReady ? "Payment-capable" : "Payment not ready"}</span>
                       <span>{job.portalReady ? "Portal ready" : "Portal link missing"}</span>
+                      {job.billingFollowUpAt ? (
+                        <span>{job.billingFollowUpOverdue ? `Follow-up overdue since ${new Date(job.billingFollowUpAt).toLocaleDateString()}` : `Follow-up due ${new Date(job.billingFollowUpAt).toLocaleDateString()}`}</span>
+                      ) : null}
                     </div>
                   </div>
                   <div className="operator-table__cell operator-table__cell--actions">

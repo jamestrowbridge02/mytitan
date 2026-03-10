@@ -21,21 +21,31 @@ export class PortalService {
     const db = this.prisma as any;
     const settings = await db.tenantSetting.findUnique({ where: { tenantId: companyId } });
     const now = new Date();
-    const jobs = await db.job.findMany({
-      where: {
-        companyId,
-        status: { in: ['OPEN', 'SCHEDULED', 'IN_PROGRESS', 'COMPLETED', 'INVOICED'] },
-      },
-      include: {
-        publicTokens: {
-          where: { expiresAt: { gt: now } },
-          orderBy: { createdAt: 'desc' },
-          take: 1,
+    const [jobs, recentActivity] = await Promise.all([
+      db.job.findMany({
+        where: {
+          companyId,
+          status: { in: ['OPEN', 'SCHEDULED', 'IN_PROGRESS', 'COMPLETED', 'INVOICED'] },
         },
-      },
-      orderBy: [{ updatedAt: 'desc' }],
-      take: 40,
-    });
+        include: {
+          publicTokens: {
+            where: { expiresAt: { gt: now } },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+          },
+        },
+        orderBy: [{ updatedAt: 'desc' }],
+        take: 40,
+      }),
+      db.auditEvent.findMany({
+        where: {
+          companyId,
+          type: { startsWith: 'portal.' },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 12,
+      }),
+    ]);
 
     const rows = jobs.map((job: any) => {
       const token = job.publicTokens?.[0] || null;
@@ -64,6 +74,12 @@ export class PortalService {
         paymentReady: rows.filter((row) => row.paymentReady).length,
       },
       jobs: rows,
+      recentActivity: recentActivity.map((event: any) => ({
+        id: event.id,
+        type: event.type,
+        message: event.message,
+        createdAt: event.createdAt,
+      })),
     };
   }
 

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
 import { DashboardShell } from "../../components/dashboard-shell";
 import {
@@ -47,6 +48,7 @@ function isToday(value?: string | null) {
 }
 
 export default function BookingsPage() {
+  const router = useRouter();
   const [bookings, setBookings] = useState<any[]>([]);
   const [startsAt, setStartsAt] = useState("");
   const [endsAt, setEndsAt] = useState("");
@@ -65,6 +67,7 @@ export default function BookingsPage() {
   const [timingFilter, setTimingFilter] = useState<TimingFilter>("all");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [notice, setNotice] = useState("");
+  const [busyConvertId, setBusyConvertId] = useState<string | null>(null);
   const [savedView, setSavedView] = useStickyOperatorView<BookingSavedView>("mytitan_bookings_saved_view_v1", "all");
   const marketplaceEnabled = isMarketplaceEnabled();
 
@@ -156,6 +159,25 @@ export default function BookingsPage() {
       pushNotice(`${label} copied`);
     } catch {
       pushNotice(`Could not copy ${label.toLowerCase()}`);
+    }
+  }
+
+  async function convertBooking(bookingId: string) {
+    setBusyConvertId(bookingId);
+    setError("");
+    try {
+      const res = await apiFetch(`/bookings/${bookingId}/convert`, { method: "POST" });
+      const jobId = res?.job?.id;
+      const jobRef = res?.job?.jobRef || jobId;
+      pushNotice(res?.alreadyLinked ? `Booking already linked to ${jobRef}` : `Converted booking to ${jobRef}`);
+      await load();
+      if (jobId) {
+        void router.push(`/dashboard/jobs/${jobId}`);
+      }
+    } catch (err: any) {
+      setError(err?.message || "Failed to convert booking");
+    } finally {
+      setBusyConvertId(null);
     }
   }
 
@@ -491,7 +513,6 @@ export default function BookingsPage() {
 
               {filteredBookings.map((booking) => {
                 const selected = selectedIds.includes(booking.id);
-                const convertHref = `/dashboard/jobs/new?bookingId=${encodeURIComponent(booking.id)}&customerName=${encodeURIComponent(booking.customerName || "")}`;
                 return (
                   <OperatorDataTableRow key={booking.id} selected={selected}>
                     <div className="operator-table__cell">
@@ -539,11 +560,19 @@ export default function BookingsPage() {
                             href: `/dashboard/bookings/${booking.id}`,
                           },
                           ...(!booking.jobId ? [{
-                            label: "Convert to job",
-                            description: "Create a job from this unlinked booking",
+                            label: busyConvertId === booking.id ? "Converting..." : "Convert to job",
+                            description: "Create a linked scheduled job from this booking",
                             shortcut: "New",
                             group: "Booking",
-                            href: convertHref,
+                            onClick: () => void convertBooking(booking.id),
+                            disabled: busyConvertId === booking.id,
+                          }] : []),
+                          ...(booking.jobId ? [{
+                            label: "Open linked job",
+                            description: "Open the linked job record",
+                            shortcut: "Open",
+                            group: "Booking",
+                            href: `/dashboard/jobs/${booking.jobId}`,
                           }] : []),
                           {
                             label: "Copy booking ID",

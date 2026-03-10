@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtPayload } from '../auth/auth.types';
@@ -27,6 +27,13 @@ export class BookingsController {
   @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
   list(@CurrentUser() user: JwtPayload, @Query('from') from?: string, @Query('to') to?: string) {
     return this.bookingsService.list(user.companyId, from, to);
+  }
+
+  @Post(':id/convert')
+  @Feature('bookings_enabled')
+  @Roles('OWNER', 'ADMIN', 'STAFF')
+  convert(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.bookingsService.convertToJob(user.companyId, user.sub, id);
   }
 
   @Get('settings')

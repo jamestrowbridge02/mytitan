@@ -80,6 +80,9 @@ export class MetricsService {
       stalledJobs,
       unassignedOpenJobs,
       overdueBillingFollowUps,
+      bookingsConvertedLast7Days,
+      agedUnlinkedBookings,
+      inProgressTechnicianJobs,
       completedLast7Days,
       completedPrevious7Days,
       recentCompletedByTechnician,
@@ -171,6 +174,28 @@ export class MetricsService {
           remindAt: { lt: now },
         },
       }),
+      db.booking.count({
+        where: {
+          companyId: tenantId,
+          jobId: { not: null },
+          updatedAt: { gte: last7Days },
+        },
+      }),
+      db.booking.count({
+        where: {
+          companyId: tenantId,
+          jobId: null,
+          status: { in: ['PENDING', 'PLANNED', 'CONFIRMED'] },
+          createdAt: { lt: new Date(now.getTime() - 48 * 60 * 60 * 1000) },
+        },
+      }),
+      db.job.count({
+        where: {
+          companyId: tenantId,
+          assignedUserId: { not: null },
+          status: 'IN_PROGRESS',
+        },
+      }),
       db.job.count({
         where: {
           companyId: tenantId,
@@ -241,12 +266,16 @@ export class MetricsService {
         customersNeedingFollowUp,
         billingReadyJobs,
         portalReadyJobs,
+        bookingsConvertedLast7Days,
+        agedUnlinkedBookings,
+        technicianCompletionQueue: inProgressTechnicianJobs,
       },
       alerts: [
         stalledJobs > 0 ? { key: 'stalled_jobs', severity: 'warn', label: 'Stalled active jobs', count: stalledJobs, href: '/dashboard/jobs' } : null,
         unassignedOpenJobs > 0 ? { key: 'unassigned_jobs', severity: 'warn', label: 'Unassigned open jobs', count: unassignedOpenJobs, href: '/dashboard/jobs' } : null,
         overdueBillingFollowUps > 0 ? { key: 'overdue_followups', severity: 'warn', label: 'Overdue reminders', count: overdueBillingFollowUps, href: '/dashboard/billing/readiness' } : null,
         publicUnlinkedBookings > 0 ? { key: 'public_conversion', severity: 'info', label: 'Public bookings awaiting conversion', count: publicUnlinkedBookings, href: '/dashboard/bookings' } : null,
+        agedUnlinkedBookings > 0 ? { key: 'stale_booking_conversion', severity: 'warn', label: 'Unlinked bookings older than 48h', count: agedUnlinkedBookings, href: '/dashboard/bookings' } : null,
       ].filter(Boolean),
       trends: {
         completedLast7Days,

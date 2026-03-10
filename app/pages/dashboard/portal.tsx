@@ -20,6 +20,12 @@ type PortalOverview = {
     awaitingApproval: number;
     paymentReady: number;
   };
+  recentActivity: Array<{
+    id: string;
+    type: string;
+    message: string;
+    createdAt?: string | null;
+  }>;
   jobs: Array<{
     id: string;
     jobRef: string;
@@ -184,6 +190,33 @@ export default function PortalOpsPage() {
             />
           )}
         </section>
+
+        {data?.recentActivity?.length ? (
+          <section className="card operator-section">
+            <div className="operator-section__header">
+              <div>
+                <h2 className="operator-section__title">Portal lifecycle audit</h2>
+                <p className="operator-section__subtitle">Recent internal portal access events from the operator side.</p>
+              </div>
+            </div>
+
+            <OperatorDataTable columns="minmax(220px, 1fr) minmax(160px, 0.8fr)">
+              <OperatorDataTableHeader>
+                <div className="operator-table__cell">Event</div>
+                <div className="operator-table__cell">When</div>
+              </OperatorDataTableHeader>
+              {data.recentActivity.map((event) => (
+                <OperatorDataTableRow key={event.id}>
+                  <div className="operator-table__cell">
+                    <div className="operator-cellTitle">{event.type}</div>
+                    <div className="operator-cellSubtle">{event.message}</div>
+                  </div>
+                  <div className="operator-table__cell">{event.createdAt ? new Date(event.createdAt).toLocaleString() : "Unknown"}</div>
+                </OperatorDataTableRow>
+              ))}
+            </OperatorDataTable>
+          </section>
+        ) : null}
       </div>
     </DashboardShell>
   );

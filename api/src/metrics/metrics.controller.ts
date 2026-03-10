@@ -44,6 +44,9 @@ export class MetricsController {
           customersNeedingFollowUp: 0,
           billingReadyJobs: 0,
           portalReadyJobs: 0,
+          bookingsConvertedLast7Days: 0,
+          agedUnlinkedBookings: 0,
+          technicianCompletionQueue: 0,
         },
         alerts: [],
         trends: {

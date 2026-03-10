@@ -89,6 +89,7 @@ type AutomationDiagnostics = {
     contactGapJobs: number;
     staleUnassignedJobs: number;
     publicBookingsAwaitingConversion: number;
+    bookingConversionsLast7Days: number;
   };
   alerts: Array<{ key: string; severity: string; label: string; count: number; href: string }>;
 };
@@ -494,6 +495,7 @@ export default function AutomationsSettingsPage() {
               <span className="badge">Contact gaps {diagnostics.summary.contactGapJobs}</span>
               <span className="badge">Unassigned backlog {diagnostics.summary.staleUnassignedJobs}</span>
               <span className="badge">Public conversion backlog {diagnostics.summary.publicBookingsAwaitingConversion}</span>
+              <span className="badge">Conversions 7d {diagnostics.summary.bookingConversionsLast7Days}</span>
             </div>
             {diagnostics.alerts.length ? (
               <div style={{ display: "grid", gap: 10 }}>

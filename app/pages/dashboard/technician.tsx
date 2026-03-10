@@ -16,6 +16,7 @@ type TechQueue = {
     assignedJobs: number;
     inProgress: number;
     dueTodayBookings: number;
+    overdueAssignedJobs: number;
   };
   jobs: Array<{
     id: string;
@@ -25,6 +26,11 @@ type TechQueue = {
     serviceName?: string | null;
     scheduledAt?: string | null;
     urgency?: string;
+    lastFieldEvent?: {
+      eventType?: string | null;
+      message?: string | null;
+      createdAt?: string | null;
+    } | null;
   }>;
   bookings: Array<{
     id: string;
@@ -109,6 +115,7 @@ export default function TechnicianPage() {
       { label: "Assigned jobs", value: String(data.summary.assignedJobs), hint: "Current active workload" },
       { label: "In progress", value: String(data.summary.inProgress), hint: "Work already underway" },
       { label: "Bookings today", value: String(data.summary.dueTodayBookings), hint: "Today’s assigned booking windows" },
+      { label: "Overdue", value: String(data.summary.overdueAssignedJobs), hint: "Assigned jobs now behind schedule" },
     ];
   }, [data]);
 
@@ -170,6 +177,9 @@ export default function TechnicianPage() {
                           ? "Active field work"
                           : "Ready to start"}
                       </span>
+                      {job.lastFieldEvent?.createdAt ? (
+                        <span>{job.lastFieldEvent.message || job.lastFieldEvent.eventType} · {new Date(job.lastFieldEvent.createdAt).toLocaleString()}</span>
+                      ) : null}
                     </div>
                   </div>
                   <div className="operator-table__cell operator-table__cell--actions">

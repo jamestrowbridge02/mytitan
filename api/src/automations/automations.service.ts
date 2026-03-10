@@ -297,6 +297,14 @@ export class AutomationsService {
         action: "Create a follow-up reminder when a job cannot be reached by email or phone",
         deliveryMode: settings.deliveryMode,
       },
+      {
+        key: "booking_conversion",
+        label: "Booking conversion audit",
+        enabled: true,
+        trigger: "booking.converted",
+        action: "Log a durable automation run when a booking becomes a scheduled job",
+        deliveryMode: "metadata_only",
+      },
     ];
   }
 
@@ -328,7 +336,7 @@ export class AutomationsService {
     const db = this.prisma as any;
     const now = new Date();
     const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const [rules, pendingRuns, pendingBillingFollowUps, contactGapJobs, staleUnassignedJobs, publicBookingsAwaitingConversion] = await Promise.all([
+    const [rules, pendingRuns, pendingBillingFollowUps, contactGapJobs, staleUnassignedJobs, publicBookingsAwaitingConversion, recentBookingConversions] = await Promise.all([
       this.listRules(tenantId),
       this.listRuns(tenantId, 12),
       db.jobReminder.count({
@@ -363,6 +371,13 @@ export class AutomationsService {
           createdAt: { gte: last7Days },
         },
       }),
+      db.activityEvent.count({
+        where: {
+          tenantId,
+          type: "automation.booking_conversion",
+          at: { gte: last7Days },
+        },
+      }),
     ]);
 
     return {
@@ -373,6 +388,7 @@ export class AutomationsService {
         contactGapJobs,
         staleUnassignedJobs,
         publicBookingsAwaitingConversion,
+        bookingConversionsLast7Days: recentBookingConversions,
       },
       alerts: [
         contactGapJobs > 0
@@ -519,5 +535,30 @@ export class AutomationsService {
     });
 
     return { logged: true, reminderCreated, reason: reminderCreated ? "created" : "already_exists" };
+  }
+
+  async handleBookingConverted(companyId: string, userId: string | null, booking: any, job: any) {
+    await this.activity.push({
+      tenantId: companyId,
+      type: "automation.booking_conversion",
+      label: `Automation recorded booking conversion for ${job?.jobRef || job?.id || booking?.id}`,
+      jobId: job?.id || null,
+      jobRef: job?.jobRef || null,
+      customerId: job?.customerId || null,
+      customerName: job?.customerName || booking?.customerName || null,
+      status: job?.status || null,
+      technicianId: job?.assignedUserId || booking?.assignedUserId || null,
+      payloadJson: {
+        automationKey: "booking_conversion",
+        bookingId: booking?.id || null,
+        bookingStatus: booking?.status || null,
+        bookingSource: booking?.source || null,
+        bookingStartsAt: booking?.startsAt ? new Date(booking.startsAt).toISOString() : null,
+        linkedJobId: job?.id || null,
+        linkedJobRef: job?.jobRef || null,
+      },
+    });
+
+    return { logged: true };
   }
 }

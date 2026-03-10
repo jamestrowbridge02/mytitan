@@ -3,6 +3,8 @@ import crypto from 'crypto';
 import { AuditService } from '../audit/audit.service';
 import { AutomationsService } from '../automations/automations.service';
 import { isAutomationsV1Enabled, isBookingProV1Enabled, isLocationsAdvancedV1Enabled } from '../common/feature-flags';
+import { ActivityService } from '../events/activity.service';
+import { JobsService } from '../jobs/jobs.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { acquireTechnicianLock } from '../common/advisory-lock';
@@ -23,6 +25,8 @@ export class BookingsService {
     private readonly audit: AuditService,
     private readonly notifications: NotificationsService,
     private readonly automations: AutomationsService,
+    private readonly activity: ActivityService,
+    private readonly jobs: JobsService,
   ) {}
   private readonly logger = new Logger(BookingsService.name);
 
@@ -194,6 +198,114 @@ export class BookingsService {
       },
       orderBy: { startsAt: 'asc' },
     });
+  }
+
+  async convertToJob(companyId: string, userId: string, bookingId: string) {
+    const db = this.prisma as any;
+    const booking = await db.booking.findFirst({
+      where: { id: bookingId, companyId },
+      include: {
+        job: true,
+        service: { select: { id: true, name: true } },
+        proService: { select: { id: true, name: true } },
+      },
+    });
+
+    if (!booking) {
+      throw new BadRequestException('Booking not found');
+    }
+
+    if (booking.jobId && booking.job) {
+      return {
+        booking,
+        job: booking.job,
+        alreadyLinked: true,
+      };
+    }
+
+    const created = await this.jobs.create(companyId, userId, {
+      locationId: booking.locationId || undefined,
+      customerName: String(booking.customerName || '').trim() || 'Booking customer',
+      customerEmail: String(booking.customerEmail || '').trim() || undefined,
+      customerPhone: String(booking.customerPhone || '').trim() || undefined,
+      serviceName: booking.proService?.name || booking.service?.name || undefined,
+      scheduledAt: booking.startsAt ? new Date(booking.startsAt).toISOString() : undefined,
+      formData: {
+        sourceBookingId: booking.id,
+        bookingSource: booking.source,
+        bookingStatus: booking.status,
+        scheduledAt: booking.startsAt ? new Date(booking.startsAt).toISOString() : null,
+        customerName: booking.customerName || null,
+        customerEmail: booking.customerEmail || null,
+        customerPhone: booking.customerPhone || null,
+      },
+    });
+
+    const nextStatus =
+      booking.status === 'IN_PROGRESS'
+        ? 'IN_PROGRESS'
+        : booking.status === 'COMPLETED'
+        ? 'COMPLETED'
+        : 'SCHEDULED';
+
+    const patchedJob = await this.jobs.patchPartial(companyId, userId, created.id, {
+      status: nextStatus as any,
+      assignedUserId: booking.assignedUserId || undefined,
+      scheduledAt: booking.startsAt ? new Date(booking.startsAt).toISOString() : undefined,
+      locationId: booking.locationId || undefined,
+    });
+
+    const linkedBooking = await db.booking.update({
+      where: { id: booking.id },
+      data: {
+        jobId: patchedJob.id,
+        status: booking.status === 'PENDING' || booking.status === 'PLANNED' ? 'CONFIRMED' : booking.status,
+      },
+    });
+
+    await db.jobActivity.create({
+      data: {
+        companyId,
+        jobId: patchedJob.id,
+        actorUserId: userId,
+        eventType: 'booking.converted',
+        message: `Booking ${booking.id} converted into ${patchedJob.jobRef || patchedJob.id}`,
+        payloadJson: {
+          bookingId: booking.id,
+          bookingSource: booking.source,
+          bookingStartsAt: booking.startsAt,
+        },
+      },
+    });
+
+    await this.activity.push({
+      tenantId: companyId,
+      type: 'booking.converted',
+      label: `Booking ${booking.id} converted to ${patchedJob.jobRef || patchedJob.id}`,
+      jobId: patchedJob.id,
+      jobRef: patchedJob.jobRef || null,
+      customerId: patchedJob.customerId || null,
+      customerName: patchedJob.customerName || booking.customerName || null,
+      status: patchedJob.status || null,
+      technicianId: patchedJob.assignedUserId || booking.assignedUserId || null,
+      payloadJson: {
+        bookingId: booking.id,
+        bookingSource: booking.source,
+        bookingStatus: booking.status,
+      },
+    });
+
+    if (isAutomationsV1Enabled()) {
+      await this.automations.handleBookingConverted(companyId, userId, linkedBooking, patchedJob);
+    }
+
+    await this.audit.log(companyId, 'booking.convert', `Converted booking ${booking.id} into ${patchedJob.jobRef || patchedJob.id}`, userId);
+
+    return {
+      booking: linkedBooking,
+      job: patchedJob,
+      alreadyLinked: false,
+    };
   }
 
   private async ensureBusinessHours(tenantId: string) {

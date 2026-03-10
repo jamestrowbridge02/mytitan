@@ -22,6 +22,12 @@ export class TechService {
           assignedUserId: userId,
           status: { in: ['OPEN', 'SCHEDULED', 'IN_PROGRESS'] },
         },
+        include: {
+          activities: {
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+          },
+        },
         orderBy: [{ scheduledAt: 'asc' }, { createdAt: 'desc' }],
       }),
       db.booking.findMany({
@@ -41,9 +47,17 @@ export class TechService {
         assignedJobs: jobs.length,
         inProgress: jobs.filter((job: any) => job.status === 'IN_PROGRESS').length,
         dueTodayBookings: bookings.length,
+        overdueAssignedJobs: jobs.filter((job: any) => job.scheduledAt && new Date(job.scheduledAt).getTime() < now.getTime() && job.status !== 'IN_PROGRESS').length,
       },
       jobs: jobs.map((job: any) => ({
         ...job,
+        lastFieldEvent: job.activities?.[0]
+          ? {
+              eventType: job.activities[0].eventType,
+              message: job.activities[0].message,
+              createdAt: job.activities[0].createdAt,
+            }
+          : null,
         urgency:
           job.status === 'IN_PROGRESS'
             ? 'active'

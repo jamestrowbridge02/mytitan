@@ -357,6 +357,14 @@ export class BillingService {
           orderBy: { createdAt: 'desc' },
           take: 1,
         },
+        reminders: {
+          where: {
+            completedAt: null,
+            note: 'Automation billing follow-up',
+          },
+          orderBy: { remindAt: 'asc' },
+          take: 1,
+        },
       },
       orderBy: [{ completedAt: 'desc' }, { updatedAt: 'desc' }],
       take: 50,
@@ -367,6 +375,7 @@ export class BillingService {
       const invoiceReady = Boolean(job.completedAt || job.status === 'COMPLETED' || job.status === 'INVOICED');
       const paymentReady = Boolean(settings?.paymentsEnabled && this.isStripeConfigured() && (job.totalCents || 0) > 0);
       const portalReady = Boolean((settings?.featureCustomerPortal || settings?.paymentsEnabled) && token);
+      const billingFollowUpAt = job.reminders?.[0]?.remindAt || null;
       return {
         id: job.id,
         jobRef: job.jobRef,
@@ -380,6 +389,8 @@ export class BillingService {
         invoiceReady,
         paymentReady,
         portalReady,
+        billingFollowUpAt,
+        billingFollowUpOverdue: Boolean(billingFollowUpAt && new Date(billingFollowUpAt).getTime() < now.getTime()),
         portalUrl: token ? `${appUrl}/portal/job/${token}` : null,
         paymentLinkUrl: job.paymentLinkUrl || null,
       };
@@ -395,6 +406,7 @@ export class BillingService {
         paid: rows.filter((row) => Boolean(row.invoicePaidAt)).length,
         paymentReady: rows.filter((row) => row.paymentReady).length,
         portalReady: rows.filter((row) => row.portalReady).length,
+        overdueBillingFollowUps: rows.filter((row) => row.billingFollowUpOverdue).length,
       },
       jobs: rows,
     };

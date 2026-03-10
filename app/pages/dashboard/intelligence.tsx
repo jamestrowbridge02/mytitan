@@ -22,6 +22,9 @@ type IntelligenceData = {
     customersNeedingFollowUp: number;
     billingReadyJobs: number;
     portalReadyJobs: number;
+    bookingsConvertedLast7Days: number;
+    agedUnlinkedBookings: number;
+    technicianCompletionQueue: number;
   };
   alerts: Array<{ key: string; severity: string; label: string; count: number; href: string }>;
   trends: {
@@ -44,6 +47,9 @@ const EMPTY: IntelligenceData = {
     customersNeedingFollowUp: 0,
     billingReadyJobs: 0,
     portalReadyJobs: 0,
+    bookingsConvertedLast7Days: 0,
+    agedUnlinkedBookings: 0,
+    technicianCompletionQueue: 0,
   },
   alerts: [],
   trends: {
@@ -80,6 +86,7 @@ export default function IntelligencePage() {
       { label: "Follow-up load", value: String(data.summary.customersNeedingFollowUp), hint: "Customers without recent activity" },
       { label: "Billing ready", value: String(data.summary.billingReadyJobs), hint: "Completed work not yet invoiced" },
       { label: "Portal ready", value: String(data.summary.portalReadyJobs), hint: "Jobs with active customer access" },
+      { label: "Converted", value: String(data.summary.bookingsConvertedLast7Days), hint: "Bookings turned into jobs in the last 7 days" },
       { label: "Completion delta", value: data.trends.completionDelta >= 0 ? `+${data.trends.completionDelta}` : String(data.trends.completionDelta), hint: "Last 7 days vs previous 7 days" },
     ],
     [data],
@@ -159,6 +166,9 @@ export default function IntelligencePage() {
               ["Customers needing follow-up", data.summary.customersNeedingFollowUp, "No activity or stale activity in the last 30 days"],
               ["Billing-ready jobs", data.summary.billingReadyJobs, "Completed work still waiting on invoice issuance"],
               ["Portal-ready jobs", data.summary.portalReadyJobs, "Jobs already exposed through an active customer portal link"],
+              ["Bookings converted last 7 days", data.summary.bookingsConvertedLast7Days, "Real booking-to-job throughput from the scheduling queue"],
+              ["Aged unlinked bookings", data.summary.agedUnlinkedBookings, "Bookings that have been waiting for conversion for more than 48 hours"],
+              ["Technician completion queue", data.summary.technicianCompletionQueue, "Assigned field jobs currently in progress"],
             ].map(([label, value, meaning]) => (
               <OperatorDataTableRow key={String(label)}>
                 <div className="operator-table__cell"><strong>{label}</strong></div>
