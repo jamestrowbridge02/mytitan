@@ -12,6 +12,7 @@ test.describe("public portal workflow", () => {
     await page.goto(`/portal/job/${portalToken}`);
     await expect(page.getByTestId("public-portal-billing-progress")).toBeVisible();
     await expect(page.getByTestId("public-portal-next-step")).toBeVisible();
+    await expect(page.getByText(/Billing progress/i)).toBeVisible();
 
     const refreshButton = page.getByTestId("public-portal-refresh-payment");
     if (await refreshButton.count()) {
@@ -25,6 +26,17 @@ test.describe("public portal workflow", () => {
     } else {
       await expect(page.getByTestId("public-portal-billing-progress")).toContainText(/Payment availability/i);
       await expect(page.getByText(/Secure payment is unavailable|Payments not configured/i).first()).toBeVisible();
+    }
+
+    const approveButton = page.getByTestId("public-portal-approve");
+    if (await approveButton.count()) {
+      await page.route(/\/public\/job\/.+\/approve/, async (route) => {
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        await route.continue();
+      }, { times: 1 });
+      await approveButton.click();
+      await expect(approveButton).toBeDisabled();
+      await expect(page.getByTestId("public-portal-decline")).toBeDisabled();
     }
   });
 });

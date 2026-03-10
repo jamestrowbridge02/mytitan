@@ -53,6 +53,8 @@ export default function CommandCentrePage() {
   const [showSaveView, setShowSaveView] = useState(false);
   const [saveViewName, setSaveViewName] = useState('');
   const [openedJob, setOpenedJob] = useState<any>(null);
+  const [savingView, setSavingView] = useState(false);
+  const [bulkBusy, setBulkBusy] = useState(false);
   const { notice, showSuccess, showError, clearNotice } = useOperatorNotice();
 
   useEffect(() => {
@@ -186,6 +188,7 @@ export default function CommandCentrePage() {
   }
 
   async function runBulk(operation: string, payload: Record<string, any>) {
+    if (bulkBusy) return;
     const explicitIds = Array.isArray(payload.jobIds) ? payload.jobIds : null;
     const ids = explicitIds && explicitIds.length ? explicitIds : selected;
     if (!ids.length) return;
@@ -193,6 +196,7 @@ export default function CommandCentrePage() {
     if (destructive && typeof window !== 'undefined') {
       if (!window.confirm(`Close ${ids.length} selected jobs?`)) return;
     }
+    setBulkBusy(true);
     try {
       const res = await apiFetch('/jobs/bulk', {
         method: 'POST',
@@ -203,10 +207,14 @@ export default function CommandCentrePage() {
       await load();
     } catch (err: any) {
       showError(err?.message || 'Bulk operation failed');
+    } finally {
+      setBulkBusy(false);
     }
   }
 
   async function saveView() {
+    if (savingView) return;
+    setSavingView(true);
     const filters = {
       search,
       status,
@@ -231,6 +239,8 @@ export default function CommandCentrePage() {
       showSuccess('View saved');
     } catch (err: any) {
       showError(err?.message || 'Failed to save view');
+    } finally {
+      setSavingView(false);
     }
   }
 
@@ -353,7 +363,7 @@ export default function CommandCentrePage() {
         <div className="two-col">
           <div>
             <label>Search</label>
-            <input ref={searchRef} className="input" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Job ref, customer, reg..." />
+            <input ref={searchRef} className="input" data-testid="ccv1-search-input" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} placeholder="Job ref, customer, reg..." />
           </div>
           <div>
             <label>Status</label>
@@ -387,41 +397,41 @@ export default function CommandCentrePage() {
         </div>
         {premiumEnabled ? (
           <div style={{ marginTop: 10, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-            <select className="input" style={{ margin: 0, width: 260 }} value={activeViewId} onChange={(e) => applyView(e.target.value)}>
+            <select className="input" data-testid="ccv1-saved-view-select" style={{ margin: 0, width: 260 }} value={activeViewId} onChange={(e) => applyView(e.target.value)}>
               <option value="">Quick switch saved view</option>
               {views.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
             </select>
-            <button className="button secondary" type="button" onClick={() => { setShowSaveView(true); setSaveViewName(''); }}>Save View</button>
-            <button className="button secondary" type="button" onClick={removeView} disabled={!activeViewId}>Delete View</button>
+            <button className="button secondary" data-testid="ccv1-save-view-trigger" type="button" disabled={savingView} onClick={() => { setShowSaveView(true); setSaveViewName(''); }}>Save View</button>
+            <button className="button secondary" data-testid="ccv1-delete-view" type="button" onClick={removeView} disabled={!activeViewId || savingView}>Delete View</button>
           </div>
         ) : null}
       </div>
 
       {showSaveView ? (
-        <div aria-label="Save command centre view" className="card" style={{ marginBottom: 14 }}>
+        <div aria-label="Save command centre view" className="card" data-testid="ccv1-save-view-panel" style={{ marginBottom: 14 }}>
           <h3 style={{ marginTop: 0 }}>Save view</h3>
-          <input aria-label="Saved view name" className="input" value={saveViewName} onChange={(e) => setSaveViewName(e.target.value)} placeholder="View name" />
+          <input aria-label="Saved view name" className="input" data-testid="ccv1-save-view-input" value={saveViewName} onChange={(e) => setSaveViewName(e.target.value)} placeholder="View name" />
           <div style={{ display: 'flex', gap: 8 }}>
-            <button className="button" type="button" onClick={saveView}>Save</button>
-            <button className="button secondary" type="button" onClick={() => setShowSaveView(false)}>Cancel</button>
+            <button className="button" data-testid="ccv1-save-view-submit" type="button" disabled={savingView || !saveViewName.trim()} onClick={saveView}>{savingView ? 'Saving...' : 'Save'}</button>
+            <button className="button secondary" data-testid="ccv1-save-view-cancel" type="button" disabled={savingView} onClick={() => setShowSaveView(false)}>Cancel</button>
           </div>
         </div>
       ) : null}
 
-      <div className="card" style={{ marginBottom: 14 }}>
+      <div className="card" data-testid="ccv1-bulk-bar" style={{ marginBottom: 14 }}>
         <strong>Bulk actions</strong>
-        <p className="muted" style={{ marginTop: 6 }}>Selected jobs: {selected.length}</p>
+        <p className="muted" data-testid="ccv1-selected-count" style={{ marginTop: 6 }}>Selected jobs: {selected.length}</p>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <select className="input" style={{ margin: 0, width: 170 }} value={bulkStatus} onChange={(e) => setBulkStatus(e.target.value)}>
+          <select className="input" data-testid="ccv1-bulk-status-select" style={{ margin: 0, width: 170 }} value={bulkStatus} onChange={(e) => setBulkStatus(e.target.value)}>
             {STATUS_LABELS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
           </select>
-          <button className="button secondary" type="button" onClick={() => runBulk('setStatus', { status: bulkStatus })}>Change Status</button>
-          <select className="input" style={{ margin: 0, width: 220 }} value={bulkLocation} onChange={(e) => setBulkLocation(e.target.value)}>
+          <button className="button secondary" data-testid="ccv1-bulk-status-action" type="button" disabled={bulkBusy || !selected.length} onClick={() => runBulk('setStatus', { status: bulkStatus })}>Change Status</button>
+          <select className="input" data-testid="ccv1-bulk-location-select" style={{ margin: 0, width: 220 }} value={bulkLocation} onChange={(e) => setBulkLocation(e.target.value)}>
             <option value="all">All / none</option>
             {locations.map((loc) => <option key={loc.id} value={loc.id}>{loc.name}</option>)}
           </select>
-          <button className="button secondary" type="button" onClick={() => runBulk('setLocation', { locationId: bulkLocation })}>Move Location</button>
-          <button className="button secondary" type="button" onClick={() => runBulk('closeJobs', {})}>Close</button>
+          <button className="button secondary" data-testid="ccv1-bulk-location-action" type="button" disabled={bulkBusy || !selected.length} onClick={() => runBulk('setLocation', { locationId: bulkLocation })}>Move Location</button>
+          <button className="button secondary" data-testid="ccv1-bulk-close-action" type="button" disabled={bulkBusy || !selected.length} onClick={() => runBulk('closeJobs', {})}>Close</button>
         </div>
       </div>
 

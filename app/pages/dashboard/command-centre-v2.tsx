@@ -49,12 +49,14 @@ export default function CommandCentreV2Page() {
   const [activeViewId, setActiveViewId] = useState('');
   const [saveViewName, setSaveViewName] = useState('');
   const [showSaveView, setShowSaveView] = useState(false);
+  const [savingView, setSavingView] = useState(false);
   const [assignTechId, setAssignTechId] = useState<string>("");
     const [assignTime, setAssignTime] = useState<string>("");
     const [openedJob, setOpenedJob] = useState<any>(null);
     const [dragJobId, setDragJobId] = useState<string>("");
     const [dragStatusTarget, setDragStatusTarget] = useState<string>("");
   const [pendingBulk, setPendingBulk] = useState<{ op: string; payload: Record<string, any>; label: string } | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
   const [pendingInlineJobId, setPendingInlineJobId] = useState<string>("");
   const [seededDefaults, setSeededDefaults] = useState(false);
   const [defaultViewApplied, setDefaultViewApplied] = useState(false);
@@ -98,6 +100,8 @@ export default function CommandCentreV2Page() {
         setLastUpdated(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
     } catch (err: any) {
       showError(err?.message || 'Failed to load board');
+    } finally {
+      if (background) setIsRefreshing(false);
     }
   }
 
@@ -275,6 +279,8 @@ export default function CommandCentreV2Page() {
   }
 
   async function saveView() {
+    if (savingView) return;
+    setSavingView(true);
     try {
       if (activeViewId) {
         await apiFetch(`/board-views/${activeViewId}`, {
@@ -300,12 +306,16 @@ export default function CommandCentreV2Page() {
       await loadViews();
     } catch (err: any) {
       showError(err?.message || 'Failed to save view');
+    } finally {
+      setSavingView(false);
     }
   }
 
   async function runBulk(operation: string, payload: Record<string, any>) {
+    if (bulkBusy) return;
     const ids = selected;
     if (!ids.length) return;
+    setBulkBusy(true);
     try {
       const res = await apiFetch('/jobs/bulk-v2', {
         method: 'POST',
@@ -316,6 +326,8 @@ export default function CommandCentreV2Page() {
       await loadBoard();
     } catch (err: any) {
       showError(err?.message || 'Bulk operation failed');
+    } finally {
+      setBulkBusy(false);
     }
   }
 
@@ -629,41 +641,41 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
           </div>
         </div>
         <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <select className="input" style={{ margin: 0, width: 260 }} value={activeViewId} onChange={(e) => applyView(e.target.value)}>
+          <select className="input" data-testid="ccv2-saved-view-select" style={{ margin: 0, width: 260 }} value={activeViewId} onChange={(e) => applyView(e.target.value)}>
             <option value="">Saved views</option>
             {views.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
           </select>
-          <button className="button secondary ccv2-button" type="button" onClick={() => { setShowSaveView(true); setSaveViewName(''); }}>Save view</button>
+          <button className="button secondary ccv2-button" data-testid="ccv2-save-view-trigger" type="button" disabled={savingView} onClick={() => { setShowSaveView(true); setSaveViewName(''); }}>Save view</button>
         </div>
       </div>
 
       {showSaveView ? (
-        <div aria-label="Save board view" className="card ccv2-surface" style={{ marginBottom: 14 }}>
-          <input aria-label="Saved board view name" className="input" value={saveViewName} onChange={(e) => setSaveViewName(e.target.value)} placeholder="View name" />
+        <div aria-label="Save board view" className="card ccv2-surface" data-testid="ccv2-save-view-panel" style={{ marginBottom: 14 }}>
+          <input aria-label="Saved board view name" className="input" data-testid="ccv2-save-view-input" value={saveViewName} onChange={(e) => setSaveViewName(e.target.value)} placeholder="View name" />
           <div style={{ display: 'flex', gap: 8 }}>
-            <button className="button ccv2-button" type="button" onClick={saveView}>Save</button>
-            <button className="button secondary ccv2-button" type="button" onClick={() => setShowSaveView(false)}>Cancel</button>
+            <button className="button ccv2-button" data-testid="ccv2-save-view-submit" type="button" disabled={savingView || !saveViewName.trim()} onClick={saveView}>{savingView ? 'Saving...' : 'Save'}</button>
+            <button className="button secondary ccv2-button" data-testid="ccv2-save-view-cancel" type="button" disabled={savingView} onClick={() => setShowSaveView(false)}>Cancel</button>
           </div>
         </div>
       ) : null}
 
-      <div className="card ccv2-surface ccv2-filters-surface" style={{ marginBottom: 14 }}>
+      <div className="card ccv2-surface ccv2-filters-surface" data-testid="ccv2-bulk-bar" style={{ marginBottom: 14 }}>
         <strong>Bulk bar</strong>
-        <p className="muted">Selected: {selected.length}</p>
+        <p className="muted" data-testid="ccv2-selected-count">Selected: {selected.length}</p>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <select className="input" style={{ margin: 0, width: 170 }} value={bulkStatus} onChange={(e) => setBulkStatus(e.target.value)}>
+          <select className="input" data-testid="ccv2-bulk-status-select" style={{ margin: 0, width: 170 }} value={bulkStatus} onChange={(e) => setBulkStatus(e.target.value)}>
             {STATUS_LABELS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
           </select>
-          <button className="button secondary ccv2-button" type="button" onClick={() => triggerBulk('setStatus', { status: bulkStatus }, `Set status to ${bulkStatus}`)}>Status</button>
-          <select className="input" style={{ margin: 0, width: 220 }} value={bulkLocation} onChange={(e) => setBulkLocation(e.target.value)}>
+          <button className="button secondary ccv2-button" data-testid="ccv2-bulk-status-action" type="button" disabled={bulkBusy || !selected.length} onClick={() => triggerBulk('setStatus', { status: bulkStatus }, `Set status to ${bulkStatus}`)}>Status</button>
+          <select className="input" data-testid="ccv2-bulk-location-select" style={{ margin: 0, width: 220 }} value={bulkLocation} onChange={(e) => setBulkLocation(e.target.value)}>
             <option value="all">All / none</option>
             {locations.map((loc) => <option key={loc.id} value={loc.id}>{loc.name}</option>)}
           </select>
-          <button className="button secondary ccv2-button" type="button" onClick={() => triggerBulk('setLocation', { locationId: bulkLocation }, `Assign location ${bulkLocation}`)}>Location</button>
+          <button className="button secondary ccv2-button" data-testid="ccv2-bulk-location-action" type="button" disabled={bulkBusy || !selected.length} onClick={() => triggerBulk('setLocation', { locationId: bulkLocation }, `Assign location ${bulkLocation}`)}>Location</button>
           {demoPolishEnabled ? (
-            <button className="button secondary ccv2-button" type="button" onClick={() => triggerBulk('markComplete', {}, 'Mark complete')}>Mark Complete</button>
+            <button className="button secondary ccv2-button" data-testid="ccv2-bulk-complete-action" type="button" disabled={bulkBusy || !selected.length} onClick={() => triggerBulk('markComplete', {}, 'Mark complete')}>Mark Complete</button>
           ) : (
-            <button className="button secondary ccv2-button" type="button" onClick={() => triggerBulk('closeJobs', {}, 'Close jobs')}>Close</button>
+            <button className="button secondary ccv2-button" data-testid="ccv2-bulk-close-action" type="button" disabled={bulkBusy || !selected.length} onClick={() => triggerBulk('closeJobs', {}, 'Close jobs')}>Close</button>
           )}
         </div>
       </div>
@@ -682,11 +694,11 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
                 onDragEnd={() => { setDragJobId(""); setDragStatusTarget(""); }}
               >
                 <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <input type="checkbox" checked={selected.includes(job.id)} onChange={(e) => { e.stopPropagation(); setSelected((prev) => prev.includes(job.id) ? prev.filter((x) => x !== job.id) : [...prev, job.id]); }} />
+                  <input data-testid={`ccv2-select-${job.id}`} type="checkbox" checked={selected.includes(job.id)} onChange={(e) => { e.stopPropagation(); setSelected((prev) => prev.includes(job.id) ? prev.filter((x) => x !== job.id) : [...prev, job.id]); }} />
                   <strong>{job.jobRef}</strong>
                 </label>
                 <div>
-                  <button className="button secondary ccv2-button" type="button" onClick={(e) => { e.stopPropagation(); setOpenedJob(job); }}>Open</button>
+                  <button className="button secondary ccv2-button" data-testid={`ccv2-open-${job.id}`} type="button" onClick={(e) => { e.stopPropagation(); setOpenedJob(job); }}>Open</button>
                 </div>
                 <div onClick={(e) => e.stopPropagation()}>
                   <InlineStatusActions job={job} />
@@ -715,7 +727,7 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
                       onDragStart={() => setDragJobId(job.id)}
                       onDragEnd={() => { setDragJobId(""); setDragStatusTarget(""); }}
                     >
-                      <button type="button" onClick={() => setOpenedJob(job)} style={{ width: '100%', textAlign: 'left', background: 'transparent', border: 0, padding: 0 }}>
+                      <button data-testid={`ccv2-card-open-${job.id}`} type="button" onClick={() => setOpenedJob(job)} style={{ width: '100%', textAlign: 'left', background: 'transparent', border: 0, padding: 0 }}>
                         <span>{job.jobRef}</span>
                         <span className="muted">{job.customerName || 'Customer'}</span>
                       </button>
@@ -731,12 +743,12 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
 
       {pendingBulk && demoPolishEnabled ? (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'grid', placeItems: 'center', zIndex: 40, padding: 16 }}>
-          <div aria-labelledby="ccv2-bulk-confirm-title" aria-modal="true" className="card ccv2-card" role="dialog" style={{ width: 'min(520px, 100%)' }}>
+          <div aria-labelledby="ccv2-bulk-confirm-title" aria-modal="true" className="card ccv2-card" data-testid="ccv2-bulk-confirm-dialog" role="dialog" style={{ width: 'min(520px, 100%)' }}>
             <h3 id="ccv2-bulk-confirm-title" style={{ marginTop: 0 }}>Confirm bulk action</h3>
             <p className="muted">{pendingBulk.label} on {selected.length} selected jobs.</p>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button className="button ccv2-button" type="button" onClick={confirmBulk}>Confirm</button>
-              <button className="button secondary ccv2-button" type="button" onClick={() => setPendingBulk(null)}>Cancel</button>
+              <button className="button ccv2-button" data-testid="ccv2-bulk-confirm-submit" type="button" disabled={bulkBusy} onClick={confirmBulk}>{bulkBusy ? 'Applying...' : 'Confirm'}</button>
+              <button className="button secondary ccv2-button" data-testid="ccv2-bulk-confirm-cancel" type="button" disabled={bulkBusy} onClick={() => setPendingBulk(null)}>Cancel</button>
             </div>
           </div>
         </div>
@@ -745,7 +757,7 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
     
 
       {openedJob ? (
-        <div className="ccv2-sidepanel">
+        <div className="ccv2-sidepanel" data-testid="ccv2-sidepanel">
           <div className="ccv2-sidepanel-header">
             <strong>{openedJob.jobRef || "Job"}</strong>
             <button className="button secondary" onClick={() => setOpenedJob(null)}>Close</button>

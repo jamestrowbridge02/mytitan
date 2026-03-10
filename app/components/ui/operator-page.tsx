@@ -473,6 +473,7 @@ export function OperatorRowActions({
                         key={`${action.label}-${action.href}`}
                         aria-disabled={action.disabled ? true : undefined}
                         className={`operator-rowActions__item${action.disabled ? " is-disabled" : ""}`}
+                        data-testid={action.testId}
                         href={action.disabled ? "#" : action.href}
                         onClick={(event) => {
                           if (action.disabled) {
@@ -497,6 +498,7 @@ export function OperatorRowActions({
                       <button
                         key={`${action.label}-button`}
                         className="operator-rowActions__item"
+                        data-testid={action.testId}
                         disabled={action.disabled}
                         ref={(node) => {
                           itemRefs.current[action.itemIndex] = node;
