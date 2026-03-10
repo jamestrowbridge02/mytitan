@@ -64,6 +64,7 @@ export class MetricsService {
     const now = new Date();
     const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const last30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const previous7Days = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
     const next7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
     const [
@@ -76,6 +77,13 @@ export class MetricsService {
       customersNeedingFollowUp,
       billingReadyJobs,
       portalReadyJobs,
+      stalledJobs,
+      unassignedOpenJobs,
+      overdueBillingFollowUps,
+      completedLast7Days,
+      completedPrevious7Days,
+      recentCompletedByTechnician,
+      recentCommunications,
     ] = await Promise.all([
       db.job.groupBy({
         by: ['status'],
@@ -142,6 +150,57 @@ export class MetricsService {
           publicTokens: { some: { expiresAt: { gt: now } } },
         },
       }),
+      db.job.count({
+        where: {
+          companyId: tenantId,
+          status: { in: ['OPEN', 'SCHEDULED', 'IN_PROGRESS'] },
+          updatedAt: { lt: new Date(now.getTime() - 72 * 60 * 60 * 1000) },
+        },
+      }),
+      db.job.count({
+        where: {
+          companyId: tenantId,
+          status: { in: ['OPEN', 'SCHEDULED'] },
+          assignedUserId: null,
+        },
+      }),
+      db.jobReminder.count({
+        where: {
+          companyId: tenantId,
+          completedAt: null,
+          remindAt: { lt: now },
+        },
+      }),
+      db.job.count({
+        where: {
+          companyId: tenantId,
+          completedAt: { gte: last7Days },
+        },
+      }),
+      db.job.count({
+        where: {
+          companyId: tenantId,
+          completedAt: { gte: previous7Days, lt: last7Days },
+        },
+      }),
+      db.job.groupBy({
+        by: ['assignedUserId'],
+        where: {
+          companyId: tenantId,
+          assignedUserId: { not: null },
+          completedAt: { gte: last7Days },
+        },
+        _count: { assignedUserId: true },
+      }),
+      db.activityEvent.findMany({
+        where: {
+          tenantId,
+          type: { in: ['sms.sent', 'email.sent'] },
+          at: { gte: last7Days },
+        },
+        orderBy: { at: 'asc' },
+        select: { at: true, type: true },
+      }),
     ]);
 
     const assignedIds = technicianLoad.map((row: any) => row.assignedUserId).filter(Boolean);
@@ -166,6 +225,14 @@ export class MetricsService {
           assignedJobs: row._count.assignedUserId,
         }))
         .sort((a: any, b: any) => b.assignedJobs - a.assignedJobs),
+      technicianThroughput: recentCompletedByTechnician
+        .filter((row: any) => row.assignedUserId)
+        .map((row: any) => ({
+          technicianId: row.assignedUserId,
+          technicianName: techMap.get(row.assignedUserId) || row.assignedUserId,
+          completedJobs: row._count.assignedUserId,
+        }))
+        .sort((a: any, b: any) => b.completedJobs - a.completedJobs),
       summary: {
         upcomingBookingsNext7Days: upcomingBookings,
         publicBookingsAwaitingConversion: publicUnlinkedBookings,
@@ -174,6 +241,26 @@ export class MetricsService {
         customersNeedingFollowUp,
         billingReadyJobs,
         portalReadyJobs,
+      },
+      alerts: [
+        stalledJobs > 0 ? { key: 'stalled_jobs', severity: 'warn', label: 'Stalled active jobs', count: stalledJobs, href: '/dashboard/jobs' } : null,
+        unassignedOpenJobs > 0 ? { key: 'unassigned_jobs', severity: 'warn', label: 'Unassigned open jobs', count: unassignedOpenJobs, href: '/dashboard/jobs' } : null,
+        overdueBillingFollowUps > 0 ? { key: 'overdue_followups', severity: 'warn', label: 'Overdue reminders', count: overdueBillingFollowUps, href: '/dashboard/billing/readiness' } : null,
+        publicUnlinkedBookings > 0 ? { key: 'public_conversion', severity: 'info', label: 'Public bookings awaiting conversion', count: publicUnlinkedBookings, href: '/dashboard/bookings' } : null,
+      ].filter(Boolean),
+      trends: {
+        completedLast7Days,
+        completedPrevious7Days,
+        completionDelta: completedLast7Days - completedPrevious7Days,
+        communicationByDay: Array.from({ length: 7 }).map((_, index) => {
+          const day = new Date(last7Days.getTime() + index * 24 * 60 * 60 * 1000);
+          const key = day.toISOString().slice(0, 10);
+          const count = recentCommunications.filter((row: any) => {
+            const at = row?.at ? new Date(row.at) : null;
+            return at && !Number.isNaN(at.getTime()) && at.toISOString().slice(0, 10) === key;
+          }).length;
+          return { day: key, count };
+        }),
       },
     };
   }

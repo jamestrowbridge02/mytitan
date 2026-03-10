@@ -35,6 +35,7 @@ export class MetricsController {
       return {
         jobsByStatus: [],
         technicianLoad: [],
+        technicianThroughput: [],
         summary: {
           upcomingBookingsNext7Days: 0,
           publicBookingsAwaitingConversion: 0,
@@ -43,6 +44,13 @@ export class MetricsController {
           customersNeedingFollowUp: 0,
           billingReadyJobs: 0,
           portalReadyJobs: 0,
+        },
+        alerts: [],
+        trends: {
+          completedLast7Days: 0,
+          completedPrevious7Days: 0,
+          completionDelta: 0,
+          communicationByDay: [],
         },
       };
     }

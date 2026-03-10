@@ -13,6 +13,7 @@ import { apiFetch } from "../../lib/api";
 type IntelligenceData = {
   jobsByStatus: Array<{ status: string; count: number }>;
   technicianLoad: Array<{ technicianId: string; technicianName: string; assignedJobs: number }>;
+  technicianThroughput: Array<{ technicianId: string; technicianName: string; completedJobs: number }>;
   summary: {
     upcomingBookingsNext7Days: number;
     publicBookingsAwaitingConversion: number;
@@ -22,11 +23,19 @@ type IntelligenceData = {
     billingReadyJobs: number;
     portalReadyJobs: number;
   };
+  alerts: Array<{ key: string; severity: string; label: string; count: number; href: string }>;
+  trends: {
+    completedLast7Days: number;
+    completedPrevious7Days: number;
+    completionDelta: number;
+    communicationByDay: Array<{ day: string; count: number }>;
+  };
 };
 
 const EMPTY: IntelligenceData = {
   jobsByStatus: [],
   technicianLoad: [],
+  technicianThroughput: [],
   summary: {
     upcomingBookingsNext7Days: 0,
     publicBookingsAwaitingConversion: 0,
@@ -35,6 +44,13 @@ const EMPTY: IntelligenceData = {
     customersNeedingFollowUp: 0,
     billingReadyJobs: 0,
     portalReadyJobs: 0,
+  },
+  alerts: [],
+  trends: {
+    completedLast7Days: 0,
+    completedPrevious7Days: 0,
+    completionDelta: 0,
+    communicationByDay: [],
   },
 };
 
@@ -64,6 +80,7 @@ export default function IntelligencePage() {
       { label: "Follow-up load", value: String(data.summary.customersNeedingFollowUp), hint: "Customers without recent activity" },
       { label: "Billing ready", value: String(data.summary.billingReadyJobs), hint: "Completed work not yet invoiced" },
       { label: "Portal ready", value: String(data.summary.portalReadyJobs), hint: "Jobs with active customer access" },
+      { label: "Completion delta", value: data.trends.completionDelta >= 0 ? `+${data.trends.completionDelta}` : String(data.trends.completionDelta), hint: "Last 7 days vs previous 7 days" },
     ],
     [data],
   );
@@ -95,6 +112,31 @@ export default function IntelligencePage() {
         {error ? <p role="alert" style={{ color: "#ff8a8a", marginTop: 0 }}>{error}</p> : null}
         {loading ? <div className="operator-note">Loading intelligence...</div> : null}
 
+        {data.alerts.length ? (
+          <section className="card operator-section">
+            <div className="operator-section__header">
+              <div>
+                <h2 className="operator-section__title">Operational alerts</h2>
+                <p className="operator-section__subtitle">Live backlog signals that need operator attention now.</p>
+              </div>
+            </div>
+            <OperatorDataTable columns="minmax(220px, 1fr) minmax(100px, 0.5fr) minmax(160px, auto)">
+              <OperatorDataTableHeader>
+                <div className="operator-table__cell">Alert</div>
+                <div className="operator-table__cell">Count</div>
+                <div className="operator-table__cell">Action</div>
+              </OperatorDataTableHeader>
+              {data.alerts.map((alert) => (
+                <OperatorDataTableRow key={alert.key}>
+                  <div className="operator-table__cell"><strong>{alert.label}</strong></div>
+                  <div className="operator-table__cell">{alert.count}</div>
+                  <div className="operator-table__cell"><a href={alert.href}>Open queue</a></div>
+                </OperatorDataTableRow>
+              ))}
+            </OperatorDataTable>
+          </section>
+        ) : null}
+
         <section className="card operator-section">
           <div className="operator-section__header">
             <div>
@@ -122,6 +164,35 @@ export default function IntelligencePage() {
                 <div className="operator-table__cell"><strong>{label}</strong></div>
                 <div className="operator-table__cell">{String(value)}</div>
                 <div className="operator-table__cell">{String(meaning)}</div>
+              </OperatorDataTableRow>
+            ))}
+          </OperatorDataTable>
+        </section>
+
+        <section className="card operator-section">
+          <div className="operator-section__header">
+            <div>
+              <h2 className="operator-section__title">Velocity and trends</h2>
+              <p className="operator-section__subtitle">Recent completion and communication movement from durable activity and job data.</p>
+            </div>
+          </div>
+          <OperatorDataTable columns="minmax(220px, 1fr) minmax(120px, 0.6fr)">
+            <OperatorDataTableHeader>
+              <div className="operator-table__cell">Trend</div>
+              <div className="operator-table__cell">Value</div>
+            </OperatorDataTableHeader>
+            <OperatorDataTableRow>
+              <div className="operator-table__cell">Completed jobs last 7 days</div>
+              <div className="operator-table__cell">{data.trends.completedLast7Days}</div>
+            </OperatorDataTableRow>
+            <OperatorDataTableRow>
+              <div className="operator-table__cell">Completed jobs previous 7 days</div>
+              <div className="operator-table__cell">{data.trends.completedPrevious7Days}</div>
+            </OperatorDataTableRow>
+            {data.trends.communicationByDay.map((row) => (
+              <OperatorDataTableRow key={row.day}>
+                <div className="operator-table__cell">Communications on {row.day}</div>
+                <div className="operator-table__cell">{row.count}</div>
               </OperatorDataTableRow>
             ))}
           </OperatorDataTable>
@@ -181,6 +252,35 @@ export default function IntelligencePage() {
               title="No active technician load"
               description="Assignment counts will appear when active jobs are owned by technicians."
               actions={[{ label: "Open calendar", href: "/dashboard/calendar", variant: "secondary" }]}
+            />
+          )}
+        </section>
+
+        <section className="card operator-section">
+          <div className="operator-section__header">
+            <div>
+              <h2 className="operator-section__title">Technician throughput</h2>
+              <p className="operator-section__subtitle">Completed jobs in the last 7 days by technician ownership.</p>
+            </div>
+          </div>
+          {data.technicianThroughput.length ? (
+            <OperatorDataTable columns="minmax(220px, 1fr) minmax(120px, 0.6fr)">
+              <OperatorDataTableHeader>
+                <div className="operator-table__cell">Technician</div>
+                <div className="operator-table__cell">Completed jobs</div>
+              </OperatorDataTableHeader>
+              {data.technicianThroughput.map((row) => (
+                <OperatorDataTableRow key={row.technicianId}>
+                  <div className="operator-table__cell">{row.technicianName}</div>
+                  <div className="operator-table__cell">{row.completedJobs}</div>
+                </OperatorDataTableRow>
+              ))}
+            </OperatorDataTable>
+          ) : (
+            <OperatorEmptyStateCard
+              title="No technician throughput yet"
+              description="Completed-work throughput appears once assigned technicians start closing jobs."
+              actions={[{ label: "Open technician queue", href: "/dashboard/technician", variant: "secondary" }]}
             />
           )}
         </section>
