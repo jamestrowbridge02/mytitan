@@ -76,6 +76,7 @@ export default function PortalOpsPage() {
 
   async function provisionLink(jobId: string) {
     setBusyJobId(jobId);
+    setError("");
     try {
       await apiFetch(`/portal/jobs/${jobId}/link`, { method: "POST" });
       setNotice("Portal link prepared");
@@ -89,6 +90,7 @@ export default function PortalOpsPage() {
 
   async function run(jobId: string, action: "link" | "revoke" | "regenerate") {
     setBusyJobId(jobId);
+    setError("");
     try {
       const endpoint =
         action === "link"
@@ -97,7 +99,13 @@ export default function PortalOpsPage() {
           ? `/portal/jobs/${jobId}/revoke`
           : `/portal/jobs/${jobId}/regenerate`;
       await apiFetch(endpoint, { method: "POST" });
-      setNotice(action === "revoke" ? "Portal link revoked" : action === "regenerate" ? "Portal link regenerated" : "Portal link prepared");
+      setNotice(
+        action === "revoke"
+          ? "Portal link revoked. Existing customer access is now blocked."
+          : action === "regenerate"
+          ? "Portal link regenerated. Previous access has been replaced."
+          : "Portal link prepared",
+      );
       await load();
     } catch (err: any) {
       setError(err?.message || `Failed to ${action} portal link`);
@@ -187,7 +195,9 @@ export default function PortalOpsPage() {
                   <div className="operator-table__cell operator-table__cell--actions">
                     <OperatorRowActions
                       primaryAction={
-                        job.portalUrl
+                        job.portalState === "expired"
+                          ? { label: busyJobId === job.id ? "Regenerating..." : "Regenerate link", onClick: () => void run(job.id, "regenerate"), disabled: busyJobId === job.id }
+                          : job.portalUrl
                           ? { label: "Open portal", href: job.portalUrl }
                           : { label: busyJobId === job.id ? "Preparing..." : "Prepare link", onClick: () => void provisionLink(job.id), disabled: busyJobId === job.id }
                       }

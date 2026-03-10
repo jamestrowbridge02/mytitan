@@ -3030,6 +3030,13 @@ body {
   text-transform: uppercase;
 }
 
+[data-shell="app"] .operator-rowActions__toggle:focus-visible,
+[data-shell="app"] .operator-rowActions__item:focus-visible,
+[data-shell="app"] .operator-guidance__toggle:focus-visible {
+  outline: 2px solid rgba(94, 234, 212, 0.9);
+  outline-offset: 2px;
+}
+
 [data-shell="app"] .operator-rowActions__panel {
   position: absolute;
   right: 0;

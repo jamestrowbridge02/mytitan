@@ -296,8 +296,8 @@ export default function CommandCentrePage() {
       <div className="card" style={{ marginBottom: 14 }}>
         <h1 style={{ marginTop: 0 }}>Job Command Centre</h1>
         <p className="muted">Manage many jobs quickly from one screen.</p>
-        {error ? <p style={{ color: '#ff8a8a' }}>{error}</p> : null}
-        {toast ? <p style={{ color: '#5eead4' }}>{toast} {premiumEnabled ? <button className="button secondary" type="button" onClick={undoLastChange}>Undo</button> : null}</p> : null}
+        {error ? <p role="alert" style={{ color: '#ff8a8a' }}>{error}</p> : null}
+        {toast ? <p aria-live="polite" role="status" style={{ color: '#5eead4' }}>{toast} {premiumEnabled ? <button className="button secondary" type="button" onClick={undoLastChange}>Undo</button> : null}</p> : null}
       </div>
 
       <OnboardingCoach

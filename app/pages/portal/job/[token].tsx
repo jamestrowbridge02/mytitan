@@ -155,6 +155,7 @@ export default function PublicJobPortal() {
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
   const [paymentConfigured, setPaymentConfigured] = useState<boolean | null>(null);
   const [checkoutHint, setCheckoutHint] = useState('');
+  const [pendingAction, setPendingAction] = useState<'' | 'approve' | 'decline' | 'sign' | 'pay' | 'refresh-payment'>('');
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawingRef = useRef(false);
   const signatureHistoryRef = useRef<ImageData[]>([]);
@@ -174,6 +175,7 @@ export default function PublicJobPortal() {
 
   async function refreshPaymentStatus() {
     if (!tokenValue || !marketplaceEnabled) return;
+    setPendingAction('refresh-payment');
     try {
       const suffix = sessionIdValue ? `?session_id=${sessionIdValue}` : '';
       const res = await fetch(`${API_BASE}/public/job/${tokenValue}/payment-status${suffix}`);
@@ -188,6 +190,8 @@ export default function PublicJobPortal() {
       setPaymentConfigured(data?.configured !== false);
     } catch {
       setPaymentStatus('unknown');
+    } finally {
+      setPendingAction('');
     }
   }
 
@@ -264,6 +268,7 @@ export default function PublicJobPortal() {
   async function approve() {
     setError('');
     setStatus('');
+    setPendingAction('approve');
     try {
       const res = await fetch(`${API_BASE}/public/job/${tokenValue}/approve`, {
         method: 'POST',
@@ -278,12 +283,15 @@ export default function PublicJobPortal() {
       setStatus('Approved.');
     } catch (err: any) {
       setError(err?.message || 'Approval failed');
+    } finally {
+      setPendingAction('');
     }
   }
 
   async function decline() {
     setError('');
     setStatus('');
+    setPendingAction('decline');
     try {
       const res = await fetch(`${API_BASE}/public/job/${tokenValue}/decline`, {
         method: 'POST',
@@ -298,12 +306,15 @@ export default function PublicJobPortal() {
       setStatus('Declined.');
     } catch (err: any) {
       setError(err?.message || 'Decline failed');
+    } finally {
+      setPendingAction('');
     }
   }
 
   async function sign() {
     setError('');
     setStatus('');
+    setPendingAction('sign');
     try {
       const dataUrl = canvasRef.current?.toDataURL('image/png');
       const res = await fetch(`${API_BASE}/public/job/${tokenValue}/sign`, {
@@ -319,6 +330,8 @@ export default function PublicJobPortal() {
       setStatus('Signature saved.');
     } catch (err: any) {
       setError(err?.message || 'Signature failed');
+    } finally {
+      setPendingAction('');
     }
   }
 
@@ -326,6 +339,7 @@ export default function PublicJobPortal() {
     setError('');
     setStatus('');
     setCheckoutHint('');
+    setPendingAction('pay');
     try {
       const res = await fetch(`${API_BASE}/public/job/${tokenValue}/checkout`, { method: 'POST' });
       const data = await res.json().catch(() => null);
@@ -352,6 +366,8 @@ export default function PublicJobPortal() {
       setPaymentConfigured(false);
     } catch {
       setError('Payment failed to start');
+    } finally {
+      setPendingAction('');
     }
   }
 
@@ -364,8 +380,8 @@ export default function PublicJobPortal() {
       <div className="container">
         <div className="card">
           <h1>Customer portal</h1>
-          {error && <p style={{ color: '#ff8a8a' }}>{error}</p>}
-          {status && <p style={{ color: '#7bdba5' }}>{status}</p>}
+          {error && <p role="alert" style={{ color: '#ff8a8a' }}>{error}</p>}
+          {status && <p aria-live="polite" role="status" style={{ color: '#7bdba5' }}>{status}</p>}
 
           {job && (
             <>
@@ -431,12 +447,12 @@ export default function PublicJobPortal() {
                 <input className="input" value={declineReason} onChange={(e) => setDeclineReason(e.target.value)} />
 
                 <div style={{ marginTop: 8 }}>
-                  <button className="button" type="button" onClick={approve} style={{ marginRight: 8 }}>
-                    Approve Job
+                  <button className="button" type="button" onClick={approve} disabled={pendingAction !== ''} style={{ marginRight: 8 }}>
+                    {pendingAction === 'approve' ? 'Approving...' : 'Approve Job'}
                   </button>
                   {marketplaceEnabled ? (
-                    <button className="button secondary" type="button" onClick={decline}>
-                      Decline Job
+                    <button className="button secondary" type="button" onClick={decline} disabled={pendingAction !== ''}>
+                      {pendingAction === 'decline' ? 'Declining...' : 'Decline Job'}
                     </button>
                   ) : null}
                 </div>
@@ -462,14 +478,14 @@ export default function PublicJobPortal() {
                   }}
                 />
                 <div style={{ marginTop: 8 }}>
-                  <button className="button secondary" type="button" onClick={clearCanvas} style={{ marginRight: 8 }}>
+                  <button className="button secondary" type="button" onClick={clearCanvas} disabled={pendingAction !== ''} style={{ marginRight: 8 }}>
                     Clear
                   </button>
-                  <button className="button secondary" type="button" onClick={undoCanvas} style={{ marginRight: 8 }}>
+                  <button className="button secondary" type="button" onClick={undoCanvas} disabled={pendingAction !== ''} style={{ marginRight: 8 }}>
                     Undo
                   </button>
-                  <button className="button" type="button" onClick={sign}>
-                    Save Signature
+                  <button className="button" type="button" onClick={sign} disabled={pendingAction !== ''}>
+                    {pendingAction === 'sign' ? 'Saving...' : 'Save Signature'}
                   </button>
                 </div>
               </div>
@@ -477,8 +493,8 @@ export default function PublicJobPortal() {
               <div className="card" style={{ padding: 16, marginTop: 16 }}>
                 <h3>3) Pay</h3>
                 {portal?.enabled && portal?.paymentsEnabled && portal?.stripeConfigured && marketplaceEnabled ? (
-                  <button className="button" type="button" onClick={pay}>
-                    Pay securely
+                  <button className="button" type="button" onClick={pay} disabled={pendingAction !== ''}>
+                    {pendingAction === 'pay' ? 'Opening payment...' : 'Pay securely'}
                   </button>
                 ) : (
                   <p className="muted">Payments are not configured for this job.</p>
@@ -632,8 +648,8 @@ export default function PublicJobPortal() {
 
         <p className="muted" style={{ marginTop: 12 }}>{nextStepMessage}</p>
 
-        {error && <p style={{ color: '#ff8a8a', marginTop: 12 }}>{error}</p>}
-        {status && <p style={{ color: '#7bdba5', marginTop: 12 }}>{status}</p>}
+        {error && <p role="alert" style={{ color: '#ff8a8a', marginTop: 12 }}>{error}</p>}
+        {status && <p aria-live="polite" role="status" style={{ color: '#7bdba5', marginTop: 12 }}>{status}</p>}
 
         <StepCard
           title="Step 1: Review job summary"
@@ -734,14 +750,14 @@ export default function PublicJobPortal() {
             onTouchEnd={stopDraw}
           />
           <div style={{ display: 'grid', gap: 10, marginTop: 10 }}>
-            <button className="button secondary" type="button" onClick={clearCanvas} style={{ width: '100%', minHeight: 46 }}>
+            <button className="button secondary" type="button" onClick={clearCanvas} disabled={pendingAction !== ''} style={{ width: '100%', minHeight: 46 }}>
               Clear Signature
             </button>
-            <button className="button secondary" type="button" onClick={undoCanvas} style={{ width: '100%', minHeight: 46 }}>
+            <button className="button secondary" type="button" onClick={undoCanvas} disabled={pendingAction !== ''} style={{ width: '100%', minHeight: 46 }}>
               Undo Last Stroke
             </button>
-            <button className="button" type="button" onClick={sign} disabled={!step3Enabled} style={{ width: '100%', minHeight: 46 }}>
-              Save Signature
+            <button className="button" type="button" onClick={sign} disabled={!step3Enabled || pendingAction !== ''} style={{ width: '100%', minHeight: 46 }}>
+              {pendingAction === 'sign' ? 'Saving...' : 'Save Signature'}
             </button>
           </div>
         </StepCard>
@@ -770,11 +786,11 @@ export default function PublicJobPortal() {
                   Billing state: {String(portal.summary.billingState).replaceAll('_', ' ')}
                 </p>
               ) : null}
-              <button className="button" type="button" onClick={pay} disabled={!step4Enabled} style={{ width: '100%', minHeight: 46 }}>
-                Pay now
+              <button className="button" type="button" onClick={pay} disabled={!step4Enabled || pendingAction !== ''} style={{ width: '100%', minHeight: 46 }}>
+                {pendingAction === 'pay' ? 'Opening payment...' : 'Pay now'}
               </button>
-              <button className="button secondary" type="button" onClick={refreshPaymentStatus} style={{ width: '100%', minHeight: 46 }}>
-                Refresh payment status
+              <button className="button secondary" type="button" onClick={refreshPaymentStatus} disabled={pendingAction !== ''} style={{ width: '100%', minHeight: 46 }}>
+                {pendingAction === 'refresh-payment' ? 'Refreshing...' : 'Refresh payment status'}
               </button>
               {checkoutHint ? <p className="muted" style={{ margin: 0 }}>{checkoutHint}</p> : null}
               {paymentStatus ? <p className="muted" style={{ margin: 0 }}>Payment status: {paymentStatus}</p> : null}

@@ -78,6 +78,7 @@ export default function TechnicianPage() {
 
   async function run(jobId: string, action: "start" | "complete") {
     setBusyId(jobId);
+    setError("");
     try {
       await apiFetch(`/tech/jobs/${jobId}/${action}`, {
         method: "POST",
@@ -94,6 +95,7 @@ export default function TechnicianPage() {
 
   async function arrive(jobId: string) {
     setBusyId(jobId);
+    setError("");
     try {
       await apiFetch(`/tech/jobs/${jobId}/arrive`, {
         method: "POST",
@@ -112,6 +114,7 @@ export default function TechnicianPage() {
     const note = String(noteDrafts[jobId] || "").trim();
     if (!note) return;
     setBusyId(jobId);
+    setError("");
     try {
       await apiFetch(`/tech/jobs/${jobId}/note`, {
         method: "POST",
@@ -215,18 +218,20 @@ export default function TechnicianPage() {
                         ? { label: busyId === job.id ? "Completing..." : "Complete", onClick: () => void run(job.id, "complete"), disabled: busyId === job.id }
                         : { label: busyId === job.id ? "Starting..." : "Start", onClick: () => void run(job.id, "start"), disabled: busyId === job.id }}
                       actions={[
-                        { label: busyId === job.id ? "Arriving..." : "Log arrival", onClick: () => void arrive(job.id), group: "Field actions", description: "Record that the technician has arrived on site", disabled: busyId === job.id },
+                        { label: busyId === job.id ? "Arriving..." : "Log arrival", onClick: () => void arrive(job.id), group: "Field actions", description: "Record that the technician has arrived on site", disabled: busyId === job.id || job.status === "COMPLETED" || job.status === "CANCELLED" },
                         { label: "Open job", href: `/dashboard/jobs/${job.id}`, group: "Internal", description: "Open the full internal job record" },
                       ]}
                     />
                     <div style={{ display: "grid", gap: 6, marginTop: 10 }}>
                       <input
+                        aria-label={`Add field note for ${job.jobRef}`}
                         className="input"
                         value={noteDrafts[job.id] || ""}
                         onChange={(e) => setNoteDrafts((prev) => ({ ...prev, [job.id]: e.target.value }))}
                         placeholder="Add technician note"
+                        disabled={busyId === job.id}
                       />
-                      <button className="button secondary" type="button" onClick={() => void saveNote(job.id)} disabled={busyId === job.id || !String(noteDrafts[job.id] || "").trim()}>
+                      <button aria-label={`Save field note for ${job.jobRef}`} className="button secondary" type="button" onClick={() => void saveNote(job.id)} disabled={busyId === job.id || !String(noteDrafts[job.id] || "").trim()}>
                         {busyId === job.id ? "Saving..." : "Save note"}
                       </button>
                     </div>

@@ -32,6 +32,13 @@ type BookingSettings = {
 type TimingFilter = "all" | "upcoming" | "today" | "unlinked";
 type BookingSavedView = "all" | "upcoming" | "today" | "unlinked";
 
+function getConversionIssues(booking: any) {
+  const issues: string[] = [];
+  if (!booking?.customerName) issues.push("customer name");
+  if (!booking?.startsAt || !booking?.endsAt) issues.push("time window");
+  return issues;
+}
+
 function formatDateTime(value?: string | null) {
   if (!value) return "Unscheduled";
   const date = new Date(value);
@@ -163,6 +170,12 @@ export default function BookingsPage() {
   }
 
   async function convertBooking(bookingId: string) {
+    const booking = bookings.find((item) => item.id === bookingId);
+    const readinessIssues = getConversionIssues(booking);
+    if (readinessIssues.length) {
+      setError(`Booking cannot be converted yet. Missing: ${readinessIssues.join(", ")}`);
+      return;
+    }
     setBusyConvertId(bookingId);
     setError("");
     try {
@@ -535,6 +548,8 @@ export default function BookingsPage() {
 
               {filteredBookings.map((booking) => {
                 const selected = selectedIds.includes(booking.id);
+                const readinessIssues = getConversionIssues(booking);
+                const canConvert = !booking.jobId && readinessIssues.length === 0;
                 return (
                   <OperatorDataTableRow key={booking.id} selected={selected}>
                     <div className="operator-table__cell">
@@ -567,7 +582,13 @@ export default function BookingsPage() {
                     <div className="operator-table__cell">
                       <div className="operator-cellMeta">
                         <span><strong>{booking.jobId || "Not linked"}</strong></span>
-                        <span>{booking.jobId ? "Existing job linked" : booking.customerName ? "Needs conversion" : "Add customer name before conversion"}</span>
+                        <span>
+                          {booking.jobId
+                            ? "Existing job linked"
+                            : readinessIssues.length
+                            ? `Conversion blocked: missing ${readinessIssues.join(", ")}`
+                            : "Ready to convert into a job"}
+                        </span>
                       </div>
                     </div>
                     <div className="operator-table__cell operator-table__cell--actions">
@@ -583,11 +604,11 @@ export default function BookingsPage() {
                           },
                           ...(!booking.jobId ? [{
                             label: busyConvertId === booking.id ? "Converting..." : "Convert to job",
-                            description: "Create a linked scheduled job from this booking",
+                            description: canConvert ? "Create a linked scheduled job from this booking" : `Blocked until ${readinessIssues.join(" and ")} ${readinessIssues.length > 1 ? "are" : "is"} added`,
                             shortcut: "New",
                             group: "Booking",
                             onClick: () => void convertBooking(booking.id),
-                            disabled: busyConvertId === booking.id,
+                            disabled: busyConvertId === booking.id || !canConvert,
                           }] : []),
                           ...(booking.jobId ? [{
                             label: "Open linked job",

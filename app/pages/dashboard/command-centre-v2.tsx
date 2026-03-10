@@ -566,8 +566,8 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
           <span className="ccv2-status-pill ccv2-status-pill--in_progress">IN_PROGRESS</span>
           <span className="ccv2-status-pill ccv2-status-pill--completed">COMPLETED</span>
         </div>
-        {error ? <p style={{ color: '#ff8a8a' }}>{error}</p> : null}
-        {toast ? <div className={`ccv2-toast ccv2-toast--${toastType}`}>{toast}</div> : null}
+        {error ? <p role="alert" style={{ color: '#ff8a8a' }}>{error}</p> : null}
+        {toast ? <div aria-live="polite" className={`ccv2-toast ccv2-toast--${toastType}`} role="status">{toast}</div> : null}
       </div>
 
       <div className="card ccv2-activity-stream" style={{ marginBottom: 14 }}>

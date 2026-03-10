@@ -85,6 +85,7 @@ export default function BillingReadinessPage() {
 
   async function run(jobId: string, action: "issue-invoice" | "mark-paid" | "queue-follow-up" | "escalate-follow-up") {
     setBusyJobId(jobId);
+    setError("");
     try {
       await apiFetch(`/billing/jobs/${jobId}/${action}`, { method: "POST" });
       setNotice(
@@ -209,7 +210,7 @@ export default function BillingReadinessPage() {
                                 label: busyJobId === job.id ? "Queuing..." : "Queue follow-up",
                                 onClick: () => void run(job.id, "queue-follow-up"),
                                 group: "Payments",
-                                description: "Create or refresh a billing reminder for this job",
+                                description: job.billingFollowUpAt ? "Refresh the current billing reminder for this job" : "Create a billing reminder for this job",
                                 disabled: busyJobId === job.id,
                               },
                               ...(job.billingFollowUpOverdue
