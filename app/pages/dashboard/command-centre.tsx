@@ -91,6 +91,7 @@ export default function CommandCentrePage() {
       if (selectedLocationIds.length > 0) q.set('locationIds', selectedLocationIds.join(','));
       const data = await apiFetch(`/jobs/board?${q.toString()}`);
       setBoard(data || { grouped: {}, counts: {} });
+      setError('');
     } catch (err: any) {
       setError(err?.message || 'Failed to load board');
     }
@@ -396,9 +397,9 @@ export default function CommandCentrePage() {
       </div>
 
       {showSaveView ? (
-        <div className="card" style={{ marginBottom: 14 }}>
+        <div aria-label="Save command centre view" className="card" style={{ marginBottom: 14 }}>
           <h3 style={{ marginTop: 0 }}>Save view</h3>
-          <input className="input" value={saveViewName} onChange={(e) => setSaveViewName(e.target.value)} placeholder="View name" />
+          <input aria-label="Saved view name" className="input" value={saveViewName} onChange={(e) => setSaveViewName(e.target.value)} placeholder="View name" />
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="button" type="button" onClick={saveView}>Save</button>
             <button className="button secondary" type="button" onClick={() => setShowSaveView(false)}>Cancel</button>

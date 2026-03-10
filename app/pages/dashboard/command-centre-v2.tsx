@@ -89,6 +89,7 @@ export default function CommandCentreV2Page() {
       const data = await apiFetch(`/jobs/board-v2?${q.toString()}`);
         const nextHash = JSON.stringify(data || {});
       setBoard(data || { grouped: {}, counts: {} });
+      setError('');
         if (lastBoardHash && lastBoardHash !== nextHash) {
           setLiveNotice("Board updated");
           window.setTimeout(() => setLiveNotice(""), 2200);
@@ -557,8 +558,8 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
                 {lastUpdated ? `Updated ${lastUpdated}` : "Live workspace"}
               </span>
             </div>
-            <button className="button secondary ccv2-button" type="button" onClick={() => void loadBoard(true)}>
-              Refresh
+            <button className="button secondary ccv2-button" type="button" onClick={() => void loadBoard(true)} disabled={isRefreshing}>
+              {isRefreshing ? 'Refreshing...' : 'Refresh'}
             </button>
           </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
@@ -568,6 +569,7 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
         </div>
         {error ? <p role="alert" style={{ color: '#ff8a8a' }}>{error}</p> : null}
         {toast ? <div aria-live="polite" className={`ccv2-toast ccv2-toast--${toastType}`} role="status">{toast}</div> : null}
+        {liveNotice ? <div aria-live="polite" className="ccv2-live-notice" role="status">{liveNotice}</div> : null}
       </div>
 
       <div className="card ccv2-activity-stream" style={{ marginBottom: 14 }}>
@@ -643,8 +645,8 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
       </div>
 
       {showSaveView ? (
-        <div className="card ccv2-surface" style={{ marginBottom: 14 }}>
-          <input className="input" value={saveViewName} onChange={(e) => setSaveViewName(e.target.value)} placeholder="View name" />
+        <div aria-label="Save board view" className="card ccv2-surface" style={{ marginBottom: 14 }}>
+          <input aria-label="Saved board view name" className="input" value={saveViewName} onChange={(e) => setSaveViewName(e.target.value)} placeholder="View name" />
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="button ccv2-button" type="button" onClick={saveView}>Save</button>
             <button className="button secondary ccv2-button" type="button" onClick={() => setShowSaveView(false)}>Cancel</button>
@@ -736,8 +738,8 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
 
       {pendingBulk && demoPolishEnabled ? (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'grid', placeItems: 'center', zIndex: 40, padding: 16 }}>
-          <div className="card ccv2-card" style={{ width: 'min(520px, 100%)' }}>
-            <h3 style={{ marginTop: 0 }}>Confirm bulk action</h3>
+          <div aria-labelledby="ccv2-bulk-confirm-title" aria-modal="true" className="card ccv2-card" role="dialog" style={{ width: 'min(520px, 100%)' }}>
+            <h3 id="ccv2-bulk-confirm-title" style={{ marginTop: 0 }}>Confirm bulk action</h3>
             <p className="muted">{pendingBulk.label} on {selected.length} selected jobs.</p>
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="button ccv2-button" type="button" onClick={confirmBulk}>Confirm</button>

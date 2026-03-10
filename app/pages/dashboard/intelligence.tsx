@@ -132,7 +132,7 @@ export default function IntelligencePage() {
         />
 
         {error ? <p role="alert" style={{ color: "#ff8a8a", marginTop: 0 }}>{error}</p> : null}
-        {loading ? <div className="operator-note">Loading intelligence...</div> : null}
+        {loading ? <div aria-live="polite" className="operator-note" role="status">Loading intelligence...</div> : null}
 
         {data.attentionQueue.length ? (
           <section className="card operator-section">
