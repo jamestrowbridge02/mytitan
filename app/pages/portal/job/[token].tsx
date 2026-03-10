@@ -373,7 +373,7 @@ export default function PublicJobPortal() {
   }
 
   if (!job && !error) {
-    return <div className="container" role="status" aria-live="polite">Loading...</div>;
+    return <div className="container" data-testid="public-portal-loading" role="status" aria-live="polite">Loading...</div>;
   }
 
   if (!portalPolishV1Enabled) {
@@ -626,7 +626,7 @@ export default function PublicJobPortal() {
           <StatusChip label="Completed" value={completed} />
         </div>
 
-        <section className="card" style={{ padding: 16, marginTop: 14 }}>
+        <section className="card" data-testid="public-portal-billing-progress" style={{ padding: 16, marginTop: 14 }}>
           <h3 style={{ marginTop: 0 }}>Billing progress</h3>
           <div style={{ display: 'grid', gap: 8 }}>
             <p style={{ margin: 0 }}>
@@ -647,10 +647,10 @@ export default function PublicJobPortal() {
           </div>
         </section>
 
-        <p className="muted" style={{ marginTop: 12 }}>{nextStepMessage}</p>
+        <p className="muted" data-testid="public-portal-next-step" style={{ marginTop: 12 }}>{nextStepMessage}</p>
 
-        {error && <p role="alert" style={{ color: '#ff8a8a', marginTop: 12 }}>{error}</p>}
-        {status && <p aria-live="polite" role="status" style={{ color: '#7bdba5', marginTop: 12 }}>{status}</p>}
+        {error && <p data-testid="public-portal-error" role="alert" style={{ color: '#ff8a8a', marginTop: 12 }}>{error}</p>}
+        {status && <p aria-live="polite" data-testid="public-portal-status" role="status" style={{ color: '#7bdba5', marginTop: 12 }}>{status}</p>}
 
         <StepCard
           title="Step 1: Review job summary"
@@ -696,11 +696,11 @@ export default function PublicJobPortal() {
             </>
           ) : null}
           <div style={{ display: 'grid', gap: 10, marginTop: 10 }}>
-            <button className="button" type="button" onClick={approve} style={{ width: '100%', minHeight: 46 }}>
+            <button className="button" data-testid="public-portal-approve" type="button" onClick={approve} style={{ width: '100%', minHeight: 46 }}>
               Approve Job
             </button>
             {marketplaceEnabled ? (
-              <button className="button secondary" type="button" onClick={decline} style={{ width: '100%', minHeight: 46 }}>
+              <button className="button secondary" data-testid="public-portal-decline" type="button" onClick={decline} style={{ width: '100%', minHeight: 46 }}>
                 Decline Job
               </button>
             ) : null}
@@ -757,7 +757,7 @@ export default function PublicJobPortal() {
             <button className="button secondary" type="button" onClick={undoCanvas} disabled={pendingAction !== ''} style={{ width: '100%', minHeight: 46 }}>
               Undo Last Stroke
             </button>
-            <button className="button" type="button" onClick={sign} disabled={!step3Enabled || pendingAction !== ''} style={{ width: '100%', minHeight: 46 }}>
+            <button className="button" data-testid="public-portal-sign" type="button" onClick={sign} disabled={!step3Enabled || pendingAction !== ''} style={{ width: '100%', minHeight: 46 }}>
               {pendingAction === 'sign' ? 'Saving...' : 'Save Signature'}
             </button>
           </div>
@@ -787,10 +787,10 @@ export default function PublicJobPortal() {
                   Billing state: {String(portal.summary.billingState).replaceAll('_', ' ')}
                 </p>
               ) : null}
-              <button className="button" type="button" onClick={pay} disabled={!step4Enabled || pendingAction !== ''} style={{ width: '100%', minHeight: 46 }}>
+              <button className="button" data-testid="public-portal-pay" type="button" onClick={pay} disabled={!step4Enabled || pendingAction !== ''} style={{ width: '100%', minHeight: 46 }}>
                 {pendingAction === 'pay' ? 'Opening payment...' : 'Pay now'}
               </button>
-              <button className="button secondary" type="button" onClick={refreshPaymentStatus} disabled={pendingAction !== ''} style={{ width: '100%', minHeight: 46 }}>
+              <button className="button secondary" data-testid="public-portal-refresh-payment" type="button" onClick={refreshPaymentStatus} disabled={pendingAction !== ''} style={{ width: '100%', minHeight: 46 }}>
                 {pendingAction === 'refresh-payment' ? 'Refreshing...' : 'Refresh payment status'}
               </button>
               {checkoutHint ? <p className="muted" style={{ margin: 0 }}>{checkoutHint}</p> : null}

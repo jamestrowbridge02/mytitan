@@ -18,15 +18,17 @@ export function OperatorNotice({
     <div
       aria-live="polite"
       className={`operator-notice ${notice.kind}`}
+      data-testid={`operator-notice-${notice.kind}`}
       role={isError ? "alert" : "status"}
     >
       <div className="operator-notice__body">
-        <div className="operator-notice__message">{notice.message}</div>
+        <div className="operator-notice__message" data-testid="operator-notice-message">{notice.message}</div>
         {actions ? <div className="operator-notice__actions">{actions}</div> : null}
       </div>
       <button
         aria-label="Dismiss notice"
         className="operator-notice__dismiss"
+        data-testid="operator-notice-dismiss"
         type="button"
         onClick={onDismiss}
       >

@@ -552,7 +552,7 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
                 {lastUpdated ? `Updated ${lastUpdated}` : "Live workspace"}
               </span>
             </div>
-            <button className="button secondary ccv2-button" type="button" onClick={() => void loadBoard(true)} disabled={isRefreshing}>
+            <button className="button secondary ccv2-button" data-testid="ccv2-refresh-button" type="button" onClick={() => void loadBoard(true)} disabled={isRefreshing}>
               {isRefreshing ? 'Refreshing...' : 'Refresh'}
             </button>
           </div>
@@ -596,7 +596,7 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
         <div className="two-col ccv2-grid">
           <div>
             <label>Search</label>
-            <input ref={searchRef} className="input ccv2-input" placeholder="Search jobs, customer, reg..." value={searchInput} onChange={(e) => setSearchInput(e.target.value)} />
+            <input ref={searchRef} className="input ccv2-input" data-testid="ccv2-search-input" placeholder="Search jobs, customer, reg..." value={searchInput} onChange={(e) => setSearchInput(e.target.value)} />
           </div>
           <div>
             <label>Status</label>

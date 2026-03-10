@@ -191,10 +191,10 @@ export default function BillingReadinessPage() {
                     <OperatorRowActions
                       primaryAction={
                         !job.invoiceIssuedAt
-                          ? { label: busyJobId === job.id ? "Issuing..." : "Issue invoice", onClick: () => void run(job.id, "issue-invoice"), disabled: busyJobId === job.id }
+                          ? { label: busyJobId === job.id ? "Issuing..." : "Issue invoice", onClick: () => void run(job.id, "issue-invoice"), disabled: busyJobId === job.id, testId: `billing-issue-invoice-${job.id}` }
                           : !job.invoicePaidAt
-                          ? { label: busyJobId === job.id ? "Recording..." : "Mark paid", onClick: () => void run(job.id, "mark-paid"), disabled: busyJobId === job.id }
-                          : { label: "Open job", href: `/dashboard/jobs/${job.id}` }
+                          ? { label: busyJobId === job.id ? "Recording..." : "Mark paid", onClick: () => void run(job.id, "mark-paid"), disabled: busyJobId === job.id, testId: `billing-mark-paid-${job.id}` }
+                          : { label: "Open job", href: `/dashboard/jobs/${job.id}`, testId: `billing-open-job-${job.id}` }
                       }
                       actions={[
                         ...(!job.invoicePaidAt
@@ -205,6 +205,7 @@ export default function BillingReadinessPage() {
                                 group: "Payments",
                                 description: job.billingFollowUpAt ? "Refresh the current billing reminder for this job" : "Create a billing reminder for this job",
                                 disabled: busyJobId === job.id,
+                                testId: `billing-queue-follow-up-${job.id}`,
                               },
                               ...(job.billingFollowUpOverdue
                                 ? [{
@@ -213,6 +214,7 @@ export default function BillingReadinessPage() {
                                     group: "Payments",
                                     description: "Pull an overdue billing follow-up forward for operator attention",
                                     disabled: busyJobId === job.id,
+                                    testId: `billing-escalate-follow-up-${job.id}`,
                                   }]
                                 : []),
                             ]

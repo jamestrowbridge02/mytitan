@@ -30,3 +30,6 @@ api/prisma/migrations/**/.DS_Store
 *.localbak.*
 
 .env.local
+app/playwright-report/
+app/test-results/
+app/.playwright/

@@ -188,20 +188,20 @@ export default function PortalOpsPage() {
                     <OperatorRowActions
                       primaryAction={
                         job.portalState === "expired"
-                          ? { label: busyJobId === job.id ? "Regenerating..." : "Regenerate link", onClick: () => void run(job.id, "regenerate"), disabled: busyJobId === job.id }
+                          ? { label: busyJobId === job.id ? "Regenerating..." : "Regenerate link", onClick: () => void run(job.id, "regenerate"), disabled: busyJobId === job.id, testId: `portal-regenerate-${job.id}` }
                           : job.portalUrl
-                          ? { label: "Open portal", href: job.portalUrl }
-                          : { label: busyJobId === job.id ? "Preparing..." : "Prepare link", onClick: () => void provisionLink(job.id), disabled: busyJobId === job.id }
+                          ? { label: "Open portal", href: job.portalUrl, testId: `portal-open-${job.id}` }
+                          : { label: busyJobId === job.id ? "Preparing..." : "Prepare link", onClick: () => void provisionLink(job.id), disabled: busyJobId === job.id, testId: `portal-prepare-${job.id}` }
                       }
                       actions={[
                         { label: "Open job", href: `/dashboard/jobs/${job.id}`, group: "Internal", description: "Review the internal job record" },
                         ...(job.portalTokenActive
                           ? [
-                              { label: busyJobId === job.id ? "Regenerating..." : "Regenerate link", onClick: () => void run(job.id, "regenerate"), group: "Portal lifecycle", description: "Invalidate the current link and issue a new token", disabled: busyJobId === job.id },
-                              { label: busyJobId === job.id ? "Revoking..." : "Revoke link", onClick: () => void run(job.id, "revoke"), group: "Portal lifecycle", description: "Expire the current customer portal token", disabled: busyJobId === job.id },
+                              { label: busyJobId === job.id ? "Regenerating..." : "Regenerate link", onClick: () => void run(job.id, "regenerate"), group: "Portal lifecycle", description: "Invalidate the current link and issue a new token", disabled: busyJobId === job.id, testId: `portal-regenerate-${job.id}` },
+                              { label: busyJobId === job.id ? "Revoking..." : "Revoke link", onClick: () => void run(job.id, "revoke"), group: "Portal lifecycle", description: "Expire the current customer portal token", disabled: busyJobId === job.id, testId: `portal-revoke-${job.id}` },
                             ]
                           : job.portalState === "expired"
-                          ? [{ label: busyJobId === job.id ? "Regenerating..." : "Regenerate link", onClick: () => void run(job.id, "regenerate"), group: "Portal lifecycle", description: "Issue a fresh customer portal token after expiry", disabled: busyJobId === job.id }]
+                          ? [{ label: busyJobId === job.id ? "Regenerating..." : "Regenerate link", onClick: () => void run(job.id, "regenerate"), group: "Portal lifecycle", description: "Issue a fresh customer portal token after expiry", disabled: busyJobId === job.id, testId: `portal-regenerate-${job.id}` }]
                           : []),
                         { label: "Open billing readiness", href: "/dashboard/billing/readiness", group: "Internal", description: "Review billing and payment readiness" },
                       ]}

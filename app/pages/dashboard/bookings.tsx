@@ -585,7 +585,7 @@ export default function BookingsPage() {
                     </div>
                     <div className="operator-table__cell operator-table__cell--actions">
                       <OperatorRowActions
-                        primaryAction={{ label: "Schedule", href: "/dashboard/calendar" }}
+                        primaryAction={{ label: "Schedule", href: "/dashboard/calendar", testId: `booking-schedule-${booking.id}` }}
                         actions={[
                           {
                             label: "Open booking",
@@ -593,6 +593,7 @@ export default function BookingsPage() {
                             shortcut: "Open",
                             group: "Booking",
                             href: `/dashboard/bookings/${booking.id}`,
+                            testId: `booking-open-${booking.id}`,
                           },
                           ...(!booking.jobId ? [{
                             label: busyConvertId === booking.id ? "Converting..." : "Convert to job",
@@ -601,6 +602,7 @@ export default function BookingsPage() {
                             group: "Booking",
                             onClick: () => void convertBooking(booking.id),
                             disabled: busyConvertId === booking.id || !canConvert,
+                            testId: `booking-convert-${booking.id}`,
                           }] : []),
                           ...(booking.jobId ? [{
                             label: "Open linked job",
@@ -608,6 +610,7 @@ export default function BookingsPage() {
                             shortcut: "Open",
                             group: "Booking",
                             href: `/dashboard/jobs/${booking.jobId}`,
+                            testId: `booking-open-job-${booking.id}`,
                           }] : []),
                           {
                             label: "Copy booking ID",

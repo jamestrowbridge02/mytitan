@@ -10,6 +10,7 @@ type OperatorAction = {
   description?: string;
   shortcut?: string;
   group?: string;
+  testId?: string;
 };
 
 type OperatorStat = {
@@ -24,6 +25,7 @@ type OperatorFilterAction = {
   onClick?: () => void;
   variant?: "primary" | "secondary";
   disabled?: boolean;
+  testId?: string;
 };
 
 type OperatorSavedView = {
@@ -44,21 +46,21 @@ function OperatorActionButton({ action }: { action: OperatorAction | OperatorFil
   if (action.href) {
     if (action.disabled) {
       return (
-        <button className={className} type="button" disabled>
+        <button className={className} data-testid={action.testId} type="button" disabled>
           {action.label}
         </button>
       );
     }
 
     return (
-      <Link className={className} href={action.href}>
+      <Link className={className} data-testid={action.testId} href={action.href}>
         {action.label}
       </Link>
     );
   }
 
   return (
-    <button className={className} type="button" onClick={action.onClick} disabled={action.disabled}>
+    <button className={className} data-testid={action.testId} type="button" onClick={action.onClick} disabled={action.disabled}>
       {action.label}
     </button>
   );

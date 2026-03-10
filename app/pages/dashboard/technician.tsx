@@ -206,10 +206,10 @@ export default function TechnicianPage() {
                   <div className="operator-table__cell operator-table__cell--actions">
                     <OperatorRowActions
                       primaryAction={job.status === "IN_PROGRESS"
-                        ? { label: busyId === job.id ? "Completing..." : "Complete", onClick: () => void run(job.id, "complete"), disabled: busyId === job.id }
-                        : { label: busyId === job.id ? "Starting..." : "Start", onClick: () => void run(job.id, "start"), disabled: busyId === job.id }}
+                        ? { label: busyId === job.id ? "Completing..." : "Complete", onClick: () => void run(job.id, "complete"), disabled: busyId === job.id, testId: `technician-complete-${job.id}` }
+                        : { label: busyId === job.id ? "Starting..." : "Start", onClick: () => void run(job.id, "start"), disabled: busyId === job.id, testId: `technician-start-${job.id}` }}
                       actions={[
-                        { label: busyId === job.id ? "Arriving..." : "Log arrival", onClick: () => void arrive(job.id), group: "Field actions", description: "Record that the technician has arrived on site", disabled: busyId === job.id || job.status === "COMPLETED" || job.status === "CANCELLED" },
+                        { label: busyId === job.id ? "Arriving..." : "Log arrival", onClick: () => void arrive(job.id), group: "Field actions", description: "Record that the technician has arrived on site", disabled: busyId === job.id || job.status === "COMPLETED" || job.status === "CANCELLED", testId: `technician-arrive-${job.id}` },
                         { label: "Open job", href: `/dashboard/jobs/${job.id}`, group: "Internal", description: "Open the full internal job record" },
                       ]}
                     />
@@ -217,12 +217,13 @@ export default function TechnicianPage() {
                       <input
                         aria-label={`Add field note for ${job.jobRef}`}
                         className="input"
+                        data-testid={`technician-note-input-${job.id}`}
                         value={noteDrafts[job.id] || ""}
                         onChange={(e) => setNoteDrafts((prev) => ({ ...prev, [job.id]: e.target.value }))}
                         placeholder="Add technician note"
                         disabled={busyId === job.id}
                       />
-                      <button aria-label={`Save field note for ${job.jobRef}`} className="button secondary" type="button" onClick={() => void saveNote(job.id)} disabled={busyId === job.id || !String(noteDrafts[job.id] || "").trim()}>
+                      <button aria-label={`Save field note for ${job.jobRef}`} className="button secondary" data-testid={`technician-note-save-${job.id}`} type="button" onClick={() => void saveNote(job.id)} disabled={busyId === job.id || !String(noteDrafts[job.id] || "").trim()}>
                         {busyId === job.id ? "Saving..." : "Save note"}
                       </button>
                     </div>
