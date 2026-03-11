@@ -30,8 +30,9 @@ test.describe("scheduling capacity planning", () => {
     await loginAs(page, request, "e2e.operator@mytitan.local", "MyTitanE2E!2026");
 
     await page.goto("/dashboard/scheduling");
-    await expect(page.getByText(fixtureRefs.commandCentreJobRef)).toBeVisible();
-    await page.getByRole("button", { name: fixtureRefs.commandCentreJobRef }).first().evaluate((element: HTMLButtonElement) => element.click());
+    const pressureList = page.getByTestId("scheduling-pressure-list");
+    await expect(pressureList).toContainText(/Unassigned|Due work|Recurring/i);
+    await pressureList.getByRole("button").first().evaluate((element: HTMLButtonElement) => element.click());
     await expect(page.getByTestId("scheduling-recommendation-list")).toContainText(/Capacity available|Fits remaining capacity|No overlap/i);
   });
 

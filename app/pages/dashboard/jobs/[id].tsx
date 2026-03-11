@@ -19,6 +19,7 @@ import { isCommandCentreV2Enabled, isNotificationsV1Enabled } from "../../../lib
 import { getJobNextAction } from "../../../lib/next-action";
 import { getJobSignals } from "../../../lib/ops-signals";
 import { sortTimelineItems, toTimelineItemsFromCommsEvents, toTimelineItemsFromJobActivity } from "../../../lib/timeline-adapter";
+import { emptyPermissionSnapshot, hasWorkspacePermission, normalizePermissionSnapshot } from "../../../lib/workspace-permissions";
 
 function money(cents: number, currency = "GBP") {
   return new Intl.NumberFormat(undefined, { style: "currency", currency }).format((cents || 0) / 100);
@@ -104,6 +105,9 @@ export default function JobDetailPage() {
   const [requestId, setRequestId] = useState<string | undefined>(undefined);
   const [statusMessage, setStatusMessage] = useState("");
   const [activityItems, setActivityItems] = useState<any[]>([]);
+  const [approvalRequests, setApprovalRequests] = useState<any[]>([]);
+  const [approvalBusy, setApprovalBusy] = useState(false);
+  const [permissions, setPermissions] = useState(() => emptyPermissionSnapshot());
 
   const commandCentreV2Enabled = isCommandCentreV2Enabled();
   const commsEnabled = isNotificationsV1Enabled();
@@ -117,15 +121,18 @@ export default function JobDetailPage() {
       setLoading(true);
       if (commsEnabled) setCommsLoading(true);
       try {
-        const [jobPayload, activityPayload] = await Promise.all([
+        const [jobPayload, activityPayload, me] = await Promise.all([
           apiFetch(`/jobs/${id}`),
           commandCentreV2Enabled ? apiFetch(`/jobs/${id}/activity`).catch(() => []) : Promise.resolve([]),
+          apiFetch("/me").catch(() => null),
         ]);
         setJob(jobPayload);
         setActivity(Array.isArray(activityPayload) ? activityPayload : []);
+        setPermissions(normalizePermissionSnapshot(me?.permissions));
         if (commsEnabled) {
           await loadComms();
         }
+        await loadApprovals();
       } catch (err: any) {
         setError(err?.message || "Failed to load job");
         setRequestId(err instanceof ApiError ? err.requestId : undefined);
@@ -158,6 +165,16 @@ export default function JobDetailPage() {
     }
   }
 
+  async function loadApprovals() {
+    if (!id) return;
+    try {
+      const rows = await apiFetch(`/customer-approvals?entityType=JOB&entityId=${encodeURIComponent(id)}`);
+      setApprovalRequests(Array.isArray(rows) ? rows : []);
+    } catch {
+      setApprovalRequests([]);
+    }
+  }
+
   useEffect(() => {
     load();
     if (id) {
@@ -183,6 +200,29 @@ export default function JobDetailPage() {
     } catch (err: any) {
       setError(err?.message || "Failed to update job status");
       setRequestId(err instanceof ApiError ? err.requestId : undefined);
+    }
+  }
+
+  async function requestApproval() {
+    if (!job?.customerId || !id) return;
+    setApprovalBusy(true);
+    setError("");
+    try {
+      await apiFetch("/customer-approvals", {
+        method: "POST",
+        body: JSON.stringify({
+          customerId: job.customerId,
+          entityType: "JOB",
+          entityId: id,
+          kind: "WORK_AUTHORIZATION",
+        }),
+      });
+      setStatusMessage("Approval request created");
+      await loadApprovals();
+    } catch (err: any) {
+      setError(err?.message || "Failed to create approval request");
+    } finally {
+      setApprovalBusy(false);
     }
   }
 
@@ -228,6 +268,7 @@ export default function JobDetailPage() {
     ...toTimelineItemsFromCommsEvents(commsEvents),
   ]);
   const signals = getJobSignals(job);
+  const canManagePortal = hasWorkspacePermission(permissions, "portal.manage");
 
   if (loading && !job) {
     return (
@@ -459,6 +500,34 @@ export default function JobDetailPage() {
             entityType="job"
             entityId={id}
           />
+
+          <EntitySection title="Customer approvals" subtitle="Request explicit customer approval without breaking the existing portal flow.">
+            <div data-testid="approval-request-list" style={{ display: "grid", gap: 10 }}>
+              {approvalRequests.length ? (
+                approvalRequests.map((approval) => (
+                  <div key={approval.id} className="integration-card">
+                    <div>
+                      <strong>{approval.entityLabel || approval.kind}</strong>
+                      <p className="muted" style={{ margin: "4px 0 0 0" }}>
+                        {approval.kind.replaceAll("_", " ")} • {approval.status} • Requested {formatDateTime(approval.requestedAt)}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="muted">No explicit approval requests yet.</p>
+              )}
+            </div>
+            {canManagePortal ? (
+              <div style={{ marginTop: 12 }}>
+                <button className="button" type="button" onClick={() => void requestApproval()} disabled={approvalBusy || !job?.customerId} data-testid="approval-request-create">
+                  {approvalBusy ? "Creating..." : "Request work authorization"}
+                </button>
+              </div>
+            ) : (
+              <p className="muted" style={{ marginTop: 12 }}>Your role cannot create customer approval requests.</p>
+            )}
+          </EntitySection>
 
           <EntitySection title="Scheduling & Assignment" subtitle="Who owns this job and key schedule touchpoints.">
             <div className="two-col">

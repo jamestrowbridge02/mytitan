@@ -43,6 +43,7 @@ import { TechModule } from './tech/tech.module';
 import { ArtifactsModule } from './artifacts/artifacts.module';
 import { ServicePlansModule } from './service-plans/service-plans.module';
 import { ScheduleModule } from './schedule/schedule.module';
+import { CustomerWorkspaceModule } from './customer-workspace/customer-workspace.module';
 
 @Module({
   imports: [
@@ -97,6 +98,7 @@ import { ScheduleModule } from './schedule/schedule.module';
     ArtifactsModule,
     ServicePlansModule,
     ScheduleModule,
+    CustomerWorkspaceModule,
   ],
 })
 export class AppModule {}

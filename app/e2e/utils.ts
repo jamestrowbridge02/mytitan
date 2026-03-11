@@ -12,6 +12,8 @@ export const fixtureRefs = {
   convertibleBookingId: "e2e-booking-convertible",
   convertibleCustomerId: "e2e-customer-convertible",
   convertibleCustomerSlug: "e2e-convertible",
+  portalExpiredCustomerSlug: "e2e-portal-expired",
+  portalExpiredCustomerEmail: "portal-expired@mytitan.local",
   blockedBookingId: "e2e-booking-blocked",
   invoiceReadyJobId: "e2e-job-invoice-ready",
   invoiceReadyJobRef: "E2E-INV-READY-001",
@@ -54,6 +56,10 @@ export const fixtureRefs = {
   technicianPassword: "MyTitanE2ETech!2026",
   viewerEmail: "e2e.viewer@mytitan.local",
   viewerPassword: "MyTitanE2EViewer!2026",
+  customerWorkspaceEmail: "portal-active@mytitan.local",
+  customerWorkspacePassword: "MyTitanCustomer!2026",
+  customerWorkspaceInviteToken: "custinvite_e2e_customer_invited",
+  blockedCustomerSlug: "e2e-blocked",
 };
 
 export type E2EMetadata = {
@@ -187,5 +193,24 @@ export async function loginAs(page: Page, request: APIRequestContext, email: str
   }
   await page.addInitScript((nextToken) => {
     window.localStorage.setItem("mytitan_token", nextToken);
+  }, token);
+}
+
+export async function loginCustomerAs(page: Page, request: APIRequestContext, email: string, password: string) {
+  const response = await request.post("http://127.0.0.1:3000/customer-auth/login", {
+    data: { email, password },
+    headers: { "Content-Type": "application/json" },
+  });
+  if (!response.ok()) {
+    const body = await response.text();
+    throw new Error(`Failed to log in customer ${email} (${response.status()}: ${body})`);
+  }
+  const body = await response.json();
+  const token = String(body?.token || "");
+  if (!token) {
+    throw new Error(`Customer token missing for ${email}`);
+  }
+  await page.addInitScript((nextToken) => {
+    window.localStorage.setItem("mytitan_customer_token", nextToken);
   }, token);
 }

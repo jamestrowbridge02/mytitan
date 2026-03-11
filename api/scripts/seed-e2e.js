@@ -57,6 +57,22 @@ const FIXTURE = {
     financeOps: { id: "e2e-customer-finance-ops", slug: "e2e-finance-ops", name: "E2E Finance Ops", email: "finance-ops@mytitan.local", phone: "+447700900110" },
     technicianRole: { id: "e2e-customer-technician-role", slug: "e2e-technician-role", name: "E2E Technician Role Customer", email: "technician-role@mytitan.local", phone: "+447700900111" },
   },
+  customerWorkspace: {
+    activeAccount: {
+      id: "e2e-customer-account-active",
+      email: "portal-active@mytitan.local",
+      password: "MyTitanCustomer!2026",
+    },
+    invitedAccount: {
+      id: "e2e-customer-account-invited",
+      email: "blocked@mytitan.local",
+      inviteToken: "custinvite_e2e_customer_invited",
+    },
+  },
+  customerApprovals: {
+    pendingJob: { id: "e2e-customer-approval-pending-job" },
+    approvedDocument: { id: "e2e-customer-approval-approved-document" },
+  },
   jobs: {
     invoiceReady: { id: "e2e-job-invoice-ready", jobRef: "E2E-INV-READY-001" },
     issued: { id: "e2e-job-issued", jobRef: "E2E-ISSUED-001" },
@@ -157,6 +173,10 @@ function encryptSeedText(value) {
 
 function artifactRoot() {
   return path.resolve(process.cwd(), process.env.ARTIFACTS_STORAGE_ROOT || "uploads/artifacts");
+}
+
+function tokenHash(token) {
+  return crypto.createHash("sha256").update(token).digest("hex");
 }
 
 async function writeSeedArtifact(companyId, entityType, entityId, fileName, contents) {
@@ -703,6 +723,22 @@ async function ensureWebhookDelivery(id, payload) {
 
 async function ensureDocumentArtifact(id, payload) {
   await prisma.documentArtifact.upsert({
+    where: { id },
+    create: { id, ...payload },
+    update: payload,
+  });
+}
+
+async function ensureCustomerAccount(id, payload) {
+  await prisma.customerAccount.upsert({
+    where: { id },
+    create: { id, ...payload },
+    update: payload,
+  });
+}
+
+async function ensureCustomerApproval(id, payload) {
+  await prisma.customerApproval.upsert({
     where: { id },
     create: { id, ...payload },
     update: payload,
@@ -1619,6 +1655,69 @@ async function main() {
     createdAt: addMinutes(now, -16),
   });
 
+  await prisma.customerApproval.deleteMany({
+    where: {
+      tenantId: company.id,
+      id: { notIn: [FIXTURE.customerApprovals.pendingJob.id, FIXTURE.customerApprovals.approvedDocument.id] },
+    },
+  });
+  await prisma.customerAccount.deleteMany({
+    where: {
+      tenantId: company.id,
+      id: { notIn: [FIXTURE.customerWorkspace.activeAccount.id, FIXTURE.customerWorkspace.invitedAccount.id] },
+    },
+  });
+
+  await ensureCustomerAccount(FIXTURE.customerWorkspace.activeAccount.id, {
+    tenantId: company.id,
+    customerId: customers.portalActive.id,
+    email: FIXTURE.customerWorkspace.activeAccount.email,
+    passwordHash: await bcrypt.hash(FIXTURE.customerWorkspace.activeAccount.password, 10),
+    status: "ACTIVE",
+    invitedAt: addMinutes(now, -120),
+    activatedAt: addMinutes(now, -118),
+    lastLoginAt: addMinutes(now, -30),
+    inviteTokenHash: null,
+    inviteTokenExpiresAt: null,
+  });
+  await ensureCustomerAccount(FIXTURE.customerWorkspace.invitedAccount.id, {
+    tenantId: company.id,
+    customerId: customers.blocked.id,
+    email: FIXTURE.customerWorkspace.invitedAccount.email,
+    passwordHash: "",
+    status: "INVITED",
+    invitedAt: addMinutes(now, -45),
+    activatedAt: null,
+    lastLoginAt: null,
+    inviteTokenHash: tokenHash(FIXTURE.customerWorkspace.invitedAccount.inviteToken),
+    inviteTokenExpiresAt: addMinutes(now, 60 * 24 * 7),
+  });
+
+  await ensureCustomerApproval(FIXTURE.customerApprovals.pendingJob.id, {
+    tenantId: company.id,
+    customerId: customers.portalActive.id,
+    entityType: "JOB",
+    entityId: portalActiveJob.id,
+    kind: "WORK_AUTHORIZATION",
+    status: "PENDING",
+    requestedAt: addMinutes(now, -20),
+    respondedAt: null,
+    responseNote: null,
+    requestedByUserId: operator.id,
+  });
+  await ensureCustomerApproval(FIXTURE.customerApprovals.approvedDocument.id, {
+    tenantId: company.id,
+    customerId: customers.portalActive.id,
+    entityType: "DOCUMENT",
+    entityId: FIXTURE.artifacts.jobPortal.id,
+    kind: "DOCUMENT_ACKNOWLEDGEMENT",
+    status: "APPROVED",
+    requestedAt: addMinutes(now, -19),
+    respondedAt: addMinutes(now, -18),
+    responseNote: "Reviewed in seeded workspace flow",
+    requestedByUserId: operator.id,
+  });
+
   await ensureActivityEvent("e2e-activity-artifact-created", {
     type: "artifact.created",
     label: `Added ${FIXTURE.artifacts.jobPortal.label}`,
@@ -1634,6 +1733,66 @@ async function main() {
       entityId: portalActiveJob.id,
       kind: "PORTAL_DOCUMENT",
       label: FIXTURE.artifacts.jobPortal.label,
+    },
+  });
+  await ensureActivityEvent("e2e-activity-customer-account-invited", {
+    type: "customer.account.invited",
+    label: "Invited customer account for E2E Blocked Customer",
+    at: addMinutes(now, -45),
+    tenantId: company.id,
+    customerId: customers.blocked.id,
+    customerName: customers.blocked.name,
+    payloadJson: {
+      customerAccountId: FIXTURE.customerWorkspace.invitedAccount.id,
+      email: FIXTURE.customerWorkspace.invitedAccount.email,
+      invitedByUserId: operator.id,
+    },
+  });
+  await ensureActivityEvent("e2e-activity-customer-account-activated", {
+    type: "customer.account.activated",
+    label: "Customer account activated for E2E Portal Active",
+    at: addMinutes(now, -118),
+    tenantId: company.id,
+    customerId: customers.portalActive.id,
+    customerName: customers.portalActive.name,
+    payloadJson: {
+      customerAccountId: FIXTURE.customerWorkspace.activeAccount.id,
+      email: FIXTURE.customerWorkspace.activeAccount.email,
+    },
+  });
+  await ensureActivityEvent("e2e-activity-customer-approval-requested", {
+    type: "customer.approval.requested",
+    label: `Requested work authorization for ${portalActiveJob.jobRef}`,
+    at: addMinutes(now, -20),
+    tenantId: company.id,
+    customerId: customers.portalActive.id,
+    customerName: customers.portalActive.name,
+    jobId: portalActiveJob.id,
+    jobRef: portalActiveJob.jobRef,
+    status: portalActiveJob.status,
+    payloadJson: {
+      approvalId: FIXTURE.customerApprovals.pendingJob.id,
+      entityType: "JOB",
+      entityId: portalActiveJob.id,
+      kind: "WORK_AUTHORIZATION",
+      requestedByUserId: operator.id,
+    },
+  });
+  await ensureActivityEvent("e2e-activity-customer-approval-approved", {
+    type: "customer.approval.approved",
+    label: `Approved document acknowledgement for ${FIXTURE.artifacts.jobPortal.label}`,
+    at: addMinutes(now, -18),
+    tenantId: company.id,
+    customerId: customers.portalActive.id,
+    customerName: customers.portalActive.name,
+    jobId: portalActiveJob.id,
+    jobRef: portalActiveJob.jobRef,
+    status: portalActiveJob.status,
+    payloadJson: {
+      approvalId: FIXTURE.customerApprovals.approvedDocument.id,
+      entityType: "DOCUMENT",
+      entityId: FIXTURE.artifacts.jobPortal.id,
+      kind: "DOCUMENT_ACKNOWLEDGEMENT",
     },
   });
 
@@ -1690,7 +1849,7 @@ async function main() {
     autoCreateBooking: false,
     autoCreateJob: true,
     notesJson: { operatorNotes: "Seeded paused recurring job plan" },
-    portalVisible: false,
+    portalVisible: true,
     createdByUserId: operator.id,
   }, [
     { title: "Review warranty status" },
@@ -1833,6 +1992,7 @@ async function main() {
   console.log(`finance_ready_job=${financeReadyJob.jobRef}`);
   console.log(`portal_active_job=${portalActiveJob.jobRef}`);
   console.log(`portal_token=${FIXTURE.tokens.active}`);
+  console.log(`customer_workspace_email=${FIXTURE.customerWorkspace.activeAccount.email}`);
   console.log(`technician_job=${technicianJob.jobRef}`);
   console.log(`technician_role_job=${technicianRoleJob.jobRef}`);
   console.log(`command_centre_job=${openJob.jobRef}`);

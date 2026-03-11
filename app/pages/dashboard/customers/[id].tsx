@@ -4,6 +4,7 @@ import { EntityArtifactsCard } from "../../../components/artifacts/EntityArtifac
 import { EntityCustomFieldsCard } from "../../../components/custom-fields/EntityCustomFieldsCard";
 import { DashboardShell } from "../../../components/dashboard-shell";
 import { apiFetch } from "../../../lib/api";
+import { emptyPermissionSnapshot, hasWorkspacePermission, normalizePermissionSnapshot } from "../../../lib/workspace-permissions";
 
 export default function CustomerTimelinePage() {
   const router = useRouter();
@@ -16,6 +17,12 @@ export default function CustomerTimelinePage() {
   const [message, setMessage] = useState("");
   const [notice, setNotice] = useState("");
   const [servicePlans, setServicePlans] = useState<any[]>([]);
+  const [accountStatus, setAccountStatus] = useState<any>(null);
+  const [approvalRequests, setApprovalRequests] = useState<any[]>([]);
+  const [inviteLink, setInviteLink] = useState("");
+  const [actionBusy, setActionBusy] = useState(false);
+  const [permissions, setPermissions] = useState(() => emptyPermissionSnapshot());
+  const canManagePortal = hasWorkspacePermission(permissions, "portal.manage");
   const recurringActivity = items.filter((item) => {
     const type = String(item?.type || "");
     const label = String(item?.label || "").toLowerCase();
@@ -54,12 +61,34 @@ export default function CustomerTimelinePage() {
     }
   }
 
+  async function loadWorkspaceGovernance(activeCustomer?: any) {
+    const customerId = String(activeCustomer?.id || "");
+    if (!customerId) {
+      setAccountStatus(null);
+      setApprovalRequests([]);
+      return;
+    }
+    try {
+      const [account, approvals] = await Promise.all([
+        apiFetch(`/customer-accounts/${encodeURIComponent(customerId)}/status`),
+        apiFetch(`/customer-approvals?customerId=${encodeURIComponent(customerId)}`),
+      ]);
+      setAccountStatus(account || null);
+      setApprovalRequests(Array.isArray(approvals) ? approvals : []);
+    } catch {
+      setAccountStatus(null);
+      setApprovalRequests([]);
+    }
+  }
+
   useEffect(() => {
     if (!router.isReady) return;
     const run = async () => {
       setLoading(true);
       let resolved: any = null;
       try {
+        const me = await apiFetch("/me").catch(() => null);
+        setPermissions(normalizePermissionSnapshot(me?.permissions));
         if (typeof id === "string" && id) {
           resolved = await apiFetch(`/customers/${encodeURIComponent(id)}`);
           setCustomer(resolved || null);
@@ -67,10 +96,29 @@ export default function CustomerTimelinePage() {
       } catch {
         setCustomer(null);
       }
-      await Promise.all([loadTimeline(resolved), loadServicePlans(resolved)]);
+      await Promise.all([loadTimeline(resolved), loadServicePlans(resolved), loadWorkspaceGovernance(resolved)]);
     };
     void run();
   }, [router.isReady, id, name]);
+
+  async function inviteCustomerAccount() {
+    if (!customer?.id) return;
+    setActionBusy(true);
+    setNotice("");
+    try {
+      const response = await apiFetch("/customer-accounts/invite", {
+        method: "POST",
+        body: JSON.stringify({ customerId: customer.id }),
+      });
+      setInviteLink(String(response?.activationUrl || ""));
+      setNotice("Customer account invite prepared");
+      await loadWorkspaceGovernance(customer);
+    } catch {
+      setNotice("Could not invite customer account");
+    } finally {
+      setActionBusy(false);
+    }
+  }
 
   async function sendCommunication() {
     try {
@@ -130,6 +178,62 @@ export default function CustomerTimelinePage() {
             entityId={id}
           />
         ) : null}
+
+        <div className="card customer-comms-card" data-testid="customer-account-status">
+          <div className="customer-comms-head">
+            <h3 style={{ margin: 0 }}>Customer account</h3>
+            {notice ? <div className="ccv2-toast ccv2-toast--info">{notice}</div> : null}
+          </div>
+          {accountStatus?.account ? (
+            <div style={{ display: "grid", gap: 8 }}>
+              <div><strong>{accountStatus.account.email}</strong></div>
+              <p className="muted" style={{ margin: 0 }}>
+                {accountStatus.account.status} • Invited {accountStatus.account.invitedAt ? new Date(accountStatus.account.invitedAt).toLocaleString() : "not yet"}
+              </p>
+              <p className="muted" style={{ margin: 0 }}>
+                Activated {accountStatus.account.activatedAt ? new Date(accountStatus.account.activatedAt).toLocaleString() : "not yet"} • Last login {accountStatus.account.lastLoginAt ? new Date(accountStatus.account.lastLoginAt).toLocaleString() : "never"}
+              </p>
+            </div>
+          ) : (
+            <p className="muted">No customer workspace account invited yet.</p>
+          )}
+          {canManagePortal ? (
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
+              <button className="button" type="button" onClick={() => void inviteCustomerAccount()} disabled={actionBusy} data-testid="customer-account-invite">
+                {actionBusy ? "Preparing..." : accountStatus?.account ? "Resend invite" : "Invite customer account"}
+              </button>
+              {inviteLink ? (
+                <a className="button secondary" href={inviteLink} target="_blank" rel="noreferrer noopener">
+                  Open activation link
+                </a>
+              ) : null}
+            </div>
+          ) : (
+            <p className="muted" style={{ marginTop: 12 }}>Your role cannot manage customer account access.</p>
+          )}
+        </div>
+
+        <div className="card customer-comms-card" data-testid="approval-request-list">
+          <div className="customer-comms-head">
+            <h3 style={{ margin: 0 }}>Approval requests</h3>
+          </div>
+          {approvalRequests.length ? (
+            <div style={{ display: "grid", gap: 10 }}>
+              {approvalRequests.map((approval) => (
+                <div key={approval.id} className="integration-card">
+                  <div>
+                    <strong>{approval.entityLabel || approval.kind}</strong>
+                    <p className="muted" style={{ margin: "4px 0 0 0" }}>
+                      {approval.kind.replaceAll("_", " ")} • {approval.status} • Requested {approval.requestedAt ? new Date(approval.requestedAt).toLocaleString() : "now"}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="muted">No approval requests recorded for this customer.</p>
+          )}
+        </div>
 
         <div className="card customer-comms-card" data-testid="customer-service-plans">
           <div className="customer-comms-head">

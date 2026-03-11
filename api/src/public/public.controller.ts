@@ -24,6 +24,7 @@ import { getPortalCopy } from "../common/business-config";
 import { PrismaService } from "../prisma/prisma.service";
 import { ActivityService } from "../events/activity.service";
 import { ArtifactsService } from "../artifacts/artifacts.service";
+import { CustomerWorkspaceService } from "../customer-workspace/customer-workspace.service";
 import { ServicePlansService } from "../service-plans/service-plans.service";
 import { ApproveJobDto, DeclineJobDto, SignJobDto } from "./public.dto";
 
@@ -41,6 +42,7 @@ export class PublicController {
     private readonly automations: AutomationsService,
     private readonly activity: ActivityService,
     private readonly artifacts: ArtifactsService,
+    private readonly customerWorkspace: CustomerWorkspaceService,
     private readonly servicePlans: ServicePlansService,
   ) {}
 
@@ -264,6 +266,13 @@ export class PublicController {
         declinedReason: null,
       },
     });
+    await this.customerWorkspace.syncPortalJobApproval({
+      tenantId: record.job.companyId,
+      customerId: record.job.customerId || null,
+      jobId: record.jobId,
+      decision: "approve",
+      actorName: dto.name ?? null,
+    });
     await this.audit.log(record.job.companyId, "portal.approve", `Job ${record.job.jobRef} approved`, null);
     return { approvedAt: updated.approvedAt };
   }
@@ -280,6 +289,14 @@ export class PublicController {
         declinedReason: dto.reason ?? null,
         approvedAt: null,
       },
+    });
+    await this.customerWorkspace.syncPortalJobApproval({
+      tenantId: record.job.companyId,
+      customerId: record.job.customerId || null,
+      jobId: record.jobId,
+      decision: "decline",
+      actorName: dto.name ?? null,
+      note: dto.reason ?? null,
     });
     await this.audit.log(record.job.companyId, "portal.decline", `Job ${record.job.jobRef} declined`, null);
     return { declinedAt: updated.declinedAt };

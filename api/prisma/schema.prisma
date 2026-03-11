@@ -144,6 +144,32 @@ enum ServicePlanRunStatus {
   FAILED
 }
 
+enum CustomerAccountStatus {
+  INVITED
+  ACTIVE
+  DISABLED
+}
+
+enum CustomerApprovalEntityType {
+  JOB
+  BOOKING
+  DOCUMENT
+  SERVICE_PLAN
+}
+
+enum CustomerApprovalKind {
+  QUOTE_ACCEPTANCE
+  WORK_AUTHORIZATION
+  DOCUMENT_ACKNOWLEDGEMENT
+  PLAN_APPROVAL
+}
+
+enum CustomerApprovalStatus {
+  PENDING
+  APPROVED
+  DECLINED
+}
+
 enum NextActionType {
   CALL
   EMAIL
@@ -256,6 +282,8 @@ model Company {
   automationSuggestionStates AutomationSuggestionState[]
   customFields             CustomField[]
   customFieldValues        CustomFieldValue[]
+  customerAccounts         CustomerAccount[]
+  customerApprovals        CustomerApproval[]
 }
 
 model User {
@@ -295,6 +323,7 @@ model User {
   createdJobs              Job[]                     @relation("JobCreator")
   technicianAvailabilities TechnicianAvailability[] @relation("TechnicianAvailabilityUser")
   technicianCapacityExceptions TechnicianCapacityException[] @relation("TechnicianCapacityExceptionUser")
+  requestedCustomerApprovals CustomerApproval[]     @relation("CustomerApprovalRequester")
 
   @@unique([companyId, email])
 }
@@ -378,12 +407,59 @@ model Customer {
   jobs           Job[]
   activityEvents ActivityEvent[]
   servicePlans   ServicePlan[]
+  customerAccount CustomerAccount?
+  approvals      CustomerApproval[]
 
   @@unique([companyId, slug])
   @@index([companyId, name])
   @@index([companyId, email])
   @@index([companyId, phone])
   @@index([companyId, createdAt])
+}
+
+model CustomerAccount {
+  id                 String                @id @default(cuid())
+  tenantId           String
+  customerId         String                @unique
+  email              String
+  passwordHash       String?
+  status             CustomerAccountStatus @default(INVITED)
+  lastLoginAt        DateTime?
+  invitedAt          DateTime?
+  activatedAt        DateTime?
+  inviteTokenHash    String?
+  inviteTokenExpiresAt DateTime?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  tenant             Company               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer           Customer              @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, email])
+  @@index([tenantId, status])
+  @@index([tenantId, invitedAt])
+}
+
+model CustomerApproval {
+  id                String                     @id @default(cuid())
+  tenantId          String
+  customerId        String
+  entityType        CustomerApprovalEntityType
+  entityId          String
+  kind              CustomerApprovalKind
+  status            CustomerApprovalStatus     @default(PENDING)
+  requestedAt       DateTime                   @default(now())
+  respondedAt       DateTime?
+  responseNote      String?
+  requestedByUserId String?
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+  tenant            Company                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer          Customer                   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  requestedByUser   User?                      @relation("CustomerApprovalRequester", fields: [requestedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, customerId, status])
+  @@index([tenantId, entityType, entityId])
+  @@index([tenantId, kind, status])
 }
 
 model Job {
