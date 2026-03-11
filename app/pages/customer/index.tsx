@@ -95,11 +95,11 @@ export default function CustomerWorkspacePage() {
 
   if (!workspace) {
     return (
-      <div className="container" style={{ maxWidth: 1120, paddingTop: 32, paddingBottom: 32 }}>
-        <div className="card" style={{ padding: 24, marginBottom: 16 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
+      <div className="container customer-workspace" style={{ maxWidth: 1120 }}>
+        <div className="card customer-workspace__section" style={{ marginBottom: 16 }}>
+          <div className="customer-workspace__hero">
             <div>
-              <p className="muted" style={{ margin: 0, letterSpacing: "0.08em", textTransform: "uppercase" }}>Customer workspace</p>
+              <p className="customer-workspace__eyebrow">Customer workspace</p>
               <h1 style={{ marginTop: 8, marginBottom: 8 }}>Track your service records</h1>
               <p className="muted" style={{ margin: 0 }}>
                 Review jobs, documents, plans, and approvals linked to your account. Existing tokenized portal links still work.
@@ -109,15 +109,15 @@ export default function CustomerWorkspacePage() {
           </div>
         </div>
 
-        <div className="card" style={{ padding: 24 }}>
+        <div className="card customer-workspace__section">
           <h2 style={{ marginTop: 0 }}>Sign in</h2>
-          {error ? <p style={{ color: "#fca5a5" }}>{error}</p> : null}
-          <form onSubmit={login} style={{ display: "grid", gap: 12 }}>
+          {error ? <p className="auth-shell__status auth-shell__status--error">{error}</p> : null}
+          <form className="auth-shell__form" onSubmit={login}>
             <label>Email</label>
             <input className="input" type="email" value={email} onChange={(event) => setEmail(event.target.value)} data-testid="customer-login-email" />
             <label>Password</label>
             <input className="input" type="password" value={password} onChange={(event) => setPassword(event.target.value)} data-testid="customer-login-password" />
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+            <div className="auth-shell__actions">
               <button className="button" type="submit" disabled={authLoading} data-testid="customer-login-submit">
                 {authLoading ? "Signing in..." : "Sign in"}
               </button>
@@ -130,11 +130,11 @@ export default function CustomerWorkspacePage() {
   }
 
   return (
-    <div className="container" style={{ maxWidth: 1200, paddingTop: 28, paddingBottom: 32 }}>
-      <div className="card" style={{ padding: 24, marginBottom: 16 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
+    <div className="container customer-workspace">
+      <div className="card customer-workspace__section" style={{ marginBottom: 16 }}>
+        <div className="customer-workspace__hero">
           <div>
-            <p className="muted" style={{ margin: 0, letterSpacing: "0.08em", textTransform: "uppercase" }}>Customer workspace</p>
+            <p className="customer-workspace__eyebrow">Customer workspace</p>
             <h1 style={{ marginTop: 8, marginBottom: 6 }}>{workspace.customer?.name || "Customer"}</h1>
             <p className="muted" style={{ margin: 0 }}>
               {workspace.customer?.email || "No email"} {workspace.customer?.phone ? `• ${workspace.customer.phone}` : ""}
@@ -145,11 +145,11 @@ export default function CustomerWorkspacePage() {
             <button className="button secondary" type="button" onClick={signOut}>Sign out</button>
           </div>
         </div>
-        {notice ? <p style={{ color: "#5eead4", marginTop: 12 }}>{notice}</p> : null}
-        {error ? <p style={{ color: "#fca5a5", marginTop: 12 }}>{error}</p> : null}
+        {notice ? <p className="auth-shell__status auth-shell__status--success" style={{ marginTop: 12 }}>{notice}</p> : null}
+        {error ? <p className="auth-shell__status auth-shell__status--error" style={{ marginTop: 12 }}>{error}</p> : null}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16, marginBottom: 16 }}>
+      <div className="customer-workspace__stats">
         <div className="card" style={{ padding: 20 }}>
           <h3 style={{ marginTop: 0 }}>Account</h3>
           <p className="muted" style={{ marginBottom: 4 }}>Status</p>
@@ -168,7 +168,7 @@ export default function CustomerWorkspacePage() {
       </div>
 
       <div style={{ display: "grid", gap: 16 }}>
-        <section className="card" style={{ padding: 24 }}>
+        <section className="card customer-workspace__section">
           <h2 style={{ marginTop: 0 }}>Pending approvals</h2>
           {workspace.approvals?.length ? (
             <div style={{ display: "grid", gap: 12 }}>
@@ -201,7 +201,7 @@ export default function CustomerWorkspacePage() {
           )}
         </section>
 
-        <section className="card" style={{ padding: 24 }}>
+        <section className="card customer-workspace__section">
           <h2 style={{ marginTop: 0 }}>Jobs</h2>
           {workspace.jobs?.length ? (
             <div style={{ display: "grid", gap: 12 }}>
@@ -225,7 +225,7 @@ export default function CustomerWorkspacePage() {
           )}
         </section>
 
-        <section className="card" style={{ padding: 24 }}>
+        <section className="card customer-workspace__section">
           <h2 style={{ marginTop: 0 }}>Documents</h2>
           {workspace.documents?.length ? (
             <div style={{ display: "grid", gap: 12 }}>
@@ -248,7 +248,7 @@ export default function CustomerWorkspacePage() {
           )}
         </section>
 
-        <section className="card" style={{ padding: 24 }}>
+        <section className="card customer-workspace__section">
           <h2 style={{ marginTop: 0 }}>Service plans</h2>
           {workspace.servicePlans?.length ? (
             <div style={{ display: "grid", gap: 12 }}>

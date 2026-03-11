@@ -55,30 +55,59 @@ export default function Login() {
   }
 
   return (
-    <div className="container">
-      <div className="card">
-        <h1>Welcome back</h1>
-        {error && <p style={{ color: '#ff8a8a' }}>{error}</p>}
-        <form onSubmit={handleSubmit}>
-          <label>Email</label>
-          <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-          <label>Password</label>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <input className="input" style={{ marginBottom: 0 }} type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} />
-            <button type="button" className="button secondary" onClick={() => setShowPassword((v) => !v)}>
-              {showPassword ? 'Hide' : 'Show'}
-            </button>
-          </div>
-          {authPolish ? (
-            <p style={{ marginTop: 8, marginBottom: 16 }}>
-              <Link href="/forgot-password">Forgot password?</Link>
+    <div className="auth-shell">
+      <div className="auth-shell__frame">
+        <section className="auth-shell__panel auth-shell__hero">
+          <div>
+            <div className="auth-shell__eyebrow">MyTitan operations workspace</div>
+            <h1 className="auth-shell__title">Control the day without losing the detail.</h1>
+            <p className="auth-shell__lead">
+              Run bookings, jobs, customer approvals, service plans, documents, and billing from one operational system built for service teams.
             </p>
-          ) : null}
-          <button className="button" type="submit">Log in</button>
-        </form>
-        <p style={{ marginTop: 16 }}>
-          No account? <Link href="/signup">Create one</Link>
-        </p>
+          </div>
+          <ul className="auth-shell__featureList">
+            <li className="auth-shell__feature">
+              <strong>Readable under pressure</strong>
+              Clear workflow, scheduling, and billing surfaces for high-volume operators.
+            </li>
+            <li className="auth-shell__feature">
+              <strong>Governed by default</strong>
+              Workspace permissions, audit-friendly automation, and tenant-scoped controls stay intact.
+            </li>
+            <li className="auth-shell__feature">
+              <strong>Built for real service work</strong>
+              Capacity planning, recurring work, approvals, artifacts, and customer visibility are part of the core system.
+            </li>
+          </ul>
+        </section>
+
+        <section className="card auth-shell__panel">
+          <h1>Welcome back</h1>
+          {error ? <p className="auth-shell__status auth-shell__status--error">{error}</p> : null}
+          <form className="auth-shell__form" onSubmit={handleSubmit}>
+            <label>Email</label>
+            <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+            <label>Password</label>
+            <div className="auth-shell__actions">
+              <input className="input" style={{ marginBottom: 0, flex: 1 }} type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} />
+              <button type="button" className="button secondary" onClick={() => setShowPassword((v) => !v)}>
+                {showPassword ? 'Hide' : 'Show'}
+              </button>
+            </div>
+            {authPolish ? (
+              <p style={{ marginTop: 4, marginBottom: 4 }}>
+                <Link href="/forgot-password">Forgot password?</Link>
+              </p>
+            ) : null}
+            <div className="auth-shell__actions">
+              <button className="button" type="submit">Log in</button>
+              <Link className="button secondary" href="/signup">Create account</Link>
+            </div>
+          </form>
+          <p className="muted" style={{ marginTop: 16, marginBottom: 0 }}>
+            Secure operator access with role-based governance and tenant-scoped data boundaries.
+          </p>
+        </section>
       </div>
     </div>
   );
