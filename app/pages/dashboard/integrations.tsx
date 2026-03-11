@@ -124,6 +124,8 @@ const WEBHOOK_EVENT_TYPES = [
   "job.completed",
   "invoice.issued",
   "invoice.overdue",
+  "quote.sent",
+  "quote.approved",
   "technician.arrived",
   "portal.document_signed",
   "automation.rule_applied",

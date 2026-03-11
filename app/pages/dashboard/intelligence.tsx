@@ -32,6 +32,8 @@ type IntelligenceData = {
     overdueInvoices: number;
     dueServicePlans: number;
     overduePlanRuns: number;
+    quotesAwaitingApproval: number;
+    approvedQuotesAwaitingConversion: number;
     overloadedTechnicianDays: number;
     unassignedDueWorkPressure: number;
   };
@@ -67,6 +69,8 @@ const EMPTY: IntelligenceData = {
     overdueInvoices: 0,
     dueServicePlans: 0,
     overduePlanRuns: 0,
+    quotesAwaitingApproval: 0,
+    approvedQuotesAwaitingConversion: 0,
     overloadedTechnicianDays: 0,
     unassignedDueWorkPressure: 0,
   },
@@ -224,6 +228,8 @@ export default function IntelligencePage() {
               ["Technician completion queue", data.summary.technicianCompletionQueue, "Assigned field jobs currently in progress"],
               ["Service plans due now", data.summary.dueServicePlans, "Recurring plans already ready for their next run"],
               ["Recurring runs needing review", data.summary.overduePlanRuns, "Pending or failed recurring runs that need operator action"],
+              ["Quotes awaiting approval", data.summary.quotesAwaitingApproval, "Sent quotes still waiting on customer acceptance"],
+              ["Approved quotes awaiting conversion", data.summary.approvedQuotesAwaitingConversion, "Approved pricing ready to become real work"],
               ["Unassigned due work", data.summary.unassignedDueWorkPressure, "Upcoming work and recurring pressure without technician ownership"],
               ["Technician days overloaded", data.summary.overloadedTechnicianDays, "Technician schedules already exceed daily capacity"],
               ["Portal links expiring soon", data.summary.portalLinksExpiringSoon, "Customer access links that need refresh before they go stale"],

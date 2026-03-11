@@ -20,6 +20,8 @@ export const INTEGRATION_PLATFORM_EVENT_TYPES = [
   'job.completed',
   'invoice.issued',
   'invoice.overdue',
+  'quote.sent',
+  'quote.approved',
   'technician.arrived',
   'portal.document_signed',
   'automation.rule_applied',
@@ -149,6 +151,10 @@ export class IntegrationPlatformService {
           return 'invoice.issued';
         case 'billing.invoice.overdue':
           return 'invoice.overdue';
+        case 'quote.sent':
+          return 'quote.sent';
+        case 'quote.approved':
+          return 'quote.approved';
         case 'technician.arrived':
           return 'technician.arrived';
         case 'portal.document_signed':

@@ -17,6 +17,7 @@ export default function CustomerTimelinePage() {
   const [message, setMessage] = useState("");
   const [notice, setNotice] = useState("");
   const [servicePlans, setServicePlans] = useState<any[]>([]);
+  const [quotes, setQuotes] = useState<any[]>([]);
   const [accountStatus, setAccountStatus] = useState<any>(null);
   const [approvalRequests, setApprovalRequests] = useState<any[]>([]);
   const [inviteLink, setInviteLink] = useState("");
@@ -61,6 +62,20 @@ export default function CustomerTimelinePage() {
     }
   }
 
+  async function loadQuotes(activeCustomer?: any) {
+    const customerId = String(activeCustomer?.id || "");
+    if (!customerId) {
+      setQuotes([]);
+      return;
+    }
+    try {
+      const rows = await apiFetch(`/quotes?customerId=${encodeURIComponent(customerId)}`);
+      setQuotes(Array.isArray(rows) ? rows : []);
+    } catch {
+      setQuotes([]);
+    }
+  }
+
   async function loadWorkspaceGovernance(activeCustomer?: any) {
     const customerId = String(activeCustomer?.id || "");
     if (!customerId) {
@@ -96,7 +111,7 @@ export default function CustomerTimelinePage() {
       } catch {
         setCustomer(null);
       }
-      await Promise.all([loadTimeline(resolved), loadServicePlans(resolved), loadWorkspaceGovernance(resolved)]);
+      await Promise.all([loadTimeline(resolved), loadServicePlans(resolved), loadWorkspaceGovernance(resolved), loadQuotes(resolved)]);
     };
     void run();
   }, [router.isReady, id, name]);
@@ -269,6 +284,29 @@ export default function CustomerTimelinePage() {
             </div>
           ) : (
             <p className="muted">No linked service plans yet.</p>
+          )}
+        </div>
+
+        <div className="card customer-comms-card" data-testid="customer-quotes">
+          <div className="customer-comms-head">
+            <h3 style={{ margin: 0 }}>Quotes</h3>
+          </div>
+          {quotes.length ? (
+            <div style={{ display: "grid", gap: 10 }}>
+              {quotes.slice(0, 5).map((quote) => (
+                <div key={quote.id} className="integration-card">
+                  <div>
+                    <strong>{quote.quoteNumber}</strong>
+                    <p className="muted" style={{ margin: "4px 0 0 0" }}>
+                      {quote.title} • {quote.status} • {quote.totalCents ? new Intl.NumberFormat(undefined, { style: "currency", currency: quote.currency || "GBP" }).format(quote.totalCents / 100) : "No value"}
+                    </p>
+                  </div>
+                  <a className="button secondary" href="/dashboard/quotes">Open quotes</a>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="muted">No linked quotes yet.</p>
           )}
         </div>
 

@@ -7,8 +7,8 @@ import {
   MinLength,
 } from "class-validator";
 
-export const CUSTOMER_APPROVAL_ENTITY_TYPES = ["JOB", "DOCUMENT", "SERVICE_PLAN"] as const;
-export const CUSTOMER_APPROVAL_KINDS = ["WORK_AUTHORIZATION", "DOCUMENT_ACKNOWLEDGEMENT", "PLAN_APPROVAL"] as const;
+export const CUSTOMER_APPROVAL_ENTITY_TYPES = ["JOB", "DOCUMENT", "SERVICE_PLAN", "QUOTE"] as const;
+export const CUSTOMER_APPROVAL_KINDS = ["WORK_AUTHORIZATION", "DOCUMENT_ACKNOWLEDGEMENT", "PLAN_APPROVAL", "QUOTE_ACCEPTANCE"] as const;
 
 export class InviteCustomerAccountDto {
   @IsString()

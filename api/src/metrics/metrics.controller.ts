@@ -53,6 +53,8 @@ export class MetricsController {
           overdueInvoices: 0,
           dueServicePlans: 0,
           overduePlanRuns: 0,
+          quotesAwaitingApproval: 0,
+          approvedQuotesAwaitingConversion: 0,
           overloadedTechnicianDays: 0,
           unassignedDueWorkPressure: 0,
         },

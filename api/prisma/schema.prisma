@@ -155,6 +155,7 @@ enum CustomerApprovalEntityType {
   BOOKING
   DOCUMENT
   SERVICE_PLAN
+  QUOTE
 }
 
 enum CustomerApprovalKind {
@@ -162,6 +163,36 @@ enum CustomerApprovalKind {
   WORK_AUTHORIZATION
   DOCUMENT_ACKNOWLEDGEMENT
   PLAN_APPROVAL
+}
+
+enum QuoteStatus {
+  DRAFT
+  SENT
+  APPROVED
+  DECLINED
+  EXPIRED
+  CONVERTED
+}
+
+enum QuoteLineItemType {
+  LABOUR
+  PART
+  FEE
+  DISCOUNT
+  OTHER
+}
+
+enum RevenueCollectionTaskKind {
+  QUOTE_FOLLOW_UP
+  INVOICE_FOLLOW_UP
+  APPROVAL_FOLLOW_UP
+  PAYMENT_FOLLOW_UP
+}
+
+enum RevenueCollectionTaskStatus {
+  OPEN
+  COMPLETED
+  CANCELLED
 }
 
 enum CustomerApprovalStatus {
@@ -240,6 +271,8 @@ model Company {
   documentArtifacts        DocumentArtifact[]
   servicePlans             ServicePlan[]
   servicePlanRuns          ServicePlanRun[]
+  quotes                   Quote[]
+  revenueCollectionTasks   RevenueCollectionTask[]
   tradePackInstalls        TradePackInstall[]
   templatePresets          TemplatePreset[]
   tradeAccountNotes        TradeAccountNote[]
@@ -324,6 +357,7 @@ model User {
   technicianAvailabilities TechnicianAvailability[] @relation("TechnicianAvailabilityUser")
   technicianCapacityExceptions TechnicianCapacityException[] @relation("TechnicianCapacityExceptionUser")
   requestedCustomerApprovals CustomerApproval[]     @relation("CustomerApprovalRequester")
+  createdQuotes            Quote[]                  @relation("QuoteCreator")
 
   @@unique([companyId, email])
 }
@@ -409,6 +443,8 @@ model Customer {
   servicePlans   ServicePlan[]
   customerAccount CustomerAccount?
   approvals      CustomerApproval[]
+  quotes         Quote[]
+  revenueCollectionTasks RevenueCollectionTask[]
 
   @@unique([companyId, slug])
   @@index([companyId, name])
@@ -530,6 +566,8 @@ model Job {
   activities               JobActivity[]
   reminders                JobReminder[]
   signatures               JobSignature[]
+  quotes                   Quote[]
+  revenueCollectionTasks   RevenueCollectionTask[]
 
   @@unique([companyId, jobRef])
   @@index([companyId, createdAt])
@@ -657,6 +695,7 @@ model Booking {
   tradeAccount   TradeAccount?       @relation(fields: [tradeAccountId], references: [id], onDelete: SetNull)
   proService     Service?            @relation(fields: [proServiceId], references: [id], onDelete: SetNull)
   answers        BookingAnswer[]
+  quotes         Quote[]
 
   @@index([companyId, startsAt])
   @@index([companyId, tradeAccountId, startsAt])
@@ -1446,6 +1485,85 @@ model DocumentArtifact {
   @@index([tenantId, entityType, entityId, createdAt])
   @@index([tenantId, entityType, entityId, kind])
   @@index([tenantId, portalVisible, createdAt])
+}
+
+model Quote {
+  id                   String      @id @default(cuid())
+  tenantId             String
+  customerId           String
+  jobId                String?
+  bookingId            String?
+  quoteNumber          String
+  status               QuoteStatus @default(DRAFT)
+  title                String
+  summary              String?
+  subtotalCents        Int         @default(0)
+  taxCents             Int         @default(0)
+  totalCents           Int         @default(0)
+  currency             String
+  expiresAt            DateTime?
+  approvedAt           DateTime?
+  declinedAt           DateTime?
+  convertedAt          DateTime?
+  createdByUserId      String?
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+  tenant               Company     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer             Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  job                  Job?        @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  booking              Booking?    @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  createdByUser        User?       @relation("QuoteCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  lineItems            QuoteLineItem[]
+  revenueCollectionTasks RevenueCollectionTask[]
+
+  @@unique([tenantId, quoteNumber])
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, customerId, createdAt])
+  @@index([tenantId, jobId])
+  @@index([tenantId, bookingId])
+}
+
+model QuoteLineItem {
+  id              String            @id @default(cuid())
+  quoteId         String
+  sortOrder       Int               @default(0)
+  type            QuoteLineItemType
+  title           String
+  description     String?
+  quantity        Decimal           @db.Decimal(10, 2)
+  unitPriceCents  Int
+  totalPriceCents Int
+  metadataJson    Json?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  quote           Quote             @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  @@index([quoteId, sortOrder])
+}
+
+model RevenueCollectionTask {
+  id             String                      @id @default(cuid())
+  tenantId       String
+  jobId          String?
+  quoteId        String?
+  customerId     String
+  kind           RevenueCollectionTaskKind
+  status         RevenueCollectionTaskStatus @default(OPEN)
+  dueAt          DateTime
+  completedAt    DateTime?
+  notesJson      Json?
+  createdAt      DateTime                    @default(now())
+  updatedAt      DateTime                    @updatedAt
+  tenant         Company                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  job            Job?                        @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  quote          Quote?                      @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+  customer       Customer                    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status, dueAt])
+  @@index([tenantId, customerId, status])
+  @@index([tenantId, kind, status])
+  @@index([tenantId, quoteId, kind])
+  @@index([tenantId, jobId, kind])
 }
 
 model ServicePlan {

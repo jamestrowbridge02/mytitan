@@ -106,6 +106,7 @@ export default function JobDetailPage() {
   const [statusMessage, setStatusMessage] = useState("");
   const [activityItems, setActivityItems] = useState<any[]>([]);
   const [approvalRequests, setApprovalRequests] = useState<any[]>([]);
+  const [quotes, setQuotes] = useState<any[]>([]);
   const [approvalBusy, setApprovalBusy] = useState(false);
   const [permissions, setPermissions] = useState(() => emptyPermissionSnapshot());
 
@@ -175,10 +176,21 @@ export default function JobDetailPage() {
     }
   }
 
+  async function loadQuotes() {
+    if (!id) return;
+    try {
+      const rows = await apiFetch(`/quotes?jobId=${encodeURIComponent(id)}`);
+      setQuotes(Array.isArray(rows) ? rows : []);
+    } catch {
+      setQuotes([]);
+    }
+  }
+
   useEffect(() => {
     load();
     if (id) {
       void loadActivityHistory(String(id));
+      void loadQuotes();
     }
   }, [load]);
 
@@ -527,6 +539,26 @@ export default function JobDetailPage() {
             ) : (
               <p className="muted" style={{ marginTop: 12 }}>Your role cannot create customer approval requests.</p>
             )}
+          </EntitySection>
+
+          <EntitySection title="Quotes" subtitle="Linked quote state, customer pricing approval, and revenue conversion context for this job.">
+            <div style={{ display: "grid", gap: 10 }}>
+              {quotes.length ? (
+                quotes.map((quote) => (
+                  <div key={quote.id} className="integration-card">
+                    <div>
+                      <strong>{quote.quoteNumber}</strong>
+                      <p className="muted" style={{ margin: "4px 0 0 0" }}>
+                        {quote.title} • {quote.status} • {money(Number(quote.totalCents || 0), quote.currency || "GBP")}
+                      </p>
+                    </div>
+                    <Link className="button secondary" href="/dashboard/quotes">Open quotes</Link>
+                  </div>
+                ))
+              ) : (
+                <p className="muted">No quotes are linked to this job yet.</p>
+              )}
+            </div>
           </EntitySection>
 
           <EntitySection title="Scheduling & Assignment" subtitle="Who owns this job and key schedule touchpoints.">

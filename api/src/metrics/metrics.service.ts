@@ -96,6 +96,8 @@ export class MetricsService {
       overdueInvoices,
       dueServicePlans,
       overduePlanRuns,
+      quotesAwaitingApproval,
+      approvedQuotesAwaitingConversion,
       schedulingCapacity,
       schedulingPressure,
       completedLast7Days,
@@ -263,6 +265,19 @@ export class MetricsService {
           scheduledFor: { lt: now },
         },
       }),
+      db.quote.count({
+        where: {
+          tenantId,
+          status: 'SENT',
+        },
+      }),
+      db.quote.count({
+        where: {
+          tenantId,
+          status: 'APPROVED',
+          convertedAt: null,
+        },
+      }),
       this.schedule.getCapacity(tenantId, { from: todayKey, to: next7Key }),
       this.schedule.getTechnicianSchedulePressure(tenantId, { date: todayKey }),
       db.job.count({
@@ -351,10 +366,18 @@ export class MetricsService {
         overdueInvoices,
         dueServicePlans,
         overduePlanRuns,
+        quotesAwaitingApproval,
+        approvedQuotesAwaitingConversion,
         overloadedTechnicianDays,
         unassignedDueWorkPressure,
       },
       attentionQueue: [
+        quotesAwaitingApproval > 0
+          ? { key: 'quotes_awaiting_approval', label: 'Quotes awaiting approval', count: quotesAwaitingApproval, href: '/dashboard/quotes', hint: 'Sent quotes still waiting on customer approval' }
+          : null,
+        approvedQuotesAwaitingConversion > 0
+          ? { key: 'approved_quotes_awaiting_conversion', label: 'Approved quotes ready for conversion', count: approvedQuotesAwaitingConversion, href: '/dashboard/quotes', hint: 'Approved pricing is ready to become real operational work' }
+          : null,
         dueServicePlans > 0
           ? { key: 'due_service_plans', label: 'Service plans due now', count: dueServicePlans, href: '/dashboard/service-plans', hint: 'Recurring work is ready to generate the next booking or job' }
           : null,

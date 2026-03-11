@@ -58,6 +58,8 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     title: "Money",
     items: [
+      { title: "Quotes", href: "/dashboard/quotes" },
+      { title: "Revenue tasks", href: "/dashboard/revenue" },
       { title: "Billing", href: "/dashboard/billing" },
       { title: "Billing readiness", href: "/dashboard/billing/readiness" },
       { title: "Portal Ops", href: "/dashboard/portal" },

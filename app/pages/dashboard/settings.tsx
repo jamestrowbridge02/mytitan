@@ -189,6 +189,8 @@ const AUTOMATION_TRIGGER_OPTIONS = [
   { value: 'job.completed', label: 'Job completed', description: 'Use this for post-completion billing, review, or customer follow-up workflows.' },
   { value: 'invoice.issued', label: 'Invoice issued', description: 'Use this when collections or customer communication should start once billing is sent.' },
   { value: 'invoice.overdue', label: 'Invoice overdue', description: 'Use this to escalate unpaid invoice follow-up once due dates have passed.' },
+  { value: 'quote.sent', label: 'Quote sent', description: 'Use this when quote follow-up or internal revenue tracking should start after pricing is shared.' },
+  { value: 'quote.approved', label: 'Quote approved', description: 'Use this when approved pricing should trigger conversion or internal follow-up.' },
   { value: 'technician.arrived', label: 'Technician arrived', description: 'Use this to notify dispatch or office staff when field work begins.' },
   { value: 'portal.document_signed', label: 'Portal document signed', description: 'Use this to continue workflow after a customer signs portal paperwork.' },
 ];
@@ -324,13 +326,13 @@ function getRuleDraftValidationError(ruleDraft: AutomationRuleDraft) {
   const billingConditionSelected =
     ruleDraft.conditionJson.invoiceIssued !== null && ruleDraft.conditionJson.invoiceIssued !== undefined
     || ruleDraft.conditionJson.invoicePaid !== null && ruleDraft.conditionJson.invoicePaid !== undefined;
-  if (billingConditionSelected && !['job.completed', 'invoice.issued', 'invoice.overdue', 'portal.document_signed'].includes(ruleDraft.trigger)) {
+  if (billingConditionSelected && !['job.completed', 'invoice.issued', 'invoice.overdue', 'portal.document_signed', 'quote.sent', 'quote.approved'].includes(ruleDraft.trigger)) {
     return 'Invoice conditions can only be used with job completion, invoice, or portal-signing triggers.';
   }
   if (
     ruleDraft.conditionJson.hasAssignedUser !== null &&
     ruleDraft.conditionJson.hasAssignedUser !== undefined &&
-    !['booking.converted', 'job.created', 'job.completed', 'technician.arrived'].includes(ruleDraft.trigger)
+    !['booking.converted', 'job.created', 'job.completed', 'technician.arrived', 'quote.sent', 'quote.approved'].includes(ruleDraft.trigger)
   ) {
     return 'Assigned-user conditions can only be used with booking, job, or technician workflow triggers.';
   }

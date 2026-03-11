@@ -52,9 +52,10 @@ test.describe("customer accounts and approvals", () => {
     await loginCustomerAs(page, request, fixtureRefs.customerWorkspaceEmail, fixtureRefs.customerWorkspacePassword);
     await page.goto("/customer");
 
-    await page.getByRole("button", { name: "Approve" }).first().click();
+    const jobApprovalRow = page.getByTestId("customer-approval-row").filter({ hasText: fixtureRefs.portalActiveJobRef }).first();
+    await jobApprovalRow.getByRole("button", { name: "Approve" }).click();
     await expect(page.getByText(/Approval recorded/i)).toBeVisible();
-    await expect(page.getByText(/APPROVED/i).first()).toBeVisible();
+    await expect(jobApprovalRow.getByText(/APPROVED/i)).toBeVisible();
   });
 
   test("customer decline flow works for a newly requested approval", async ({ page, request }) => {
@@ -79,9 +80,10 @@ test.describe("customer accounts and approvals", () => {
     await loginCustomerAs(page, request, fixtureRefs.customerWorkspaceEmail, fixtureRefs.customerWorkspacePassword);
     await page.goto("/customer");
 
-    await page.getByRole("button", { name: "Decline" }).first().click();
+    const jobApprovalRow = page.getByTestId("customer-approval-row").filter({ hasText: fixtureRefs.portalActiveJobRef }).first();
+    await jobApprovalRow.getByRole("button", { name: "Decline" }).click();
     await expect(page.getByText(/Decline recorded/i)).toBeVisible();
-    await expect(page.getByText(/DECLINED/i).first()).toBeVisible();
+    await expect(jobApprovalRow.getByText(/DECLINED/i)).toBeVisible();
   });
 
   test("operator invite flow works from customer detail", async ({ page, request }) => {

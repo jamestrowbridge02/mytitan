@@ -19,14 +19,16 @@ const DEFAULT_SETTINGS = {
   deliveryMode: "metadata_only" as const,
 };
 
-const BILLING_CONDITION_TRIGGERS = new Set(["job.completed", "invoice.issued", "invoice.overdue", "portal.document_signed"]);
-const ASSIGNMENT_CONDITION_TRIGGERS = new Set(["booking.converted", "job.created", "job.completed", "technician.arrived"]);
+const BILLING_CONDITION_TRIGGERS = new Set(["job.completed", "invoice.issued", "invoice.overdue", "portal.document_signed", "quote.sent", "quote.approved"]);
+const ASSIGNMENT_CONDITION_TRIGGERS = new Set(["booking.converted", "job.created", "job.completed", "technician.arrived", "quote.sent", "quote.approved"]);
 const CUSTOM_FIELD_TRIGGER_SUPPORT: Record<string, Array<"job" | "booking" | "customer" | "technician">> = {
   "booking.converted": ["booking", "customer", "job"],
   "job.created": ["job", "customer", "technician"],
   "job.completed": ["job", "customer", "technician"],
   "invoice.issued": ["job", "customer"],
   "invoice.overdue": ["job", "customer"],
+  "quote.sent": ["job", "customer"],
+  "quote.approved": ["job", "customer"],
   "technician.arrived": ["job", "technician", "customer"],
   "portal.document_signed": ["job", "customer"],
 };

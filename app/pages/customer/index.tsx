@@ -165,9 +165,36 @@ export default function CustomerWorkspacePage() {
           <h3 style={{ marginTop: 0 }}>Visible plans</h3>
           <p style={{ margin: 0 }}>{workspace.servicePlans?.length || 0}</p>
         </div>
+        <div className="card" style={{ padding: 20 }}>
+          <h3 style={{ marginTop: 0 }}>Quotes</h3>
+          <p style={{ margin: 0 }}>{workspace.quotes?.length || 0}</p>
+        </div>
       </div>
 
       <div style={{ display: "grid", gap: 16 }}>
+        <section className="card customer-workspace__section">
+          <h2 style={{ marginTop: 0 }}>Quotes</h2>
+          {workspace.quotes?.length ? (
+            <div style={{ display: "grid", gap: 12 }}>
+              {workspace.quotes.map((quote: any) => (
+                <div key={quote.id} className="integration-card" data-testid="customer-quote-row">
+                  <div>
+                    <strong>{quote.quoteNumber}</strong>
+                    <p className="muted" style={{ margin: "6px 0 0 0" }}>
+                      {quote.title} • {quote.status} • {money(Number(quote.totalCents || 0), quote.currency || "GBP")}
+                    </p>
+                  </div>
+                  <div className="muted" style={{ textAlign: "right" }}>
+                    {quote.expiresAt ? `Expires ${new Date(quote.expiresAt).toLocaleDateString()}` : "No expiry"}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="muted">No customer-visible quotes yet.</p>
+          )}
+        </section>
+
         <section className="card customer-workspace__section">
           <h2 style={{ marginTop: 0 }}>Pending approvals</h2>
           {workspace.approvals?.length ? (

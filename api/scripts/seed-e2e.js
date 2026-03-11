@@ -72,6 +72,7 @@ const FIXTURE = {
   customerApprovals: {
     pendingJob: { id: "e2e-customer-approval-pending-job" },
     approvedDocument: { id: "e2e-customer-approval-approved-document" },
+    pendingQuote: { id: "e2e-customer-approval-pending-quote" },
   },
   jobs: {
     invoiceReady: { id: "e2e-job-invoice-ready", jobRef: "E2E-INV-READY-001" },
@@ -129,6 +130,14 @@ const FIXTURE = {
     active: { id: "e2e-service-plan-active", name: "Quarterly Vehicle Health Check" },
     paused: { id: "e2e-service-plan-paused", name: "Annual Warranty Review" },
     run: { id: "e2e-service-plan-run-executed" },
+  },
+  quotes: {
+    draft: { id: "e2e-quote-draft", number: "Q-2026-00010", title: "Draft wheel restoration quote" },
+    sent: { id: "e2e-quote-sent", number: "Q-2026-00011", title: "Portal-visible service quote" },
+    approved: { id: "e2e-quote-approved", number: "Q-2026-00012", title: "Approved recurring conversion quote" },
+  },
+  revenueTasks: {
+    overdueInvoice: { id: "e2e-revenue-task-overdue-invoice" },
   },
   scheduling: {
     availabilityOperator: { id: "e2e-tech-availability-operator" },
@@ -767,6 +776,38 @@ async function ensureServicePlan(id, payload, tasks = []) {
 
 async function ensureServicePlanRun(id, payload) {
   await prisma.servicePlanRun.upsert({
+    where: { id },
+    create: { id, ...payload },
+    update: payload,
+  });
+}
+
+async function ensureQuote(id, payload, lineItems = []) {
+  await prisma.quote.upsert({
+    where: { id },
+    create: { id, ...payload },
+    update: payload,
+  });
+  await prisma.quoteLineItem.deleteMany({ where: { quoteId: id } });
+  if (lineItems.length) {
+    await prisma.quoteLineItem.createMany({
+      data: lineItems.map((item, index) => ({
+        quoteId: id,
+        sortOrder: typeof item.sortOrder === "number" ? item.sortOrder : index,
+        type: item.type,
+        title: item.title,
+        description: item.description || null,
+        quantity: item.quantity,
+        unitPriceCents: item.unitPriceCents,
+        totalPriceCents: item.totalPriceCents,
+        metadataJson: item.metadataJson || null,
+      })),
+    });
+  }
+}
+
+async function ensureRevenueCollectionTask(id, payload) {
+  await prisma.revenueCollectionTask.upsert({
     where: { id },
     create: { id, ...payload },
     update: payload,
@@ -1658,7 +1699,13 @@ async function main() {
   await prisma.customerApproval.deleteMany({
     where: {
       tenantId: company.id,
-      id: { notIn: [FIXTURE.customerApprovals.pendingJob.id, FIXTURE.customerApprovals.approvedDocument.id] },
+      id: {
+        notIn: [
+          FIXTURE.customerApprovals.pendingJob.id,
+          FIXTURE.customerApprovals.approvedDocument.id,
+          FIXTURE.customerApprovals.pendingQuote.id,
+        ],
+      },
     },
   });
   await prisma.customerAccount.deleteMany({
@@ -1715,6 +1762,182 @@ async function main() {
     requestedAt: addMinutes(now, -19),
     respondedAt: addMinutes(now, -18),
     responseNote: "Reviewed in seeded workspace flow",
+    requestedByUserId: operator.id,
+  });
+
+  const seededQuoteIds = [FIXTURE.quotes.draft.id, FIXTURE.quotes.sent.id, FIXTURE.quotes.approved.id];
+  await prisma.quoteLineItem.deleteMany({
+    where: {
+      quoteId: { notIn: seededQuoteIds },
+      quote: { tenantId: company.id },
+    },
+  });
+  await prisma.quote.deleteMany({
+    where: {
+      tenantId: company.id,
+      id: { notIn: seededQuoteIds },
+    },
+  });
+  await prisma.revenueCollectionTask.deleteMany({
+    where: {
+      tenantId: company.id,
+      id: { notIn: [FIXTURE.revenueTasks.overdueInvoice.id] },
+    },
+  });
+
+  await ensureQuote(
+    FIXTURE.quotes.draft.id,
+    {
+      tenantId: company.id,
+      customerId: customers.financeOps.id,
+      jobId: financeReadyJob.id,
+      bookingId: null,
+      quoteNumber: FIXTURE.quotes.draft.number,
+      status: "DRAFT",
+      title: FIXTURE.quotes.draft.title,
+      summary: "Seeded draft quote for revenue operator editing coverage.",
+      subtotalCents: 25000,
+      taxCents: 5000,
+      totalCents: 30000,
+      currency: "GBP",
+      expiresAt: addMinutes(now, 60 * 24 * 5),
+      approvedAt: null,
+      declinedAt: null,
+      convertedAt: null,
+      createdByUserId: operator.id,
+      createdAt: addMinutes(now, -80),
+      updatedAt: addMinutes(now, -75),
+    },
+    [
+      {
+        type: "LABOUR",
+        title: "Refinish labour",
+        quantity: 1,
+        unitPriceCents: 18000,
+        totalPriceCents: 18000,
+      },
+      {
+        type: "PART",
+        title: "Protective finish",
+        quantity: 1,
+        unitPriceCents: 7000,
+        totalPriceCents: 7000,
+      },
+    ],
+  );
+
+  await ensureQuote(
+    FIXTURE.quotes.sent.id,
+    {
+      tenantId: company.id,
+      customerId: customers.portalActive.id,
+      jobId: portalActiveJob.id,
+      bookingId: null,
+      quoteNumber: FIXTURE.quotes.sent.number,
+      status: "SENT",
+      title: FIXTURE.quotes.sent.title,
+      summary: "Seeded sent quote awaiting customer response in the customer workspace.",
+      subtotalCents: 42000,
+      taxCents: 8400,
+      totalCents: 50400,
+      currency: "GBP",
+      expiresAt: addMinutes(now, 60 * 24 * 3),
+      approvedAt: null,
+      declinedAt: null,
+      convertedAt: null,
+      createdByUserId: operator.id,
+      createdAt: addMinutes(now, -65),
+      updatedAt: addMinutes(now, -60),
+    },
+    [
+      {
+        type: "LABOUR",
+        title: "Field repair labour",
+        quantity: 2,
+        unitPriceCents: 12000,
+        totalPriceCents: 24000,
+      },
+      {
+        type: "FEE",
+        title: "Callout fee",
+        quantity: 1,
+        unitPriceCents: 18000,
+        totalPriceCents: 18000,
+      },
+    ],
+  );
+
+  await ensureQuote(
+    FIXTURE.quotes.approved.id,
+    {
+      tenantId: company.id,
+      customerId: customers.convertible.id,
+      jobId: null,
+      bookingId: FIXTURE.bookings.convertible.id,
+      quoteNumber: FIXTURE.quotes.approved.number,
+      status: "APPROVED",
+      title: FIXTURE.quotes.approved.title,
+      summary: "Seeded approved quote ready for explicit operator conversion.",
+      subtotalCents: 36000,
+      taxCents: 7200,
+      totalCents: 43200,
+      currency: "GBP",
+      expiresAt: addMinutes(now, 60 * 24 * 7),
+      approvedAt: addMinutes(now, -35),
+      declinedAt: null,
+      convertedAt: null,
+      createdByUserId: operator.id,
+      createdAt: addMinutes(now, -70),
+      updatedAt: addMinutes(now, -35),
+    },
+    [
+      {
+        type: "LABOUR",
+        title: "Recurring service labour",
+        quantity: 1,
+        unitPriceCents: 28000,
+        totalPriceCents: 28000,
+      },
+      {
+        type: "PART",
+        title: "Seal kit",
+        quantity: 1,
+        unitPriceCents: 8000,
+        totalPriceCents: 8000,
+      },
+    ],
+  );
+
+  await ensureRevenueCollectionTask(FIXTURE.revenueTasks.overdueInvoice.id, {
+    tenantId: company.id,
+    jobId: issuedJob.id,
+    quoteId: null,
+    customerId: customers.issued.id,
+    kind: "INVOICE_FOLLOW_UP",
+    status: "OPEN",
+    dueAt: addMinutes(now, -60),
+    completedAt: null,
+    notesJson: {
+      title: `Invoice overdue for ${issuedJob.jobRef}`,
+      state: "invoice_overdue",
+      jobRef: issuedJob.jobRef,
+      totalCents: issuedJob.totalCents,
+      sourceFingerprint: `job:${issuedJob.id}:overdue:${new Date(issuedJob.invoiceDueAt).toISOString()}`,
+    },
+    createdAt: addMinutes(now, -58),
+    updatedAt: addMinutes(now, -58),
+  });
+
+  await ensureCustomerApproval(FIXTURE.customerApprovals.pendingQuote.id, {
+    tenantId: company.id,
+    customerId: customers.portalActive.id,
+    entityType: "QUOTE",
+    entityId: FIXTURE.quotes.sent.id,
+    kind: "QUOTE_ACCEPTANCE",
+    status: "PENDING",
+    requestedAt: addMinutes(now, -59),
+    respondedAt: null,
+    responseNote: null,
     requestedByUserId: operator.id,
   });
 
@@ -1793,6 +2016,53 @@ async function main() {
       entityType: "DOCUMENT",
       entityId: FIXTURE.artifacts.jobPortal.id,
       kind: "DOCUMENT_ACKNOWLEDGEMENT",
+    },
+  });
+  await ensureActivityEvent("e2e-activity-quote-sent", {
+    type: "quote.sent",
+    label: `Quote sent: ${FIXTURE.quotes.sent.number}`,
+    at: addMinutes(now, -59),
+    tenantId: company.id,
+    customerId: customers.portalActive.id,
+    customerName: customers.portalActive.name,
+    jobId: portalActiveJob.id,
+    jobRef: portalActiveJob.jobRef,
+    status: "SENT",
+    payloadJson: {
+      quoteId: FIXTURE.quotes.sent.id,
+      quoteNumber: FIXTURE.quotes.sent.number,
+      totalCents: 50400,
+    },
+  });
+  await ensureActivityEvent("e2e-activity-quote-approved", {
+    type: "quote.approved",
+    label: `Quote approved: ${FIXTURE.quotes.approved.number}`,
+    at: addMinutes(now, -35),
+    tenantId: company.id,
+    customerId: customers.convertible.id,
+    customerName: customers.convertible.name,
+    jobId: null,
+    jobRef: null,
+    status: "APPROVED",
+    payloadJson: {
+      quoteId: FIXTURE.quotes.approved.id,
+      quoteNumber: FIXTURE.quotes.approved.number,
+    },
+  });
+  await ensureActivityEvent("e2e-activity-revenue-task-opened", {
+    type: "revenue.task.opened",
+    label: `Invoice overdue for ${issuedJob.jobRef}`,
+    at: addMinutes(now, -58),
+    tenantId: company.id,
+    customerId: customers.issued.id,
+    customerName: customers.issued.name,
+    jobId: issuedJob.id,
+    jobRef: issuedJob.jobRef,
+    status: "OPEN",
+    payloadJson: {
+      revenueTaskId: FIXTURE.revenueTasks.overdueInvoice.id,
+      kind: "INVOICE_FOLLOW_UP",
+      sourceFingerprint: `job:${issuedJob.id}:overdue:${new Date(issuedJob.invoiceDueAt).toISOString()}`,
     },
   });
 

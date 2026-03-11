@@ -44,6 +44,7 @@ import { ArtifactsModule } from './artifacts/artifacts.module';
 import { ServicePlansModule } from './service-plans/service-plans.module';
 import { ScheduleModule } from './schedule/schedule.module';
 import { CustomerWorkspaceModule } from './customer-workspace/customer-workspace.module';
+import { RevenueModule } from './revenue/revenue.module';
 
 @Module({
   imports: [
@@ -99,6 +100,7 @@ import { CustomerWorkspaceModule } from './customer-workspace/customer-workspace
     ServicePlansModule,
     ScheduleModule,
     CustomerWorkspaceModule,
+    RevenueModule,
   ],
 })
 export class AppModule {}

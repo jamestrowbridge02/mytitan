@@ -10,6 +10,8 @@ export const AUTOMATION_RULE_TRIGGERS = [
   "job.completed",
   "invoice.issued",
   "invoice.overdue",
+  "quote.sent",
+  "quote.approved",
   "technician.arrived",
   "portal.document_signed",
 ] as const;

@@ -9,13 +9,14 @@ import * as bcrypt from "bcryptjs";
 import * as crypto from "crypto";
 import { ActivityService } from "../events/activity.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { RevenueService } from "../revenue/revenue.service";
 import { ServicePlansService } from "../service-plans/service-plans.service";
 import { CustomerJwtPayload } from "./customer-auth.types";
 import type { CreateCustomerApprovalDto } from "./dto";
 
 type ApprovalStatus = "PENDING" | "APPROVED" | "DECLINED";
-type ApprovalEntityType = "JOB" | "DOCUMENT" | "SERVICE_PLAN";
-type ApprovalKind = "WORK_AUTHORIZATION" | "DOCUMENT_ACKNOWLEDGEMENT" | "PLAN_APPROVAL";
+type ApprovalEntityType = "JOB" | "DOCUMENT" | "SERVICE_PLAN" | "QUOTE";
+type ApprovalKind = "WORK_AUTHORIZATION" | "DOCUMENT_ACKNOWLEDGEMENT" | "PLAN_APPROVAL" | "QUOTE_ACCEPTANCE";
 
 @Injectable()
 export class CustomerWorkspaceService {
@@ -24,6 +25,7 @@ export class CustomerWorkspaceService {
     private readonly jwt: JwtService,
     private readonly activity: ActivityService,
     private readonly servicePlans: ServicePlansService,
+    private readonly revenue: RevenueService,
   ) {}
 
   private tokenHash(token: string) {
@@ -188,6 +190,42 @@ export class CustomerWorkspaceService {
       };
     }
 
+    if (dto.entityType === "QUOTE") {
+      if (dto.kind !== "QUOTE_ACCEPTANCE") {
+        throw new BadRequestException("Quotes support acceptance approvals only");
+      }
+      const quote = await this.prisma.quote.findFirst({
+        where: {
+          id: dto.entityId,
+          tenantId,
+          customerId: dto.customerId,
+        },
+        select: {
+          id: true,
+          quoteNumber: true,
+          title: true,
+          customerId: true,
+          status: true,
+          customer: { select: { name: true } },
+          job: { select: { id: true, jobRef: true, status: true } },
+        },
+      });
+      if (!quote) throw new BadRequestException("Quote not found for this customer");
+      return {
+        entityType: "QUOTE" as const,
+        entityId: quote.id,
+        customerId: quote.customerId,
+        label: quote.quoteNumber || quote.title,
+        activity: {
+          jobId: quote.job?.id || null,
+          jobRef: quote.job?.jobRef || null,
+          customerId: quote.customerId,
+          customerName: quote.customer?.name || null,
+          status: quote.status || null,
+        },
+      };
+    }
+
     throw new BadRequestException("Unsupported approval entity type");
   }
 
@@ -215,6 +253,13 @@ export class CustomerWorkspaceService {
       });
       entityLabel = plan?.name || "Service plan";
       entityHref = plan?.id ? `/dashboard/service-plans` : null;
+    } else if (approval.entityType === "QUOTE") {
+      const quote = await this.prisma.quote.findFirst({
+        where: { id: approval.entityId, tenantId: approval.tenantId },
+        select: { id: true, quoteNumber: true, title: true },
+      });
+      entityLabel = quote?.quoteNumber || quote?.title || "Quote";
+      entityHref = quote?.id ? `/dashboard/quotes` : null;
     }
 
     return {
@@ -587,6 +632,9 @@ export class CustomerWorkspaceService {
     let jobMeta: any = null;
     if (approval.entityType === "JOB" && approval.kind === "WORK_AUTHORIZATION") {
       jobMeta = await this.mirrorJobApprovalDecision(tenantId, customerId, approval.entityId, decision, note || null, approval.customer?.name || null);
+    } else if (approval.entityType === "QUOTE" && approval.kind === "QUOTE_ACCEPTANCE") {
+      const quoteResult = await this.revenue.recordCustomerQuoteDecision(tenantId, customerId, approval.entityId, decision, note || null);
+      jobMeta = quoteResult?.jobId ? { id: quoteResult.jobId, jobRef: quoteResult.jobRef || null, status: quoteResult.status || null } : null;
     }
 
     const status = decision === "approve" ? "APPROVED" : "DECLINED";
@@ -767,7 +815,7 @@ export class CustomerWorkspaceService {
 
   async getCustomerWorkspace(tenantId: string, customerId: string) {
     const customer = await this.resolveCustomer(tenantId, customerId);
-    const [account, jobs, servicePlans, approvals, activity] = await Promise.all([
+    const [account, jobs, servicePlans, approvals, quotes, activity] = await Promise.all([
       this.prisma.customerAccount.findUnique({
         where: {
           customerId: customer.id,
@@ -820,12 +868,25 @@ export class CustomerWorkspaceService {
         orderBy: [{ requestedAt: "desc" }],
         take: 12,
       }),
+      this.prisma.quote.findMany({
+        where: {
+          tenantId,
+          customerId: customer.id,
+          status: { not: "DRAFT" },
+        },
+        orderBy: [{ updatedAt: "desc" }],
+        take: 12,
+        include: {
+          lineItems: { orderBy: { sortOrder: "asc" } },
+          job: { select: { id: true, jobRef: true } },
+        },
+      }),
       this.prisma.activityEvent.findMany({
         where: {
           tenantId,
           customerId: customer.id,
           OR: [
-            { type: { in: ["customer.account.invited", "customer.account.activated", "customer.approval.requested", "customer.approval.approved", "customer.approval.declined", "portal.document_signed", "billing.invoice.issued", "billing.payment.received", "artifact.created"] } },
+            { type: { in: ["customer.account.invited", "customer.account.activated", "customer.approval.requested", "customer.approval.approved", "customer.approval.declined", "portal.document_signed", "billing.invoice.issued", "billing.payment.received", "artifact.created", "quote.sent", "quote.approved", "quote.declined", "quote.converted", "revenue.task.opened", "revenue.task.completed", "revenue.task.cancelled"] } },
             { type: { startsWith: "service_plan." } },
           ],
         },
@@ -862,6 +923,27 @@ export class CustomerWorkspaceService {
         approvalState: job.declinedAt ? "DECLINED" : job.approvedAt ? "APPROVED" : "PENDING",
       })),
       documents,
+      quotes: quotes.map((quote) => ({
+        id: quote.id,
+        quoteNumber: quote.quoteNumber,
+        title: quote.title,
+        status: quote.status,
+        summary: quote.summary || null,
+        totalCents: quote.totalCents,
+        currency: quote.currency,
+        expiresAt: quote.expiresAt || null,
+        approvedAt: quote.approvedAt || null,
+        convertedAt: quote.convertedAt || null,
+        jobId: quote.jobId || null,
+        jobRef: quote.job?.jobRef || null,
+        lineItems: (quote.lineItems || []).map((item) => ({
+          id: item.id,
+          title: item.title,
+          type: item.type,
+          quantity: Number(item.quantity),
+          totalPriceCents: item.totalPriceCents,
+        })),
+      })),
       servicePlans,
       approvals: approvalViews,
       recentActivity: activity.map((item) => ({
