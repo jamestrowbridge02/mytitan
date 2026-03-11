@@ -1,5 +1,6 @@
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
+import { EntityCustomFieldsCard } from "../../../components/custom-fields/EntityCustomFieldsCard";
 import { DashboardShell } from "../../../components/dashboard-shell";
 import { apiFetch } from "../../../lib/api";
 
@@ -92,6 +93,14 @@ export default function CustomerTimelinePage() {
             </p>
           </div>
         </div>
+
+        {typeof id === "string" && id ? (
+          <EntityCustomFieldsCard
+            title="Customer custom fields"
+            entityType="customer"
+            entityId={id}
+          />
+        ) : null}
 
         <div className="card customer-comms-card">
           <div className="customer-comms-head">

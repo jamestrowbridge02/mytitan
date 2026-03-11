@@ -6,6 +6,7 @@ import { DashboardShell } from '../../components/dashboard-shell';
 import { apiFetch } from '../../lib/api';
 import { getBusinessTerms } from '../../lib/business-config';
 import { getCommandCentreRealtimeMode, getCommandCentreSseUrl, isCommandCentreRealtimeDisabled } from '../../lib/command-centre-realtime';
+import { getRequiredFieldWarningLabel } from '../../lib/custom-fields';
 import { isCommandCentreV2Enabled, isDemoPolishV1Enabled } from '../../lib/feature-flags';
 import { useTenantSettings } from '../../lib/tenant-settings';
 import { getJobStages, getStageStatus, getVisibleStages, mapStatusToStage } from '../../lib/workflow-config';
@@ -468,12 +469,14 @@ export default function CommandCentreV2Page() {
     const snapshot = board;
     try {
       applyOptimisticJobUpdate(jobId, payload);
-      await apiFetch(`/jobs/${jobId}`, { method: 'PATCH', body: JSON.stringify(payload) });
+      const updated = await apiFetch(`/jobs/${jobId}`, { method: 'PATCH', body: JSON.stringify(payload) });
       showSuccess('Job updated');
       await loadBoard(true);
+      return updated;
     } catch (err: any) {
       setBoard(snapshot);
       showError(err?.message || 'Inline update failed');
+      throw err;
     }
   }
 
@@ -491,7 +494,7 @@ export default function CommandCentreV2Page() {
 async function inlineSetStatus(jobId: string, nextStatus: string) {
     try {
       setPendingInlineJobId(jobId);
-      await patchJob(jobId, { status: nextStatus });
+      return await patchJob(jobId, { status: nextStatus });
     } finally {
       setPendingInlineJobId("");
     }
@@ -729,6 +732,9 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
                   <strong>{job.jobRef}</strong>
                 </label>
                 <div className="muted" data-testid="workflow-stage-label">{mapStatusToStage(job?.status, jobStages)?.label || job.status}</div>
+                {Array.isArray(job?.missingRequiredFields) && job.missingRequiredFields.length ? (
+                  <div className="badge warn" data-testid="ccv2-required-fields-warning">{getRequiredFieldWarningLabel(job.missingRequiredFields)}</div>
+                ) : null}
                 <div>
                   <button className="button secondary ccv2-button" data-testid={`ccv2-open-${job.id}`} type="button" onClick={(e) => { e.stopPropagation(); setOpenedJob(job); }}>Open</button>
                 </div>
@@ -763,6 +769,9 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
                         <span>{job.jobRef}</span>
                         <span className="muted">{job.customerName || 'Customer'}</span>
                         <span className="muted" data-testid="workflow-stage-label">{stage.label}</span>
+                        {Array.isArray(job?.missingRequiredFields) && job.missingRequiredFields.length ? (
+                          <span className="badge warn" data-testid="ccv2-required-fields-warning">{getRequiredFieldWarningLabel(job.missingRequiredFields)}</span>
+                        ) : null}
                       </button>
                       <InlineStatusActions job={job} />
                     </div>
@@ -812,6 +821,16 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
               <div className="ccv2-sidepanel-kv"><span>Status</span><strong>{openedJob.status || "-"}</strong></div>
             </div>
 
+            {Array.isArray(openedJob?.missingRequiredFields) && openedJob.missingRequiredFields.length ? (
+              <div className="ccv2-sidepanel-section">
+                <div className="ccv2-sidepanel-sectionTitle">Required fields</div>
+                <div className="badge warn" data-testid="ccv2-required-fields-warning">{getRequiredFieldWarningLabel(openedJob.missingRequiredFields)}</div>
+                <div className="muted" style={{ marginTop: 8 }}>
+                  Missing required fields: {openedJob.missingRequiredFields.join(', ')}
+                </div>
+              </div>
+            ) : null}
+
             <div className="ccv2-sidepanel-section">
               <div className="ccv2-sidepanel-sectionTitle">Activity</div>
               <div className="ccv2-timeline">
@@ -854,11 +873,11 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
               <button
                 className="button"
                 onClick={async () => {
-                  await patchJob(openedJob.id, {
+                  const updated = await patchJob(openedJob.id, {
                     assignedUserId: assignTechId || null,
                     scheduledAt: assignTime || null,
                   });
-                  setOpenedJob({ ...openedJob, assignedUserId: assignTechId || null, scheduledAt: assignTime || null });
+                  setOpenedJob(updated || { ...openedJob, assignedUserId: assignTechId || null, scheduledAt: assignTime || null });
                 }}
               >
                 Assign & Schedule
@@ -897,8 +916,8 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
                   disabled={pendingInlineJobId === openedJob.id}
                   onClick={async () => {
                     const nextStatus = getStageStatus(opt);
-                    await inlineSetStatus(openedJob.id, nextStatus);
-                    setOpenedJob({ ...openedJob, status: nextStatus });
+                    const updated = await inlineSetStatus(openedJob.id, nextStatus);
+                    setOpenedJob(updated || { ...openedJob, status: nextStatus });
                   }}
                 >
                   {pendingInlineJobId === openedJob.id ? "Updating..." : opt.label}

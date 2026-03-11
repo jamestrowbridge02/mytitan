@@ -1,4 +1,6 @@
+import path from "path";
 import fs from "fs/promises";
+import { execSync } from "child_process";
 import { request, type FullConfig } from "@playwright/test";
 import { authDir, authFile, defaultOperatorEmail, defaultOperatorPassword, metadataFile, type E2EMetadata } from "./utils";
 
@@ -24,6 +26,9 @@ export default async function globalSetup(config: FullConfig) {
   const apiBase = process.env.PLAYWRIGHT_API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:3000";
   const email = process.env.PLAYWRIGHT_TEST_EMAIL?.trim() || defaultOperatorEmail;
   const password = process.env.PLAYWRIGHT_TEST_PASSWORD || defaultOperatorPassword;
+  const shouldSeedDockerFixtures =
+    process.env.PLAYWRIGHT_SKIP_DOCKER_SEED !== "1" &&
+    /^http:\/\/127\.0\.0\.1:3000\/?$/.test(apiBase);
 
   await fs.mkdir(authDir, { recursive: true });
 
@@ -38,6 +43,13 @@ export default async function globalSetup(config: FullConfig) {
     await safeUnlink(authFile);
     await fs.writeFile(metadataFile, JSON.stringify(metadata, null, 2));
     return;
+  }
+
+  if (shouldSeedDockerFixtures) {
+    execSync("docker compose exec -T api sh -lc 'cd /app && npm run seed:e2e'", {
+      cwd: path.resolve(__dirname, "..", ".."),
+      stdio: "inherit",
+    });
   }
 
   const loginContext = await request.newContext({

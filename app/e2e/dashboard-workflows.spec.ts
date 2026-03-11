@@ -1,7 +1,14 @@
+import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 import { authFile, fixtureRefs, hasDashboardAuth, installApiProxy } from "./utils";
 
 test.use({ storageState: authFile });
+
+async function getToken(page: Page) {
+  const token = await page.evaluate(() => window.localStorage.getItem("mytitan_token"));
+  expect(token).toBeTruthy();
+  return token as string;
+}
 
 test.describe("dashboard workflows", () => {
   test.skip(!hasDashboardAuth(), "Seed the E2E fixtures or provide dashboard credentials before running authenticated workflow tests.");
@@ -119,6 +126,40 @@ test.describe("dashboard workflows", () => {
 
     await page.getByTestId(`ccv2-open-${"e2e-job-open"}`).evaluate((element: HTMLButtonElement) => element.click());
     await expect(page.getByTestId("ccv2-sidepanel")).toBeVisible();
+  });
+
+  test("command centre shows missing required field badge", async ({ page, request }) => {
+    await installApiProxy(page, request);
+    await page.goto("/dashboard/command-centre-v2");
+    const token = await getToken(page);
+    const fieldsResponse = await request.get("http://127.0.0.1:3000/custom-fields?entityType=job&visible=true", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const fields = await fieldsResponse.json();
+    const serialField = Array.isArray(fields) ? fields.find((field: any) => field?.key === fixtureRefs.customFieldJobSerialKey) : null;
+    expect(serialField?.id).toBeTruthy();
+    const resetResponse = await request.post("http://127.0.0.1:3000/custom-fields/values", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      data: {
+        entityType: "job",
+        entityId: fixtureRefs.commandCentreJobId,
+        values: [{ fieldId: serialField.id, valueJson: null }],
+      },
+    });
+    expect(resetResponse.ok()).toBeTruthy();
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "Command Centre", exact: true })).toBeVisible();
+    const jobCard = page.locator(".integration-card", { hasText: fixtureRefs.commandCentreJobRef }).first();
+    await expect(jobCard.getByTestId("ccv2-required-fields-warning")).toContainText("serial_number required");
+
+    await jobCard.getByTestId(`ccv2-open-${fixtureRefs.commandCentreJobId}`).evaluate((element: HTMLButtonElement) => element.click());
+    const sidepanel = page.getByTestId("ccv2-sidepanel");
+    await expect(sidepanel).toBeVisible();
+    await expect(sidepanel.getByTestId("ccv2-required-fields-warning")).toContainText("serial_number required");
+    await expect(sidepanel).toContainText(/Missing required fields: serial_number/i);
   });
 
   test("settings workflow terminology persists onto core operator surfaces", async ({ page, request }) => {

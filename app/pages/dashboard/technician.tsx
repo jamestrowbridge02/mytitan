@@ -190,6 +190,14 @@ export default function TechnicianPage() {
 
         <OperatorNotice notice={notice} onDismiss={clearNotice} />
 
+        {meId ? (
+          <EntityCustomFieldsCard
+            title={`${terms.technicians.slice(0, -1) || "Technician"} details`}
+            entityType="technician"
+            entityId={meId}
+          />
+        ) : null}
+
         <section className="card operator-section">
           <div className="operator-section__header">
             <div>

@@ -4,6 +4,7 @@ import { AuditService } from "../audit/audit.service";
 import { assertPermission } from "../common/permissions";
 import { ActivityService } from "../events/activity.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { getJobStages } from "../config/workflow-config";
 import { CreateAutomationRuleDto, UpdateAutomationRuleDto, UpdateAutomationsSettingsDto } from "./automations.dto";
 import { AUTOMATION_RULE_TRIGGERS, AutomationRuleAction, AutomationRuleEngine } from "./rule-engine";
 import { AutomationSuggestionEngine } from "./suggestion-engine";
@@ -144,6 +145,7 @@ export class AutomationsService {
     if (condition?.invoicePaid === false) fragments.push("invoice was unpaid");
     if (condition?.hasAssignedUser === true) fragments.push("an assigned user was present");
     if (condition?.hasAssignedUser === false) fragments.push("no assigned user was present");
+    if (condition?.workflowStageReady) fragments.push(`workflow stage ${condition.workflowStageReady} was ready`);
     if (fragments.length) {
       return `Why: ${fragments.join(" and ")}`;
     }
@@ -206,6 +208,20 @@ export class AutomationsService {
     }
     if ((condition.hasAssignedUser !== null && condition.hasAssignedUser !== undefined) && !ASSIGNMENT_CONDITION_TRIGGERS.has(trigger)) {
       throw new BadRequestException("hasAssignedUser can only be used with booking, job, or technician workflow triggers");
+    }
+    if (condition.workflowStageReady !== null && condition.workflowStageReady !== undefined) {
+      const stageId = String(condition.workflowStageReady || "").trim();
+      if (!stageId) {
+        throw new BadRequestException("workflowStageReady requires a workflow stage id");
+      }
+      const settings = await this.prisma.tenantSetting.findUnique({
+        where: { tenantId },
+        select: { businessConfigJson: true },
+      });
+      const validStage = getJobStages(settings).find((stage) => stage.id === stageId);
+      if (!validStage) {
+        throw new BadRequestException(`workflowStageReady stage ${stageId} was not found`);
+      }
     }
     await this.validateCustomFieldMatcher(tenantId, condition.customFieldEquals || null, trigger, "equals");
     await this.validateCustomFieldMatcher(tenantId, condition.customFieldExists || null, trigger, "exists");

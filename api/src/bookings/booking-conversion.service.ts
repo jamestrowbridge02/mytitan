@@ -6,6 +6,7 @@ import { ActivityService } from '../events/activity.service';
 import { JobsService } from '../jobs/jobs.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { assertWorkflowStageReadiness } from '../config/workflow-stage-readiness';
 
 @Injectable()
 export class BookingConversionService {
@@ -39,6 +40,10 @@ export class BookingConversionService {
       if (!booking) {
         throw new BadRequestException('Booking not found');
       }
+      const settings = await tx.tenantSetting.findUnique({
+        where: { tenantId: companyId },
+        select: { businessConfigJson: true },
+      });
 
       const readinessIssues: string[] = [];
       if (!String(booking.customerName || '').trim()) readinessIssues.push('customer_name_missing');
@@ -106,6 +111,16 @@ export class BookingConversionService {
           ? 'COMPLETED'
           : 'SCHEDULED';
 
+      await assertWorkflowStageReadiness({
+        prisma: tx,
+        tenantId: companyId,
+        entityType: 'job',
+        entityId: created.id,
+        status: nextStatus,
+        settings,
+        action: `convert the booking into a ${nextStatus} job`,
+      });
+
       const patchedJob = await tx.job.update({
         where: { id: created.id },
         data: {
@@ -137,6 +152,15 @@ export class BookingConversionService {
         jobId: patchedJob.id,
         status: booking.status === 'PENDING' || booking.status === 'PLANNED' ? 'CONFIRMED' : booking.status,
       };
+      await assertWorkflowStageReadiness({
+        prisma: tx,
+        tenantId: companyId,
+        entityType: 'booking',
+        entityId: booking.id,
+        status: linkData.status,
+        settings,
+        action: 'convert the booking',
+      });
       const linked = await tx.booking.updateMany({
         where: {
           id: booking.id,

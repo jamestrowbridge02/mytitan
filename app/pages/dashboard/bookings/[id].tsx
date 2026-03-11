@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
+import { EntityCustomFieldsCard } from "../../../components/custom-fields/EntityCustomFieldsCard";
 import { DashboardShell } from "../../../components/dashboard-shell";
 import OnboardingCoach from "../../../components/coach/OnboardingCoach";
 import EntityHeader, { type EntityAction } from "../../../components/entity/EntityHeader";
@@ -492,6 +493,12 @@ export default function BookingDetailPage() {
               </div>
             </div>
           </EntitySection>
+
+          <EntityCustomFieldsCard
+            title="Booking custom fields"
+            entityType="booking"
+            entityId={id}
+          />
 
           {schedulingEnabled ? (
             <EntitySection title="Suggested slots" subtitle="Use scheduling intelligence to reschedule quickly.">

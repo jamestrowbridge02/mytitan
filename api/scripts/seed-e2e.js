@@ -221,21 +221,21 @@ async function ensureTenantSettings(companyId, defaultLocationId, planId) {
         workflowStages: {
           bookings: [
             { id: "lead", label: "Lead Intake", statuses: ["PENDING", "PLANNED"], visible: true },
-            { id: "scheduled", label: "Confirmed Visit", statuses: ["CONFIRMED"], visible: true },
+            { id: "scheduled", label: "Confirmed Visit", statuses: ["CONFIRMED"], visible: true, requiredCustomFieldKeys: ["booking_source"], requiredFieldEnforcementMode: "block" },
             { id: "working", label: "On Site", statuses: ["IN_PROGRESS"], visible: true },
             { id: "completed", label: "Finished", statuses: ["COMPLETED"], visible: true },
             { id: "cancelled", label: "Cancelled", statuses: ["CANCELLED"], visible: true },
           ],
           jobs: [
-            { id: "ready", label: "Ready for Dispatch", statuses: ["OPEN"], visible: true, requiredCustomFieldKeys: ["serial_number"] },
+            { id: "ready", label: "Ready for Dispatch", statuses: ["OPEN"], visible: true, requiredCustomFieldKeys: ["serial_number"], requiredFieldEnforcementMode: "block" },
             { id: "scheduled", label: "Booked In", statuses: ["SCHEDULED"], visible: true },
             { id: "in_progress", label: "Work Underway", statuses: ["IN_PROGRESS"], visible: true },
-            { id: "completed", label: "Ready to Bill", statuses: ["COMPLETED", "INVOICED"], visible: true, requiredCustomFieldKeys: ["warranty_status"] },
+            { id: "completed", label: "Ready to Bill", statuses: ["COMPLETED", "INVOICED"], visible: true, requiredCustomFieldKeys: ["warranty_status"], requiredFieldEnforcementMode: "block" },
             { id: "cancelled", label: "Closed Out", statuses: ["CANCELLED"], visible: true },
           ],
           technician: [
             { id: "dispatch", label: "Awaiting Arrival", statuses: ["OPEN", "SCHEDULED"], visible: true, requiredCustomFieldKeys: ["certification"] },
-            { id: "working", label: "Working On Site", statuses: ["IN_PROGRESS"], visible: true },
+            { id: "working", label: "Working On Site", statuses: ["IN_PROGRESS"], visible: true, requiredCustomFieldKeys: ["certification"], requiredFieldEnforcementMode: "block" },
             { id: "finished", label: "Field Complete", statuses: ["COMPLETED", "INVOICED"], visible: true },
             { id: "cancelled", label: "Cancelled", statuses: ["CANCELLED"], visible: true },
           ],
@@ -267,21 +267,21 @@ async function ensureTenantSettings(companyId, defaultLocationId, planId) {
         workflowStages: {
           bookings: [
             { id: "lead", label: "Lead Intake", statuses: ["PENDING", "PLANNED"], visible: true },
-            { id: "scheduled", label: "Confirmed Visit", statuses: ["CONFIRMED"], visible: true },
+            { id: "scheduled", label: "Confirmed Visit", statuses: ["CONFIRMED"], visible: true, requiredCustomFieldKeys: ["booking_source"], requiredFieldEnforcementMode: "block" },
             { id: "working", label: "On Site", statuses: ["IN_PROGRESS"], visible: true },
             { id: "completed", label: "Finished", statuses: ["COMPLETED"], visible: true },
             { id: "cancelled", label: "Cancelled", statuses: ["CANCELLED"], visible: true },
           ],
           jobs: [
-            { id: "ready", label: "Ready for Dispatch", statuses: ["OPEN"], visible: true, requiredCustomFieldKeys: ["serial_number"] },
+            { id: "ready", label: "Ready for Dispatch", statuses: ["OPEN"], visible: true, requiredCustomFieldKeys: ["serial_number"], requiredFieldEnforcementMode: "block" },
             { id: "scheduled", label: "Booked In", statuses: ["SCHEDULED"], visible: true },
             { id: "in_progress", label: "Work Underway", statuses: ["IN_PROGRESS"], visible: true },
-            { id: "completed", label: "Ready to Bill", statuses: ["COMPLETED", "INVOICED"], visible: true, requiredCustomFieldKeys: ["warranty_status"] },
+            { id: "completed", label: "Ready to Bill", statuses: ["COMPLETED", "INVOICED"], visible: true, requiredCustomFieldKeys: ["warranty_status"], requiredFieldEnforcementMode: "block" },
             { id: "cancelled", label: "Closed Out", statuses: ["CANCELLED"], visible: true },
           ],
           technician: [
             { id: "dispatch", label: "Awaiting Arrival", statuses: ["OPEN", "SCHEDULED"], visible: true, requiredCustomFieldKeys: ["certification"] },
-            { id: "working", label: "Working On Site", statuses: ["IN_PROGRESS"], visible: true },
+            { id: "working", label: "Working On Site", statuses: ["IN_PROGRESS"], visible: true, requiredCustomFieldKeys: ["certification"], requiredFieldEnforcementMode: "block" },
             { id: "finished", label: "Field Complete", statuses: ["COMPLETED", "INVOICED"], visible: true },
             { id: "cancelled", label: "Cancelled", statuses: ["CANCELLED"], visible: true },
           ],
@@ -652,6 +652,9 @@ async function ensureSavedViews(companyId, userId) {
 
 async function resetCustomFields(companyId) {
   const baselineIds = Object.values(FIXTURE.customFields).map((field) => field.id);
+  await prisma.customFieldValue.deleteMany({
+    where: { tenantId: companyId },
+  });
   await prisma.customField.deleteMany({
     where: {
       tenantId: companyId,

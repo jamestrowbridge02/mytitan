@@ -25,6 +25,12 @@ export type CustomFieldValue = {
   updatedAt?: string;
 };
 
+export type WorkflowMissingRequiredFields = {
+  missingRequiredFields?: string[] | null;
+  workflowStageEnforcementMode?: "warn" | "block" | null;
+  workflowStageReady?: boolean | null;
+};
+
 export function normalizeCustomFieldValue(field: CustomField, value: unknown) {
   if (value === null || value === undefined || value === "") return null;
   if (field.type === "number") {
@@ -73,4 +79,8 @@ export function getMissingRequiredCustomFieldKeys(
     const value = valueMap.get(`${entityType}:${entityId}:${key}`);
     return value === null || value === undefined || value === "";
   });
+}
+
+export function getRequiredFieldWarningLabel(missingRequiredFields: string[]) {
+  return `${missingRequiredFields.join(", ")} required`;
 }

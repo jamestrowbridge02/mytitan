@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
+import { EntityCustomFieldsCard } from "../../../components/custom-fields/EntityCustomFieldsCard";
 import { DashboardShell } from "../../../components/dashboard-shell";
 import OnboardingCoach from "../../../components/coach/OnboardingCoach";
 import EntityHeader, { type EntityAction } from "../../../components/entity/EntityHeader";
@@ -445,6 +446,12 @@ export default function JobDetailPage() {
               </div>
             </div>
           </EntitySection>
+
+          <EntityCustomFieldsCard
+            title="Job custom fields"
+            entityType="job"
+            entityId={id}
+          />
 
           <EntitySection title="Scheduling & Assignment" subtitle="Who owns this job and key schedule touchpoints.">
             <div className="two-col">

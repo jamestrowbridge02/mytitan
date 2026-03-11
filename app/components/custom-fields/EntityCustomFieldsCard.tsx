@@ -9,11 +9,13 @@ export function EntityCustomFieldsCard({
   entityType,
   entityId,
   onSaved,
+  readOnly = false,
 }: {
   title: string;
   entityType: CustomFieldEntityType;
   entityId: string;
   onSaved?: (values: CustomFieldValue[]) => void;
+  readOnly?: boolean;
 }) {
   const [fields, setFields] = useState<CustomField[]>([]);
   const [values, setValues] = useState<Record<string, unknown>>({});
@@ -89,6 +91,7 @@ export function EntityCustomFieldsCard({
                 className="input"
                 data-testid={`custom-field-input-${field.key}`}
                 value={String(values[field.id] ?? "")}
+                disabled={readOnly}
                 onChange={(e) => setValues((prev) => ({ ...prev, [field.id]: e.target.value }))}
               >
                 <option value="">Not set</option>
@@ -101,6 +104,7 @@ export function EntityCustomFieldsCard({
                 className="input"
                 data-testid={`custom-field-input-${field.key}`}
                 value={values[field.id] === true ? "true" : values[field.id] === false ? "false" : ""}
+                disabled={readOnly}
                 onChange={(e) => setValues((prev) => ({ ...prev, [field.id]: e.target.value }))}
               >
                 <option value="">Not set</option>
@@ -113,6 +117,7 @@ export function EntityCustomFieldsCard({
                 data-testid={`custom-field-input-${field.key}`}
                 type={field.type === "number" ? "number" : field.type === "date" ? "date" : "text"}
                 value={field.type === "date" && values[field.id] ? String(values[field.id]).slice(0, 10) : String(values[field.id] ?? "")}
+                disabled={readOnly}
                 onChange={(e) => setValues((prev) => ({ ...prev, [field.id]: e.target.value }))}
               />
             )}
@@ -120,11 +125,13 @@ export function EntityCustomFieldsCard({
           </label>
         ))}
       </div>
-      <div style={{ marginTop: 12 }}>
-        <button className="button" type="button" disabled={saving} onClick={() => void save()}>
-          {saving ? "Saving..." : "Save custom fields"}
-        </button>
-      </div>
+      {!readOnly ? (
+        <div style={{ marginTop: 12 }}>
+          <button className="button" type="button" disabled={saving} onClick={() => void save()}>
+            {saving ? "Saving..." : "Save custom fields"}
+          </button>
+        </div>
+      ) : null}
     </section>
   );
 }

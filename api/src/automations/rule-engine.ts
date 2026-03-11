@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from "@nestjs/common";
 import { ModuleRef } from "@nestjs/core";
 import { ActivityService } from "../events/activity.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { resolveWorkflowStageReadiness } from "../config/workflow-stage-readiness";
 
 export const AUTOMATION_RULE_TRIGGERS = [
   "booking.converted",
@@ -29,6 +30,7 @@ export type AutomationRuleCondition = {
   invoiceIssued?: boolean | null;
   invoicePaid?: boolean | null;
   hasAssignedUser?: boolean | null;
+  workflowStageReady?: string | null;
   customFieldEquals?: {
     entityType: "job" | "booking" | "customer" | "technician";
     key: string;
@@ -131,6 +133,7 @@ export class AutomationRuleEngine {
       invoiceIssued: typeof raw.invoiceIssued === "boolean" ? raw.invoiceIssued : null,
       invoicePaid: typeof raw.invoicePaid === "boolean" ? raw.invoicePaid : null,
       hasAssignedUser: typeof raw.hasAssignedUser === "boolean" ? raw.hasAssignedUser : null,
+      workflowStageReady: raw.workflowStageReady ? String(raw.workflowStageReady).trim() : null,
       customFieldEquals: this.normalizeCustomFieldMatcher(raw.customFieldEquals, "equals") as any,
       customFieldExists: this.normalizeCustomFieldMatcher(raw.customFieldExists, "exists") as any,
       customFieldNotExists: this.normalizeCustomFieldMatcher(raw.customFieldNotExists, "not_exists") as any,
@@ -237,6 +240,22 @@ export class AutomationRuleEngine {
     if (condition.hasAssignedUser !== null && condition.hasAssignedUser !== undefined) {
       const hasAssignedUser = Boolean(payload.assignedUserId);
       if (hasAssignedUser !== condition.hasAssignedUser) return false;
+    }
+    if (condition.workflowStageReady) {
+      if (!payload.jobId) return false;
+      const settings = await this.prisma.tenantSetting.findUnique({
+        where: { tenantId },
+        select: { businessConfigJson: true },
+      });
+      const readiness = await resolveWorkflowStageReadiness({
+        prisma: this.prisma,
+        tenantId,
+        entityType: "job",
+        entityId: payload.jobId,
+        stageId: condition.workflowStageReady,
+        settings,
+      });
+      if (!readiness.stage || !readiness.ready) return false;
     }
     if (condition.customFieldEquals) {
       const resolved = await this.resolveCustomFieldValue(tenantId, condition.customFieldEquals, payload);

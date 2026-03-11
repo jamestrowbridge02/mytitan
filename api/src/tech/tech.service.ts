@@ -4,6 +4,7 @@ import { ActivityService } from '../events/activity.service';
 import { JobsService } from '../jobs/jobs.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { getTechnicianChecklist } from '../common/business-config';
+import { assertWorkflowStageReadiness } from '../config/workflow-stage-readiness';
 
 @Injectable()
 export class TechService {
@@ -114,6 +115,19 @@ export class TechService {
     }
 
     const nextStatus = action === 'start' ? 'IN_PROGRESS' : 'COMPLETED';
+    const settings = await db.tenantSetting.findUnique({
+      where: { tenantId: companyId },
+      select: { businessConfigJson: true },
+    });
+    await assertWorkflowStageReadiness({
+      prisma: db,
+      tenantId: companyId,
+      entityType: 'technician',
+      entityId: userId,
+      status: nextStatus,
+      settings,
+      action: `move the technician workflow to ${nextStatus}`,
+    });
     const updated = await this.jobs.updateStatus(companyId, userId, jobId, nextStatus as any);
 
     if (note) {

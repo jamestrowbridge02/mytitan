@@ -1,8 +1,8 @@
 export type BusinessConfig = {
   workflowStages?: {
-    bookings?: Array<{ id: string; label?: string | null; statuses?: string[] | null; visible?: boolean | null; requiredCustomFieldKeys?: string[] | null }> | null;
-    jobs?: Array<{ id: string; label?: string | null; statuses?: string[] | null; visible?: boolean | null; requiredCustomFieldKeys?: string[] | null }> | null;
-    technician?: Array<{ id: string; label?: string | null; statuses?: string[] | null; visible?: boolean | null; requiredCustomFieldKeys?: string[] | null }> | null;
+    bookings?: Array<{ id: string; label?: string | null; statuses?: string[] | null; visible?: boolean | null; requiredCustomFieldKeys?: string[] | null; requiredFieldEnforcementMode?: "warn" | "block" | null }> | null;
+    jobs?: Array<{ id: string; label?: string | null; statuses?: string[] | null; visible?: boolean | null; requiredCustomFieldKeys?: string[] | null; requiredFieldEnforcementMode?: "warn" | "block" | null }> | null;
+    technician?: Array<{ id: string; label?: string | null; statuses?: string[] | null; visible?: boolean | null; requiredCustomFieldKeys?: string[] | null; requiredFieldEnforcementMode?: "warn" | "block" | null }> | null;
   } | null;
   terminology?: {
     jobs?: string | null;

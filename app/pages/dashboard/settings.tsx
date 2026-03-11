@@ -94,6 +94,7 @@ type AutomationConditionDraft = {
   invoiceIssued?: boolean | null;
   invoicePaid?: boolean | null;
   hasAssignedUser?: boolean | null;
+  workflowStageReady?: string | null;
   customFieldEquals?: { entityType: 'job' | 'booking' | 'customer' | 'technician'; key: string; value: string } | null;
   customFieldExists?: { entityType: 'job' | 'booking' | 'customer' | 'technician'; key: string } | null;
   customFieldNotExists?: { entityType: 'job' | 'booking' | 'customer' | 'technician'; key: string } | null;
@@ -276,6 +277,7 @@ function buildRuleSummary(ruleDraft: AutomationRuleDraft) {
   if (ruleDraft.conditionJson.invoicePaid === false) conditionParts.push('invoice is unpaid');
   if (ruleDraft.conditionJson.hasAssignedUser === true) conditionParts.push('an assigned user exists');
   if (ruleDraft.conditionJson.hasAssignedUser === false) conditionParts.push('no assigned user exists');
+  if (ruleDraft.conditionJson.workflowStageReady) conditionParts.push(`workflow stage ${ruleDraft.conditionJson.workflowStageReady} is ready`);
   if (ruleDraft.conditionJson.customFieldEquals?.key) {
     conditionParts.push(`${ruleDraft.conditionJson.customFieldEquals.entityType} field ${ruleDraft.conditionJson.customFieldEquals.key} equals ${ruleDraft.conditionJson.customFieldEquals.value}`);
   }
@@ -330,6 +332,9 @@ function getRuleDraftValidationError(ruleDraft: AutomationRuleDraft) {
     !['booking.converted', 'job.created', 'job.completed', 'technician.arrived'].includes(ruleDraft.trigger)
   ) {
     return 'Assigned-user conditions can only be used with booking, job, or technician workflow triggers.';
+  }
+  if (ruleDraft.conditionJson.workflowStageReady !== null && ruleDraft.conditionJson.workflowStageReady !== undefined && !String(ruleDraft.conditionJson.workflowStageReady || '').trim()) {
+    return 'Workflow stage readiness conditions require a stage id.';
   }
   const matcher = ruleDraft.conditionJson.customFieldEquals || ruleDraft.conditionJson.customFieldExists || ruleDraft.conditionJson.customFieldNotExists;
   if (matcher && !String(matcher.key || '').trim()) {
@@ -452,6 +457,7 @@ export default function SettingsPage() {
           statuses: stage.statuses,
           visible: stage.visible !== false,
           requiredCustomFieldKeys: Array.isArray(stage.requiredCustomFieldKeys) ? stage.requiredCustomFieldKeys : [],
+          requiredFieldEnforcementMode: stage.requiredFieldEnforcementMode === 'block' ? 'block' : 'warn',
         })),
       },
     }));
@@ -1213,6 +1219,25 @@ export default function SettingsPage() {
                         Available {sectionKey} keys: {customFields.filter((field) => field.entityType === (sectionKey === 'jobs' ? 'job' : sectionKey === 'bookings' ? 'booking' : 'technician')).map((field) => field.key).join(', ') || 'none yet'}
                       </p>
 
+                      <label className="settings-premium-label">Enforcement mode</label>
+                      <select
+                        className="input settings-premium-input"
+                        data-testid="workflow-stage-enforcement-toggle"
+                        value={stage.requiredFieldEnforcementMode === 'block' ? 'block' : 'warn'}
+                        onChange={(e) => updateWorkflowStages(sectionKey, stages.map((item) => item.id === stage.id ? {
+                          ...item,
+                          requiredFieldEnforcementMode: e.target.value === 'block' ? 'block' : 'warn',
+                        } : item))}
+                      >
+                        <option value="warn">Warn only</option>
+                        <option value="block">Block transition</option>
+                      </select>
+                      <p className="muted settings-premium-muted" style={{ marginBottom: 10 }}>
+                        {Array.isArray(stage.requiredCustomFieldKeys) && stage.requiredCustomFieldKeys.length
+                          ? `This stage requires: ${stage.requiredCustomFieldKeys.join(', ')}`
+                          : 'This stage has no required custom fields configured.'}
+                      </p>
+
                       <p className="muted settings-premium-muted" style={{ marginBottom: 0 }}>
                         Canonical statuses: {renderStatuses(stage)}
                       </p>
@@ -1430,6 +1455,9 @@ export default function SettingsPage() {
                         {rule.conditionJson?.hasAssignedUser !== null && rule.conditionJson?.hasAssignedUser !== undefined
                           ? ` • Assigned user: ${rule.conditionJson.hasAssignedUser ? 'required' : 'not required'}`
                           : ''}
+                        {rule.conditionJson?.workflowStageReady
+                          ? ` • Workflow stage ready: ${rule.conditionJson.workflowStageReady}`
+                          : ''}
                         {(rule.conditionJson as any)?.customFieldEquals?.key
                           ? ` • ${(rule.conditionJson as any).customFieldEquals.entityType} field ${(rule.conditionJson as any).customFieldEquals.key} equals ${(rule.conditionJson as any).customFieldEquals.value}`
                           : ''}
@@ -1549,6 +1577,30 @@ export default function SettingsPage() {
                       <option value="false">Unassigned</option>
                     </select>
                     <p className="muted settings-premium-muted" style={{ marginTop: 6 }}>Use this for dispatch-oriented workflows where assignment matters.</p>
+                  </div>
+
+                  <div>
+                    <label className="settings-premium-label">Condition: workflow stage ready</label>
+                    <select
+                      className="input settings-premium-input"
+                      data-testid="automation-rule-workflow-stage-ready"
+                      value={ruleDraft.conditionJson.workflowStageReady || ''}
+                      onChange={(e) => setRuleDraft((prev) => ({
+                        ...prev,
+                        conditionJson: {
+                          ...prev.conditionJson,
+                          workflowStageReady: e.target.value || null,
+                        },
+                      }))}
+                    >
+                      <option value="">Any stage</option>
+                      {jobStages.map((stage) => (
+                        <option key={stage.id} value={stage.id}>
+                          {stage.label} ({stage.id})
+                        </option>
+                      ))}
+                    </select>
+                    <p className="muted settings-premium-muted" style={{ marginTop: 6 }}>Only run when the selected job workflow stage has all required custom fields present.</p>
                   </div>
 
                   <div>

@@ -9,6 +9,7 @@ import { NotificationsService } from "../notifications/notifications.service";
 import { AutomationsService } from "../automations/automations.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { TemplatesService } from "../templates/templates.service";
+import { assertWorkflowStageReadiness, resolveWorkflowStageReadiness } from "../config/workflow-stage-readiness";
 import { BulkJobsDto, BulkJobsV2Dto, CreateJobAssetDto, CreateJobDto, CreateJobReminderDto, JobsBoardQueryDto, PatchJobDto } from "./dto";
 
 const JOB_STATUS_TRANSITIONS: Record<JobStatus, JobStatus[]> = {
@@ -23,6 +24,58 @@ const JOB_STATUS_TRANSITIONS: Record<JobStatus, JobStatus[]> = {
 
 @Injectable()
 export class JobsService {
+  private async getWorkflowSettings(db: any, companyId: string) {
+    return db.tenantSetting.findUnique({
+      where: { tenantId: companyId },
+      select: { businessConfigJson: true },
+    });
+  }
+
+  private async ensureJobStageReady(
+    db: any,
+    companyId: string,
+    jobId: string,
+    status: string | null | undefined,
+    action: string,
+    settings?: { businessConfigJson?: unknown } | null,
+  ) {
+    return assertWorkflowStageReadiness({
+      prisma: db,
+      tenantId: companyId,
+      entityType: "job",
+      entityId: jobId,
+      status,
+      settings,
+      action,
+    });
+  }
+
+  private async decorateJobWithWorkflowReadiness(
+    db: any,
+    companyId: string,
+    job: any,
+    settings?: { businessConfigJson?: unknown } | null,
+  ) {
+    if (!job?.id) return job;
+    const workflowSettings = settings ?? await this.getWorkflowSettings(db, companyId);
+    const readiness = await resolveWorkflowStageReadiness({
+      prisma: db,
+      tenantId: companyId,
+      entityType: "job",
+      entityId: job.id,
+      status: job.status,
+      settings: workflowSettings,
+    });
+    return {
+      ...job,
+      workflowStageReady: readiness.ready,
+      workflowStageId: readiness.stageId,
+      workflowStageLabel: readiness.stageLabel,
+      workflowStageEnforcementMode: readiness.requiredFieldEnforcementMode,
+      missingRequiredFields: readiness.missingRequiredFields,
+      requiredCustomFieldKeys: readiness.requiredCustomFieldKeys,
+    };
+  }
 
   private async emitJobActivity(type: string, job: any, label: string) {
     const payload = {
@@ -755,6 +808,9 @@ export class JobsService {
     return db.job.findMany({
       where: { companyId },
       orderBy: { createdAt: "desc" },
+    }).then(async (jobs: any[]) => {
+      const settings = await this.getWorkflowSettings(db, companyId);
+      return Promise.all(jobs.map((job) => this.decorateJobWithWorkflowReadiness(db, companyId, job, settings)));
     });
   }
 
@@ -770,7 +826,8 @@ export class JobsService {
     if (!job) {
       throw new NotFoundException("Job not found");
     }
-    return job;
+    const settings = await this.getWorkflowSettings(db, companyId);
+    return this.decorateJobWithWorkflowReadiness(db, companyId, job, settings);
   }
 
   async generatePdf(companyId: string, userId: string, id: string) {
@@ -797,6 +854,8 @@ export class JobsService {
     if (!allowed.includes(newStatus)) {
       throw new BadRequestException(`Invalid status transition: ${job.status} -> ${newStatus}`);
     }
+    const settings = await this.getWorkflowSettings(db, companyId);
+    await this.ensureJobStageReady(db, companyId, job.id, newStatus, `move the job to ${newStatus}`, settings);
 
     const updated = await db.job.update({
       where: { id: job.id },
@@ -856,13 +915,14 @@ export class JobsService {
       });
     }
 
-    return updated;
+    return this.decorateJobWithWorkflowReadiness(db, companyId, updated, settings);
   }
 
   async patchPartial(companyId: string, userId: string, id: string, dto: PatchJobDto) {
     const db = this.prisma as any;
     const job = await db.job.findFirst({ where: { id, companyId } });
     if (!job) throw new NotFoundException("Job not found");
+    const settings = await this.getWorkflowSettings(db, companyId);
 
     const payload: any = {};
     if (dto.status) payload.status = dto.status;
@@ -887,6 +947,9 @@ export class JobsService {
     }
     if (dto.completedAt !== undefined) payload.completedAt = dto.completedAt ? new Date(dto.completedAt) : null;
     if (dto.status === "COMPLETED" && dto.completedAt === undefined) payload.completedAt = new Date();
+    if (dto.status && dto.status !== job.status) {
+      await this.ensureJobStageReady(db, companyId, id, dto.status, `move the job to ${dto.status}`, settings);
+    }
 
     const updated = await db.job.update({
       where: { id },
@@ -933,7 +996,7 @@ export class JobsService {
     );
     await this.maybeRunCompletionAutomation(companyId, userId, job, updated);
     await this.maybeRunContactGapAutomation(companyId, userId, updated.id);
-    return updated;
+    return this.decorateJobWithWorkflowReadiness(db, companyId, updated, settings);
   }
 
   async board(companyId: string, userId: string, query: JobsBoardQueryDto) {
@@ -990,6 +1053,8 @@ export class JobsService {
       skip: (page - 1) * pageSize,
       take: pageSize,
     });
+    const settings = await this.getWorkflowSettings(db, companyId);
+    const decoratedJobs = await Promise.all(jobs.map((job: any) => this.decorateJobWithWorkflowReadiness(db, companyId, job, settings)));
 
     const grouped: Record<string, any[]> = {
       OPEN: [],
@@ -1000,7 +1065,7 @@ export class JobsService {
       CANCELLED: [],
       DRAFT: [],
     };
-    for (const job of jobs) {
+    for (const job of decoratedJobs) {
       if (!grouped[job.status]) grouped[job.status] = [];
       grouped[job.status].push(job);
     }
@@ -1036,6 +1101,8 @@ export class JobsService {
             successCount += 1;
             continue;
           }
+          const settings = await this.getWorkflowSettings(db, companyId);
+          await this.ensureJobStageReady(db, companyId, id, dto.status, `move the job to ${dto.status}`, settings);
           await db.job.update({
             where: { id },
             data: {
@@ -1103,6 +1170,8 @@ export class JobsService {
             successCount += 1;
             continue;
           }
+          const settings = await this.getWorkflowSettings(db, companyId);
+          await this.ensureJobStageReady(db, companyId, id, "COMPLETED", "move the job to COMPLETED", settings);
           await db.job.update({ where: { id }, data: { status: "COMPLETED", completedAt: new Date() } });
           performedUpdate = true;
         } else if (dto.operation === "markComplete") {
@@ -1110,6 +1179,8 @@ export class JobsService {
             successCount += 1;
             continue;
           }
+          const settings = await this.getWorkflowSettings(db, companyId);
+          await this.ensureJobStageReady(db, companyId, id, "COMPLETED", "move the job to COMPLETED", settings);
           await db.job.update({ where: { id }, data: { status: "COMPLETED", completedAt: new Date() } });
           performedUpdate = true;
         } else {
@@ -1220,6 +1291,8 @@ export class JobsService {
       orderBy: [{ invoiceDueAt: "asc" }, { createdAt: "desc" }],
       take: 300,
     });
+    const settings = await this.getWorkflowSettings(db, companyId);
+    const decoratedJobs = await Promise.all(jobs.map((job: any) => this.decorateJobWithWorkflowReadiness(db, companyId, job, settings)));
 
     const grouped: Record<string, any[]> = {
       OPEN: [],
@@ -1230,7 +1303,7 @@ export class JobsService {
       CANCELLED: [],
       DRAFT: [],
     };
-    for (const job of jobs) {
+    for (const job of decoratedJobs) {
       if (!grouped[job.status]) grouped[job.status] = [];
       grouped[job.status].push(job);
     }
@@ -1253,6 +1326,7 @@ export class JobsService {
 
       const undoChanges: Array<{ id: string; before: any; after: any }> = [];
       const completionCandidates: Array<{ id: string; before: any; after: any }> = [];
+      const settings = await this.getWorkflowSettings(tx, companyId);
       for (const job of jobs) {
         const before = {
           status: job.status,
@@ -1264,6 +1338,7 @@ export class JobsService {
         };
 
         if (dto.operation === "setStatus" && dto.status) {
+          await this.ensureJobStageReady(tx, companyId, job.id, dto.status, `move the job to ${dto.status}`, settings);
           await tx.job.update({
             where: { id: job.id },
             data: {
@@ -1284,8 +1359,10 @@ export class JobsService {
         } else if (dto.operation === "setDueDate") {
           await tx.job.update({ where: { id: job.id }, data: { invoiceDueAt: dto.dueAt ? new Date(dto.dueAt) : null } });
         } else if (dto.operation === "closeJobs") {
+          await this.ensureJobStageReady(tx, companyId, job.id, "COMPLETED", "move the job to COMPLETED", settings);
           await tx.job.update({ where: { id: job.id }, data: { status: "COMPLETED", completedAt: new Date() } });
         } else if (dto.operation === "markComplete") {
+          await this.ensureJobStageReady(tx, companyId, job.id, "COMPLETED", "move the job to COMPLETED", settings);
           await tx.job.update({ where: { id: job.id }, data: { status: "COMPLETED", completedAt: new Date() } });
         } else {
           throw new BadRequestException("Invalid operation payload");

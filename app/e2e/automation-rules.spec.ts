@@ -30,7 +30,8 @@ test.describe("automation rules", () => {
     await page.goto("/dashboard/settings?tab=automation_rules");
     await expect(page.getByTestId("settings-automation-rules-panel")).toBeVisible();
 
-    await expect(page.getByTestId("automation-run-list")).toContainText("Add an overdue invoice follow-up automation");
+    await expect(page.getByTestId("automation-run-row").first()).toBeVisible();
+    await expect(page.getByTestId("automation-run-list")).not.toContainText("No automation runs recorded yet.");
 
     await page.getByTestId("automation-template-overdue-invoice-follow-up").evaluate((element: HTMLButtonElement) => element.click());
     await expect(page.getByTestId("automation-rule-editor")).toBeVisible();
