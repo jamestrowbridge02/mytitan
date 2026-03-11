@@ -3,6 +3,8 @@
 const { PrismaClient } = require("@prisma/client");
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
+const fs = require("fs/promises");
+const path = require("path");
 
 const prisma = new PrismaClient();
 
@@ -102,6 +104,11 @@ const FIXTURE = {
       failed: "e2e-webhook-delivery-failed",
     },
   },
+  artifacts: {
+    jobInvoice: { id: "e2e-artifact-job-invoice", label: "Seeded invoice pack", fileName: "invoice-pack.txt" },
+    jobPortal: { id: "e2e-artifact-job-portal", label: "Customer completion summary", fileName: "completion-summary.txt" },
+    customerAttachment: { id: "e2e-artifact-customer", label: "Customer warranty note", fileName: "warranty-note.txt" },
+  },
 };
 
 function addMinutes(date, minutes) {
@@ -135,6 +142,18 @@ function encryptSeedText(value) {
   const ciphertext = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]);
   const tag = cipher.getAuthTag();
   return `${iv.toString("base64")}.${tag.toString("base64")}.${ciphertext.toString("base64")}`;
+}
+
+function artifactRoot() {
+  return path.resolve(process.cwd(), process.env.ARTIFACTS_STORAGE_ROOT || "uploads/artifacts");
+}
+
+async function writeSeedArtifact(companyId, entityType, entityId, fileName, contents) {
+  const dir = path.join(artifactRoot(), companyId, entityType.toLowerCase(), entityId);
+  await fs.mkdir(dir, { recursive: true });
+  const storagePath = path.join(companyId, entityType.toLowerCase(), entityId, fileName);
+  await fs.writeFile(path.join(artifactRoot(), storagePath), contents, "utf8");
+  return storagePath;
 }
 
 async function ensurePlan() {
@@ -665,6 +684,14 @@ async function ensureWebhookEndpoint(companyId, userId) {
 
 async function ensureWebhookDelivery(id, payload) {
   await prisma.webhookDelivery.upsert({
+    where: { id },
+    create: { id, ...payload },
+    update: payload,
+  });
+}
+
+async function ensureDocumentArtifact(id, payload) {
+  await prisma.documentArtifact.upsert({
     where: { id },
     create: { id, ...payload },
     update: payload,
@@ -1451,6 +1478,89 @@ async function main() {
     durationMs: 132,
     attemptedAt: addMinutes(now, -10),
     deliveredAt: null,
+  });
+
+  const seededInvoiceStoragePath = await writeSeedArtifact(
+    company.id,
+    "JOB",
+    invoiceReadyJob.id,
+    FIXTURE.artifacts.jobInvoice.fileName,
+    "Seeded invoice pack for E2E billing artifact coverage.",
+  );
+  const seededPortalStoragePath = await writeSeedArtifact(
+    company.id,
+    "JOB",
+    portalActiveJob.id,
+    FIXTURE.artifacts.jobPortal.fileName,
+    "Customer-safe completion summary for E2E portal artifact coverage.",
+  );
+  const seededCustomerStoragePath = await writeSeedArtifact(
+    company.id,
+    "CUSTOMER",
+    customers.convertible.id,
+    FIXTURE.artifacts.customerAttachment.fileName,
+    "Customer warranty note for deterministic artifact coverage.",
+  );
+
+  await ensureDocumentArtifact(FIXTURE.artifacts.jobInvoice.id, {
+    tenantId: company.id,
+    entityType: "JOB",
+    entityId: invoiceReadyJob.id,
+    kind: "INVOICE",
+    label: FIXTURE.artifacts.jobInvoice.label,
+    fileName: FIXTURE.artifacts.jobInvoice.fileName,
+    storagePath: seededInvoiceStoragePath,
+    mimeType: "text/plain",
+    sizeBytes: Buffer.byteLength("Seeded invoice pack for E2E billing artifact coverage."),
+    portalVisible: false,
+    createdByUserId: operator.id,
+    createdAt: addMinutes(now, -31),
+  });
+  await ensureDocumentArtifact(FIXTURE.artifacts.jobPortal.id, {
+    tenantId: company.id,
+    entityType: "JOB",
+    entityId: portalActiveJob.id,
+    kind: "PORTAL_DOCUMENT",
+    label: FIXTURE.artifacts.jobPortal.label,
+    fileName: FIXTURE.artifacts.jobPortal.fileName,
+    storagePath: seededPortalStoragePath,
+    mimeType: "text/plain",
+    sizeBytes: Buffer.byteLength("Customer-safe completion summary for E2E portal artifact coverage."),
+    portalVisible: true,
+    createdByUserId: operator.id,
+    createdAt: addMinutes(now, -18),
+  });
+  await ensureDocumentArtifact(FIXTURE.artifacts.customerAttachment.id, {
+    tenantId: company.id,
+    entityType: "CUSTOMER",
+    entityId: customers.convertible.id,
+    kind: "CUSTOMER_ATTACHMENT",
+    label: FIXTURE.artifacts.customerAttachment.label,
+    fileName: FIXTURE.artifacts.customerAttachment.fileName,
+    storagePath: seededCustomerStoragePath,
+    mimeType: "text/plain",
+    sizeBytes: Buffer.byteLength("Customer warranty note for deterministic artifact coverage."),
+    portalVisible: false,
+    createdByUserId: operator.id,
+    createdAt: addMinutes(now, -16),
+  });
+
+  await ensureActivityEvent("e2e-activity-artifact-created", {
+    type: "artifact.created",
+    label: `Added ${FIXTURE.artifacts.jobPortal.label}`,
+    at: addMinutes(now, -17),
+    tenantId: company.id,
+    customerId: customers.portalActive.id,
+    customerName: customers.portalActive.name,
+    jobId: portalActiveJob.id,
+    jobRef: portalActiveJob.jobRef,
+    status: portalActiveJob.status,
+    payloadJson: {
+      entityType: "JOB",
+      entityId: portalActiveJob.id,
+      kind: "PORTAL_DOCUMENT",
+      label: FIXTURE.artifacts.jobPortal.label,
+    },
   });
 
   console.log(`tenant=${company.id} (${company.name})`);

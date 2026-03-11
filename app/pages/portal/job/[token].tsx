@@ -40,6 +40,13 @@ type PortalInfo = {
     pdfReady?: boolean | null;
   };
   timeline?: Array<{ eventType?: string | null; message?: string | null; createdAt?: string | null }>;
+  documents?: Array<{
+    id: string;
+    kind: string;
+    label: string;
+    createdAt?: string | null;
+    downloadUrl?: string | null;
+  }>;
 };
 
 const formatDateTime = (value?: string | null) => {
@@ -658,6 +665,39 @@ export default function PublicJobPortal() {
               <strong>Receipt:</strong> {portal?.summary?.receiptReady ? 'Available after payment' : 'Not available yet'}
             </p>
           </div>
+        </section>
+
+        <section className="card" data-testid="public-portal-documents" style={{ padding: 16, marginTop: 14 }}>
+          <h3 style={{ marginTop: 0 }}>Documents</h3>
+          {portal?.documents?.length ? (
+            <div style={{ display: "grid", gap: 10 }}>
+              {portal.documents.map((item) => (
+                <div
+                  key={item.id}
+                  style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", border: "1px solid #2a3042", borderRadius: 12, padding: "12px 14px" }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 600 }}>{item.label}</div>
+                    <div className="muted" style={{ marginTop: 4 }}>
+                      {[item.kind.replaceAll("_", " "), formatDateTime(item.createdAt)].filter(Boolean).join(" • ")}
+                    </div>
+                  </div>
+                  {item.downloadUrl ? (
+                    <a
+                      className="button secondary"
+                      href={item.downloadUrl.startsWith("http") ? item.downloadUrl : `${API_BASE}${item.downloadUrl}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Open
+                    </a>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="muted" style={{ marginBottom: 0 }}>No customer-safe documents are available yet.</p>
+          )}
         </section>
 
         <p className="muted" data-testid="public-portal-next-step" style={{ marginTop: 12 }}>{nextStepMessage}</p>

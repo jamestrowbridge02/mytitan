@@ -454,6 +454,27 @@ export class BillingService {
       take: 50,
     });
 
+    const artifactRows = jobs.length
+      ? await db.documentArtifact.findMany({
+          where: {
+            tenantId,
+            entityType: 'JOB',
+            entityId: { in: jobs.map((job: any) => job.id) },
+            kind: { in: ['INVOICE', 'RECEIPT'] },
+          },
+          select: {
+            entityId: true,
+            kind: true,
+          },
+        })
+      : [];
+    const artifactKindsByJobId = new Map<string, Set<string>>();
+    for (const row of artifactRows) {
+      const current = artifactKindsByJobId.get(row.entityId) || new Set<string>();
+      current.add(String(row.kind));
+      artifactKindsByJobId.set(row.entityId, current);
+    }
+
     const billingEscalationsLast7Days = await db.activityEvent.count({
       where: {
         tenantId,
@@ -498,6 +519,7 @@ export class BillingService {
         : paymentReady
         ? 'Customer can pay through the portal or payment link once shared.'
         : 'Track manual payment follow-through and customer confirmation.';
+      const artifactKinds = artifactKindsByJobId.get(job.id) || new Set<string>();
       return {
         id: job.id,
         jobRef: job.jobRef,
@@ -517,8 +539,8 @@ export class BillingService {
         nextStep,
         billingFollowUpAt,
         billingFollowUpOverdue: Boolean(billingFollowUpAt && new Date(billingFollowUpAt).getTime() < now.getTime()),
-        invoiceDocumentReady: Boolean(job.invoicePdfUrl),
-        receiptReady: Boolean(job.paymentReceiptUrl),
+        invoiceDocumentReady: Boolean(job.invoicePdfUrl || artifactKinds.has('INVOICE')),
+        receiptReady: Boolean(job.paymentReceiptUrl || artifactKinds.has('RECEIPT')),
         billingTimeline: (job.activities || []).map((activity: any) => ({
           eventType: activity.eventType,
           message: activity.message,

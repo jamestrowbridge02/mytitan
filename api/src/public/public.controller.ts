@@ -23,6 +23,7 @@ import { isMarketplaceEnabled, isMediaSignatureV1Enabled, requireMarketplaceEnab
 import { getPortalCopy } from "../common/business-config";
 import { PrismaService } from "../prisma/prisma.service";
 import { ActivityService } from "../events/activity.service";
+import { ArtifactsService } from "../artifacts/artifacts.service";
 import { ApproveJobDto, DeclineJobDto, SignJobDto } from "./public.dto";
 
 @Controller("public")
@@ -38,6 +39,7 @@ export class PublicController {
     private readonly jwtService: JwtService,
     private readonly automations: AutomationsService,
     private readonly activity: ActivityService,
+    private readonly artifacts: ArtifactsService,
   ) {}
 
   private async resolveToken(token: string) {
@@ -85,7 +87,12 @@ export class PublicController {
     const formData = record.job.formData as Record<string, any> | null;
     const paymentMethod = formData?.paymentMethod ?? null;
     const paymentStatus = formData?.paymentStatus ?? null;
-    const pdfReady = Boolean(record.job.pdf?.contentBase64);
+    const portalDocuments = await this.artifacts.listPortalArtifactsForJob(record.job.companyId, record.job.id, token, {
+      invoicePdfUrl: record.job.invoicePdfUrl,
+      paymentReceiptUrl: record.job.paymentReceiptUrl,
+      createdAt: record.job.createdAt,
+    });
+    const pdfReady = Boolean(record.job.pdf?.contentBase64 || portalDocuments.some((item: any) => item.kind === "INVOICE" || item.kind === "PORTAL_DOCUMENT"));
     const paymentAvailable = Boolean(portalEnabled && paymentsEnabled && stripeReady && (record.job.totalCents || 0) > 0);
     const invoiceOverdue = Boolean(record.job.invoiceDueAt && !record.job.invoicePaidAt && new Date(record.job.invoiceDueAt).getTime() < Date.now());
     const billingState = record.job.invoicePaidAt
@@ -183,9 +190,10 @@ export class PublicController {
           billingState,
           nextCustomerStep,
           invoiceOverdue,
-          receiptReady: Boolean(record.job.paymentReceiptUrl),
+          receiptReady: Boolean(record.job.paymentReceiptUrl || portalDocuments.some((item: any) => item.kind === "RECEIPT")),
           pdfReady,
         },
+        documents: portalDocuments,
         timeline: (record.job.activities || [])
           .filter((item: any) => ['job.status', 'job.reminder.create', 'job.reminder.completed', 'tech.note', 'tech.arrived', 'booking.converted', 'billing.invoice.issued', 'billing.payment.received', 'billing.follow_up.escalated'].includes(String(item.eventType || '')))
           .map((item: any) => ({
@@ -218,6 +226,23 @@ export class PublicController {
     res.setHeader("Content-Disposition", `inline; filename="${fileName}"`);
     res.setHeader("Cache-Control", "private, max-age=300");
     res.send(buffer);
+  }
+
+  @Get("job/:token/artifacts/:artifactId")
+  async getPortalArtifact(
+    @Param("token") token: string,
+    @Param("artifactId") artifactId: string,
+    @Res() res: Response,
+  ) {
+    const record = await this.resolveToken(token);
+    const { artifact, filePath } = await this.artifacts.getPortalArtifactForJob(record.job.companyId, record.job.id, artifactId);
+    if (artifact.mimeType) {
+      res.setHeader("Content-Type", artifact.mimeType);
+    }
+    if (artifact.fileName) {
+      res.setHeader("Content-Disposition", `inline; filename="${artifact.fileName.replace(/[^a-zA-Z0-9._-]/g, "_")}"`);
+    }
+    return res.sendFile(filePath);
   }
 
   @Post("job/:token/approve")

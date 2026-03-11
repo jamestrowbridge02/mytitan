@@ -10,7 +10,10 @@ export const defaultOperatorPassword = "MyTitanE2E!2026";
 
 export const fixtureRefs = {
   convertibleBookingId: "e2e-booking-convertible",
+  convertibleCustomerId: "e2e-customer-convertible",
+  convertibleCustomerSlug: "e2e-convertible",
   blockedBookingId: "e2e-booking-blocked",
+  invoiceReadyJobId: "e2e-job-invoice-ready",
   invoiceReadyJobRef: "E2E-INV-READY-001",
   issuedJobRef: "E2E-ISSUED-001",
   financeReadyJobRef: "E2E-FIN-READY-001",
@@ -32,6 +35,9 @@ export const fixtureRefs = {
   customFieldCustomerSiteCode: "site_code",
   seededWebhookName: "E2E Operations Webhook",
   seededApiTokenName: "E2E Primary Token",
+  seededJobArtifactLabel: "Seeded invoice pack",
+  seededPortalArtifactLabel: "Customer completion summary",
+  seededCustomerArtifactLabel: "Customer warranty note",
   dispatcherEmail: "e2e.dispatcher@mytitan.local",
   dispatcherPassword: "MyTitanE2EDispatch!2026",
   financeEmail: "e2e.finance@mytitan.local",

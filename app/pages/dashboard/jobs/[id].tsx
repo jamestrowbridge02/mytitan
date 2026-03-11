@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
+import { EntityArtifactsCard } from "../../../components/artifacts/EntityArtifactsCard";
 import { EntityCustomFieldsCard } from "../../../components/custom-fields/EntityCustomFieldsCard";
 import { DashboardShell } from "../../../components/dashboard-shell";
 import OnboardingCoach from "../../../components/coach/OnboardingCoach";
@@ -449,6 +450,12 @@ export default function JobDetailPage() {
 
           <EntityCustomFieldsCard
             title="Job custom fields"
+            entityType="job"
+            entityId={id}
+          />
+
+          <EntityArtifactsCard
+            title="Documents & Artifacts"
             entityType="job"
             entityId={id}
           />

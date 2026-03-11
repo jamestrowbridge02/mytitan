@@ -111,6 +111,19 @@ enum WebhookDeliveryStatus {
   FAILED
 }
 
+enum DocumentArtifactEntityType {
+  JOB
+  CUSTOMER
+}
+
+enum DocumentArtifactKind {
+  INVOICE
+  RECEIPT
+  JOB_ATTACHMENT
+  CUSTOMER_ATTACHMENT
+  PORTAL_DOCUMENT
+}
+
 enum NextActionType {
   CALL
   EMAIL
@@ -178,6 +191,7 @@ model Company {
   apiTokens                ApiToken[]
   webhookEndpoints         WebhookEndpoint[]
   webhookDeliveries        WebhookDelivery[]
+  documentArtifacts        DocumentArtifact[]
   tradePackInstalls        TradePackInstall[]
   templatePresets          TemplatePreset[]
   tradeAccountNotes        TradeAccountNote[]
@@ -1263,6 +1277,29 @@ model WebhookDelivery {
   @@index([tenantId, createdAt])
   @@index([tenantId, eventType, createdAt])
   @@index([endpointId, createdAt])
+}
+
+model DocumentArtifact {
+  id              String                     @id @default(cuid())
+  tenantId        String
+  entityType      DocumentArtifactEntityType
+  entityId        String
+  kind            DocumentArtifactKind
+  label           String
+  fileName        String?
+  storagePath     String?
+  externalUrl     String?
+  mimeType        String?
+  sizeBytes       Int?
+  portalVisible   Boolean                    @default(false)
+  createdByUserId String?
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+  tenant          Company                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, entityType, entityId, createdAt])
+  @@index([tenantId, entityType, entityId, kind])
+  @@index([tenantId, portalVisible, createdAt])
 }
 
 model InviteToken {

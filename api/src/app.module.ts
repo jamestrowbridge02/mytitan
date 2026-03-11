@@ -40,6 +40,7 @@ import { EventsModule } from './events/events.module';
 import { CustomersModule } from './customers/customers.module';
 import { CustomFieldsModule } from './custom-fields/custom-fields.module';
 import { TechModule } from './tech/tech.module';
+import { ArtifactsModule } from './artifacts/artifacts.module';
 
 @Module({
   imports: [
@@ -91,6 +92,7 @@ import { TechModule } from './tech/tech.module';
     CustomersModule,
     CustomFieldsModule,
     TechModule,
+    ArtifactsModule,
   ],
 })
 export class AppModule {}
