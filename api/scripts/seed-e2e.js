@@ -22,6 +22,12 @@ const FIXTURE = {
     password: "MyTitanE2E!2026",
     role: "OWNER",
   },
+  workspaceUsers: {
+    dispatcher: { id: "e2e-user-dispatcher", email: "e2e.dispatcher@mytitan.local", password: "MyTitanE2EDispatch!2026", role: "DISPATCHER" },
+    finance: { id: "e2e-user-finance", email: "e2e.finance@mytitan.local", password: "MyTitanE2EFinance!2026", role: "FINANCE" },
+    technician: { id: "e2e-user-technician", email: "e2e.technician@mytitan.local", password: "MyTitanE2ETech!2026", role: "TECHNICIAN" },
+    viewer: { id: "e2e-user-viewer", email: "e2e.viewer@mytitan.local", password: "MyTitanE2EViewer!2026", role: "VIEWER" },
+  },
   boardView: {
     id: "e2e-board-view-default",
     name: "E2E Workflow Board",
@@ -45,6 +51,8 @@ const FIXTURE = {
     technician: { id: "e2e-customer-technician", slug: "e2e-technician", name: "E2E Technician Customer", email: "tech@mytitan.local", phone: "+447700900107" },
     open: { id: "e2e-customer-open", slug: "e2e-open", name: "E2E Open Queue Customer", email: "open@mytitan.local", phone: "+447700900108" },
     automation: { id: "e2e-customer-automation", slug: "e2e-automation", name: "E2E Automation Customer", email: "automation@mytitan.local", phone: "+447700900109" },
+    financeOps: { id: "e2e-customer-finance-ops", slug: "e2e-finance-ops", name: "E2E Finance Ops", email: "finance-ops@mytitan.local", phone: "+447700900110" },
+    technicianRole: { id: "e2e-customer-technician-role", slug: "e2e-technician-role", name: "E2E Technician Role Customer", email: "technician-role@mytitan.local", phone: "+447700900111" },
   },
   jobs: {
     invoiceReady: { id: "e2e-job-invoice-ready", jobRef: "E2E-INV-READY-001" },
@@ -54,11 +62,14 @@ const FIXTURE = {
     technician: { id: "e2e-job-technician", jobRef: "E2E-TECH-001" },
     automation: { id: "e2e-job-automation", jobRef: "E2E-AUTO-001" },
     open: { id: "e2e-job-open", jobRef: "E2E-OPEN-001" },
+    financeReady: { id: "e2e-job-finance-ready", jobRef: "E2E-FIN-READY-001" },
+    technicianRole: { id: "e2e-job-technician-role", jobRef: "E2E-TECH-ROLE-001" },
   },
   bookings: {
     convertible: { id: "e2e-booking-convertible" },
     blocked: { id: "e2e-booking-blocked" },
     technician: { id: "e2e-booking-technician" },
+    technicianRole: { id: "e2e-booking-technician-role" },
   },
   customFields: {
     jobSerialNumber: { id: "e2e-field-job-serial-number", key: "serial_number", label: "Serial number", entityType: "JOB", type: "TEXT" },
@@ -137,26 +148,30 @@ async function ensureLocation(companyId) {
 }
 
 async function ensureOperator(companyId, locationId) {
-  const passwordHash = await bcrypt.hash(FIXTURE.operator.password, 10);
+  return ensureWorkspaceUser(companyId, locationId, FIXTURE.operator);
+}
+
+async function ensureWorkspaceUser(companyId, locationId, fixture) {
+  const passwordHash = await bcrypt.hash(fixture.password, 10);
   const user = await prisma.user.upsert({
-    where: { id: FIXTURE.operator.id },
+    where: { id: fixture.id },
     create: {
-      id: FIXTURE.operator.id,
+      id: fixture.id,
       companyId,
-      email: FIXTURE.operator.email,
+      email: fixture.email,
       emailVerified: true,
       passwordHash,
-      role: FIXTURE.operator.role,
+      role: fixture.role,
       defaultLocationId: locationId,
       lastActiveAt: new Date(),
       lastLoginAt: new Date(),
     },
     update: {
       companyId,
-      email: FIXTURE.operator.email,
+      email: fixture.email,
       emailVerified: true,
       passwordHash,
-      role: FIXTURE.operator.role,
+      role: fixture.role,
       defaultLocationId: locationId,
       lastActiveAt: new Date(),
     },
@@ -674,6 +689,10 @@ async function main() {
   const company = await ensureCompany();
   const location = await ensureLocation(company.id);
   const operator = await ensureOperator(company.id, location.id);
+  const dispatcherUser = await ensureWorkspaceUser(company.id, location.id, FIXTURE.workspaceUsers.dispatcher);
+  const financeUser = await ensureWorkspaceUser(company.id, location.id, FIXTURE.workspaceUsers.finance);
+  const technicianUser = await ensureWorkspaceUser(company.id, location.id, FIXTURE.workspaceUsers.technician);
+  const viewerUser = await ensureWorkspaceUser(company.id, location.id, FIXTURE.workspaceUsers.viewer);
   const planId = await ensurePlan();
 
   await ensureInvoiceCounter(company.id);
@@ -932,6 +951,76 @@ async function main() {
     assignedUserId: null,
   });
 
+  const financeReadyJob = await ensureJob({
+    companyId: company.id,
+    locationId: location.id,
+    userId: operator.id,
+    customerId: customers.financeOps.id,
+    jobId: FIXTURE.jobs.financeReady.id,
+    jobRef: FIXTURE.jobs.financeReady.jobRef,
+    status: "COMPLETED",
+    customerName: customers.financeOps.name,
+    customerEmail: customers.financeOps.email,
+    customerPhone: customers.financeOps.phone,
+    totalCents: 54000,
+    scheduledAt: addMinutes(today, 13 * 60),
+    completedAt: addMinutes(now, -90),
+    invoiceIssuedAt: null,
+    invoiceDueAt: null,
+    invoicePaidAt: null,
+    approvedAt: addMinutes(now, -95),
+    approvedByName: "E2E Finance Customer",
+    signedAt: addMinutes(now, -92),
+    signatureName: "E2E Finance Customer",
+    signatureDataUrl: "data:image/png;base64,ZmFrZS1zaWduYXR1cmU=",
+    paymentLinkUrl: null,
+    paymentReceiptUrl: null,
+    invoicePdfUrl: null,
+    paymentCheckoutSessionId: null,
+    serviceName: "Finance governance check",
+    vehicleMake: "Jaguar",
+    vehicleModel: "F-Type",
+    vehicleReg: "E2E007",
+    formData: { selectedWheels: ["Front left"], services: ["Finance governance check"] },
+    whatsappCompletionLink: null,
+    assignedUserId: null,
+  });
+
+  const technicianRoleJob = await ensureJob({
+    companyId: company.id,
+    locationId: location.id,
+    userId: operator.id,
+    customerId: customers.technicianRole.id,
+    jobId: FIXTURE.jobs.technicianRole.id,
+    jobRef: FIXTURE.jobs.technicianRole.jobRef,
+    status: "SCHEDULED",
+    customerName: customers.technicianRole.name,
+    customerEmail: customers.technicianRole.email,
+    customerPhone: customers.technicianRole.phone,
+    totalCents: 33000,
+    scheduledAt: addMinutes(now, 120),
+    completedAt: null,
+    invoiceIssuedAt: null,
+    invoiceDueAt: null,
+    invoicePaidAt: null,
+    approvedAt: null,
+    approvedByName: null,
+    signedAt: null,
+    signatureName: null,
+    signatureDataUrl: null,
+    paymentLinkUrl: null,
+    paymentReceiptUrl: null,
+    invoicePdfUrl: null,
+    paymentCheckoutSessionId: null,
+    serviceName: "Technician governance check",
+    vehicleMake: "Ford",
+    vehicleModel: "Focus ST",
+    vehicleReg: "E2E008",
+    formData: { selectedWheels: ["Rear left"], services: ["Technician governance check"] },
+    whatsappCompletionLink: null,
+    assignedUserId: technicianUser.id,
+  });
+
   await ensureJobActivity(company.id, invoiceReadyJob.id, operator.id, "e2e-activity-invoice-ready-complete", "job.status", "Job completed and ready for invoice", addMinutes(now, -170));
   await ensureJobActivity(company.id, issuedJob.id, operator.id, "e2e-activity-issued-invoice", "billing.invoice.issued", "Invoice issued to customer", addMinutes(now, -235));
   await ensureJobActivity(company.id, issuedJob.id, operator.id, "e2e-activity-issued-follow-up", "job.reminder.create", "Billing follow-up queued", addMinutes(now, -200));
@@ -941,6 +1030,8 @@ async function main() {
   await ensureJobActivity(company.id, technicianJob.id, operator.id, "e2e-activity-tech-note", "tech.note", "Customer requested extra care on the front-right wheel.", addMinutes(now, -10));
   await ensureJobActivity(company.id, automationJob.id, operator.id, "e2e-activity-auto-work", "tech.note", "Automation test job is active and ready for completion.", addMinutes(now, -8));
   await ensureJobActivity(company.id, openJob.id, operator.id, "e2e-activity-open", "job.status", "New job created in the command centre queue", addMinutes(now, -60));
+  await ensureJobActivity(company.id, financeReadyJob.id, operator.id, "e2e-activity-finance-ready", "job.status", "Finance governance job is ready for invoice issuance", addMinutes(now, -85));
+  await ensureJobActivity(company.id, technicianRoleJob.id, technicianUser.id, "e2e-activity-tech-role-assigned", "job.status", "Technician governance job assigned to role-scoped technician", addMinutes(now, -20));
 
   await ensureReminder("e2e-reminder-billing-overdue", company.id, issuedJob.id, addMinutes(now, -180), "Automation billing follow-up");
   await ensureReminder("e2e-reminder-dispatch-overdue", company.id, openJob.id, addMinutes(now, -90), "Automation dispatch follow-up");
@@ -1082,6 +1173,38 @@ async function main() {
     },
   });
 
+  await prisma.booking.upsert({
+    where: { id: FIXTURE.bookings.technicianRole.id },
+    create: {
+      id: FIXTURE.bookings.technicianRole.id,
+      companyId: company.id,
+      locationId: location.id,
+      jobId: technicianRoleJob.id,
+      serviceId: service.id,
+      customerName: customers.technicianRole.name,
+      customerEmail: customers.technicianRole.email,
+      customerPhone: customers.technicianRole.phone,
+      startsAt: addMinutes(bookingBase, 360),
+      endsAt: addMinutes(bookingBase, 420),
+      status: "CONFIRMED",
+      source: "INTERNAL",
+      assignedUserId: technicianUser.id,
+    },
+    update: {
+      locationId: location.id,
+      jobId: technicianRoleJob.id,
+      serviceId: service.id,
+      customerName: customers.technicianRole.name,
+      customerEmail: customers.technicianRole.email,
+      customerPhone: customers.technicianRole.phone,
+      startsAt: addMinutes(bookingBase, 360),
+      endsAt: addMinutes(bookingBase, 420),
+      status: "CONFIRMED",
+      source: "INTERNAL",
+      assignedUserId: technicianUser.id,
+    },
+  });
+
   const serialField = await ensureCustomField(company.id, FIXTURE.customFields.jobSerialNumber);
   const warrantyField = await ensureCustomField(company.id, FIXTURE.customFields.jobWarrantyStatus);
   const bookingSourceField = await ensureCustomField(company.id, FIXTURE.customFields.bookingSource);
@@ -1095,6 +1218,7 @@ async function main() {
   await ensureCustomFieldValue(company.id, bookingSourceField.id, "BOOKING", FIXTURE.bookings.convertible.id, "website");
   await ensureCustomFieldValue(company.id, siteCodeField.id, "CUSTOMER", customers.convertible.id, "SITE-E2E-01");
   await ensureCustomFieldValue(company.id, certificationField.id, "TECHNICIAN", operator.id, "EV Specialist");
+  await ensureCustomFieldValue(company.id, certificationField.id, "TECHNICIAN", technicianUser.id, "E2E Mobile Certified");
 
   await ensureSavedViews(company.id, operator.id);
 
@@ -1178,13 +1302,23 @@ async function main() {
   console.log(`tenant=${company.id} (${company.name})`);
   console.log(`operator_email=${FIXTURE.operator.email}`);
   console.log(`operator_password=${FIXTURE.operator.password}`);
+  console.log(`dispatcher_email=${FIXTURE.workspaceUsers.dispatcher.email}`);
+  console.log(`dispatcher_password=${FIXTURE.workspaceUsers.dispatcher.password}`);
+  console.log(`finance_email=${FIXTURE.workspaceUsers.finance.email}`);
+  console.log(`finance_password=${FIXTURE.workspaceUsers.finance.password}`);
+  console.log(`technician_email=${FIXTURE.workspaceUsers.technician.email}`);
+  console.log(`technician_password=${FIXTURE.workspaceUsers.technician.password}`);
+  console.log(`viewer_email=${FIXTURE.workspaceUsers.viewer.email}`);
+  console.log(`viewer_password=${FIXTURE.workspaceUsers.viewer.password}`);
   console.log(`convertible_booking=${FIXTURE.bookings.convertible.id}`);
   console.log(`blocked_booking=${FIXTURE.bookings.blocked.id}`);
   console.log(`invoice_ready_job=${invoiceReadyJob.jobRef}`);
   console.log(`issued_job=${issuedJob.jobRef}`);
+  console.log(`finance_ready_job=${financeReadyJob.jobRef}`);
   console.log(`portal_active_job=${portalActiveJob.jobRef}`);
   console.log(`portal_token=${FIXTURE.tokens.active}`);
   console.log(`technician_job=${technicianJob.jobRef}`);
+  console.log(`technician_role_job=${technicianRoleJob.jobRef}`);
   console.log(`command_centre_job=${openJob.jobRef}`);
 }
 

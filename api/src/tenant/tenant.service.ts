@@ -3,6 +3,8 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import crypto from 'crypto';
 import { AuditService } from '../audit/audit.service';
 import { DEFAULT_PLAN_CODE, PLAN_DEFINITIONS } from '../billing/billing.constants';
+import { Role } from '../common/constants';
+import { assertPermission } from '../common/permissions';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateTenantSettingsDto } from './tenant.dto';
 
@@ -46,8 +48,9 @@ export class TenantService {
     return this.ensureTenantSettings(tenantId);
   }
 
-  async updateSettings(tenantId: string, userId: string, role: string, dto: UpdateTenantSettingsDto) {
+  async updateSettings(tenantId: string, userId: string, role: Role, dto: UpdateTenantSettingsDto) {
     const db = this.prisma as any;
+    const user = { companyId: tenantId, sub: userId, role, email: '' } as const;
 
     const settings = await this.ensureTenantSettings(tenantId);
     let plan = null;
@@ -71,6 +74,20 @@ export class TenantService {
       if (isEnterprise && role !== 'OWNER') {
         throw new BadRequestException('Only OWNER can change Enterprise AI limits.');
       }
+    }
+
+    const nextBusinessConfig = dto.businessConfigJson;
+    if (
+      nextBusinessConfig &&
+      typeof nextBusinessConfig === 'object' &&
+      'workflowStages' in nextBusinessConfig
+    ) {
+      await assertPermission({
+        user,
+        permission: 'workflow.manage',
+        audit: this.audit,
+        action: 'tenant.settings.workflow',
+      });
     }
 
     const payload: Record<string, any> = {

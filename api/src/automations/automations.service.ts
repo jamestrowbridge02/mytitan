@@ -75,7 +75,7 @@ export class AutomationsService {
         }
         await assertPermission({
           user,
-          permission: "AUTOMATIONS_ADMIN",
+          permission: "automations.manage",
           audit: this.audit,
           action: "automations.enable_live_send",
         });

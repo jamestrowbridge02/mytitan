@@ -4,6 +4,7 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtPayload } from '../auth/auth.types';
 import { Roles } from '../common/roles.decorator';
 import { RolesGuard } from '../common/roles.guard';
+import { assertPermission } from '../common/permissions';
 import { isMarketplaceEnabled } from '../common/feature-flags';
 import { MetricsService } from './metrics.service';
 
@@ -30,7 +31,8 @@ export class MetricsController {
 
   @Get('intelligence')
   @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
-  intelligence(@CurrentUser() user: JwtPayload) {
+  async intelligence(@CurrentUser() user: JwtPayload) {
+    await assertPermission({ user, permission: 'dashboard.view_intelligence', action: 'metrics.intelligence' });
     if (!isMarketplaceEnabled()) {
       return {
         jobsByStatus: [],

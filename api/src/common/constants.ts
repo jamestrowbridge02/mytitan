@@ -1,5 +1,11 @@
-export const ROLES = ['OWNER', 'ADMIN', 'STAFF', 'READ_ONLY'] as const;
+export const ROLES = ['OWNER', 'ADMIN', 'DISPATCHER', 'FINANCE', 'TECHNICIAN', 'VIEWER', 'STAFF', 'READ_ONLY'] as const;
 export type Role = (typeof ROLES)[number];
+
+export const MODERN_WORKSPACE_ROLES = ['OWNER', 'ADMIN', 'DISPATCHER', 'FINANCE', 'TECHNICIAN', 'VIEWER'] as const;
+export type ModernWorkspaceRole = (typeof MODERN_WORKSPACE_ROLES)[number];
+
+export const ASSIGNABLE_WORKSPACE_ROLES = ['ADMIN', 'DISPATCHER', 'FINANCE', 'TECHNICIAN', 'VIEWER'] as const;
+export type AssignableWorkspaceRole = (typeof ASSIGNABLE_WORKSPACE_ROLES)[number];
 
 export const JOB_STATUSES = [
   'DRAFT',

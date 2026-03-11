@@ -12,6 +12,7 @@ import {
   OperatorRowActions,
 } from "../../../components/ui/operator-page";
 import { apiFetch } from "../../../lib/api";
+import { emptyPermissionSnapshot, hasWorkspacePermission, normalizePermissionSnapshot } from "../../../lib/workspace-permissions";
 
 type BillingReadiness = {
   paymentsEnabled: boolean;
@@ -62,6 +63,8 @@ function money(cents: number, currency: string) {
 export default function BillingReadinessPage() {
   const [data, setData] = useState<BillingReadiness | null>(null);
   const [busyJobId, setBusyJobId] = useState<string | null>(null);
+  const [permissions, setPermissions] = useState(() => emptyPermissionSnapshot());
+  const [permissionsReady, setPermissionsReady] = useState(false);
   const { notice, showError, showSuccess, clearNotice } = useOperatorNotice();
 
   const load = async () => {
@@ -75,8 +78,33 @@ export default function BillingReadinessPage() {
   };
 
   useEffect(() => {
-    void load();
+    let cancelled = false;
+    const loadMe = async () => {
+      try {
+        const me = await apiFetch("/me");
+        if (!cancelled) {
+          setPermissions(normalizePermissionSnapshot(me?.permissions));
+        }
+      } catch {
+        if (!cancelled) {
+          setPermissions(emptyPermissionSnapshot());
+        }
+      } finally {
+        if (!cancelled) {
+          setPermissionsReady(true);
+        }
+      }
+    };
+    void loadMe();
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  useEffect(() => {
+    if (!permissionsReady || !hasWorkspacePermission(permissions, "billing.manage")) return;
+    void load();
+  }, [permissions, permissionsReady]);
 
   async function run(jobId: string, action: "issue-invoice" | "mark-paid" | "queue-follow-up" | "escalate-follow-up") {
     setBusyJobId(jobId);
@@ -112,6 +140,25 @@ export default function BillingReadinessPage() {
       { label: "Escalations 7d", value: String(data.summary.billingEscalationsLast7Days), hint: "Billing reminders pushed into faster collections follow-up" },
     ];
   }, [data]);
+
+  if (permissionsReady && !hasWorkspacePermission(permissions, "billing.manage")) {
+    return (
+      <DashboardShell>
+        <div className="operator-stack" data-testid="billing-governance-blocked">
+          <OperatorPageHeader
+            eyebrow="Business OS"
+            title="Billing readiness"
+            subtitle="Billing actions are restricted to roles trusted with invoice and payment operations."
+            stats={[]}
+          />
+          <OperatorEmptyStateCard
+            title="Billing access restricted"
+            description="Your workspace role cannot issue invoices or record payments. Ask an owner, admin, finance user, or legacy staff operator for access."
+          />
+        </div>
+      </DashboardShell>
+    );
+  }
 
   return (
     <DashboardShell>

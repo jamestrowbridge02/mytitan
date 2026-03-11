@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { AuditService } from "../audit/audit.service";
 import { BillingService } from "../billing/billing.service";
+import { Role } from "../common/constants";
 import { PrismaService } from "../prisma/prisma.service";
 import { TenantService } from "../tenant/tenant.service";
 import { TradePacksService } from "../trade-packs/trade-packs.service";
@@ -210,7 +211,7 @@ export class GuidedSetupService {
     }
   }
 
-  async applyStep(tenantId: string, userId: string, role: string, step: number, data: Record<string, any>, skipped: boolean) {
+  async applyStep(tenantId: string, userId: string, role: Role, step: number, data: Record<string, any>, skipped: boolean) {
     const db = this.prisma as any;
     const stepKey = GUIDED_SETUP_STEPS[Math.max(0, Math.min(step, GUIDED_SETUP_STEPS.length - 1))] || `step_${step}`;
 

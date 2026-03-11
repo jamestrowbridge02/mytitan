@@ -5,6 +5,7 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtPayload } from '../auth/auth.types';
 import { AuditService } from '../audit/audit.service';
 import { isLocationsV1Enabled } from '../common/feature-flags';
+import { getPermissionSnapshot } from '../common/permissions';
 import { PrismaService } from '../prisma/prisma.service';
 
 @UseGuards(JwtAuthGuard)
@@ -17,7 +18,10 @@ export class MeController {
 
   @Get('me')
   me(@CurrentUser() user: JwtPayload) {
-    return user;
+    return {
+      ...user,
+      permissions: getPermissionSnapshot(user.role),
+    };
   }
 
   @Get('me/location')

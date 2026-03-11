@@ -31,6 +31,10 @@ The seed creates:
 
 - operator email: `e2e.operator@mytitan.local`
 - operator password: `MyTitanE2E!2026`
+- dispatcher email: `e2e.dispatcher@mytitan.local`
+- finance email: `e2e.finance@mytitan.local`
+- technician email: `e2e.technician@mytitan.local`
+- viewer email: `e2e.viewer@mytitan.local`
 - deterministic bookings, billing, portal, technician, and command-centre records
 
 ## Payments in local E2E

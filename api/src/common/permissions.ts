@@ -4,28 +4,68 @@ import { AuditService } from '../audit/audit.service';
 import { Role } from './constants';
 
 export const PERMISSIONS = [
-  'BILLING_MANAGE',
-  'USER_INVITE',
-  'USER_ROLE_ASSIGN',
-  'USER_MANAGE',
-  'EXPORT_DATA',
-  'REFUND_MANAGE',
-  'WEBHOOK_ADMIN',
-  'AUTOMATIONS_ADMIN',
+  'settings.manage',
+  'workflow.manage',
+  'custom_fields.manage',
+  'automations.manage',
+  'billing.manage',
+  'portal.manage',
+  'technician.execute',
+  'jobs.transition',
+  'dashboard.view_intelligence',
+  'users.invite',
+  'users.role_assign',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
+export type PermissionSnapshot = Record<Permission, boolean>;
 
 export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   OWNER: [...PERMISSIONS],
-  ADMIN: ['USER_INVITE', 'USER_MANAGE', 'AUTOMATIONS_ADMIN'],
-  STAFF: [],
-  READ_ONLY: [],
+  ADMIN: [...PERMISSIONS],
+  DISPATCHER: ['portal.manage', 'jobs.transition', 'dashboard.view_intelligence'],
+  FINANCE: ['billing.manage', 'dashboard.view_intelligence'],
+  TECHNICIAN: ['technician.execute'],
+  VIEWER: [],
+  // Legacy roles remain supported to avoid breaking existing tenants.
+  STAFF: [
+    'automations.manage',
+    'billing.manage',
+    'portal.manage',
+    'technician.execute',
+    'jobs.transition',
+    'dashboard.view_intelligence',
+  ],
+  READ_ONLY: ['dashboard.view_intelligence'],
+};
+
+const ROLE_FAMILY: Record<Role, Role[]> = {
+  OWNER: ['OWNER'],
+  ADMIN: ['ADMIN'],
+  DISPATCHER: ['DISPATCHER'],
+  FINANCE: ['FINANCE'],
+  TECHNICIAN: ['TECHNICIAN'],
+  VIEWER: ['VIEWER'],
+  // Legacy controller decorators often refer to STAFF/READ_ONLY.
+  STAFF: ['STAFF', 'DISPATCHER', 'FINANCE', 'TECHNICIAN'],
+  READ_ONLY: ['READ_ONLY', 'VIEWER'],
 };
 
 export function hasPermission(role: Role | undefined, permission: Permission): boolean {
   if (!role) return false;
   return ROLE_PERMISSIONS[role]?.includes(permission) ?? false;
+}
+
+export function getPermissionSnapshot(role: Role | undefined): PermissionSnapshot {
+  return PERMISSIONS.reduce((snapshot, permission) => {
+    snapshot[permission] = hasPermission(role, permission);
+    return snapshot;
+  }, {} as PermissionSnapshot);
+}
+
+export function roleSatisfiesRequirement(role: Role | undefined, requiredRole: Role): boolean {
+  if (!role) return false;
+  return ROLE_FAMILY[requiredRole]?.includes(role) ?? false;
 }
 
 export async function assertPermission({

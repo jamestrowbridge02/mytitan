@@ -13,19 +13,31 @@ export const fixtureRefs = {
   blockedBookingId: "e2e-booking-blocked",
   invoiceReadyJobRef: "E2E-INV-READY-001",
   issuedJobRef: "E2E-ISSUED-001",
+  financeReadyJobRef: "E2E-FIN-READY-001",
   portalActiveJobRef: "E2E-PORTAL-ACTIVE-001",
   portalExpiredJobRef: "E2E-PORTAL-EXPIRED-001",
   technicianJobRef: "E2E-TECH-001",
+  technicianRoleJobRef: "E2E-TECH-ROLE-001",
   automationJobRef: "E2E-AUTO-001",
   commandCentreJobRef: "E2E-OPEN-001",
   commandCentreJobId: "e2e-job-open",
   automationJobId: "e2e-job-automation",
+  financeJobId: "e2e-job-finance-ready",
+  technicianRoleJobId: "e2e-job-technician-role",
   portalToken: "e2e-public-portal-token",
   automationSuggestionKey: "invoice-overdue-follow-up",
   dismissedAutomationSuggestionKey: "technician-arrival-office-notify",
   customFieldJobSerialKey: "serial_number",
   customFieldWarrantyKey: "warranty_status",
   customFieldCustomerSiteCode: "site_code",
+  dispatcherEmail: "e2e.dispatcher@mytitan.local",
+  dispatcherPassword: "MyTitanE2EDispatch!2026",
+  financeEmail: "e2e.finance@mytitan.local",
+  financePassword: "MyTitanE2EFinance!2026",
+  technicianEmail: "e2e.technician@mytitan.local",
+  technicianPassword: "MyTitanE2ETech!2026",
+  viewerEmail: "e2e.viewer@mytitan.local",
+  viewerPassword: "MyTitanE2EViewer!2026",
 };
 
 export type E2EMetadata = {
@@ -120,4 +132,22 @@ export async function installApiProxy(page: Page, request: APIRequestContext) {
       await fulfillFromLocalApi(route, request);
     });
   }
+}
+
+export async function loginAs(page: Page, request: APIRequestContext, email: string, password: string) {
+  const response = await request.post("http://127.0.0.1:3000/auth/login", {
+    data: { email, password },
+    headers: { "Content-Type": "application/json" },
+  });
+  if (!response.ok()) {
+    throw new Error(`Failed to log in as ${email}`);
+  }
+  const body = await response.json();
+  const token = String(body?.token || "");
+  if (!token) {
+    throw new Error(`Auth token missing for ${email}`);
+  }
+  await page.addInitScript((nextToken) => {
+    window.localStorage.setItem("mytitan_token", nextToken);
+  }, token);
 }

@@ -2,8 +2,10 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import React from "react";
 import { NAV_GROUPS, NavItem } from "./nav-config";
+import { apiFetch } from "../../lib/api";
 import { getBusinessTerms, getCommandCentreHref, getOptionalModuleVisibility } from "../../lib/business-config";
 import { useTenantSettings } from "../../lib/tenant-settings";
+import { emptyPermissionSnapshot, normalizePermissionSnapshot } from "../../lib/workspace-permissions";
 
 function isActive(pathname: string, href?: string) {
   if (!href) return false;
@@ -37,6 +39,7 @@ function cx(...xs: Array<string | false | null | undefined>) {
 export default function Sidebar() {
   const router = useRouter();
   const { settings } = useTenantSettings();
+  const [permissions, setPermissions] = React.useState(() => emptyPermissionSnapshot());
   const terms = getBusinessTerms(settings);
   const commandCentreHref = getCommandCentreHref(settings);
   const moduleVisibility = getOptionalModuleVisibility(settings);
@@ -63,6 +66,26 @@ export default function Sidebar() {
       }
     }
   }, [path]);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    const loadMe = async () => {
+      try {
+        const me = await apiFetch("/me");
+        if (!cancelled) {
+          setPermissions(normalizePermissionSnapshot(me?.permissions));
+        }
+      } catch {
+        if (!cancelled) {
+          setPermissions(emptyPermissionSnapshot());
+        }
+      }
+    };
+    void loadMe();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const normalized = q.trim().toLowerCase();
   const isSearching = normalized.length >= 2;
@@ -99,6 +122,16 @@ export default function Sidebar() {
     { title: "Integrations", href: "/dashboard/integrations" },
   ];
 
+  function canAccessHref(href?: string) {
+    if (!href) return true;
+    if (href.startsWith("/dashboard/settings")) return permissions["settings.manage"];
+    if (href.startsWith("/dashboard/billing")) return permissions["billing.manage"];
+    if (href.startsWith("/dashboard/portal")) return permissions["portal.manage"];
+    if (href.startsWith("/dashboard/technician")) return permissions["technician.execute"];
+    if (href.startsWith("/dashboard/intelligence")) return permissions["dashboard.view_intelligence"];
+    return true;
+  }
+
   return (
     <aside className="mt-sidebar hidden md:block h-screen w-[292px] shrink-0">
       <div className="flex h-full flex-col px-3 py-3">
@@ -126,7 +159,7 @@ export default function Sidebar() {
           <div className="mt-2 text-[11px] text-white/45">Ctrl K opens global command search.</div>
 
           <div className="mt-sidebar__quick mt-3">
-            {primaryQuickLinks.map((item) => {
+            {primaryQuickLinks.filter((item) => canAccessHref(item.href)).map((item) => {
               const active = isActive(path, item.href);
               return (
                 <Link
@@ -179,6 +212,7 @@ export default function Sidebar() {
             const visibleItems = g.items
               .filter(canShow)
               .filter((item) => {
+                if (!canAccessHref(item.href)) return false;
                 if (item.href === "/dashboard/intelligence") return moduleVisibility.showIntelligence;
                 if (item.href === "/dashboard/portal") return moduleVisibility.showPortalOps;
                 if (item.href === "/dashboard/technician") return moduleVisibility.showTechnicianQueue;
@@ -215,7 +249,7 @@ export default function Sidebar() {
                               {it.title}
                             </div>
                             <div className="space-y-1">
-                              {it.children.filter(canShow).map((c) => {
+                              {it.children.filter(canShow).filter((c) => canAccessHref(c.href)).map((c) => {
                                 const href = c.href || "#";
                                 const active = isActive(path, href);
                                 return (

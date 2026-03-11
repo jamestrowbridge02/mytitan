@@ -22,6 +22,7 @@ import type { Response } from 'express';
 import { JwtAuthGuard } from '../auth/auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtPayload } from '../auth/auth.types';
+import { assertPermission } from '../common/permissions';
 import { Roles } from '../common/roles.decorator';
 import { RolesGuard } from '../common/roles.guard';
 import { SetLogoUrlDto, UpdateTenantSettingsDto } from './tenant.dto';
@@ -67,13 +68,15 @@ export class TenantController {
 
   @Put('settings')
   @Roles('OWNER', 'ADMIN')
-  updateSettings(@CurrentUser() user: JwtPayload, @Body() dto: UpdateTenantSettingsDto) {
+  async updateSettings(@CurrentUser() user: JwtPayload, @Body() dto: UpdateTenantSettingsDto) {
+    await assertPermission({ user, permission: 'settings.manage', action: 'tenant.settings.update' });
     return this.tenantService.updateSettings(user.companyId, user.sub, user.role, dto);
   }
 
   @Patch('settings')
   @Roles('OWNER', 'ADMIN')
-  patchSettings(@CurrentUser() user: JwtPayload, @Body() dto: UpdateTenantSettingsDto) {
+  async patchSettings(@CurrentUser() user: JwtPayload, @Body() dto: UpdateTenantSettingsDto) {
+    await assertPermission({ user, permission: 'settings.manage', action: 'tenant.settings.patch' });
     return this.tenantService.updateSettings(user.companyId, user.sub, user.role, dto);
   }
 

@@ -2,6 +2,7 @@ import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post,
 import { JwtAuthGuard } from "../auth/auth.guard";
 import { CurrentUser } from "../auth/current-user.decorator";
 import { JwtPayload } from "../auth/auth.types";
+import { assertPermission } from "../common/permissions";
 import { requireAutomationsV1Enabled } from "../common/feature-flags";
 import { Roles } from "../common/roles.decorator";
 import { RolesGuard } from "../common/roles.guard";
@@ -22,7 +23,8 @@ export class AutomationsController {
 
   @Patch("settings")
   @Roles("OWNER", "ADMIN", "STAFF")
-  updateSettings(@CurrentUser() user: JwtPayload, @Body() dto: UpdateAutomationsSettingsDto) {
+  async updateSettings(@CurrentUser() user: JwtPayload, @Body() dto: UpdateAutomationsSettingsDto) {
+    await assertPermission({ user, permission: "automations.manage", action: "automations.settings.update" });
     requireAutomationsV1Enabled();
     return this.automations.updateSettings(user, dto);
   }
@@ -78,35 +80,40 @@ export class AutomationsController {
 
   @Post("suggestions/:id/apply")
   @Roles("OWNER", "ADMIN", "STAFF")
-  applySuggestion(@CurrentUser() user: JwtPayload, @Param("id") id: string) {
+  async applySuggestion(@CurrentUser() user: JwtPayload, @Param("id") id: string) {
+    await assertPermission({ user, permission: "automations.manage", action: "automations.suggestions.apply" });
     requireAutomationsV1Enabled();
     return this.automations.applySuggestion(user, id);
   }
 
   @Post("suggestions/:id/dismiss")
   @Roles("OWNER", "ADMIN", "STAFF")
-  dismissSuggestion(@CurrentUser() user: JwtPayload, @Param("id") id: string) {
+  async dismissSuggestion(@CurrentUser() user: JwtPayload, @Param("id") id: string) {
+    await assertPermission({ user, permission: "automations.manage", action: "automations.suggestions.dismiss" });
     requireAutomationsV1Enabled();
     return this.automations.dismissSuggestion(user, id);
   }
 
   @Post("workspace-rules")
   @Roles("OWNER", "ADMIN", "STAFF")
-  createWorkspaceRule(@CurrentUser() user: JwtPayload, @Body() dto: CreateAutomationRuleDto) {
+  async createWorkspaceRule(@CurrentUser() user: JwtPayload, @Body() dto: CreateAutomationRuleDto) {
+    await assertPermission({ user, permission: "automations.manage", action: "automations.rules.create" });
     requireAutomationsV1Enabled();
     return this.automations.createWorkspaceRule(user, dto);
   }
 
   @Patch("workspace-rules/:id")
   @Roles("OWNER", "ADMIN", "STAFF")
-  updateWorkspaceRule(@CurrentUser() user: JwtPayload, @Param("id") id: string, @Body() dto: UpdateAutomationRuleDto) {
+  async updateWorkspaceRule(@CurrentUser() user: JwtPayload, @Param("id") id: string, @Body() dto: UpdateAutomationRuleDto) {
+    await assertPermission({ user, permission: "automations.manage", action: "automations.rules.update" });
     requireAutomationsV1Enabled();
     return this.automations.updateWorkspaceRule(user, id, dto);
   }
 
   @Delete("workspace-rules/:id")
   @Roles("OWNER", "ADMIN", "STAFF")
-  deleteWorkspaceRule(@CurrentUser() user: JwtPayload, @Param("id") id: string) {
+  async deleteWorkspaceRule(@CurrentUser() user: JwtPayload, @Param("id") id: string) {
+    await assertPermission({ user, permission: "automations.manage", action: "automations.rules.delete" });
     requireAutomationsV1Enabled();
     return this.automations.deleteWorkspaceRule(user, id);
   }

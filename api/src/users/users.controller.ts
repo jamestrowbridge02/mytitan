@@ -46,7 +46,7 @@ export class UsersController {
     const requestId = String(req.requestId || req.headers?.['x-request-id'] || '').trim() || undefined;
     await assertPermission({
       user,
-      permission: 'USER_INVITE',
+      permission: 'users.invite',
       audit: this.audit,
       requestId,
       action: 'users.invite',
@@ -66,7 +66,7 @@ export class UsersController {
     const requestId = String(req.requestId || req.headers?.['x-request-id'] || '').trim() || undefined;
     await assertPermission({
       user,
-      permission: 'USER_ROLE_ASSIGN',
+      permission: 'users.role_assign',
       audit: this.audit,
       requestId,
       action: 'users.updateRole',

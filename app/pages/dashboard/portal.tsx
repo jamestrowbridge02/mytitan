@@ -12,6 +12,7 @@ import {
   OperatorRowActions,
 } from "../../components/ui/operator-page";
 import { apiFetch } from "../../lib/api";
+import { emptyPermissionSnapshot, hasWorkspacePermission, normalizePermissionSnapshot } from "../../lib/workspace-permissions";
 
 type PortalOverview = {
   enabled: boolean;
@@ -53,6 +54,8 @@ type PortalOverview = {
 export default function PortalOpsPage() {
   const [data, setData] = useState<PortalOverview | null>(null);
   const [busyJobId, setBusyJobId] = useState<string | null>(null);
+  const [permissions, setPermissions] = useState(() => emptyPermissionSnapshot());
+  const [permissionsReady, setPermissionsReady] = useState(false);
   const { notice, showError, showSuccess, clearNotice } = useOperatorNotice();
 
   async function load() {
@@ -66,8 +69,33 @@ export default function PortalOpsPage() {
   }
 
   useEffect(() => {
-    void load();
+    let cancelled = false;
+    const loadMe = async () => {
+      try {
+        const me = await apiFetch("/me");
+        if (!cancelled) {
+          setPermissions(normalizePermissionSnapshot(me?.permissions));
+        }
+      } catch {
+        if (!cancelled) {
+          setPermissions(emptyPermissionSnapshot());
+        }
+      } finally {
+        if (!cancelled) {
+          setPermissionsReady(true);
+        }
+      }
+    };
+    void loadMe();
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  useEffect(() => {
+    if (!permissionsReady || !hasWorkspacePermission(permissions, "portal.manage")) return;
+    void load();
+  }, [permissions, permissionsReady]);
 
   async function provisionLink(jobId: string) {
     setBusyJobId(jobId);
@@ -117,6 +145,25 @@ export default function PortalOpsPage() {
       { label: "Expiring soon", value: String(data.summary.expiringSoon), hint: "Portal links expiring within 7 days" },
     ];
   }, [data]);
+
+  if (permissionsReady && !hasWorkspacePermission(permissions, "portal.manage")) {
+    return (
+      <DashboardShell>
+        <div className="operator-stack" data-testid="portal-governance-blocked">
+          <OperatorPageHeader
+            eyebrow="Business OS"
+            title="Portal Ops"
+            subtitle="Portal lifecycle controls are limited to roles that can manage customer-facing access."
+            stats={[]}
+          />
+          <OperatorEmptyStateCard
+            title="Portal access restricted"
+            description="Your workspace role cannot manage portal lifecycle actions. Ask an owner, admin, or dispatcher for access."
+          />
+        </div>
+      </DashboardShell>
+    );
+  }
 
   return (
     <DashboardShell>

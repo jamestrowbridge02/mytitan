@@ -5,6 +5,7 @@ import { JwtPayload } from "../auth/auth.types";
 import { featureGate } from "../common/feature-gate";
 import { isCommandCentreV1Enabled, isCommandCentreV2Enabled } from "../common/feature-flags";
 import { JOB_STATUSES, normalizeJobStatusInput } from "../common/constants";
+import { assertPermission } from "../common/permissions";
 import { Roles } from "../common/roles.decorator";
 import { RolesGuard } from "../common/roles.guard";
 import { BulkJobsDto, BulkJobsV2Dto, CreateJobDto, CreateJobReminderDto, JobsBoardQueryDto, PatchJobDto, UpdateJobStatusDto } from "./dto";
@@ -61,11 +62,12 @@ export class JobsController {
 
   @Patch(":id/status")
   @Roles("OWNER", "ADMIN", "STAFF")
-  updateStatus(
+  async updateStatus(
     @CurrentUser() user: JwtPayload,
     @Param("id") id: string,
     @Body() dto: UpdateJobStatusDto,
   ) {
+    await assertPermission({ user, permission: "jobs.transition", action: "jobs.status.update" });
     const normalized = normalizeJobStatusInput(dto.status);
     if (!normalized) {
       throw new BadRequestException({ code: "INVALID_STATUS", allowed: JOB_STATUSES });
@@ -75,21 +77,30 @@ export class JobsController {
 
   @Patch(":id")
   @Roles("OWNER", "ADMIN", "STAFF")
-  patchInline(@CurrentUser() user: JwtPayload, @Param("id") id: string, @Body() dto: PatchJobDto) {
+  async patchInline(@CurrentUser() user: JwtPayload, @Param("id") id: string, @Body() dto: PatchJobDto) {
+    if (dto && Object.prototype.hasOwnProperty.call(dto, "status")) {
+      await assertPermission({ user, permission: "jobs.transition", action: "jobs.patch.status" });
+    }
     return this.jobsService.patchPartial(user.companyId, user.sub, id, dto);
   }
 
   @Post("bulk")
   @Roles("OWNER", "ADMIN", "STAFF")
-  bulk(@CurrentUser() user: JwtPayload, @Body() dto: BulkJobsDto) {
+  async bulk(@CurrentUser() user: JwtPayload, @Body() dto: BulkJobsDto) {
     featureGate({ enabled: isCommandCentreV1Enabled(), feature: 'COMMAND_CENTRE_V1', mode: 'mutation' });
+    if (dto?.status) {
+      await assertPermission({ user, permission: "jobs.transition", action: "jobs.bulk.status" });
+    }
     return this.jobsService.bulk(user.companyId, user.sub, dto);
   }
 
   @Post("bulk-v2")
   @Roles("OWNER", "ADMIN", "STAFF")
-  bulkV2(@CurrentUser() user: JwtPayload, @Body() dto: BulkJobsV2Dto) {
+  async bulkV2(@CurrentUser() user: JwtPayload, @Body() dto: BulkJobsV2Dto) {
     featureGate({ enabled: isCommandCentreV2Enabled(), feature: 'COMMAND_CENTRE_V2', mode: 'mutation' });
+    if (dto?.status) {
+      await assertPermission({ user, permission: "jobs.transition", action: "jobs.bulk_v2.status" });
+    }
     return this.jobsService.bulkV2(user.companyId, user.sub, dto);
   }
 

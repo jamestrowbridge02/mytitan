@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react';
 import { DashboardShell } from '../../components/dashboard-shell';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { apiFetch } from '../../lib/api';
+import { ASSIGNABLE_WORKSPACE_ROLES } from '../../lib/workspace-permissions';
 
-const ROLES = ['OWNER', 'ADMIN', 'STAFF', 'READ_ONLY'];
+const ROLES = ['OWNER', ...ASSIGNABLE_WORKSPACE_ROLES];
 
 export default function UsersPage() {
   const [users, setUsers] = useState<any[]>([]);
   const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState('STAFF');
+  const [inviteRole, setInviteRole] = useState('DISPATCHER');
   const [meRole, setMeRole] = useState<string>('');
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
@@ -38,7 +39,7 @@ export default function UsersPage() {
       });
       setStatus(`Invite created. Token: ${res?.token || ''}`);
       setInviteEmail('');
-      setInviteRole('STAFF');
+      setInviteRole('DISPATCHER');
       await load();
     } catch (err: any) {
       setError(err.message || 'Failed to invite');

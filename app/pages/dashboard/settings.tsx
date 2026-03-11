@@ -13,6 +13,7 @@ import type { CustomField } from '../../lib/custom-fields';
 import { isAutomationsV1Enabled, isGuidedSetupV2Enabled, isNotificationsV1Enabled } from '../../lib/feature-flags';
 import { TenantSettings, useTenantSettings } from '../../lib/tenant-settings';
 import { getBookingStages, getJobStages, getTechnicianStages, type WorkflowStage } from '../../lib/workflow-config';
+import { emptyPermissionSnapshot, hasWorkspacePermission, normalizePermissionSnapshot } from '../../lib/workspace-permissions';
 
 type TabKey = 'branding' | 'email' | 'pricing' | 'features' | 'workflow' | 'custom_fields' | 'automation_rules' | 'ai';
 
@@ -373,7 +374,21 @@ export default function SettingsPage() {
   const [deletingRuleId, setDeletingRuleId] = useState<string | null>(null);
   const [applyingSuggestionKey, setApplyingSuggestionKey] = useState<string | null>(null);
   const [dismissingSuggestionKey, setDismissingSuggestionKey] = useState<string | null>(null);
+  const [permissions, setPermissions] = useState(() => emptyPermissionSnapshot());
+  const [permissionsReady, setPermissionsReady] = useState(false);
   const { notice, showSuccess, showError, clearNotice } = useOperatorNotice();
+
+  const canManageSettings = hasWorkspacePermission(permissions, 'settings.manage');
+  const canManageWorkflow = hasWorkspacePermission(permissions, 'workflow.manage');
+  const canManageCustomFields = hasWorkspacePermission(permissions, 'custom_fields.manage');
+  const canManageAutomations = hasWorkspacePermission(permissions, 'automations.manage');
+
+  const visibleTabs = useMemo(() => TABS.filter((item) => {
+    if (item.key === 'workflow') return canManageWorkflow;
+    if (item.key === 'custom_fields') return canManageCustomFields;
+    if (item.key === 'automation_rules') return canManageAutomations;
+    return canManageSettings;
+  }), [canManageAutomations, canManageCustomFields, canManageSettings, canManageWorkflow]);
 
   useEffect(() => {
     if (settings) {
@@ -382,12 +397,42 @@ export default function SettingsPage() {
   }, [settings]);
 
   useEffect(() => {
+    let cancelled = false;
+    const loadMe = async () => {
+      try {
+        const me = await apiFetch('/me');
+        if (!cancelled) {
+          setPermissions(normalizePermissionSnapshot(me?.permissions));
+        }
+      } catch {
+        if (!cancelled) {
+          setPermissions(emptyPermissionSnapshot());
+        }
+      } finally {
+        if (!cancelled) {
+          setPermissionsReady(true);
+        }
+      }
+    };
+    void loadMe();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!router.isReady) return;
     const queryTab = typeof router.query.tab === 'string' ? router.query.tab : '';
-    if (queryTab && TABS.some((item) => item.key === queryTab)) {
+    if (queryTab && visibleTabs.some((item) => item.key === queryTab)) {
       setTab(queryTab as TabKey);
     }
-  }, [router.isReady, router.query.tab]);
+  }, [router.isReady, router.query.tab, visibleTabs]);
+
+  useEffect(() => {
+    if (!visibleTabs.some((item) => item.key === tab)) {
+      setTab(visibleTabs[0]?.key || 'branding');
+    }
+  }, [tab, visibleTabs]);
 
   useEffect(() => {
     if (!notificationsEnabled) return;
@@ -788,6 +833,27 @@ export default function SettingsPage() {
     showSuccess('Tour reset. Open dashboard to start again.');
   }
 
+  if (permissionsReady && !canManageSettings) {
+    return (
+      <DashboardShell>
+        <div className="settings-premium-shell">
+          <OperatorPageHeader
+            eyebrow="Configuration"
+            title="Settings"
+            subtitle="Workspace settings are limited to owners and admins."
+            stats={[]}
+          />
+          <div className="card settings-premium-card" data-testid="settings-governance-blocked">
+            <h2 style={{ marginTop: 0 }}>Access restricted</h2>
+            <p className="muted settings-premium-muted" style={{ marginBottom: 0 }}>
+              Your workspace role does not include settings management. Ask an owner or admin to update workspace configuration.
+            </p>
+          </div>
+        </div>
+      </DashboardShell>
+    );
+  }
+
   return (
     <DashboardShell>
   <div className="settings-premium-shell">
@@ -839,7 +905,7 @@ export default function SettingsPage() {
           </div>
         ) : null}
         <div className="tab-row">
-          {TABS.map((item) => (
+          {visibleTabs.map((item) => (
             <button
               key={item.key}
               data-testid={`settings-tab-${item.key}`}

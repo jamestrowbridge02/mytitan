@@ -11,6 +11,10 @@ datasource db {
 enum UserRole {
   OWNER
   ADMIN
+  DISPATCHER
+  FINANCE
+  TECHNICIAN
+  VIEWER
   STAFF
   READ_ONLY
 }

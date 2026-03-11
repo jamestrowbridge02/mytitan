@@ -17,6 +17,7 @@ import { getBusinessTerms } from "../../lib/business-config";
 import { getMissingRequiredCustomFieldKeys, type CustomField, type CustomFieldValue } from "../../lib/custom-fields";
 import { useTenantSettings } from "../../lib/tenant-settings";
 import { getTechnicianStages, mapStatusToStage } from "../../lib/workflow-config";
+import { emptyPermissionSnapshot, hasWorkspacePermission, normalizePermissionSnapshot } from "../../lib/workspace-permissions";
 
 type TechQueue = {
   summary: {
@@ -66,6 +67,8 @@ export default function TechnicianPage() {
   const [meId, setMeId] = useState<string | null>(null);
   const [technicianFields, setTechnicianFields] = useState<CustomField[]>([]);
   const [technicianFieldValues, setTechnicianFieldValues] = useState<CustomFieldValue[]>([]);
+  const [permissions, setPermissions] = useState(() => emptyPermissionSnapshot());
+  const [permissionsReady, setPermissionsReady] = useState(false);
   const { notice, showError, showSuccess, clearNotice } = useOperatorNotice();
 
   async function load() {
@@ -79,10 +82,36 @@ export default function TechnicianPage() {
   }
 
   useEffect(() => {
-    void load();
+    let cancelled = false;
+    const loadMe = async () => {
+      try {
+        const me = await apiFetch("/me");
+        if (!cancelled) {
+          setPermissions(normalizePermissionSnapshot(me?.permissions));
+        }
+      } catch {
+        if (!cancelled) {
+          setPermissions(emptyPermissionSnapshot());
+        }
+      } finally {
+        if (!cancelled) {
+          setPermissionsReady(true);
+        }
+      }
+    };
+    void loadMe();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
+    if (!permissionsReady || !hasWorkspacePermission(permissions, "technician.execute")) return;
+    void load();
+  }, [permissions, permissionsReady]);
+
+  useEffect(() => {
+    if (!permissionsReady || !hasWorkspacePermission(permissions, "technician.execute")) return;
     async function loadTechnicianFieldData() {
       try {
         const [me, fieldRows] = await Promise.all([
@@ -101,7 +130,7 @@ export default function TechnicianPage() {
       }
     }
     void loadTechnicianFieldData();
-  }, []);
+  }, [permissions, permissionsReady]);
 
   async function run(jobId: string, action: "start" | "complete") {
     setBusyId(jobId);
@@ -163,6 +192,25 @@ export default function TechnicianPage() {
       { label: "Overdue", value: String(data.summary.overdueAssignedJobs), hint: "Assigned jobs now behind schedule" },
     ];
   }, [data]);
+
+  if (permissionsReady && !hasWorkspacePermission(permissions, "technician.execute")) {
+    return (
+      <DashboardShell>
+        <div className="operator-stack" data-testid="technician-governance-blocked">
+          <OperatorPageHeader
+            eyebrow="Field OS"
+            title={`${terms.technicians} queue`}
+            subtitle="Field-execution actions are restricted to technician-capable workspace roles."
+            stats={[]}
+          />
+          <OperatorEmptyStateCard
+            title="Technician access restricted"
+            description="Your workspace role cannot use technician execution actions. Ask an owner, admin, technician, or legacy staff user for access."
+          />
+        </div>
+      </DashboardShell>
+    );
+  }
 
   return (
     <DashboardShell>

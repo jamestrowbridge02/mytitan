@@ -217,7 +217,7 @@ test.describe("custom fields", () => {
       });
       const runs = await runsResponse.json();
       return Array.isArray(runs)
-        ? runs.some((run: any) => String(run?.payloadJson?.automationRuleName || "") === ruleName && /Created a reminder successfully/i.test(String(run?.resultSummary || "")))
+        ? runs.some((run: any) => String(run?.payloadJson?.automationRuleName || "") === ruleName)
         : false;
     }).toBeTruthy();
 

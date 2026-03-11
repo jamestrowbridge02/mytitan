@@ -41,7 +41,7 @@ export class BillingController {
     const requestId = String(req.requestId || req.headers['x-request-id'] || '').trim() || undefined;
     await assertPermission({
       user,
-      permission: 'BILLING_MANAGE',
+      permission: 'billing.manage',
       audit: this.audit,
       requestId,
       action: 'billing.checkout',
@@ -59,7 +59,7 @@ export class BillingController {
     const requestId = String(req.requestId || req.headers['x-request-id'] || '').trim() || undefined;
     await assertPermission({
       user,
-      permission: 'BILLING_MANAGE',
+      permission: 'billing.manage',
       audit: this.audit,
       requestId,
       action: 'billing.portal',
@@ -75,31 +75,36 @@ export class BillingController {
 
   @Get('readiness')
   @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
-  readiness(@CurrentUser() user: JwtPayload) {
+  async readiness(@CurrentUser() user: JwtPayload) {
+    await assertPermission({ user, permission: 'billing.manage', audit: this.audit, action: 'billing.readiness' });
     return this.billing.getBillingReadiness(user.companyId);
   }
 
   @Post('jobs/:id/issue-invoice')
   @Roles('OWNER', 'ADMIN', 'STAFF')
-  issueInvoice(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+  async issueInvoice(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    await assertPermission({ user, permission: 'billing.manage', audit: this.audit, action: 'billing.issue_invoice' });
     return this.billing.issueInvoice(user.companyId, user.sub, id);
   }
 
   @Post('jobs/:id/mark-paid')
   @Roles('OWNER', 'ADMIN', 'STAFF')
-  markPaid(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+  async markPaid(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    await assertPermission({ user, permission: 'billing.manage', audit: this.audit, action: 'billing.mark_paid' });
     return this.billing.markPaidOffline(user.companyId, user.sub, id);
   }
 
   @Post('jobs/:id/queue-follow-up')
   @Roles('OWNER', 'ADMIN', 'STAFF')
-  queueFollowUp(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+  async queueFollowUp(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    await assertPermission({ user, permission: 'billing.manage', audit: this.audit, action: 'billing.queue_follow_up' });
     return this.billing.queueBillingFollowUp(user.companyId, user.sub, id);
   }
 
   @Post('jobs/:id/escalate-follow-up')
   @Roles('OWNER', 'ADMIN', 'STAFF')
-  escalateFollowUp(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+  async escalateFollowUp(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    await assertPermission({ user, permission: 'billing.manage', audit: this.audit, action: 'billing.escalate_follow_up' });
     return this.billing.escalateBillingFollowUp(user.companyId, user.sub, id);
   }
 }

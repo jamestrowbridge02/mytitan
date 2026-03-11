@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } f
 import { JwtAuthGuard } from "../auth/auth.guard";
 import { CurrentUser } from "../auth/current-user.decorator";
 import { JwtPayload } from "../auth/auth.types";
+import { assertPermission } from "../common/permissions";
 import { Roles } from "../common/roles.decorator";
 import { RolesGuard } from "../common/roles.guard";
 import { CreateCustomFieldDto, CustomFieldValuesQueryDto, UpdateCustomFieldDto, UpsertCustomFieldValuesDto } from "./custom-fields.dto";
@@ -20,19 +21,22 @@ export class CustomFieldsController {
 
   @Post()
   @Roles("OWNER", "ADMIN")
-  create(@CurrentUser() user: JwtPayload, @Body() dto: CreateCustomFieldDto) {
+  async create(@CurrentUser() user: JwtPayload, @Body() dto: CreateCustomFieldDto) {
+    await assertPermission({ user, permission: "custom_fields.manage", action: "custom_fields.create" });
     return this.customFields.createField(user, dto);
   }
 
   @Patch(":id")
   @Roles("OWNER", "ADMIN")
-  update(@CurrentUser() user: JwtPayload, @Param("id") id: string, @Body() dto: UpdateCustomFieldDto) {
+  async update(@CurrentUser() user: JwtPayload, @Param("id") id: string, @Body() dto: UpdateCustomFieldDto) {
+    await assertPermission({ user, permission: "custom_fields.manage", action: "custom_fields.update" });
     return this.customFields.updateField(user, id, dto);
   }
 
   @Delete(":id")
   @Roles("OWNER", "ADMIN")
-  remove(@CurrentUser() user: JwtPayload, @Param("id") id: string) {
+  async remove(@CurrentUser() user: JwtPayload, @Param("id") id: string) {
+    await assertPermission({ user, permission: "custom_fields.manage", action: "custom_fields.remove" });
     return this.customFields.deleteField(user, id);
   }
 
