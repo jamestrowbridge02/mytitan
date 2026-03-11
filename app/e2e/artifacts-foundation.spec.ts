@@ -43,6 +43,6 @@ test.describe("documents and artifacts foundation", () => {
       buffer: Buffer.from("Operator note for artifact upload coverage.", "utf8"),
     });
     await page.getByTestId("artifact-upload-job").evaluate((element: HTMLButtonElement) => element.click());
-    await expect(page.getByText("Uploaded E2E operator note")).toBeVisible();
+    await expect(page.getByTestId("artifact-card-job")).toContainText("Uploaded E2E operator note");
   });
 });

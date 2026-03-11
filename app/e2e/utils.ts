@@ -38,6 +38,10 @@ export const fixtureRefs = {
   seededJobArtifactLabel: "Seeded invoice pack",
   seededPortalArtifactLabel: "Customer completion summary",
   seededCustomerArtifactLabel: "Customer warranty note",
+  activeServicePlanId: "e2e-service-plan-active",
+  pausedServicePlanId: "e2e-service-plan-paused",
+  activeServicePlanName: "Quarterly Vehicle Health Check",
+  pausedServicePlanName: "Annual Warranty Review",
   dispatcherEmail: "e2e.dispatcher@mytitan.local",
   dispatcherPassword: "MyTitanE2EDispatch!2026",
   financeEmail: "e2e.finance@mytitan.local",
@@ -154,12 +158,23 @@ export async function installApiProxy(page: Page, request: APIRequestContext) {
 }
 
 export async function loginAs(page: Page, request: APIRequestContext, email: string, password: string) {
-  const response = await request.post("http://127.0.0.1:3000/auth/login", {
-    data: { email, password },
-    headers: { "Content-Type": "application/json" },
-  });
-  if (!response.ok()) {
-    throw new Error(`Failed to log in as ${email}`);
+  let response = null as Awaited<ReturnType<APIRequestContext["post"]>> | null;
+  let lastStatus = 0;
+  let lastBody = "";
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    response = await request.post("http://127.0.0.1:3000/auth/login", {
+      data: { email, password },
+      headers: { "Content-Type": "application/json" },
+    });
+    lastStatus = response.status();
+    if (response.ok()) {
+      break;
+    }
+    lastBody = await response.text();
+    await new Promise((resolve) => setTimeout(resolve, 200 * (attempt + 1)));
+  }
+  if (!response?.ok()) {
+    throw new Error(`Failed to log in as ${email} (status ${lastStatus}${lastBody ? `: ${lastBody}` : ""})`);
   }
   const body = await response.json();
   const token = String(body?.token || "");

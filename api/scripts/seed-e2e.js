@@ -109,6 +109,11 @@ const FIXTURE = {
     jobPortal: { id: "e2e-artifact-job-portal", label: "Customer completion summary", fileName: "completion-summary.txt" },
     customerAttachment: { id: "e2e-artifact-customer", label: "Customer warranty note", fileName: "warranty-note.txt" },
   },
+  servicePlans: {
+    active: { id: "e2e-service-plan-active", name: "Quarterly Vehicle Health Check" },
+    paused: { id: "e2e-service-plan-paused", name: "Annual Warranty Review" },
+    run: { id: "e2e-service-plan-run-executed" },
+  },
 };
 
 function addMinutes(date, minutes) {
@@ -692,6 +697,34 @@ async function ensureWebhookDelivery(id, payload) {
 
 async function ensureDocumentArtifact(id, payload) {
   await prisma.documentArtifact.upsert({
+    where: { id },
+    create: { id, ...payload },
+    update: payload,
+  });
+}
+
+async function ensureServicePlan(id, payload, tasks = []) {
+  await prisma.servicePlan.upsert({
+    where: { id },
+    create: { id, ...payload },
+    update: payload,
+  });
+  await prisma.servicePlanTask.deleteMany({ where: { planId: id } });
+  if (tasks.length) {
+    await prisma.servicePlanTask.createMany({
+      data: tasks.map((task, index) => ({
+        planId: id,
+        title: task.title,
+        description: task.description || null,
+        sortOrder: typeof task.sortOrder === "number" ? task.sortOrder : index,
+        metadataJson: task.metadataJson || null,
+      })),
+    });
+  }
+}
+
+async function ensureServicePlanRun(id, payload) {
+  await prisma.servicePlanRun.upsert({
     where: { id },
     create: { id, ...payload },
     update: payload,
@@ -1560,6 +1593,92 @@ async function main() {
       entityId: portalActiveJob.id,
       kind: "PORTAL_DOCUMENT",
       label: FIXTURE.artifacts.jobPortal.label,
+    },
+  });
+
+  const seededServicePlanIds = [FIXTURE.servicePlans.active.id, FIXTURE.servicePlans.paused.id];
+  await prisma.servicePlanRun.deleteMany({
+    where: {
+      tenantId: company.id,
+      id: { notIn: [FIXTURE.servicePlans.run.id] },
+    },
+  });
+  await prisma.servicePlanTask.deleteMany({
+    where: {
+      planId: { notIn: seededServicePlanIds },
+      plan: { tenantId: company.id },
+    },
+  });
+  await prisma.servicePlan.deleteMany({
+    where: {
+      tenantId: company.id,
+      id: { notIn: seededServicePlanIds },
+    },
+  });
+
+  await ensureServicePlan(FIXTURE.servicePlans.active.id, {
+    tenantId: company.id,
+    customerId: customers.convertible.id,
+    name: FIXTURE.servicePlans.active.name,
+    description: "Recurring quarterly check for high-value fleet customers.",
+    status: "ACTIVE",
+    cadenceUnit: "QUARTER",
+    cadenceInterval: 1,
+    nextRunAt: addMinutes(now, -90),
+    lastRunAt: addMinutes(now, -60 * 24 * 30),
+    autoCreateBooking: true,
+    autoCreateJob: false,
+    notesJson: { operatorNotes: "Seeded recurring booking plan" },
+    portalVisible: true,
+    createdByUserId: operator.id,
+  }, [
+    { title: "Inspect tyres" },
+    { title: "Check service records" },
+  ]);
+
+  await ensureServicePlan(FIXTURE.servicePlans.paused.id, {
+    tenantId: company.id,
+    customerId: customers.portalActive.id,
+    name: FIXTURE.servicePlans.paused.name,
+    description: "Annual review kept paused for operator-controlled resume coverage.",
+    status: "PAUSED",
+    cadenceUnit: "YEAR",
+    cadenceInterval: 1,
+    nextRunAt: addMinutes(now, 60 * 24 * 14),
+    lastRunAt: addMinutes(now, -60 * 24 * 180),
+    autoCreateBooking: false,
+    autoCreateJob: true,
+    notesJson: { operatorNotes: "Seeded paused recurring job plan" },
+    portalVisible: false,
+    createdByUserId: operator.id,
+  }, [
+    { title: "Review warranty status" },
+  ]);
+
+  await ensureServicePlanRun(FIXTURE.servicePlans.run.id, {
+    tenantId: company.id,
+    planId: FIXTURE.servicePlans.active.id,
+    scheduledFor: addMinutes(now, -60 * 24 * 30),
+    executedAt: addMinutes(now, -60 * 24 * 30 + 5),
+    status: "EXECUTED",
+    bookingId: FIXTURE.bookings.convertible.id,
+    jobId: null,
+    resultJson: {
+      trigger: "due",
+      bookingId: FIXTURE.bookings.convertible.id,
+    },
+  });
+
+  await ensureActivityEvent("e2e-activity-service-plan-executed", {
+    type: "service_plan.executed",
+    label: `Executed recurring plan ${FIXTURE.servicePlans.active.name}`,
+    at: addMinutes(now, -60 * 24 * 30 + 5),
+    tenantId: company.id,
+    customerId: customers.convertible.id,
+    customerName: customers.convertible.name,
+    payloadJson: {
+      planId: FIXTURE.servicePlans.active.id,
+      bookingId: FIXTURE.bookings.convertible.id,
     },
   });
 

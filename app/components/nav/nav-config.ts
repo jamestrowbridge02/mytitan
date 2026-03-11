@@ -40,6 +40,7 @@ export const NAV_GROUPS: NavGroup[] = [
         title: "Customers",
         children: [
           { title: "CRM", href: "/dashboard/customers" },
+          { title: "Service plans", href: "/dashboard/service-plans" },
         ],
       },
     ],

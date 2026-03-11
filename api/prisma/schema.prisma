@@ -124,6 +124,26 @@ enum DocumentArtifactKind {
   PORTAL_DOCUMENT
 }
 
+enum ServicePlanStatus {
+  ACTIVE
+  PAUSED
+  CANCELLED
+}
+
+enum ServicePlanCadenceUnit {
+  WEEK
+  MONTH
+  QUARTER
+  YEAR
+}
+
+enum ServicePlanRunStatus {
+  PENDING
+  EXECUTED
+  SKIPPED
+  FAILED
+}
+
 enum NextActionType {
   CALL
   EMAIL
@@ -192,6 +212,8 @@ model Company {
   webhookEndpoints         WebhookEndpoint[]
   webhookDeliveries        WebhookDelivery[]
   documentArtifacts        DocumentArtifact[]
+  servicePlans             ServicePlan[]
+  servicePlanRuns          ServicePlanRun[]
   tradePackInstalls        TradePackInstall[]
   templatePresets          TemplatePreset[]
   tradeAccountNotes        TradeAccountNote[]
@@ -351,6 +373,7 @@ model Customer {
   company        Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
   jobs           Job[]
   activityEvents ActivityEvent[]
+  servicePlans   ServicePlan[]
 
   @@unique([companyId, slug])
   @@index([companyId, name])
@@ -1300,6 +1323,67 @@ model DocumentArtifact {
   @@index([tenantId, entityType, entityId, createdAt])
   @@index([tenantId, entityType, entityId, kind])
   @@index([tenantId, portalVisible, createdAt])
+}
+
+model ServicePlan {
+  id                String                  @id @default(cuid())
+  tenantId          String
+  customerId        String
+  name              String
+  description       String?
+  status            ServicePlanStatus       @default(ACTIVE)
+  cadenceUnit       ServicePlanCadenceUnit
+  cadenceInterval   Int
+  nextRunAt         DateTime?
+  lastRunAt         DateTime?
+  autoCreateBooking Boolean                 @default(false)
+  autoCreateJob     Boolean                 @default(false)
+  notesJson         Json?
+  portalVisible     Boolean                 @default(false)
+  createdByUserId   String?
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+  tenant            Company                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer          Customer                @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  tasks             ServicePlanTask[]
+  runs              ServicePlanRun[]
+
+  @@index([tenantId, status, nextRunAt])
+  @@index([tenantId, customerId, createdAt])
+}
+
+model ServicePlanTask {
+  id           String      @id @default(cuid())
+  planId       String
+  title        String
+  description  String?
+  sortOrder    Int         @default(0)
+  metadataJson Json?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  plan         ServicePlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([planId, sortOrder])
+}
+
+model ServicePlanRun {
+  id           String               @id @default(cuid())
+  tenantId     String
+  planId       String
+  scheduledFor DateTime
+  executedAt   DateTime?
+  status       ServicePlanRunStatus @default(PENDING)
+  bookingId    String?
+  jobId        String?
+  resultJson   Json?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  tenant       Company              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan         ServicePlan          @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, scheduledFor])
+  @@index([tenantId, status, scheduledFor])
+  @@index([tenantId, createdAt])
 }
 
 model InviteToken {

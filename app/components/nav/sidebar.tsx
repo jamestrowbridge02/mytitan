@@ -118,6 +118,7 @@ export default function Sidebar() {
     { title: terms.customers, href: "/dashboard/customers" },
     { title: "Calendar", href: "/dashboard/calendar" },
     { title: terms.bookings, href: "/dashboard/bookings" },
+    { title: "Service plans", href: "/dashboard/service-plans" },
     { title: `New ${terms.jobs.slice(0, -1) || "Job"}`, href: "/dashboard/jobs/new" },
     { title: "Integrations", href: "/dashboard/integrations" },
   ];
@@ -125,6 +126,7 @@ export default function Sidebar() {
   function canAccessHref(href?: string) {
     if (!href) return true;
     if (href.startsWith("/dashboard/settings")) return permissions["settings.manage"];
+    if (href.startsWith("/dashboard/service-plans")) return permissions["settings.manage"];
     if (href.startsWith("/dashboard/billing")) return permissions["billing.manage"];
     if (href.startsWith("/dashboard/portal")) return permissions["portal.manage"];
     if (href.startsWith("/dashboard/technician")) return permissions["technician.execute"];

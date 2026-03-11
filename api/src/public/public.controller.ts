@@ -24,6 +24,7 @@ import { getPortalCopy } from "../common/business-config";
 import { PrismaService } from "../prisma/prisma.service";
 import { ActivityService } from "../events/activity.service";
 import { ArtifactsService } from "../artifacts/artifacts.service";
+import { ServicePlansService } from "../service-plans/service-plans.service";
 import { ApproveJobDto, DeclineJobDto, SignJobDto } from "./public.dto";
 
 @Controller("public")
@@ -40,6 +41,7 @@ export class PublicController {
     private readonly automations: AutomationsService,
     private readonly activity: ActivityService,
     private readonly artifacts: ArtifactsService,
+    private readonly servicePlans: ServicePlansService,
   ) {}
 
   private async resolveToken(token: string) {
@@ -92,6 +94,9 @@ export class PublicController {
       paymentReceiptUrl: record.job.paymentReceiptUrl,
       createdAt: record.job.createdAt,
     });
+    const portalServicePlans = record.job.customerId
+      ? await this.servicePlans.listPortalVisibleForCustomer(record.job.companyId, record.job.customerId)
+      : [];
     const pdfReady = Boolean(record.job.pdf?.contentBase64 || portalDocuments.some((item: any) => item.kind === "INVOICE" || item.kind === "PORTAL_DOCUMENT"));
     const paymentAvailable = Boolean(portalEnabled && paymentsEnabled && stripeReady && (record.job.totalCents || 0) > 0);
     const invoiceOverdue = Boolean(record.job.invoiceDueAt && !record.job.invoicePaidAt && new Date(record.job.invoiceDueAt).getTime() < Date.now());
@@ -194,6 +199,7 @@ export class PublicController {
           pdfReady,
         },
         documents: portalDocuments,
+        servicePlans: portalServicePlans,
         timeline: (record.job.activities || [])
           .filter((item: any) => ['job.status', 'job.reminder.create', 'job.reminder.completed', 'tech.note', 'tech.arrived', 'booking.converted', 'billing.invoice.issued', 'billing.payment.received', 'billing.follow_up.escalated'].includes(String(item.eventType || '')))
           .map((item: any) => ({

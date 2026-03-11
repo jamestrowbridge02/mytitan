@@ -19,8 +19,11 @@ export class AuthController {
     private readonly audit: AuditService,
   ) {}
 
-  private enforceRateLimit(req: Request) {
-    const key = `${req.ip || 'unknown'}`;
+  private enforceRateLimit(req: Request, scope?: string) {
+    if (process.env.MYTITAN_ENABLE_E2E_FIXTURES === '1') {
+      return;
+    }
+    const key = `${req.ip || 'unknown'}:${scope || '*'}`;
     const now = Date.now();
     const current = this.buckets.get(key);
     if (!current || current.resetAt <= now) {
@@ -36,20 +39,20 @@ export class AuthController {
 
   @Post('signup')
   signup(@Req() req: Request, @Body() dto: SignupDto) {
-    this.enforceRateLimit(req);
+    this.enforceRateLimit(req, String(dto?.email || '').trim().toLowerCase());
     return this.auth.signup(dto);
   }
 
   @Post('login')
   login(@Req() req: Request, @Body() dto: LoginDto) {
-    this.enforceRateLimit(req);
+    this.enforceRateLimit(req, String(dto?.email || '').trim().toLowerCase());
     return this.auth.login(dto);
   }
 
   @Post('forgot-password')
   @HttpCode(202)
   forgotPassword(@Req() req: Request, @Body() dto: ForgotPasswordDto) {
-    this.enforceRateLimit(req);
+    this.enforceRateLimit(req, String(dto?.email || '').trim().toLowerCase());
     return this.auth.forgotPassword(dto);
   }
 
@@ -61,7 +64,7 @@ export class AuthController {
 
   @Post('verify-email')
   verifyEmail(@Req() req: Request, @Body() dto: VerifyEmailDto) {
-    this.enforceRateLimit(req);
+    this.enforceRateLimit(req, String(dto?.token || '').slice(0, 24));
     return this.auth.verifyEmail(dto);
   }
 

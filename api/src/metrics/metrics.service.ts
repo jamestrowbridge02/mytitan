@@ -88,6 +88,8 @@ export class MetricsService {
       portalLinksExpiringSoon,
       expiredPortalLinks,
       overdueInvoices,
+      dueServicePlans,
+      overduePlanRuns,
       completedLast7Days,
       completedPrevious7Days,
       recentCompletedByTechnician,
@@ -239,6 +241,20 @@ export class MetricsService {
           invoiceDueAt: { lt: now },
         },
       }),
+      db.servicePlan.count({
+        where: {
+          tenantId,
+          status: 'ACTIVE',
+          nextRunAt: { lte: now },
+        },
+      }),
+      db.servicePlanRun.count({
+        where: {
+          tenantId,
+          status: { in: ['FAILED', 'PENDING'] },
+          scheduledFor: { lt: now },
+        },
+      }),
       db.job.count({
         where: {
           companyId: tenantId,
@@ -317,8 +333,16 @@ export class MetricsService {
         overdueDispatchFollowUps,
         expiredPortalLinks,
         overdueInvoices,
+        dueServicePlans,
+        overduePlanRuns,
       },
       attentionQueue: [
+        dueServicePlans > 0
+          ? { key: 'due_service_plans', label: 'Service plans due now', count: dueServicePlans, href: '/dashboard/service-plans', hint: 'Recurring work is ready to generate the next booking or job' }
+          : null,
+        overduePlanRuns > 0
+          ? { key: 'overdue_plan_runs', label: 'Recurring runs need review', count: overduePlanRuns, href: '/dashboard/service-plans', hint: 'Failed or pending service plan runs need operator attention' }
+          : null,
         overdueBillingFollowUps > 0
           ? { key: 'billing_followups_due', label: 'Overdue billing follow-ups', count: overdueBillingFollowUps, href: '/dashboard/billing/readiness', hint: 'Completed work already has past-due billing reminders' }
           : null,
@@ -353,6 +377,8 @@ export class MetricsService {
         overdueBillingFollowUps > 0 ? { key: 'overdue_followups', severity: 'warn', label: 'Overdue reminders', count: overdueBillingFollowUps, href: '/dashboard/billing/readiness' } : null,
         overdueDispatchFollowUps > 0 ? { key: 'dispatch_followups', severity: 'warn', label: 'Dispatch follow-ups overdue', count: overdueDispatchFollowUps, href: '/dashboard/bookings' } : null,
         overdueInvoices > 0 ? { key: 'overdue_invoices', severity: 'warn', label: 'Invoices overdue for payment', count: overdueInvoices, href: '/dashboard/billing/readiness' } : null,
+        dueServicePlans > 0 ? { key: 'due_service_plans', severity: 'info', label: 'Service plans due now', count: dueServicePlans, href: '/dashboard/service-plans' } : null,
+        overduePlanRuns > 0 ? { key: 'overdue_plan_runs', severity: 'warn', label: 'Recurring runs need review', count: overduePlanRuns, href: '/dashboard/service-plans' } : null,
         publicUnlinkedBookings > 0 ? { key: 'public_conversion', severity: 'info', label: 'Public bookings awaiting conversion', count: publicUnlinkedBookings, href: '/dashboard/bookings' } : null,
         agedUnlinkedBookings > 0 ? { key: 'stale_booking_conversion', severity: 'warn', label: 'Unlinked bookings older than 48h', count: agedUnlinkedBookings, href: '/dashboard/bookings' } : null,
         portalLinksExpiringSoon > 0 ? { key: 'portal_links_expiring', severity: 'info', label: 'Portal links expiring within 7 days', count: portalLinksExpiringSoon, href: '/dashboard/portal' } : null,

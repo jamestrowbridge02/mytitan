@@ -51,6 +51,8 @@ export class MetricsController {
           technicianCompletionQueue: 0,
           portalLinksExpiringSoon: 0,
           overdueInvoices: 0,
+          dueServicePlans: 0,
+          overduePlanRuns: 0,
         },
         attentionQueue: [],
         alerts: [],

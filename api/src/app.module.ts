@@ -41,6 +41,7 @@ import { CustomersModule } from './customers/customers.module';
 import { CustomFieldsModule } from './custom-fields/custom-fields.module';
 import { TechModule } from './tech/tech.module';
 import { ArtifactsModule } from './artifacts/artifacts.module';
+import { ServicePlansModule } from './service-plans/service-plans.module';
 
 @Module({
   imports: [
@@ -93,6 +94,7 @@ import { ArtifactsModule } from './artifacts/artifacts.module';
     CustomFieldsModule,
     TechModule,
     ArtifactsModule,
+    ServicePlansModule,
   ],
 })
 export class AppModule {}

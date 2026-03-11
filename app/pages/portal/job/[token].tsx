@@ -47,6 +47,14 @@ type PortalInfo = {
     createdAt?: string | null;
     downloadUrl?: string | null;
   }>;
+  servicePlans?: Array<{
+    id: string;
+    name: string;
+    status: string;
+    nextRunAt?: string | null;
+    lastRunAt?: string | null;
+    lastRunStatus?: string | null;
+  }>;
 };
 
 const formatDateTime = (value?: string | null) => {
@@ -699,6 +707,24 @@ export default function PublicJobPortal() {
             <p className="muted" style={{ marginBottom: 0 }}>No customer-safe documents are available yet.</p>
           )}
         </section>
+
+        {portal?.servicePlans?.length ? (
+          <section className="card" style={{ padding: 16, marginTop: 14 }}>
+            <h3 style={{ marginTop: 0 }}>Service plan status</h3>
+            <div style={{ display: "grid", gap: 10 }}>
+              {portal.servicePlans.map((plan) => (
+                <div key={plan.id} style={{ border: "1px solid #2a3042", borderRadius: 12, padding: "12px 14px" }}>
+                  <div style={{ fontWeight: 600 }}>{plan.name}</div>
+                  <div className="muted" style={{ marginTop: 4 }}>
+                    {[plan.status, plan.nextRunAt ? `Next run ${formatDateTime(plan.nextRunAt)}` : null, plan.lastRunStatus ? `Last run ${plan.lastRunStatus}` : null]
+                      .filter(Boolean)
+                      .join(" • ")}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         <p className="muted" data-testid="public-portal-next-step" style={{ marginTop: 12 }}>{nextStepMessage}</p>
 

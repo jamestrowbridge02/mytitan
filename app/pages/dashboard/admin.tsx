@@ -6,6 +6,7 @@ const TILES = [
   { label: 'Company / Branding', href: '/dashboard/settings' },
   { label: 'Locations', href: '/dashboard/locations' },
   { label: 'Users & Roles', href: '/dashboard/users' },
+  { label: 'Service plans', href: '/dashboard/service-plans' },
   { label: 'Integrations', href: '/dashboard/integrations' },
   { label: 'Billing', href: '/dashboard/billing' },
   { label: 'Inventory', href: '/dashboard/inventory' },
@@ -43,4 +44,3 @@ export default function AdminHubPage() {
     </DashboardShell>
   );
 }
-

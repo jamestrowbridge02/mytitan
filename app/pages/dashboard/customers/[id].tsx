@@ -15,6 +15,12 @@ export default function CustomerTimelinePage() {
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [notice, setNotice] = useState("");
+  const [servicePlans, setServicePlans] = useState<any[]>([]);
+  const recurringActivity = items.filter((item) => {
+    const type = String(item?.type || "");
+    const label = String(item?.label || "").toLowerCase();
+    return type.startsWith("service_plan.") || label.includes("recurring plan");
+  }).slice(0, 5);
 
   async function loadTimeline(activeCustomer?: any) {
     try {
@@ -34,6 +40,20 @@ export default function CustomerTimelinePage() {
     }
   }
 
+  async function loadServicePlans(activeCustomer?: any) {
+    const customerId = String(activeCustomer?.id || "");
+    if (!customerId) {
+      setServicePlans([]);
+      return;
+    }
+    try {
+      const rows = await apiFetch(`/service-plans?customerId=${encodeURIComponent(customerId)}`);
+      setServicePlans(Array.isArray(rows) ? rows : []);
+    } catch {
+      setServicePlans([]);
+    }
+  }
+
   useEffect(() => {
     if (!router.isReady) return;
     const run = async () => {
@@ -47,7 +67,7 @@ export default function CustomerTimelinePage() {
       } catch {
         setCustomer(null);
       }
-      await loadTimeline(resolved);
+      await Promise.all([loadTimeline(resolved), loadServicePlans(resolved)]);
     };
     void run();
   }, [router.isReady, id, name]);
@@ -110,6 +130,43 @@ export default function CustomerTimelinePage() {
             entityId={id}
           />
         ) : null}
+
+        <div className="card customer-comms-card" data-testid="customer-service-plans">
+          <div className="customer-comms-head">
+            <h3 style={{ margin: 0 }}>Service plans</h3>
+          </div>
+          {servicePlans.length ? (
+            <div style={{ display: "grid", gap: 10 }}>
+              {servicePlans.slice(0, 5).map((plan) => (
+                <div key={plan.id} className="integration-card">
+                  <div>
+                    <strong>{plan.name}</strong>
+                    <p className="muted" style={{ margin: "4px 0 0 0" }}>
+                      {plan.status} · Next run {plan.nextRunAt ? new Date(plan.nextRunAt).toLocaleString() : "not scheduled"}
+                    </p>
+                  </div>
+                  <a className="button secondary" href="/dashboard/service-plans">Open plans</a>
+                </div>
+              ))}
+            </div>
+          ) : recurringActivity.length ? (
+            <div style={{ display: "grid", gap: 10 }}>
+              {recurringActivity.map((item) => (
+                <div key={item.id || `${item.type}-${item.at}`} className="integration-card">
+                  <div>
+                    <strong>{item.label || item.type}</strong>
+                    <p className="muted" style={{ margin: "4px 0 0 0" }}>
+                      {item.at ? new Date(item.at).toLocaleString() : "Recent recurring activity"}
+                    </p>
+                  </div>
+                  <a className="button secondary" href="/dashboard/service-plans">Open plans</a>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="muted">No linked service plans yet.</p>
+          )}
+        </div>
 
         <div className="card customer-comms-card">
           <div className="customer-comms-head">

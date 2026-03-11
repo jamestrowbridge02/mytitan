@@ -23,6 +23,7 @@ export default function CommandPalette() {
         { label: terms.jobs, href: "/dashboard/jobs" },
         { label: `New ${terms.jobs.slice(0, -1) || "Job"}`, href: "/dashboard/jobs/new" },
         { label: terms.bookings, href: "/dashboard/bookings" },
+        { label: "Service plans", href: "/dashboard/service-plans" },
         { label: "Calendar", href: "/dashboard/calendar" },
         { label: terms.customers, href: "/dashboard/customers" },
         moduleVisibility.showIntelligence ? { label: "Intelligence", href: "/dashboard/intelligence" } : null,
