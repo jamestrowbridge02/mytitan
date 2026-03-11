@@ -15,6 +15,7 @@ import {
 import { apiFetch } from "../../lib/api";
 import { isMarketplaceEnabled } from "../../lib/feature-flags";
 import { useStickyOperatorView } from "../../lib/operator-view-state";
+import { emptyPermissionSnapshot, hasWorkspacePermission, normalizePermissionSnapshot } from "../../lib/workspace-permissions";
 
 type Integration = {
   key: string;
@@ -45,6 +46,40 @@ type IntegrationOps = {
     nextStep: string;
     blockers: string[];
   }>;
+};
+
+type ApiTokenRow = {
+  id: string;
+  name: string;
+  publicId: string;
+  tokenPrefix: string;
+  lastUsedAt?: string | null;
+  revokedAt?: string | null;
+  createdAt: string;
+};
+
+type WebhookEndpointRow = {
+  id: string;
+  name: string;
+  url: string;
+  active: boolean;
+  subscribedEventTypes: string[];
+  secretLastFour?: string | null;
+  lastDeliveryAt?: string | null;
+  lastSuccessAt?: string | null;
+  createdAt: string;
+};
+
+type WebhookDeliveryRow = {
+  id: string;
+  endpointId: string;
+  endpointName?: string | null;
+  eventType: string;
+  status: string;
+  responseStatus?: number | null;
+  errorMessage?: string | null;
+  deliveredAt?: string | null;
+  createdAt: string;
 };
 
 type IntegrationScope = "all" | "enabled" | "restricted";
@@ -83,22 +118,102 @@ const CONNECTIONS = [
   },
 ];
 
+const WEBHOOK_EVENT_TYPES = [
+  "booking.converted",
+  "job.created",
+  "job.completed",
+  "invoice.issued",
+  "invoice.overdue",
+  "technician.arrived",
+  "portal.document_signed",
+  "automation.rule_applied",
+  "automation.rule_ran",
+  "integration.test",
+];
+
+function formatDateTime(value?: string | null) {
+  if (!value) return "Not yet";
+  return new Date(value).toLocaleString();
+}
+
+async function fetchMeWithRetry(attempts = 3) {
+  let lastError: any = null;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      return await apiFetch("/me");
+    } catch (error) {
+      lastError = error;
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    }
+  }
+  if (lastError) {
+    throw lastError;
+  }
+  return null;
+}
+
+function roleCanManageIntegrationsFromToken() {
+  if (typeof window === "undefined") return false;
+  const raw = window.localStorage.getItem("mytitan_token");
+  if (!raw) return false;
+  try {
+    const [, payload] = raw.split(".");
+    if (!payload) return false;
+    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+    const decoded = JSON.parse(window.atob(padded));
+    return ["OWNER", "ADMIN"].includes(String(decoded?.role || ""));
+  } catch {
+    return false;
+  }
+}
+
 export default function IntegrationsPage() {
   const [items, setItems] = useState<Integration[]>([]);
   const [connections, setConnections] = useState<Record<string, ConnectionStatus>>({});
   const [ops, setOps] = useState<IntegrationOps | null>(null);
+  const [apiTokens, setApiTokens] = useState<ApiTokenRow[]>([]);
+  const [webhooks, setWebhooks] = useState<WebhookEndpointRow[]>([]);
+  const [deliveries, setDeliveries] = useState<WebhookDeliveryRow[]>([]);
+  const [permissions, setPermissions] = useState(() => emptyPermissionSnapshot());
+  const [permissionsReady, setPermissionsReady] = useState(false);
+  const [tokenRoleCanManage, setTokenRoleCanManage] = useState(false);
   const [error, setError] = useState("");
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [moduleSearch, setModuleSearch] = useState("");
   const [moduleScope, setModuleScope] = useStickyOperatorView<IntegrationScope>("mytitan_integrations_module_view_v1", "all");
   const [connectionSearch, setConnectionSearch] = useState("");
   const [connectionScope, setConnectionScope] = useStickyOperatorView<ConnectionScope>("mytitan_integrations_connection_view_v1", "all");
+  const [tokenName, setTokenName] = useState("Primary API token");
+  const [revealedToken, setRevealedToken] = useState("");
+  const [webhookName, setWebhookName] = useState("Operations webhook");
+  const [webhookUrl, setWebhookUrl] = useState("https://example.invalid/mytitan-webhook");
+  const [webhookEvents, setWebhookEvents] = useState<string[]>(["job.created", "job.completed", "invoice.issued"]);
+  const [revealedWebhookSecret, setRevealedWebhookSecret] = useState("");
   const marketplaceEnabled = isMarketplaceEnabled();
+  const canManageIntegrations = hasWorkspacePermission(permissions, "settings.manage") || tokenRoleCanManage;
+
+  useEffect(() => {
+    setTokenRoleCanManage(roleCanManageIntegrationsFromToken());
+  }, []);
 
   const load = async () => {
+    let nextPermissions = emptyPermissionSnapshot();
+    let nextError = "";
     try {
-      const data = await apiFetch("/integrations");
-      setItems(Array.isArray(data) ? data : []);
+      const me = await fetchMeWithRetry().catch(() => null);
+      nextPermissions = normalizePermissionSnapshot(me?.permissions);
+      setPermissions(nextPermissions);
+      setPermissionsReady(true);
+
+      try {
+        const modules = await apiFetch("/integrations");
+        setItems(Array.isArray(modules) ? modules : []);
+      } catch (modulesError: any) {
+        setItems([]);
+        nextError = modulesError?.message || "Failed to load integrations";
+      }
+
       const statusEntries = await Promise.all(
         CONNECTIONS.map(async (conn) => {
           try {
@@ -110,15 +225,33 @@ export default function IntegrationsPage() {
         }),
       );
       setConnections(Object.fromEntries(statusEntries));
+
       try {
         const opsData = await apiFetch("/integrations/ops");
         setOps(opsData);
       } catch {
         setOps(null);
       }
-      setError("");
+
+      if (hasWorkspacePermission(nextPermissions, "settings.manage")) {
+        const [tokens, endpoints, deliveryRows] = await Promise.all([
+          apiFetch("/integrations/api-tokens").catch(() => []),
+          apiFetch("/integrations/webhooks").catch(() => []),
+          apiFetch("/integrations/webhook-deliveries").catch(() => []),
+        ]);
+        setApiTokens(Array.isArray(tokens) ? tokens : []);
+        setWebhooks(Array.isArray(endpoints) ? endpoints : []);
+        setDeliveries(Array.isArray(deliveryRows) ? deliveryRows : []);
+      } else {
+        setApiTokens([]);
+        setWebhooks([]);
+        setDeliveries([]);
+      }
+      setError(nextError);
+
     } catch (err: any) {
       setError(err.message || "Failed to load integrations");
+      setPermissionsReady(true);
     }
   };
 
@@ -127,7 +260,7 @@ export default function IntegrationsPage() {
   }, [marketplaceEnabled]);
 
   const toggle = async (item: Integration) => {
-    if (!item.allowed) return;
+    if (!item.allowed || !canManageIntegrations) return;
     setSavingKey(item.key);
     try {
       await apiFetch("/integrations", {
@@ -144,7 +277,7 @@ export default function IntegrationsPage() {
 
   const connect = async (connKey: string) => {
     const conn = CONNECTIONS.find((entry) => entry.key === connKey);
-    if (!conn) return;
+    if (!conn || !canManageIntegrations) return;
     setSavingKey(conn.key);
     try {
       const res = await apiFetch(conn.connectEndpoint, { method: "POST" });
@@ -160,13 +293,102 @@ export default function IntegrationsPage() {
 
   const disconnect = async (connKey: string) => {
     const conn = CONNECTIONS.find((entry) => entry.key === connKey);
-    if (!conn) return;
+    if (!conn || !canManageIntegrations) return;
     setSavingKey(conn.key);
     try {
       await apiFetch(conn.disconnectEndpoint, { method: "POST" });
       await load();
     } catch (err: any) {
       setError(err.message || "Failed to disconnect");
+    } finally {
+      setSavingKey(null);
+    }
+  };
+
+  const createApiToken = async () => {
+    if (!canManageIntegrations) return;
+    setSavingKey("api-token-create");
+    try {
+      const response = await apiFetch("/integrations/api-tokens", {
+        method: "POST",
+        body: JSON.stringify({ name: tokenName }),
+      });
+      setRevealedToken(String(response?.token || ""));
+      setTokenName("Primary API token");
+      await load();
+    } catch (err: any) {
+      setError(err.message || "Failed to create API token");
+    } finally {
+      setSavingKey(null);
+    }
+  };
+
+  const revokeApiToken = async (id: string) => {
+    if (!canManageIntegrations) return;
+    setSavingKey(`api-token-${id}`);
+    try {
+      await apiFetch(`/integrations/api-tokens/${id}/revoke`, { method: "POST" });
+      await load();
+    } catch (err: any) {
+      setError(err.message || "Failed to revoke API token");
+    } finally {
+      setSavingKey(null);
+    }
+  };
+
+  const toggleWebhookEvent = (eventType: string) => {
+    setWebhookEvents((current) =>
+      current.includes(eventType)
+        ? current.filter((value) => value !== eventType)
+        : [...current, eventType],
+    );
+  };
+
+  const createWebhook = async () => {
+    if (!canManageIntegrations) return;
+    setSavingKey("webhook-create");
+    try {
+      const response = await apiFetch("/integrations/webhooks", {
+        method: "POST",
+        body: JSON.stringify({
+          name: webhookName,
+          url: webhookUrl,
+          subscribedEventTypes: webhookEvents,
+          active: true,
+        }),
+      });
+      setRevealedWebhookSecret(String(response?.secret || ""));
+      setWebhookName("Operations webhook");
+      setWebhookUrl("https://example.invalid/mytitan-webhook");
+      await load();
+    } catch (err: any) {
+      setError(err.message || "Failed to create webhook endpoint");
+    } finally {
+      setSavingKey(null);
+    }
+  };
+
+  const sendWebhookTest = async (id: string) => {
+    if (!canManageIntegrations) return;
+    setSavingKey(`webhook-test-${id}`);
+    try {
+      await apiFetch(`/integrations/webhooks/${id}/test`, { method: "POST" });
+      await load();
+    } catch (err: any) {
+      setError(err.message || "Failed to send webhook test");
+    } finally {
+      setSavingKey(null);
+    }
+  };
+
+  const deleteWebhook = async (id: string) => {
+    if (!canManageIntegrations) return;
+    setSavingKey(`webhook-delete-${id}`);
+    try {
+      await apiFetch(`/integrations/webhooks/${id}`, { method: "DELETE" });
+      await load();
+    } catch (err: any) {
+      setError(err.message || "Failed to delete webhook endpoint");
     } finally {
       setSavingKey(null);
     }
@@ -179,9 +401,9 @@ export default function IntegrationsPage() {
     return [
       { label: "Available", value: String(items.length), hint: `${enabled} enabled now` },
       { label: "Connected", value: String(connected), hint: "External accounts linked" },
-      { label: "Blocked", value: String(blocked), hint: blocked ? "Workspace permissions required" : "No marketplace blockers" },
+      { label: "Webhooks", value: String(webhooks.length), hint: webhooks.length ? `${deliveries.length} deliveries logged` : "No endpoints yet" },
     ];
-  }, [connections, items]);
+  }, [connections, deliveries.length, items, webhooks.length]);
 
   const filteredItems = useMemo(() => {
     const normalizedSearch = moduleSearch.trim().toLowerCase();
@@ -233,16 +455,24 @@ export default function IntegrationsPage() {
         <OperatorPageHeader
           eyebrow="Platform"
           title="Integrations"
-          subtitle="Structured activation and connection tables so this page behaves like a control surface instead of a placeholder settings list."
+          subtitle="Connect external systems through real workspace primitives: module readiness, API tokens, webhook subscriptions, and delivery history."
           actions={[
             { label: "Settings", href: "/dashboard/settings", variant: "secondary" },
             { label: "Bookings", href: "/dashboard/bookings" },
           ]}
-          shortcuts={["Search modules locally", "Activation and connection states are separated cleanly"]}
+          shortcuts={["Provider readiness remains visible", "Webhook delivery logs are tenant scoped"]}
           stats={stats}
         />
 
         {error ? <p role="alert" style={{ color: "#ff8a8a", marginTop: 0 }}>{error}</p> : null}
+        {permissionsReady && !canManageIntegrations ? (
+          <div className="card" data-testid="integrations-governance-readonly">
+            <strong>Read-only workspace access.</strong>
+            <p style={{ marginBottom: 0 }}>
+              You can review module and provider readiness here, but API tokens, webhooks, and connection changes require `settings.manage`.
+            </p>
+          </div>
+        ) : null}
 
         {ops?.providers?.length ? (
           <section className="card operator-section">
@@ -302,9 +532,9 @@ export default function IntegrationsPage() {
           <OperatorGuidance
             title="Integration control tips"
             items={[
-              "Saved views keep enabled or restricted module slices sticky on this device.",
-              "Primary actions stay visible, while lower-frequency module changes sit in the row menu.",
-              "Use reset to clear search and view state together when reviewing the full matrix.",
+              "Module activation controls product readiness, not provider credentials.",
+              "API tokens and webhooks are governed separately below.",
+              "Restrict workspace mutation rights with the existing settings permission model.",
             ]}
           />
 
@@ -348,7 +578,7 @@ export default function IntegrationsPage() {
                           shortcut: item.enabled ? "Off" : "On",
                           group: "Module",
                           onClick: () => void toggle(item),
-                          disabled: !item.allowed || savingKey === item.key,
+                          disabled: !item.allowed || !canManageIntegrations || savingKey === item.key,
                         },
                       ]}
                     />
@@ -369,7 +599,7 @@ export default function IntegrationsPage() {
           <div className="operator-section__header">
             <div>
               <h2 className="operator-section__title">Accounting and calendars</h2>
-              <p className="operator-section__subtitle">Connection readiness and provider status now read like a real integration control table.</p>
+              <p className="operator-section__subtitle">Connection readiness and provider status stay separate from workspace tokens and webhook delivery.</p>
             </div>
           </div>
 
@@ -407,7 +637,7 @@ export default function IntegrationsPage() {
 
               {filteredConnections.map((conn) => {
                 const status = connections[conn.key];
-                const canConnect = status?.allowed && status?.enabled;
+                const canConnect = status?.allowed && status?.enabled && canManageIntegrations;
                 return (
                   <OperatorDataTableRow key={conn.key}>
                     <div className="operator-table__cell">
@@ -432,18 +662,16 @@ export default function IntegrationsPage() {
                     <div className="operator-table__cell operator-table__cell--actions">
                       <OperatorRowActions
                         primaryAction={status?.connected
-                          ? { label: "Disconnect", onClick: () => void disconnect(conn.key), variant: "secondary", disabled: savingKey === conn.key }
+                          ? { label: "Disconnect", onClick: () => void disconnect(conn.key), variant: "secondary", disabled: !canManageIntegrations || savingKey === conn.key }
                           : { label: "Connect", onClick: () => void connect(conn.key), disabled: !canConnect || savingKey === conn.key }}
                         actions={[
-                          ...(items.find((item) => item.key === conn.key)?.configureUrl
-                            ? [{
-                                label: "Configure module",
-                                description: "Open the underlying module settings",
-                                shortcut: "Open",
-                                group: "Provider",
-                                href: items.find((item) => item.key === conn.key)?.configureUrl as string,
-                              }]
-                            : []),
+                          {
+                            label: "Configure module",
+                            description: "Open the underlying module settings",
+                            shortcut: "Open",
+                            group: "Provider",
+                            href: items.find((item) => item.key === conn.key)?.configureUrl || "/dashboard/settings",
+                          },
                         ]}
                       />
                     </div>
@@ -456,6 +684,224 @@ export default function IntegrationsPage() {
               title="No providers match this filter"
               description="Clear the search or scope filter to review the full provider connection matrix."
               actions={[{ label: "Reset filters", variant: "secondary", onClick: clearConnectionFilters }]}
+            />
+          )}
+        </section>
+
+        <section className="card operator-section">
+          <div className="operator-section__header">
+            <div>
+              <h2 className="operator-section__title">API tokens</h2>
+              <p className="operator-section__subtitle">Reveal-once workspace tokens for external systems that need a stable read path into MyTitan.</p>
+            </div>
+          </div>
+
+          {canManageIntegrations ? (
+            <div style={{ display: "grid", gap: 12, marginBottom: 16 }}>
+              <label style={{ display: "grid", gap: 6 }}>
+                <span>Token name</span>
+                <input data-testid="integration-api-token-name-input" value={tokenName} onChange={(event) => setTokenName(event.target.value)} />
+              </label>
+              <div>
+                <button data-testid="integration-api-token-create" onClick={() => void createApiToken()} disabled={savingKey === "api-token-create"}>
+                  {savingKey === "api-token-create" ? "Creating..." : "Create API token"}
+                </button>
+              </div>
+              {revealedToken ? (
+                <div className="card" data-testid="integration-api-token-reveal">
+                  <strong>Copy this token now.</strong>
+                  <p style={{ marginBottom: 8 }}>It will not be shown again after this view refreshes.</p>
+                  <code>{revealedToken}</code>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {apiTokens.length ? (
+            <OperatorDataTable columns="minmax(220px, 1.3fr) minmax(160px, 0.8fr) minmax(160px, 0.8fr) minmax(150px, auto)">
+              <OperatorDataTableHeader>
+                <div className="operator-table__cell">Token</div>
+                <div className="operator-table__cell">Prefix</div>
+                <div className="operator-table__cell">Last used</div>
+                <div className="operator-table__cell">Actions</div>
+              </OperatorDataTableHeader>
+              {apiTokens.map((token) => (
+                <OperatorDataTableRow key={token.id}>
+                  <div className="operator-table__cell">
+                    <div className="operator-cellTitle">
+                      {token.name}
+                      {token.revokedAt ? <span className="badge warn">Revoked</span> : <span className="operator-tag">Active</span>}
+                    </div>
+                    <div className="operator-cellSubtle">Created {formatDateTime(token.createdAt)}</div>
+                  </div>
+                  <div className="operator-table__cell"><code>{token.tokenPrefix}</code></div>
+                  <div className="operator-table__cell">{formatDateTime(token.lastUsedAt)}</div>
+                  <div className="operator-table__cell operator-table__cell--actions">
+                    <OperatorRowActions
+                      primaryAction={{
+                        label: token.revokedAt ? "Revoked" : "Revoke",
+                        onClick: () => void revokeApiToken(token.id),
+                        variant: "secondary",
+                        disabled: Boolean(token.revokedAt) || !canManageIntegrations || savingKey === `api-token-${token.id}`,
+                      }}
+                      actions={[]}
+                    />
+                  </div>
+                </OperatorDataTableRow>
+              ))}
+            </OperatorDataTable>
+          ) : (
+            <OperatorEmptyStateCard
+              title="No API tokens yet"
+              description="Create a workspace token to let external systems read platform activity through the governed integrations endpoint."
+            />
+          )}
+        </section>
+
+        <section className="card operator-section">
+          <div className="operator-section__header">
+            <div>
+              <h2 className="operator-section__title">Outbound webhooks</h2>
+              <p className="operator-section__subtitle">Tenant-scoped endpoint secrets, explicit event subscriptions, and delivery logs tied to real lifecycle events.</p>
+            </div>
+          </div>
+
+          {canManageIntegrations ? (
+            <div style={{ display: "grid", gap: 12, marginBottom: 16 }}>
+              <label style={{ display: "grid", gap: 6 }}>
+                <span>Endpoint name</span>
+                <input data-testid="integration-webhook-name-input" value={webhookName} onChange={(event) => setWebhookName(event.target.value)} />
+              </label>
+              <label style={{ display: "grid", gap: 6 }}>
+                <span>Destination URL</span>
+                <input data-testid="integration-webhook-url-input" value={webhookUrl} onChange={(event) => setWebhookUrl(event.target.value)} />
+              </label>
+              <div style={{ display: "grid", gap: 8 }}>
+                <strong>Subscribed events</strong>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 8 }}>
+                  {WEBHOOK_EVENT_TYPES.map((eventType) => (
+                    <label key={eventType} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <input
+                        data-testid={`integration-webhook-event-${eventType}`}
+                        type="checkbox"
+                        checked={webhookEvents.includes(eventType)}
+                        onChange={() => toggleWebhookEvent(eventType)}
+                      />
+                      <span>{eventType}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <button data-testid="integration-webhook-create" onClick={() => void createWebhook()} disabled={savingKey === "webhook-create"}>
+                  {savingKey === "webhook-create" ? "Creating..." : "Create webhook endpoint"}
+                </button>
+              </div>
+              {revealedWebhookSecret ? (
+                <div className="card" data-testid="integration-webhook-secret-reveal">
+                  <strong>Copy this signing secret now.</strong>
+                  <p style={{ marginBottom: 8 }}>It is only shown once after creation or rotation.</p>
+                  <code>{revealedWebhookSecret}</code>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {webhooks.length ? (
+            <OperatorDataTable columns="minmax(220px, 1.3fr) minmax(220px, 1.4fr) minmax(180px, 1fr) minmax(170px, auto)">
+              <OperatorDataTableHeader>
+                <div className="operator-table__cell">Endpoint</div>
+                <div className="operator-table__cell">Subscriptions</div>
+                <div className="operator-table__cell">Delivery health</div>
+                <div className="operator-table__cell">Actions</div>
+              </OperatorDataTableHeader>
+              {webhooks.map((webhook) => (
+                <OperatorDataTableRow key={webhook.id} data-testid={`integration-webhook-row-${webhook.id}`}>
+                  <div className="operator-table__cell">
+                    <div className="operator-cellTitle">
+                      {webhook.name}
+                      {webhook.active ? <span className="operator-tag">Active</span> : <span className="badge warn">Paused</span>}
+                    </div>
+                    <div className="operator-cellSubtle">{webhook.url}</div>
+                  </div>
+                  <div className="operator-table__cell">
+                    <div className="operator-cellMeta">
+                      <span><strong>{webhook.subscribedEventTypes.length} events</strong></span>
+                      <span>{webhook.subscribedEventTypes.join(", ")}</span>
+                    </div>
+                  </div>
+                  <div className="operator-table__cell">
+                    <div className="operator-cellMeta">
+                      <span><strong>Last success: {formatDateTime(webhook.lastSuccessAt)}</strong></span>
+                      <span>Last attempt: {formatDateTime(webhook.lastDeliveryAt)} · Secret ending {webhook.secretLastFour || "n/a"}</span>
+                    </div>
+                  </div>
+                  <div className="operator-table__cell operator-table__cell--actions">
+                    <OperatorRowActions
+                      primaryAction={{
+                        label: "Send test",
+                        onClick: () => void sendWebhookTest(webhook.id),
+                        disabled: !canManageIntegrations || savingKey === `webhook-test-${webhook.id}`,
+                      }}
+                      actions={[
+                        {
+                          label: "Delete endpoint",
+                          description: "Remove this endpoint and its future deliveries",
+                          shortcut: "Del",
+                          group: "Webhook",
+                          onClick: () => void deleteWebhook(webhook.id),
+                          disabled: !canManageIntegrations || savingKey === `webhook-delete-${webhook.id}`,
+                        },
+                      ]}
+                    />
+                  </div>
+                </OperatorDataTableRow>
+              ))}
+            </OperatorDataTable>
+          ) : (
+            <OperatorEmptyStateCard
+              title="No webhook endpoints yet"
+              description="Create an endpoint to subscribe external systems to booking, job, billing, portal, technician, and automation lifecycle events."
+            />
+          )}
+        </section>
+
+        <section className="card operator-section">
+          <div className="operator-section__header">
+            <div>
+              <h2 className="operator-section__title">Delivery logs</h2>
+              <p className="operator-section__subtitle">Persisted delivery status and response history for each subscribed event push.</p>
+            </div>
+          </div>
+
+          {deliveries.length ? (
+            <OperatorDataTable columns="minmax(180px, 1fr) minmax(180px, 1fr) minmax(140px, 0.8fr) minmax(220px, 1.4fr)">
+              <OperatorDataTableHeader>
+                <div className="operator-table__cell">Event</div>
+                <div className="operator-table__cell">Endpoint</div>
+                <div className="operator-table__cell">Status</div>
+                <div className="operator-table__cell">Result</div>
+              </OperatorDataTableHeader>
+              {deliveries.map((delivery) => (
+                <OperatorDataTableRow key={delivery.id} data-testid="integration-delivery-log-row">
+                  <div className="operator-table__cell">
+                    <div className="operator-cellTitle">{delivery.eventType}</div>
+                    <div className="operator-cellSubtle">{formatDateTime(delivery.createdAt)}</div>
+                  </div>
+                  <div className="operator-table__cell">{delivery.endpointName || delivery.endpointId}</div>
+                  <div className="operator-table__cell">
+                    <span className={delivery.status === "SUCCESS" ? "operator-tag" : "badge warn"}>{delivery.status}</span>
+                  </div>
+                  <div className="operator-table__cell">
+                    {delivery.responseStatus ? `HTTP ${delivery.responseStatus}` : delivery.errorMessage || "Pending"}
+                  </div>
+                </OperatorDataTableRow>
+              ))}
+            </OperatorDataTable>
+          ) : (
+            <OperatorEmptyStateCard
+              title="No delivery history yet"
+              description="Delivery rows appear here after seeded events or live webhook activity."
             />
           )}
         </section>

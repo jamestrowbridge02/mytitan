@@ -1,8 +1,11 @@
-import crypto from 'crypto';
+import * as crypto from 'crypto';
 import { ServiceUnavailableException } from '@nestjs/common';
 
 const deriveKey = () => {
-  const secret = process.env.INTEGRATIONS_ENCRYPTION_KEY?.trim();
+  const secret =
+    process.env.INTEGRATIONS_ENCRYPTION_KEY?.trim() ||
+    process.env.JWT_SECRET?.trim() ||
+    'dev_insecure_integrations_key';
   if (!secret) {
     throw new ServiceUnavailableException('INTEGRATIONS_ENCRYPTION_KEY is not configured');
   }

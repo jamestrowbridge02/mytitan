@@ -22,6 +22,7 @@ import { BillingService } from "../billing/billing.service";
 import { isMarketplaceEnabled, isMediaSignatureV1Enabled, requireMarketplaceEnabled } from "../common/feature-flags";
 import { getPortalCopy } from "../common/business-config";
 import { PrismaService } from "../prisma/prisma.service";
+import { ActivityService } from "../events/activity.service";
 import { ApproveJobDto, DeclineJobDto, SignJobDto } from "./public.dto";
 
 @Controller("public")
@@ -36,6 +37,7 @@ export class PublicController {
     private readonly billingService: BillingService,
     private readonly jwtService: JwtService,
     private readonly automations: AutomationsService,
+    private readonly activity: ActivityService,
   ) {}
 
   private async resolveToken(token: string) {
@@ -303,6 +305,19 @@ export class PublicController {
     }
 
     await this.audit.log(record.job.companyId, "portal.sign", `Signature captured for job ${record.job.jobRef}`, null);
+    await this.activity.push({
+      tenantId: record.job.companyId,
+      type: "portal.document_signed",
+      label: `Portal document signed for ${updated.jobRef || updated.id}`,
+      jobId: updated.id,
+      jobRef: updated.jobRef || null,
+      customerId: updated.customerId || null,
+      customerName: updated.customerName || null,
+      status: updated.status || null,
+      payloadJson: {
+        signerName: dto.name || null,
+      },
+    });
     await this.automations.evaluateRuleTrigger(record.job.companyId, "portal.document_signed", {
       actorUserId: null,
       jobId: updated.id,

@@ -346,6 +346,18 @@ export class AutomationsService {
 
     await this.upsertSuggestionState(tenantId, suggestion.key, "applied", rule.id);
     await this.audit.log(tenantId, "automations.suggestion.apply", `Applied automation suggestion: ${suggestion.title}`, user.sub);
+    await this.activity.push({
+      tenantId,
+      type: "automation.rule_applied",
+      label: `Automation suggestion applied: ${suggestion.title}`,
+      status: "success",
+      payloadJson: {
+        suggestionKey: suggestion.key,
+        trigger: suggestion.trigger,
+        ruleId: rule.id,
+        ruleName: rule.name,
+      },
+    });
     return {
       ok: true,
       suggestionKey: suggestion.key,

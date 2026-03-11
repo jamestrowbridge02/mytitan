@@ -317,11 +317,12 @@ export function OperatorDataTableHeader({ children }: { children: ReactNode }) {
 export function OperatorDataTableRow({
   children,
   selected,
+  ...rest
 }: {
   children: ReactNode;
   selected?: boolean;
-}) {
-  return <div aria-selected={selected ? true : undefined} className={`operator-table__row${selected ? " is-selected" : ""}`}>{children}</div>;
+} & React.HTMLAttributes<HTMLDivElement>) {
+  return <div {...rest} aria-selected={selected ? true : undefined} className={`operator-table__row${selected ? " is-selected" : ""}${rest.className ? ` ${rest.className}` : ""}`}>{children}</div>;
 }
 
 export function OperatorFilterField({

@@ -2,6 +2,7 @@
 /* eslint-disable no-console */
 const { PrismaClient } = require("@prisma/client");
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 
 const prisma = new PrismaClient();
 
@@ -82,6 +83,25 @@ const FIXTURE = {
     active: "e2e-public-portal-token",
     expired: "e2e-expired-portal-token",
   },
+  integrations: {
+    apiToken: {
+      id: "e2e-api-token-primary",
+      name: "E2E Primary Token",
+      publicId: "e2eapitoken",
+      secret: "seeded-platform-secret",
+    },
+    webhook: {
+      id: "e2e-webhook-ops",
+      name: "E2E Operations Webhook",
+      url: "https://example.invalid/mytitan-webhook",
+      secret: "whsec_e2e_seeded_webhook_secret",
+      subscribedEventTypes: ["job.created", "job.completed", "invoice.issued", "automation.rule_ran"],
+    },
+    deliveries: {
+      success: "e2e-webhook-delivery-success",
+      failed: "e2e-webhook-delivery-failed",
+    },
+  },
 };
 
 function addMinutes(date, minutes) {
@@ -98,6 +118,23 @@ function setUtcTime(date, hours, minutes) {
   const value = new Date(date);
   value.setUTCHours(hours, minutes, 0, 0);
   return value;
+}
+
+function deriveIntegrationKey() {
+  const secret =
+    String(process.env.INTEGRATIONS_ENCRYPTION_KEY || "").trim() ||
+    String(process.env.JWT_SECRET || "").trim() ||
+    "dev_insecure_integrations_key";
+  return crypto.createHash("sha256").update(secret).digest();
+}
+
+function encryptSeedText(value) {
+  const key = deriveIntegrationKey();
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
+  const ciphertext = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return `${iv.toString("base64")}.${tag.toString("base64")}.${ciphertext.toString("base64")}`;
 }
 
 async function ensurePlan() {
@@ -563,6 +600,71 @@ async function ensurePublicToken(token, jobId, expiresAt) {
 
 async function ensureActivityEvent(id, payload) {
   await prisma.activityEvent.upsert({
+    where: { id },
+    create: { id, ...payload },
+    update: payload,
+  });
+}
+
+async function ensureApiToken(companyId, userId) {
+  const token = `${"mtit"}_${FIXTURE.integrations.apiToken.publicId}_${FIXTURE.integrations.apiToken.secret}`;
+  await prisma.apiToken.upsert({
+    where: { id: FIXTURE.integrations.apiToken.id },
+    create: {
+      id: FIXTURE.integrations.apiToken.id,
+      tenantId: companyId,
+      name: FIXTURE.integrations.apiToken.name,
+      publicId: FIXTURE.integrations.apiToken.publicId,
+      tokenPrefix: `mtit_${FIXTURE.integrations.apiToken.publicId}`,
+      tokenHash: crypto.createHash("sha256").update(token).digest("hex"),
+      createdByUserId: userId,
+      lastUsedAt: addMinutes(new Date(), -20),
+    },
+    update: {
+      tenantId: companyId,
+      name: FIXTURE.integrations.apiToken.name,
+      tokenPrefix: `mtit_${FIXTURE.integrations.apiToken.publicId}`,
+      tokenHash: crypto.createHash("sha256").update(token).digest("hex"),
+      createdByUserId: userId,
+      revokedAt: null,
+      lastUsedAt: addMinutes(new Date(), -20),
+    },
+  });
+}
+
+async function ensureWebhookEndpoint(companyId, userId) {
+  return prisma.webhookEndpoint.upsert({
+    where: { id: FIXTURE.integrations.webhook.id },
+    create: {
+      id: FIXTURE.integrations.webhook.id,
+      tenantId: companyId,
+      name: FIXTURE.integrations.webhook.name,
+      url: FIXTURE.integrations.webhook.url,
+      active: true,
+      createdByUserId: userId,
+      secretEncrypted: encryptSeedText(FIXTURE.integrations.webhook.secret),
+      secretLastFour: FIXTURE.integrations.webhook.secret.slice(-4),
+      subscribedEventTypes: FIXTURE.integrations.webhook.subscribedEventTypes,
+      lastDeliveryAt: addMinutes(new Date(), -9),
+      lastSuccessAt: addMinutes(new Date(), -25),
+    },
+    update: {
+      tenantId: companyId,
+      name: FIXTURE.integrations.webhook.name,
+      url: FIXTURE.integrations.webhook.url,
+      active: true,
+      createdByUserId: userId,
+      secretEncrypted: encryptSeedText(FIXTURE.integrations.webhook.secret),
+      secretLastFour: FIXTURE.integrations.webhook.secret.slice(-4),
+      subscribedEventTypes: FIXTURE.integrations.webhook.subscribedEventTypes,
+      lastDeliveryAt: addMinutes(new Date(), -9),
+      lastSuccessAt: addMinutes(new Date(), -25),
+    },
+  });
+}
+
+async function ensureWebhookDelivery(id, payload) {
+  await prisma.webhookDelivery.upsert({
     where: { id },
     create: { id, ...payload },
     update: payload,
@@ -1219,6 +1321,8 @@ async function main() {
   await ensureCustomFieldValue(company.id, siteCodeField.id, "CUSTOMER", customers.convertible.id, "SITE-E2E-01");
   await ensureCustomFieldValue(company.id, certificationField.id, "TECHNICIAN", operator.id, "EV Specialist");
   await ensureCustomFieldValue(company.id, certificationField.id, "TECHNICIAN", technicianUser.id, "E2E Mobile Certified");
+  await ensureApiToken(company.id, operator.id);
+  const seededWebhook = await ensureWebhookEndpoint(company.id, operator.id);
 
   await ensureSavedViews(company.id, operator.id);
 
@@ -1297,6 +1401,56 @@ async function main() {
         reason: "existing_open_reminder",
       },
     },
+  });
+  await ensureActivityEvent("e2e-activity-job-created", {
+    type: "job.created",
+    label: "Job created for E2E integration visibility",
+    at: addMinutes(now, -28),
+    tenantId: company.id,
+    customerId: customers.open.id,
+    customerName: customers.open.name,
+    jobId: openJob.id,
+    jobRef: openJob.jobRef,
+    status: openJob.status,
+  });
+  await ensureWebhookDelivery(FIXTURE.integrations.deliveries.success, {
+    tenantId: company.id,
+    endpointId: seededWebhook.id,
+    eventType: "job.created",
+    eventId: "e2e-activity-job-created",
+    requestUrl: seededWebhook.url,
+    status: "SUCCESS",
+    payloadJson: {
+      id: "e2e-activity-job-created",
+      type: "job.created",
+      label: "Job created for E2E integration visibility",
+    },
+    signature: "sha256=e2e",
+    responseStatus: 202,
+    responseBody: "accepted",
+    durationMs: 84,
+    attemptedAt: addMinutes(now, -27),
+    deliveredAt: addMinutes(now, -27),
+  });
+  await ensureWebhookDelivery(FIXTURE.integrations.deliveries.failed, {
+    tenantId: company.id,
+    endpointId: seededWebhook.id,
+    eventType: "automation.rule_ran",
+    eventId: "e2e-automation-run-tech-arrival",
+    requestUrl: seededWebhook.url,
+    status: "FAILED",
+    payloadJson: {
+      id: "e2e-automation-run-tech-arrival",
+      type: "automation.rule_ran",
+      label: "Rule Technician arrival office notification skipped",
+    },
+    signature: "sha256=e2e",
+    responseStatus: 500,
+    responseBody: "server error",
+    errorMessage: "HTTP 500",
+    durationMs: 132,
+    attemptedAt: addMinutes(now, -10),
+    deliveredAt: null,
   });
 
   console.log(`tenant=${company.id} (${company.name})`);

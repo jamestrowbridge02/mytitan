@@ -1,4 +1,5 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
+import { ModuleRef } from "@nestjs/core";
 import { PrismaService } from "../prisma/prisma.service";
 
 type ActivityEventInput = {
@@ -18,7 +19,23 @@ type ActivityEventInput = {
 
 @Injectable()
 export class ActivityService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(ActivityService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly moduleRef: ModuleRef,
+  ) {}
+
+  private getIntegrationPlatformService() {
+    try {
+      // Lazy lookup avoids a hard module cycle between events and integrations.
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { IntegrationPlatformService } = require("../integrations/integration-platform.service");
+      return this.moduleRef.get<any>(IntegrationPlatformService, { strict: false });
+    } catch {
+      return null;
+    }
+  }
 
   private slugify(value: string) {
     return value
@@ -104,7 +121,7 @@ export class ActivityService {
       customerId = await this.ensureCustomerByName(tenantId, customerName);
     }
 
-    return this.prisma.activityEvent.create({
+    const created = await this.prisma.activityEvent.create({
       data: {
         type: event.type,
         label: event.label,
@@ -120,6 +137,15 @@ export class ActivityService {
         payloadJson: event.payloadJson ?? null,
       },
     });
+
+    const platform = this.getIntegrationPlatformService();
+    if (platform) {
+      void platform.publishActivityEvent(created).catch((error: any) => {
+        this.logger.warn(`integration_platform_publish_failed event=${created.id} error=${error instanceof Error ? error.message : String(error)}`);
+      });
+    }
+
+    return created;
   }
 
   async list(limit = 20, tenantId?: string | null, filters?: { jobId?: string | null; customerId?: string | null; customerName?: string | null }) {

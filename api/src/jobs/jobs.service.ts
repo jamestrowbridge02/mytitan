@@ -755,6 +755,11 @@ export class JobsService {
 
     await this.audit.log(companyId, "job.create", `Created job ${created.jobRef ?? created.id}`, userId);
     await this.logActivity(companyId, created.id, userId, "job.create", `Job ${created.jobRef ?? created.id} created`);
+    await this.emitJobActivity(
+      "job.created",
+      created,
+      `Job ${created.jobRef ?? created.id} created`,
+    );
     await this.maybeRunContactGapAutomation(companyId, userId, created.id);
     await this.automations.evaluateRuleTrigger(companyId, "job.created", {
       actorUserId: userId,
@@ -902,6 +907,11 @@ export class JobsService {
     );
     await this.maybeRunCompletionAutomation(companyId, userId, job, updated);
     if (newStatus === "COMPLETED") {
+      await this.emitJobActivity(
+        "job.completed",
+        updated,
+        `Job ${updated?.jobRef || updated?.id || id} completed`,
+      );
       await this.automations.evaluateRuleTrigger(companyId, "job.completed", {
         actorUserId: userId,
         jobId: updated.id,
@@ -994,6 +1004,13 @@ export class JobsService {
       updated,
       `Job ${updated?.jobRef || updated?.id || id} updated`,
     );
+    if (updated.status === "COMPLETED" && job.status !== "COMPLETED") {
+      await this.emitJobActivity(
+        "job.completed",
+        updated,
+        `Job ${updated?.jobRef || updated?.id || id} completed`,
+      );
+    }
     await this.maybeRunCompletionAutomation(companyId, userId, job, updated);
     await this.maybeRunContactGapAutomation(companyId, userId, updated.id);
     return this.decorateJobWithWorkflowReadiness(db, companyId, updated, settings);

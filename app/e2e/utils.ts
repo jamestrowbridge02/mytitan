@@ -30,6 +30,8 @@ export const fixtureRefs = {
   customFieldJobSerialKey: "serial_number",
   customFieldWarrantyKey: "warranty_status",
   customFieldCustomerSiteCode: "site_code",
+  seededWebhookName: "E2E Operations Webhook",
+  seededApiTokenName: "E2E Primary Token",
   dispatcherEmail: "e2e.dispatcher@mytitan.local",
   dispatcherPassword: "MyTitanE2EDispatch!2026",
   financeEmail: "e2e.finance@mytitan.local",
@@ -74,28 +76,39 @@ const e2eOrigin = new URL(e2eBaseURL).origin;
 async function fulfillFromLocalApi(route: Route, request: APIRequestContext) {
   const originalUrl = new URL(route.request().url());
   let response;
-  try {
-    response = await request.fetch(`http://127.0.0.1:3000${originalUrl.pathname}${originalUrl.search}`, {
-      method: route.request().method(),
-      headers: {
-        ...route.request().headers(),
-        host: "127.0.0.1:3000",
-        origin: e2eOrigin,
-        referer: `${e2eOrigin}/`,
-      },
-      data: route.request().postDataBuffer() ?? undefined,
-      failOnStatusCode: false,
-    });
-  } catch (error: any) {
-    const message = String(error?.message || "");
-    if (
-      message.includes("Request context disposed") ||
-      message.includes("Target page, context or browser has been closed")
-    ) {
-      await route.abort();
-      return;
+  let lastError: any = null;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      response = await request.fetch(`http://127.0.0.1:3000${originalUrl.pathname}${originalUrl.search}`, {
+        method: route.request().method(),
+        headers: {
+          ...route.request().headers(),
+          host: "127.0.0.1:3000",
+          origin: e2eOrigin,
+          referer: `${e2eOrigin}/`,
+        },
+        data: route.request().postDataBuffer() ?? undefined,
+        failOnStatusCode: false,
+      });
+      break;
+    } catch (error: any) {
+      lastError = error;
+      const message = String(error?.message || "");
+      if (
+        message.includes("Request context disposed") ||
+        message.includes("Target page, context or browser has been closed")
+      ) {
+        await route.abort();
+        return;
+      }
+      if (!message.includes("socket hang up") && !message.includes("ECONNRESET")) {
+        throw error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 150));
     }
-    throw error;
+  }
+  if (!response) {
+    throw lastError;
   }
   const headers = response.headers();
   const contentType = headers["content-type"] || "application/json; charset=utf-8";

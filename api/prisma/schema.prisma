@@ -105,6 +105,12 @@ enum IntegrationProvider {
   GOOGLE_CALENDAR
 }
 
+enum WebhookDeliveryStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
 enum NextActionType {
   CALL
   EMAIL
@@ -169,6 +175,9 @@ model Company {
   inviteTokens             InviteToken[]
   integrationConnections   IntegrationConnection[]
   integrationAuthStates    IntegrationAuthState[]
+  apiTokens                ApiToken[]
+  webhookEndpoints         WebhookEndpoint[]
+  webhookDeliveries        WebhookDelivery[]
   tradePackInstalls        TradePackInstall[]
   templatePresets          TemplatePreset[]
   tradeAccountNotes        TradeAccountNote[]
@@ -1190,6 +1199,70 @@ model IntegrationAuthState {
   tenant    Company             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, provider])
+}
+
+model ApiToken {
+  id              String   @id @default(cuid())
+  tenantId        String
+  name            String
+  publicId        String   @unique
+  tokenPrefix     String
+  tokenHash       String   @unique
+  lastUsedAt      DateTime?
+  revokedAt       DateTime?
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  tenant          Company  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, revokedAt])
+}
+
+model WebhookEndpoint {
+  id                   String            @id @default(cuid())
+  tenantId             String
+  name                 String
+  url                  String
+  secretEncrypted      String?
+  secretLastFour       String?
+  subscribedEventTypes String[]          @default([])
+  active               Boolean           @default(true)
+  createdByUserId      String?
+  lastDeliveryAt       DateTime?
+  lastSuccessAt        DateTime?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  tenant               Company           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  deliveries           WebhookDelivery[]
+
+  @@index([tenantId, active, createdAt])
+}
+
+model WebhookDelivery {
+  id             String                @id @default(cuid())
+  tenantId       String
+  endpointId     String
+  eventType      String
+  eventId        String?
+  requestUrl     String
+  status         WebhookDeliveryStatus @default(PENDING)
+  payloadJson    Json
+  signature      String?
+  responseStatus Int?
+  responseBody   String?
+  errorMessage   String?
+  durationMs     Int?
+  attemptedAt    DateTime?
+  deliveredAt    DateTime?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  tenant         Company               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  endpoint       WebhookEndpoint       @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, eventType, createdAt])
+  @@index([endpointId, createdAt])
 }
 
 model InviteToken {
