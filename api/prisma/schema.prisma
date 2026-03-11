@@ -238,6 +238,8 @@ model Company {
   staffAvailabilities      StaffAvailability[]
   techScheduleSettings     TechScheduleSetting[]
   techScheduleExceptions   TechScheduleException[]
+  technicianAvailabilities TechnicianAvailability[]
+  technicianCapacityExceptions TechnicianCapacityException[]
   blackoutDates            BlackoutDate[]
   bookingQuestions         BookingQuestion[]
   bookingAnswers           BookingAnswer[]
@@ -291,6 +293,8 @@ model User {
   notifications            Notification[]
   notificationPreference   NotificationPreference?
   createdJobs              Job[]                     @relation("JobCreator")
+  technicianAvailabilities TechnicianAvailability[] @relation("TechnicianAvailabilityUser")
+  technicianCapacityExceptions TechnicianCapacityException[] @relation("TechnicianCapacityExceptionUser")
 
   @@unique([companyId, email])
 }
@@ -718,6 +722,49 @@ model TechScheduleException {
   company      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@index([companyId, technicianId, startsAt])
+}
+
+enum TechnicianCapacityExceptionType {
+  UNAVAILABLE
+  REDUCED_CAPACITY
+  OVERTIME
+}
+
+model TechnicianAvailability {
+  id              String   @id @default(cuid())
+  tenantId        String
+  technicianId    String
+  date            DateTime
+  startTime       String
+  endTime         String
+  capacityMinutes Int
+  notesJson       Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  tenant          Company  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  technician      User     @relation("TechnicianAvailabilityUser", fields: [technicianId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, technicianId, date])
+  @@index([tenantId, date])
+}
+
+model TechnicianCapacityException {
+  id              String                          @id @default(cuid())
+  tenantId        String
+  technicianId    String
+  date            DateTime
+  type            TechnicianCapacityExceptionType
+  startTime       String
+  endTime         String
+  capacityMinutes Int
+  reason          String?
+  createdAt       DateTime                        @default(now())
+  updatedAt       DateTime                        @updatedAt
+  tenant          Company                         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  technician      User                            @relation("TechnicianCapacityExceptionUser", fields: [technicianId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, technicianId, date])
+  @@index([tenantId, date, type])
 }
 
 model BlackoutDate {

@@ -32,6 +32,8 @@ type IntelligenceData = {
     overdueInvoices: number;
     dueServicePlans: number;
     overduePlanRuns: number;
+    overloadedTechnicianDays: number;
+    unassignedDueWorkPressure: number;
   };
   attentionQueue: Array<{ key: string; label: string; count: number; href: string; hint: string }>;
   alerts: Array<{ key: string; severity: string; label: string; count: number; href: string }>;
@@ -65,6 +67,8 @@ const EMPTY: IntelligenceData = {
     overdueInvoices: 0,
     dueServicePlans: 0,
     overduePlanRuns: 0,
+    overloadedTechnicianDays: 0,
+    unassignedDueWorkPressure: 0,
   },
   attentionQueue: [],
   alerts: [],
@@ -105,6 +109,7 @@ export default function IntelligencePage() {
       { label: "Overdue invoices", value: String(data.summary.overdueInvoices), hint: "Issued invoices already past due" },
       { label: "Portal ready", value: String(data.summary.portalReadyJobs), hint: "Jobs with active customer access" },
       { label: "Plans due", value: String(data.summary.dueServicePlans), hint: "Recurring work ready to generate now" },
+      { label: "Overloaded days", value: String(data.summary.overloadedTechnicianDays), hint: "Technician days already beyond capacity" },
       { label: "Portal expired", value: String(data.summary.expiredPortalLinks), hint: "Links that already need customer access recovery" },
       { label: "Converted", value: String(data.summary.bookingsConvertedLast7Days), hint: "Bookings turned into jobs in the last 7 days" },
       { label: "Completion delta", value: data.trends.completionDelta >= 0 ? `+${data.trends.completionDelta}` : String(data.trends.completionDelta), hint: "Last 7 days vs previous 7 days" },
@@ -219,6 +224,8 @@ export default function IntelligencePage() {
               ["Technician completion queue", data.summary.technicianCompletionQueue, "Assigned field jobs currently in progress"],
               ["Service plans due now", data.summary.dueServicePlans, "Recurring plans already ready for their next run"],
               ["Recurring runs needing review", data.summary.overduePlanRuns, "Pending or failed recurring runs that need operator action"],
+              ["Unassigned due work", data.summary.unassignedDueWorkPressure, "Upcoming work and recurring pressure without technician ownership"],
+              ["Technician days overloaded", data.summary.overloadedTechnicianDays, "Technician schedules already exceed daily capacity"],
               ["Portal links expiring soon", data.summary.portalLinksExpiringSoon, "Customer access links that need refresh before they go stale"],
               ["Portal links expired", data.summary.expiredPortalLinks, "Customer access links that have already lapsed and need regeneration"],
               ["Dispatch follow-ups overdue", data.summary.overdueDispatchFollowUps, "Converted work still waiting for dispatch follow-through"],

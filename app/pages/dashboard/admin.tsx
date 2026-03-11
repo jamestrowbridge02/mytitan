@@ -7,6 +7,7 @@ const TILES = [
   { label: 'Locations', href: '/dashboard/locations' },
   { label: 'Users & Roles', href: '/dashboard/users' },
   { label: 'Service plans', href: '/dashboard/service-plans' },
+  { label: 'Scheduling', href: '/dashboard/scheduling' },
   { label: 'Integrations', href: '/dashboard/integrations' },
   { label: 'Billing', href: '/dashboard/billing' },
   { label: 'Inventory', href: '/dashboard/inventory' },

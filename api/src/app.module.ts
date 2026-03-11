@@ -42,6 +42,7 @@ import { CustomFieldsModule } from './custom-fields/custom-fields.module';
 import { TechModule } from './tech/tech.module';
 import { ArtifactsModule } from './artifacts/artifacts.module';
 import { ServicePlansModule } from './service-plans/service-plans.module';
+import { ScheduleModule } from './schedule/schedule.module';
 
 @Module({
   imports: [
@@ -95,6 +96,7 @@ import { ServicePlansModule } from './service-plans/service-plans.module';
     TechModule,
     ArtifactsModule,
     ServicePlansModule,
+    ScheduleModule,
   ],
 })
 export class AppModule {}

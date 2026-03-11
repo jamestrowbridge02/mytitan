@@ -1,9 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { ScheduleService } from '../schedule/schedule.service';
 
 @Injectable()
 export class MetricsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly schedule: ScheduleService,
+  ) {}
 
   private getMonthStart(date: Date) {
     return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
@@ -66,6 +70,8 @@ export class MetricsService {
     const last30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     const previous7Days = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
     const next7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const todayKey = now.toISOString().slice(0, 10);
+    const next7Key = next7Days.toISOString().slice(0, 10);
 
     const [
       jobsByStatus,
@@ -90,6 +96,8 @@ export class MetricsService {
       overdueInvoices,
       dueServicePlans,
       overduePlanRuns,
+      schedulingCapacity,
+      schedulingPressure,
       completedLast7Days,
       completedPrevious7Days,
       recentCompletedByTechnician,
@@ -255,6 +263,8 @@ export class MetricsService {
           scheduledFor: { lt: now },
         },
       }),
+      this.schedule.getCapacity(tenantId, { from: todayKey, to: next7Key }),
+      this.schedule.getTechnicianSchedulePressure(tenantId, { date: todayKey }),
       db.job.count({
         where: {
           companyId: tenantId,
@@ -295,6 +305,12 @@ export class MetricsService {
         })
       : [];
     const techMap = new Map(technicians.map((tech: any) => [tech.id, tech.email]));
+    const overloadedTechnicianDays = (schedulingCapacity?.rows || []).reduce((total: number, row: any) => {
+      return total + (Array.isArray(row?.days) ? row.days.filter((day: any) => day?.overloaded).length : 0);
+    }, 0);
+    const unassignedDueWorkPressure = Array.isArray(schedulingPressure?.unassignedDueWork)
+      ? schedulingPressure.unassignedDueWork.length
+      : 0;
 
     return {
       jobsByStatus: jobsByStatus.map((row: any) => ({
@@ -335,10 +351,15 @@ export class MetricsService {
         overdueInvoices,
         dueServicePlans,
         overduePlanRuns,
+        overloadedTechnicianDays,
+        unassignedDueWorkPressure,
       },
       attentionQueue: [
         dueServicePlans > 0
           ? { key: 'due_service_plans', label: 'Service plans due now', count: dueServicePlans, href: '/dashboard/service-plans', hint: 'Recurring work is ready to generate the next booking or job' }
+          : null,
+        unassignedDueWorkPressure > 0
+          ? { key: 'unassigned_due_work', label: 'Unassigned due work', count: unassignedDueWorkPressure, href: '/dashboard/scheduling', hint: 'Upcoming jobs, bookings, and recurring work are due without technician ownership' }
           : null,
         overduePlanRuns > 0
           ? { key: 'overdue_plan_runs', label: 'Recurring runs need review', count: overduePlanRuns, href: '/dashboard/service-plans', hint: 'Failed or pending service plan runs need operator attention' }
@@ -379,6 +400,7 @@ export class MetricsService {
         overdueInvoices > 0 ? { key: 'overdue_invoices', severity: 'warn', label: 'Invoices overdue for payment', count: overdueInvoices, href: '/dashboard/billing/readiness' } : null,
         dueServicePlans > 0 ? { key: 'due_service_plans', severity: 'info', label: 'Service plans due now', count: dueServicePlans, href: '/dashboard/service-plans' } : null,
         overduePlanRuns > 0 ? { key: 'overdue_plan_runs', severity: 'warn', label: 'Recurring runs need review', count: overduePlanRuns, href: '/dashboard/service-plans' } : null,
+        overloadedTechnicianDays > 0 ? { key: 'overloaded_technician_days', severity: 'warn', label: 'Technician days overloaded', count: overloadedTechnicianDays, href: '/dashboard/scheduling' } : null,
         publicUnlinkedBookings > 0 ? { key: 'public_conversion', severity: 'info', label: 'Public bookings awaiting conversion', count: publicUnlinkedBookings, href: '/dashboard/bookings' } : null,
         agedUnlinkedBookings > 0 ? { key: 'stale_booking_conversion', severity: 'warn', label: 'Unlinked bookings older than 48h', count: agedUnlinkedBookings, href: '/dashboard/bookings' } : null,
         portalLinksExpiringSoon > 0 ? { key: 'portal_links_expiring', severity: 'info', label: 'Portal links expiring within 7 days', count: portalLinksExpiringSoon, href: '/dashboard/portal' } : null,

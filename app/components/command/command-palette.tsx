@@ -25,6 +25,7 @@ export default function CommandPalette() {
         { label: terms.bookings, href: "/dashboard/bookings" },
         { label: "Service plans", href: "/dashboard/service-plans" },
         { label: "Calendar", href: "/dashboard/calendar" },
+        { label: "Scheduling", href: "/dashboard/scheduling" },
         { label: terms.customers, href: "/dashboard/customers" },
         moduleVisibility.showIntelligence ? { label: "Intelligence", href: "/dashboard/intelligence" } : null,
         { label: "Billing readiness", href: "/dashboard/billing/readiness" },

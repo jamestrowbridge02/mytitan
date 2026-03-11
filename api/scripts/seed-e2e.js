@@ -114,6 +114,12 @@ const FIXTURE = {
     paused: { id: "e2e-service-plan-paused", name: "Annual Warranty Review" },
     run: { id: "e2e-service-plan-run-executed" },
   },
+  scheduling: {
+    availabilityOperator: { id: "e2e-tech-availability-operator" },
+    availabilityTechnician: { id: "e2e-tech-availability-technician" },
+    exceptionReduced: { id: "e2e-tech-exception-reduced" },
+    exceptionUnavailable: { id: "e2e-tech-exception-unavailable" },
+  },
 };
 
 function addMinutes(date, minutes) {
@@ -725,6 +731,41 @@ async function ensureServicePlan(id, payload, tasks = []) {
 
 async function ensureServicePlanRun(id, payload) {
   await prisma.servicePlanRun.upsert({
+    where: { id },
+    create: { id, ...payload },
+    update: payload,
+  });
+}
+
+async function ensureTechScheduleSetting(companyId, technicianId, weeklyJson) {
+  return prisma.techScheduleSetting.upsert({
+    where: {
+      companyId_technicianId: {
+        companyId,
+        technicianId,
+      },
+    },
+    create: {
+      companyId,
+      technicianId,
+      weeklyJson,
+    },
+    update: {
+      weeklyJson,
+    },
+  });
+}
+
+async function ensureTechnicianAvailability(id, payload) {
+  await prisma.technicianAvailability.upsert({
+    where: { id },
+    create: { id, ...payload },
+    update: payload,
+  });
+}
+
+async function ensureTechnicianCapacityException(id, payload) {
+  await prisma.technicianCapacityException.upsert({
     where: { id },
     create: { id, ...payload },
     update: payload,
@@ -1679,6 +1720,98 @@ async function main() {
     payloadJson: {
       planId: FIXTURE.servicePlans.active.id,
       bookingId: FIXTURE.bookings.convertible.id,
+    },
+  });
+
+  await prisma.technicianAvailability.deleteMany({
+    where: {
+      tenantId: company.id,
+      id: {
+        notIn: [
+          FIXTURE.scheduling.availabilityOperator.id,
+          FIXTURE.scheduling.availabilityTechnician.id,
+        ],
+      },
+    },
+  });
+  await prisma.technicianCapacityException.deleteMany({
+    where: {
+      tenantId: company.id,
+      id: {
+        notIn: [
+          FIXTURE.scheduling.exceptionReduced.id,
+          FIXTURE.scheduling.exceptionUnavailable.id,
+        ],
+      },
+    },
+  });
+
+  const weekdaySchedule = {
+    mon: [{ start: "08:00", end: "16:00" }],
+    tue: [{ start: "08:00", end: "16:00" }],
+    wed: [{ start: "08:00", end: "16:00" }],
+    thu: [{ start: "08:00", end: "16:00" }],
+    fri: [{ start: "08:00", end: "16:00" }],
+  };
+  await ensureTechScheduleSetting(company.id, operator.id, weekdaySchedule);
+  await ensureTechScheduleSetting(company.id, technicianUser.id, {
+    mon: [{ start: "09:00", end: "14:00" }],
+    tue: [{ start: "09:00", end: "14:00" }],
+    wed: [{ start: "09:00", end: "14:00" }],
+    thu: [{ start: "09:00", end: "14:00" }],
+    fri: [{ start: "09:00", end: "14:00" }],
+  });
+
+  await ensureTechnicianAvailability(FIXTURE.scheduling.availabilityOperator.id, {
+    tenantId: company.id,
+    technicianId: operator.id,
+    date: today,
+    startTime: "08:00",
+    endTime: "15:00",
+    capacityMinutes: 420,
+    notesJson: { operatorNotes: "Healthy seeded dispatch capacity" },
+  });
+  await ensureTechnicianAvailability(FIXTURE.scheduling.availabilityTechnician.id, {
+    tenantId: company.id,
+    technicianId: technicianUser.id,
+    date: today,
+    startTime: "09:00",
+    endTime: "10:30",
+    capacityMinutes: 90,
+    notesJson: { operatorNotes: "Reduced field capacity for overload coverage" },
+  });
+  await ensureTechnicianCapacityException(FIXTURE.scheduling.exceptionReduced.id, {
+    tenantId: company.id,
+    technicianId: technicianUser.id,
+    date: today,
+    type: "REDUCED_CAPACITY",
+    startTime: "09:30",
+    endTime: "10:30",
+    capacityMinutes: 60,
+    reason: "Parts collection blocks most of the morning",
+  });
+  await ensureTechnicianCapacityException(FIXTURE.scheduling.exceptionUnavailable.id, {
+    tenantId: company.id,
+    technicianId: operator.id,
+    date: addMinutes(today, 24 * 60),
+    type: "UNAVAILABLE",
+    startTime: "08:00",
+    endTime: "16:00",
+    capacityMinutes: 420,
+    reason: "Training day blocks the full shift",
+  });
+
+  await ensureActivityEvent("e2e-activity-schedule-overload", {
+    type: "schedule.pressure",
+    label: "Technician capacity reduced for overload planning coverage",
+    at: addMinutes(now, -9),
+    tenantId: company.id,
+    technicianId: technicianUser.id,
+    payloadJson: {
+      technicianId: technicianUser.id,
+      availableMinutes: 30,
+      scheduledMinutes: 60,
+      remainingMinutes: -30,
     },
   });
 

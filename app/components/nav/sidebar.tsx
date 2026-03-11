@@ -117,6 +117,7 @@ export default function Sidebar() {
     { title: terms.jobs, href: "/dashboard/jobs" },
     { title: terms.customers, href: "/dashboard/customers" },
     { title: "Calendar", href: "/dashboard/calendar" },
+    { title: "Scheduling", href: "/dashboard/scheduling" },
     { title: terms.bookings, href: "/dashboard/bookings" },
     { title: "Service plans", href: "/dashboard/service-plans" },
     { title: `New ${terms.jobs.slice(0, -1) || "Job"}`, href: "/dashboard/jobs/new" },
@@ -127,6 +128,7 @@ export default function Sidebar() {
     if (!href) return true;
     if (href.startsWith("/dashboard/settings")) return permissions["settings.manage"];
     if (href.startsWith("/dashboard/service-plans")) return permissions["settings.manage"];
+    if (href.startsWith("/dashboard/scheduling")) return permissions["jobs.transition"] || permissions["dashboard.view_intelligence"] || permissions["technician.execute"];
     if (href.startsWith("/dashboard/billing")) return permissions["billing.manage"];
     if (href.startsWith("/dashboard/portal")) return permissions["portal.manage"];
     if (href.startsWith("/dashboard/technician")) return permissions["technician.execute"];

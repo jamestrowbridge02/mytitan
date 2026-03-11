@@ -19,22 +19,48 @@ export class AuthController {
     private readonly audit: AuditService,
   ) {}
 
-  private enforceRateLimit(req: Request, scope?: string) {
+  private bucketKey(req: Request, scope?: string) {
+    return `${req.ip || 'unknown'}:${scope || '*'}`;
+  }
+
+  private assertRateLimit(req: Request, scope?: string) {
     if (process.env.MYTITAN_ENABLE_E2E_FIXTURES === '1') {
       return;
     }
-    const key = `${req.ip || 'unknown'}:${scope || '*'}`;
+    const key = this.bucketKey(req, scope);
+    const now = Date.now();
+    const current = this.buckets.get(key);
+    if (!current || current.resetAt <= now) {
+      this.buckets.delete(key);
+      return;
+    }
+    if (current.count >= this.maxRequests) {
+      throw new HttpException('Too many auth attempts. Try again shortly.', HttpStatus.TOO_MANY_REQUESTS);
+    }
+  }
+
+  private recordRateLimitAttempt(req: Request, scope?: string) {
+    if (process.env.MYTITAN_ENABLE_E2E_FIXTURES === '1') {
+      return;
+    }
+    const key = this.bucketKey(req, scope);
     const now = Date.now();
     const current = this.buckets.get(key);
     if (!current || current.resetAt <= now) {
       this.buckets.set(key, { count: 1, resetAt: now + this.windowMs });
       return;
     }
-    if (current.count >= this.maxRequests) {
-      throw new HttpException('Too many auth attempts. Try again shortly.', HttpStatus.TOO_MANY_REQUESTS);
-    }
     current.count += 1;
     this.buckets.set(key, current);
+  }
+
+  private clearRateLimit(req: Request, scope?: string) {
+    this.buckets.delete(this.bucketKey(req, scope));
+  }
+
+  private enforceRateLimit(req: Request, scope?: string) {
+    this.assertRateLimit(req, scope);
+    this.recordRateLimitAttempt(req, scope);
   }
 
   @Post('signup')
@@ -44,9 +70,17 @@ export class AuthController {
   }
 
   @Post('login')
-  login(@Req() req: Request, @Body() dto: LoginDto) {
-    this.enforceRateLimit(req, String(dto?.email || '').trim().toLowerCase());
-    return this.auth.login(dto);
+  async login(@Req() req: Request, @Body() dto: LoginDto) {
+    const scope = String(dto?.email || '').trim().toLowerCase();
+    this.assertRateLimit(req, scope);
+    try {
+      const result = await this.auth.login(dto);
+      this.clearRateLimit(req, scope);
+      return result;
+    } catch (error) {
+      this.recordRateLimitAttempt(req, scope);
+      throw error;
+    }
   }
 
   @Post('forgot-password')

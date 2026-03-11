@@ -67,6 +67,7 @@ export default function TechnicianPage() {
   const [meId, setMeId] = useState<string | null>(null);
   const [technicianFields, setTechnicianFields] = useState<CustomField[]>([]);
   const [technicianFieldValues, setTechnicianFieldValues] = useState<CustomFieldValue[]>([]);
+  const [capacityStatus, setCapacityStatus] = useState<any>(null);
   const [permissions, setPermissions] = useState(() => emptyPermissionSnapshot());
   const [permissionsReady, setPermissionsReady] = useState(false);
   const { notice, showError, showSuccess, clearNotice } = useOperatorNotice();
@@ -124,9 +125,13 @@ export default function TechnicianPage() {
         if (!userId) return;
         const valueRows = await apiFetch(`/custom-fields/values?entityType=technician&entityId=${encodeURIComponent(userId)}`);
         setTechnicianFieldValues(Array.isArray(valueRows?.values) ? valueRows.values : []);
+        const pressureRows = await apiFetch(`/schedule/pressure?date=${new Date().toISOString().slice(0, 10)}&technicianId=${encodeURIComponent(userId)}`);
+        const firstPressure = Array.isArray(pressureRows?.technicians) ? pressureRows.technicians[0] : null;
+        setCapacityStatus(firstPressure || null);
       } catch {
         setTechnicianFields([]);
         setTechnicianFieldValues([]);
+        setCapacityStatus(null);
       }
     }
     void loadTechnicianFieldData();
@@ -244,6 +249,26 @@ export default function TechnicianPage() {
             entityType="technician"
             entityId={meId}
           />
+        ) : null}
+
+        {capacityStatus ? (
+          <section className="card operator-section">
+            <div className="operator-section__header">
+              <div>
+                <h2 className="operator-section__title">Capacity status</h2>
+                <p className="operator-section__subtitle">Today’s remaining capacity and overload signal for the current field user.</p>
+              </div>
+            </div>
+            <div className="integration-card">
+              <strong>{capacityStatus.unavailable ? "Unavailable" : capacityStatus.overloaded ? "Overloaded" : "Available"}</strong>
+              <div className="muted" style={{ marginTop: 4 }}>
+                Remaining {capacityStatus.remainingMinutes} min · Scheduled {capacityStatus.scheduledMinutes} min · Capacity {capacityStatus.availableMinutes} min
+              </div>
+              {Array.isArray(capacityStatus.capacityNotes) && capacityStatus.capacityNotes.length ? (
+                <div className="muted" style={{ marginTop: 4 }}>{capacityStatus.capacityNotes.join(" • ")}</div>
+              ) : null}
+            </div>
+          </section>
         ) : null}
 
         <section className="card operator-section">

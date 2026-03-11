@@ -60,10 +60,12 @@ export default function CommandCentreV2Page() {
   const [showSaveView, setShowSaveView] = useState(false);
   const [savingView, setSavingView] = useState(false);
   const [assignTechId, setAssignTechId] = useState<string>("");
-    const [assignTime, setAssignTime] = useState<string>("");
-    const [openedJob, setOpenedJob] = useState<any>(null);
-    const [dragJobId, setDragJobId] = useState<string>("");
-    const [dragStatusTarget, setDragStatusTarget] = useState<string>("");
+  const [assignTime, setAssignTime] = useState<string>("");
+  const [openedJob, setOpenedJob] = useState<any>(null);
+  const [dragJobId, setDragJobId] = useState<string>("");
+  const [dragStatusTarget, setDragStatusTarget] = useState<string>("");
+  const [capacityPressure, setCapacityPressure] = useState<any>(null);
+  const [assignmentRecommendations, setAssignmentRecommendations] = useState<any[]>([]);
   const [pendingBulk, setPendingBulk] = useState<{ op: string; payload: Record<string, any>; label: string } | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [pendingInlineJobId, setPendingInlineJobId] = useState<string>("");
@@ -176,6 +178,37 @@ export default function CommandCentreV2Page() {
     }
     setAssignTime("");
   }, [openedJob]);
+
+  useEffect(() => {
+    if (!openedJob) {
+      setCapacityPressure(null);
+      setAssignmentRecommendations([]);
+      return;
+    }
+    const target = assignTime
+      ? new Date(assignTime)
+      : openedJob?.scheduledAt
+      ? new Date(openedJob.scheduledAt)
+      : new Date();
+    if (Number.isNaN(target.getTime())) {
+      setCapacityPressure(null);
+      setAssignmentRecommendations([]);
+      return;
+    }
+    const day = target.toISOString().slice(0, 10);
+    const params = new URLSearchParams({
+      entityType: "job",
+      entityId: String(openedJob.id),
+      scheduledAt: target.toISOString(),
+    });
+    Promise.all([
+      apiFetch(`/schedule/pressure?date=${day}`).catch(() => null),
+      apiFetch(`/schedule/recommendations?${params.toString()}`).catch(() => null),
+    ]).then(([pressureRes, recommendationRes]) => {
+      setCapacityPressure(pressureRes || null);
+      setAssignmentRecommendations(Array.isArray(recommendationRes?.recommendations) ? recommendationRes.recommendations : []);
+    });
+  }, [openedJob, assignTime]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -850,6 +883,26 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
 
             <div className="ccv2-sidepanel-dispatch">
               <h4>Dispatch</h4>
+              {capacityPressure?.technicians?.length ? (
+                <div className="ccv2-sidepanel-section" style={{ padding: 0, marginBottom: 12 }}>
+                  <div className="ccv2-sidepanel-sectionTitle">Capacity pressure</div>
+                  <div className="muted" style={{ marginBottom: 8 }}>
+                    {capacityPressure.overloadedTechnicians?.length
+                      ? `${capacityPressure.overloadedTechnicians.length} technician day${capacityPressure.overloadedTechnicians.length === 1 ? "" : "s"} overloaded`
+                      : "No overloaded technician days for the selected schedule date"}
+                  </div>
+                  {Array.isArray(assignmentRecommendations) && assignmentRecommendations.length ? (
+                    <div style={{ display: "grid", gap: 8 }}>
+                      {assignmentRecommendations.slice(0, 3).map((row) => (
+                        <div key={row.technicianId} className="integration-card" style={{ padding: 10 }}>
+                          <strong>{row.technicianName}</strong>
+                          <div className="muted">Score {row.score} · {row.remainingMinutesAfterAssign} min after assign</div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
               <label className="ccv2-label">Technician</label>
               <select
                 className="input"

@@ -33,6 +33,7 @@ export const NAV_GROUPS: NavGroup[] = [
         title: "Scheduling",
         children: [
           { title: "Calendar", href: "/dashboard/calendar" },
+          { title: "Capacity planning", href: "/dashboard/scheduling" },
           { title: "Bookings", href: "/dashboard/bookings" },
         ],
       },
