@@ -3106,6 +3106,74 @@ body {
   letter-spacing: 0.04em;
 }
 
+[data-shell="app"] .operator-statusBadge,
+.customer-workspace .operator-statusBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(255, 255, 255, 0.78);
+  color: #334155;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+[data-shell="app"] .operator-statusBadge.is-compact,
+.customer-workspace .operator-statusBadge.is-compact {
+  min-height: 24px;
+  padding: 0 8px;
+  font-size: 10px;
+}
+
+[data-shell="app"] .operator-statusBadge--neutral,
+.customer-workspace .operator-statusBadge--neutral {
+  background: rgba(255, 255, 255, 0.86);
+  color: #475569;
+  border-color: rgba(148, 163, 184, 0.22);
+}
+
+[data-shell="app"] .operator-statusBadge--info,
+[data-shell="app"] .operator-statusBadge--draft,
+.customer-workspace .operator-statusBadge--info,
+.customer-workspace .operator-statusBadge--draft {
+  background: rgba(37, 99, 235, 0.1);
+  color: #1d4ed8;
+  border-color: rgba(37, 99, 235, 0.16);
+}
+
+[data-shell="app"] .operator-statusBadge--success,
+[data-shell="app"] .operator-statusBadge--active,
+.customer-workspace .operator-statusBadge--success,
+.customer-workspace .operator-statusBadge--active {
+  background: rgba(15, 118, 110, 0.1);
+  color: #0f766e;
+  border-color: rgba(15, 118, 110, 0.16);
+}
+
+[data-shell="app"] .operator-statusBadge--warning,
+[data-shell="app"] .operator-statusBadge--paused,
+[data-shell="app"] .operator-statusBadge--pending,
+.customer-workspace .operator-statusBadge--warning,
+.customer-workspace .operator-statusBadge--paused,
+.customer-workspace .operator-statusBadge--pending {
+  background: rgba(180, 83, 9, 0.1);
+  color: #b45309;
+  border-color: rgba(180, 83, 9, 0.18);
+}
+
+[data-shell="app"] .operator-statusBadge--critical,
+.customer-workspace .operator-statusBadge--critical {
+  background: rgba(185, 28, 28, 0.1);
+  color: #b91c1c;
+  border-color: rgba(185, 28, 28, 0.18);
+}
+
 [data-shell="app"] .operator-rowActions {
   display: inline-flex;
   align-items: center;
@@ -3561,6 +3629,56 @@ body {
   background: rgba(180, 83, 9, 0.12);
   color: #b45309;
   border-color: rgba(180, 83, 9, 0.18);
+}
+
+.customer-workspace__stats {
+  gap: 14px;
+}
+
+.customer-workspace__statCard {
+  padding: 20px;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+}
+
+.customer-workspace__statValue {
+  margin: 0;
+  font-size: 1.75rem;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: #0f172a;
+}
+
+.customer-workspace__sectionHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.customer-workspace__sectionTitle {
+  margin: 0;
+  font-size: 1.05rem;
+  letter-spacing: -0.03em;
+}
+
+.customer-workspace__list {
+  display: grid;
+  gap: 12px;
+}
+
+.customer-workspace__empty {
+  padding: 18px 0 4px;
+}
+
+.customer-workspace__metaStack {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
 }
 
 .integration-card {

@@ -1,3 +1,5 @@
+import { OperatorStatusBadge } from "../ui/operator-page";
+
 type OpsSignalsBarProps = {
   blockedBy: string[];
   risks: string[];
@@ -18,13 +20,13 @@ export default function OpsSignalsBar({ blockedBy, risks, severity, compact = fa
   return (
     <div className="pill-row" style={{ marginBottom: compact ? 0 : 12 }}>
       {items.map((item) => (
-        <span
+        <OperatorStatusBadge
           key={item.label}
-          className={`badge ${severity === "critical" ? "warn" : ""}`}
+          compact={compact}
+          label={item.label}
           style={baseStyle}
-        >
-          {item.label}
-        </span>
+          tone={severity === "critical" ? "critical" : severity === "warn" ? "warning" : "info"}
+        />
       ))}
     </div>
   );

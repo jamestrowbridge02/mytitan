@@ -40,6 +40,60 @@ type OperatorChip = {
   onClear?: () => void;
 };
 
+type OperatorStatusTone =
+  | "neutral"
+  | "info"
+  | "success"
+  | "warning"
+  | "critical"
+  | "draft"
+  | "active"
+  | "paused"
+  | "pending";
+
+const STATUS_TONE_BY_VALUE: Record<string, OperatorStatusTone> = {
+  ACTIVE: "active",
+  APPROVED: "success",
+  ARCHIVED: "paused",
+  BREACHED: "critical",
+  CANCELLED: "warning",
+  COMPLETED: "success",
+  CONNECTED: "active",
+  CRITICAL: "critical",
+  DECLINED: "warning",
+  DISMISSED: "neutral",
+  DONE: "success",
+  DRAFT: "draft",
+  ENABLED: "active",
+  FAILED: "critical",
+  HEALTHY: "success",
+  INACTIVE: "paused",
+  IN_PROGRESS: "info",
+  LIVE: "active",
+  LOW_STOCK: "warning",
+  OPEN: "info",
+  ORDERED: "info",
+  OVERDUE: "critical",
+  PAID: "success",
+  PARTIAL: "warning",
+  PAUSED: "paused",
+  PENDING: "pending",
+  RECEIVED: "success",
+  RESOLVED: "success",
+  RESTRICTED: "warning",
+  REVOKED: "critical",
+  SCHEDULED: "info",
+  SENT: "info",
+  SHORTAGE: "critical",
+  SUBMITTED: "info",
+  SUCCESS: "success",
+  WARNING: "warning",
+};
+
+function normalizeStatusKey(value: string) {
+  return value.trim().replaceAll(/[\s-]+/g, "_").toUpperCase();
+}
+
 function OperatorActionButton({ action }: { action: OperatorAction | OperatorFilterAction }) {
   const className = action.variant === "secondary" ? "button secondary operator-page__button" : "button operator-page__button";
 
@@ -268,6 +322,27 @@ export function OperatorGuidance({
         </div>
       ) : null}
     </section>
+  );
+}
+
+export function OperatorStatusBadge({
+  label,
+  tone,
+  compact = false,
+  className,
+  style,
+}: {
+  label: string;
+  tone?: OperatorStatusTone;
+  compact?: boolean;
+  className?: string;
+  style?: CSSProperties;
+}) {
+  const resolvedTone = tone || STATUS_TONE_BY_VALUE[normalizeStatusKey(label)] || "neutral";
+  return (
+    <span className={`operator-statusBadge operator-statusBadge--${resolvedTone}${compact ? " is-compact" : ""}${className ? ` ${className}` : ""}`} style={style}>
+      {label}
+    </span>
   );
 }
 
