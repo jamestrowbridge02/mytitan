@@ -554,6 +554,8 @@ export class AnalyticsService {
       activePortalAccounts,
       activePortalTokens,
       documentArtifacts,
+      pendingRenewals,
+      openPlanChangeRequests,
     ] = await Promise.all([
       db.job.findMany({
         where: {
@@ -643,6 +645,18 @@ export class AnalyticsService {
           tenantId,
         },
       }),
+      db.servicePlanRenewal.count({
+        where: {
+          tenantId,
+          status: 'PENDING',
+        },
+      }),
+      db.servicePlanChangeRequest.count({
+        where: {
+          tenantId,
+          status: { in: ['OPEN', 'APPROVED'] },
+        },
+      }),
     ]);
 
     const jobCreatedSeries = this.buildSeries(
@@ -711,6 +725,8 @@ export class AnalyticsService {
         runsExecuted: executedPlanRuns,
         executionRate: this.rate(executedPlanRuns, servicePlanRuns.length),
         overdueRuns: overdueRecurringRuns,
+        pendingRenewals,
+        openChangeRequests: openPlanChangeRequests,
       },
       approvals: {
         requested: approvals.length,
@@ -1138,6 +1154,13 @@ export class AnalyticsService {
         href: '/dashboard/service-plans',
       },
       {
+        key: 'open_plan_change_requests',
+        label: 'Open plan requests',
+        value: operations.servicePlans.openChangeRequests,
+        detail: 'Customer or operator plan changes still need review or completion.',
+        href: '/dashboard/service-plans',
+      },
+      {
         key: 'open_revenue_tasks',
         label: 'Open revenue tasks',
         value: revenue.openTasksByType.reduce((sum: number, item: any) => sum + Number(item.count || 0), 0),
@@ -1161,6 +1184,11 @@ export class AnalyticsService {
         label: 'Recurring execution focus',
         value: operations.servicePlans.overdueRuns,
         context: 'Recurring plans are due but not converting into fresh work reliably.',
+      },
+      {
+        label: 'Retention focus',
+        value: operations.servicePlans.pendingRenewals + operations.servicePlans.openChangeRequests,
+        context: 'Renewal responses and plan-change requests are the clearest customer-retention queue.',
       },
     ]);
 

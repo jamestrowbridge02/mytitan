@@ -129,7 +129,15 @@ const FIXTURE = {
   servicePlans: {
     active: { id: "e2e-service-plan-active", name: "Quarterly Vehicle Health Check" },
     paused: { id: "e2e-service-plan-paused", name: "Annual Warranty Review" },
+    portalRenewal: { id: "e2e-service-plan-portal-renewal", name: "Semi-Annual Compliance Review" },
     run: { id: "e2e-service-plan-run-executed" },
+  },
+  servicePlanRenewals: {
+    portalPending: { id: "e2e-service-plan-renewal-portal-pending" },
+  },
+  servicePlanChangeRequests: {
+    customerOpen: { id: "e2e-service-plan-request-customer-open" },
+    operatorCompleted: { id: "e2e-service-plan-request-operator-completed" },
   },
   quotes: {
     draft: { id: "e2e-quote-draft", number: "Q-2026-00010", title: "Draft wheel restoration quote" },
@@ -786,6 +794,22 @@ async function ensureServicePlan(id, payload, tasks = []) {
 
 async function ensureServicePlanRun(id, payload) {
   await prisma.servicePlanRun.upsert({
+    where: { id },
+    create: { id, ...payload },
+    update: payload,
+  });
+}
+
+async function ensureServicePlanRenewal(id, payload) {
+  await prisma.servicePlanRenewal.upsert({
+    where: { id },
+    create: { id, ...payload },
+    update: payload,
+  });
+}
+
+async function ensureServicePlanChangeRequest(id, payload) {
+  await prisma.servicePlanChangeRequest.upsert({
     where: { id },
     create: { id, ...payload },
     update: payload,
@@ -2076,7 +2100,19 @@ async function main() {
     },
   });
 
-  const seededServicePlanIds = [FIXTURE.servicePlans.active.id, FIXTURE.servicePlans.paused.id];
+  const seededServicePlanIds = [FIXTURE.servicePlans.active.id, FIXTURE.servicePlans.paused.id, FIXTURE.servicePlans.portalRenewal.id];
+  await prisma.servicePlanChangeRequest.deleteMany({
+    where: {
+      tenantId: company.id,
+      id: { notIn: [FIXTURE.servicePlanChangeRequests.customerOpen.id, FIXTURE.servicePlanChangeRequests.operatorCompleted.id] },
+    },
+  });
+  await prisma.servicePlanRenewal.deleteMany({
+    where: {
+      tenantId: company.id,
+      id: { notIn: [FIXTURE.servicePlanRenewals.portalPending.id] },
+    },
+  });
   await prisma.servicePlanRun.deleteMany({
     where: {
       tenantId: company.id,
@@ -2135,6 +2171,26 @@ async function main() {
     { title: "Review warranty status" },
   ]);
 
+  await ensureServicePlan(FIXTURE.servicePlans.portalRenewal.id, {
+    tenantId: company.id,
+    customerId: customers.portalActive.id,
+    name: FIXTURE.servicePlans.portalRenewal.name,
+    description: "Customer-visible plan seeded for renewal decisions.",
+    status: "ACTIVE",
+    cadenceUnit: "MONTH",
+    cadenceInterval: 6,
+    nextRunAt: addMinutes(now, 60 * 24 * 10),
+    lastRunAt: addMinutes(now, -60 * 24 * 120),
+    autoCreateBooking: true,
+    autoCreateJob: false,
+    notesJson: { operatorNotes: "Seeded self-serve renewal plan" },
+    portalVisible: true,
+    createdByUserId: operator.id,
+  }, [
+    { title: "Review compliance items" },
+    { title: "Confirm site access requirements" },
+  ]);
+
   await ensureServicePlanRun(FIXTURE.servicePlans.run.id, {
     tenantId: company.id,
     planId: FIXTURE.servicePlans.active.id,
@@ -2159,6 +2215,87 @@ async function main() {
     payloadJson: {
       planId: FIXTURE.servicePlans.active.id,
       bookingId: FIXTURE.bookings.convertible.id,
+    },
+  });
+
+  await ensureServicePlanRenewal(FIXTURE.servicePlanRenewals.portalPending.id, {
+    tenantId: company.id,
+    planId: FIXTURE.servicePlans.portalRenewal.id,
+    customerId: customers.portalActive.id,
+    status: "PENDING",
+    renewalWindowStartAt: addMinutes(now, -60 * 24 * 2),
+    renewalWindowEndAt: addMinutes(now, 60 * 24 * 14),
+    requestedAt: addMinutes(now, -60 * 24),
+    respondedAt: null,
+    completedAt: null,
+    notesJson: { seeded: true, source: "e2e" },
+  });
+
+  await ensureServicePlanChangeRequest(FIXTURE.servicePlanChangeRequests.customerOpen.id, {
+    tenantId: company.id,
+    planId: FIXTURE.servicePlans.paused.id,
+    customerId: customers.portalActive.id,
+    status: "OPEN",
+    kind: "RESUME_REQUEST",
+    requestedBy: "CUSTOMER",
+    requestedAt: addMinutes(now, -60 * 6),
+    respondedAt: null,
+    responseNote: null,
+    payloadJson: { note: "Please restart this plan next week." },
+  });
+
+  await ensureServicePlanChangeRequest(FIXTURE.servicePlanChangeRequests.operatorCompleted.id, {
+    tenantId: company.id,
+    planId: FIXTURE.servicePlans.active.id,
+    customerId: customers.convertible.id,
+    status: "COMPLETED",
+    kind: "SCOPE_CHANGE_REQUEST",
+    requestedBy: "OPERATOR",
+    requestedAt: addMinutes(now, -60 * 24 * 5),
+    respondedAt: addMinutes(now, -60 * 24 * 4),
+    responseNote: "Scope note logged and customer informed.",
+    payloadJson: { note: "Add seasonal tyre depth photo capture." },
+  });
+
+  await ensureActivityEvent("e2e-activity-service-plan-renewal-requested", {
+    type: "service_plan.renewal.requested",
+    label: `Requested renewal for ${FIXTURE.servicePlans.portalRenewal.name}`,
+    at: addMinutes(now, -60 * 24),
+    tenantId: company.id,
+    customerId: customers.portalActive.id,
+    customerName: customers.portalActive.name,
+    payloadJson: {
+      planId: FIXTURE.servicePlans.portalRenewal.id,
+      renewalId: FIXTURE.servicePlanRenewals.portalPending.id,
+    },
+  });
+
+  await ensureActivityEvent("e2e-activity-service-plan-change-request-created", {
+    type: "service_plan.change_request.created",
+    label: `Customer requested resume request for ${FIXTURE.servicePlans.paused.name}`,
+    at: addMinutes(now, -60 * 6),
+    tenantId: company.id,
+    customerId: customers.portalActive.id,
+    customerName: customers.portalActive.name,
+    payloadJson: {
+      planId: FIXTURE.servicePlans.paused.id,
+      requestId: FIXTURE.servicePlanChangeRequests.customerOpen.id,
+      kind: "RESUME_REQUEST",
+      requestedBy: "CUSTOMER",
+    },
+  });
+
+  await ensureActivityEvent("e2e-activity-service-plan-change-request-completed", {
+    type: "service_plan.change_request.completed",
+    label: `Completed scope change request for ${FIXTURE.servicePlans.active.name}`,
+    at: addMinutes(now, -60 * 24 * 4),
+    tenantId: company.id,
+    customerId: customers.convertible.id,
+    customerName: customers.convertible.name,
+    payloadJson: {
+      planId: FIXTURE.servicePlans.active.id,
+      requestId: FIXTURE.servicePlanChangeRequests.operatorCompleted.id,
+      kind: "SCOPE_CHANGE_REQUEST",
     },
   });
 

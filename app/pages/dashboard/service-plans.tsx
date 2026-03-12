@@ -36,6 +36,8 @@ type ServicePlan = {
   notesJson?: Record<string, any> | null;
   tasks: Array<{ title: string }>;
   recentRuns?: Array<{ id: string; status: string; scheduledFor?: string | null; bookingId?: string | null; jobId?: string | null }>;
+  currentRenewal?: ServicePlanRenewal | null;
+  recentChangeRequests?: ServicePlanChangeRequest[];
 };
 
 type ServicePlanRun = {
@@ -46,6 +48,35 @@ type ServicePlanRun = {
   bookingId?: string | null;
   jobId?: string | null;
   resultJson?: any;
+};
+
+type ServicePlanRenewal = {
+  id: string;
+  planId: string;
+  planName?: string | null;
+  customerName?: string | null;
+  customerSlug?: string | null;
+  status: string;
+  renewalWindowStartAt?: string | null;
+  renewalWindowEndAt?: string | null;
+  requestedAt?: string | null;
+  respondedAt?: string | null;
+  completedAt?: string | null;
+};
+
+type ServicePlanChangeRequest = {
+  id: string;
+  planId: string;
+  planName?: string | null;
+  customerName?: string | null;
+  customerSlug?: string | null;
+  status: string;
+  kind: string;
+  requestedBy: string;
+  requestedAt?: string | null;
+  respondedAt?: string | null;
+  responseNote?: string | null;
+  payloadJson?: any;
 };
 
 type FormState = {
@@ -98,6 +129,8 @@ export default function ServicePlansPage() {
   const [plans, setPlans] = useState<ServicePlan[]>([]);
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
   const [runs, setRuns] = useState<ServicePlanRun[]>([]);
+  const [renewals, setRenewals] = useState<ServicePlanRenewal[]>([]);
+  const [changeRequests, setChangeRequests] = useState<ServicePlanChangeRequest[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [loading, setLoading] = useState(true);
@@ -108,6 +141,8 @@ export default function ServicePlansPage() {
   const { notice, showError, showSuccess, clearNotice } = useOperatorNotice();
 
   const canManage = hasWorkspacePermission(permissions, "settings.manage");
+
+  const selectedPlan = useMemo(() => plans.find((plan) => plan.id === selectedPlanId) || null, [plans, selectedPlanId]);
 
   async function loadPlans(keepSelection = true) {
     const response = await apiFetch("/service-plans");
@@ -125,6 +160,15 @@ export default function ServicePlansPage() {
     }
   }
 
+  async function loadQueues() {
+    const [renewalRows, requestRows] = await Promise.all([
+      apiFetch("/service-plans/renewals"),
+      apiFetch("/service-plans/change-requests"),
+    ]);
+    setRenewals(Array.isArray(renewalRows) ? renewalRows : []);
+    setChangeRequests(Array.isArray(requestRows) ? requestRows : []);
+  }
+
   async function loadRuns(planId: string) {
     try {
       const response = await apiFetch(`/service-plans/${planId}/runs`);
@@ -139,16 +183,20 @@ export default function ServicePlansPage() {
     const load = async () => {
       setLoading(true);
       try {
-        const [me, customerRows, planRows] = await Promise.all([
+        const [me, customerRows, planRows, renewalRows, requestRows] = await Promise.all([
           apiFetch("/me"),
           apiFetch("/customers?limit=200"),
           apiFetch("/service-plans"),
+          apiFetch("/service-plans/renewals"),
+          apiFetch("/service-plans/change-requests"),
         ]);
         if (cancelled) return;
         setPermissions(normalizePermissionSnapshot(me?.permissions));
         setCustomers(Array.isArray(customerRows) ? customerRows : []);
         const nextPlans = Array.isArray(planRows) ? planRows : [];
         setPlans(nextPlans);
+        setRenewals(Array.isArray(renewalRows) ? renewalRows : []);
+        setChangeRequests(Array.isArray(requestRows) ? requestRows : []);
         setSelectedPlanId(nextPlans[0]?.id || null);
       } catch (error: any) {
         if (!cancelled) {
@@ -197,14 +245,18 @@ export default function ServicePlansPage() {
     const due = plans.filter((plan) => plan.status === "ACTIVE" && plan.nextRunAt && new Date(plan.nextRunAt).getTime() <= Date.now()).length;
     const bookingPlans = plans.filter((plan) => plan.autoCreateBooking).length;
     const jobPlans = plans.filter((plan) => plan.autoCreateJob).length;
+    const pendingRenewals = renewals.filter((renewal) => renewal.status === "PENDING").length;
+    const openRequests = changeRequests.filter((request) => request.status === "OPEN" || request.status === "APPROVED").length;
     return [
       { label: "Active", value: String(active), hint: "Recurring plans currently live" },
       { label: "Paused", value: String(paused), hint: "Plans not currently generating work" },
       { label: "Due now", value: String(due), hint: "Plans whose next run is already due" },
       { label: "Booking mode", value: String(bookingPlans), hint: "Plans that generate bookings" },
       { label: "Job mode", value: String(jobPlans), hint: "Plans that generate jobs" },
+      { label: "Renewals", value: String(pendingRenewals), hint: "Plans currently inside an explicit renewal window" },
+      { label: "Requests", value: String(openRequests), hint: "Customer or operator plan-change requests still being handled" },
     ];
-  }, [plans]);
+  }, [plans, renewals, changeRequests]);
 
   async function savePlan() {
     setSaving(true);
@@ -247,6 +299,7 @@ export default function ServicePlansPage() {
       await apiFetch(`/service-plans/${planId}/run-now`, { method: "POST" });
       showSuccess("Recurring run executed");
       await loadPlans();
+      await loadQueues();
       await loadRuns(planId);
     } catch (error: any) {
       showError(error?.message || "Failed to run service plan");
@@ -261,6 +314,7 @@ export default function ServicePlansPage() {
       await apiFetch(`/service-plans/${planId}/${action}`, { method: "POST" });
       showSuccess(action === "pause" ? "Service plan paused" : "Service plan resumed");
       await loadPlans();
+      await loadQueues();
       await loadRuns(planId);
     } catch (error: any) {
       showError(error?.message || `Failed to ${action} service plan`);
@@ -273,6 +327,49 @@ export default function ServicePlansPage() {
     setSelectedPlanId(null);
     setForm(EMPTY_FORM);
     setRuns([]);
+  }
+
+  async function requestRenewal(planId: string) {
+    setBusyPlanId(planId);
+    try {
+      const start = new Date();
+      const end = new Date(start.getTime() + 30 * 24 * 60 * 60 * 1000);
+      await apiFetch(`/service-plans/${planId}/renewals/request`, {
+        method: "POST",
+        body: JSON.stringify({
+          renewalWindowStartAt: start.toISOString(),
+          renewalWindowEndAt: end.toISOString(),
+          notesJson: { source: "dashboard_service_plans" },
+        }),
+      });
+      showSuccess("Renewal window opened");
+      await loadPlans();
+      await loadQueues();
+    } catch (error: any) {
+      showError(error?.message || "Failed to request renewal");
+    } finally {
+      setBusyPlanId(null);
+    }
+  }
+
+  async function updateRequest(id: string, action: "approve" | "decline" | "complete") {
+    setBusyPlanId(id);
+    try {
+      await apiFetch(`/service-plans/change-requests/${id}/${action}`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      showSuccess(`Request ${action}d`);
+      await loadPlans();
+      await loadQueues();
+      if (selectedPlanId) {
+        await loadRuns(selectedPlanId);
+      }
+    } catch (error: any) {
+      showError(error?.message || `Failed to ${action} request`);
+    } finally {
+      setBusyPlanId(null);
+    }
   }
 
   if (permissionsReady && !canManage && !plans.length && !loading) {
@@ -311,7 +408,7 @@ export default function ServicePlansPage() {
           items={[
             "Use booking mode when the next step should still pass through scheduling and conversion.",
             "Use job mode when the recurring work should enter the operational queue immediately.",
-            "Portal-visible plans can be surfaced in customer-facing status views, but only as read-safe plan metadata.",
+            "Portal-visible plans can now expose renewal windows and narrow change requests without leaking operator-only workflow data.",
           ]}
         />
 
@@ -416,9 +513,19 @@ export default function ServicePlansPage() {
           <div className="operator-section__header">
             <div>
               <h2 className="operator-section__title">{form.id ? "Edit plan" : "Create plan"}</h2>
-              <p className="operator-section__subtitle">Recurring customer work with cadence, mode, and task definitions.</p>
+              <p className="operator-section__subtitle">Recurring customer work with cadence, mode, task definitions, and explicit renewal handling.</p>
             </div>
           </div>
+          {selectedPlan?.currentRenewal ? (
+            <div className="integration-card" style={{ marginBottom: 12 }}>
+              <div>
+                <strong>Active renewal window</strong>
+                <p className="muted" style={{ margin: "6px 0 0 0" }}>
+                  {selectedPlan.currentRenewal.status} • {formatDateTime(selectedPlan.currentRenewal.renewalWindowStartAt)} to {formatDateTime(selectedPlan.currentRenewal.renewalWindowEndAt)}
+                </p>
+              </div>
+            </div>
+          ) : null}
           <div style={{ display: "grid", gap: 12 }}>
             <select className="input" data-testid="service-plan-customer" value={form.customerId} onChange={(event) => setForm((current) => ({ ...current, customerId: event.target.value }))}>
               <option value="">Select customer</option>
@@ -469,6 +576,16 @@ export default function ServicePlansPage() {
                 <button className="button" type="button" onClick={() => void savePlan()} data-testid="service-plan-save" disabled={saving}>
                   {saving ? "Saving..." : "Save plan"}
                 </button>
+                {selectedPlan?.id ? (
+                  <button
+                    className="button secondary"
+                    type="button"
+                    onClick={() => void requestRenewal(selectedPlan.id)}
+                    disabled={busyPlanId === selectedPlan.id || Boolean(selectedPlan.currentRenewal && ["PENDING", "APPROVED"].includes(selectedPlan.currentRenewal.status))}
+                  >
+                    {busyPlanId === selectedPlan.id ? "Opening..." : "Open renewal window"}
+                  </button>
+                ) : null}
                 <button className="button secondary" type="button" onClick={startCreate}>
                   Reset
                 </button>
@@ -507,6 +624,138 @@ export default function ServicePlansPage() {
             </OperatorDataTable>
           ) : (
             <p className="muted">{selectedPlanId ? "No run history yet." : "Select a plan to inspect history."}</p>
+          )}
+        </section>
+
+        <section className="card operator-section" data-testid="service-plan-renewal-list">
+          <div className="operator-section__header">
+            <div>
+              <h2 className="operator-section__title">Renewal queue</h2>
+              <p className="operator-section__subtitle">Explicit customer renewal windows waiting on customer response or operator completion.</p>
+            </div>
+          </div>
+          {renewals.length ? (
+            <OperatorDataTable columns="minmax(220px, 1.1fr) minmax(180px, 0.8fr) minmax(180px, 0.9fr) minmax(180px, auto)">
+              <OperatorDataTableHeader>
+                <div className="operator-table__cell">Plan</div>
+                <div className="operator-table__cell">Customer</div>
+                <div className="operator-table__cell">Window</div>
+                <div className="operator-table__cell">State</div>
+              </OperatorDataTableHeader>
+              {renewals.map((renewal) => (
+                <OperatorDataTableRow key={renewal.id}>
+                  <div className="operator-table__cell">
+                    <div className="operator-cellTitle">{renewal.planName || "Service plan"}</div>
+                    <div className="operator-cellSubtle">{renewal.status}</div>
+                  </div>
+                  <div className="operator-table__cell">{renewal.customerName || "Customer"}</div>
+                  <div className="operator-table__cell">
+                    <div className="operator-cellMeta">
+                      <span>{formatDateTime(renewal.renewalWindowStartAt)}</span>
+                      <span>{formatDateTime(renewal.renewalWindowEndAt)}</span>
+                    </div>
+                  </div>
+                  <div className="operator-table__cell">
+                    {renewal.status === "APPROVED" ? (
+                      <button
+                        className="button secondary"
+                        type="button"
+                        onClick={() => void apiFetch(`/service-plans/renewals/${renewal.id}/complete`, { method: "POST", body: JSON.stringify({}) }).then(async () => {
+                          showSuccess("Renewal completed");
+                          await loadPlans();
+                          await loadQueues();
+                        }).catch((error: any) => showError(error?.message || "Failed to complete renewal"))}
+                        disabled={busyPlanId === renewal.id}
+                      >
+                        Complete
+                      </button>
+                    ) : (
+                      <span className="operator-cellSubtle">{renewal.respondedAt ? `Responded ${formatDateTime(renewal.respondedAt)}` : "Awaiting response"}</span>
+                    )}
+                  </div>
+                </OperatorDataTableRow>
+              ))}
+            </OperatorDataTable>
+          ) : (
+            <p className="muted">No renewal windows are open yet.</p>
+          )}
+        </section>
+
+        <section className="card operator-section" data-testid="service-plan-change-request-list">
+          <div className="operator-section__header">
+            <div>
+              <h2 className="operator-section__title">Change request queue</h2>
+              <p className="operator-section__subtitle">Customer or operator requests for pause, resume, cancellation, cadence, or scope changes.</p>
+            </div>
+          </div>
+          {changeRequests.length ? (
+            <OperatorDataTable columns="minmax(220px, 1.1fr) minmax(180px, 0.8fr) minmax(180px, 0.8fr) minmax(240px, 1fr) minmax(220px, auto)">
+              <OperatorDataTableHeader>
+                <div className="operator-table__cell">Plan</div>
+                <div className="operator-table__cell">Customer</div>
+                <div className="operator-table__cell">Request</div>
+                <div className="operator-table__cell">Detail</div>
+                <div className="operator-table__cell">Actions</div>
+              </OperatorDataTableHeader>
+              {changeRequests.map((request) => (
+                <OperatorDataTableRow key={request.id}>
+                  <div className="operator-table__cell">
+                    <div className="operator-cellTitle">{request.planName || "Service plan"}</div>
+                    <div className="operator-cellSubtle">{request.status}</div>
+                  </div>
+                  <div className="operator-table__cell">{request.customerName || "Customer"}</div>
+                  <div className="operator-table__cell">
+                    {request.kind.replaceAll("_", " ")}
+                    <div className="operator-cellSubtle">{request.requestedBy} • {formatDateTime(request.requestedAt)}</div>
+                  </div>
+                  <div className="operator-table__cell">
+                    {request.responseNote || request.payloadJson?.note || request.payloadJson?.cadenceUnit || "No additional detail"}
+                  </div>
+                  <div className="operator-table__cell">
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      {request.status === "OPEN" ? (
+                        <>
+                          <button
+                            className="button secondary"
+                            type="button"
+                            onClick={() => void updateRequest(request.id, "approve")}
+                            data-testid="service-plan-request-approve"
+                            disabled={busyPlanId === request.id}
+                          >
+                            Approve
+                          </button>
+                          <button
+                            className="button secondary"
+                            type="button"
+                            onClick={() => void updateRequest(request.id, "decline")}
+                            data-testid="service-plan-request-decline"
+                            disabled={busyPlanId === request.id}
+                          >
+                            Decline
+                          </button>
+                        </>
+                      ) : null}
+                      {request.status === "APPROVED" ? (
+                        <button
+                          className="button"
+                          type="button"
+                          onClick={() => void updateRequest(request.id, "complete")}
+                          data-testid="service-plan-request-complete"
+                          disabled={busyPlanId === request.id}
+                        >
+                          Complete
+                        </button>
+                      ) : null}
+                      {request.status !== "OPEN" && request.status !== "APPROVED" ? (
+                        <span className="operator-cellSubtle">{request.respondedAt ? `Updated ${formatDateTime(request.respondedAt)}` : request.status}</span>
+                      ) : null}
+                    </div>
+                  </div>
+                </OperatorDataTableRow>
+              ))}
+            </OperatorDataTable>
+          ) : (
+            <p className="muted">No plan change requests are queued yet.</p>
           )}
         </section>
       </div>

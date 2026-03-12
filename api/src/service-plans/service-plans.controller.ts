@@ -5,7 +5,15 @@ import { JwtPayload } from "../auth/auth.types";
 import { assertPermission } from "../common/permissions";
 import { Roles } from "../common/roles.decorator";
 import { RolesGuard } from "../common/roles.guard";
-import { PatchServicePlanDto, UpsertServicePlanDto } from "./dto";
+import {
+  CompleteServicePlanChangeRequestDto,
+  CompleteServicePlanRenewalDto,
+  ListServicePlanChangeRequestsDto,
+  PatchServicePlanDto,
+  RequestServicePlanRenewalDto,
+  RespondServicePlanChangeRequestDto,
+  UpsertServicePlanDto,
+} from "./dto";
 import { ServicePlansService } from "./service-plans.service";
 
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -68,5 +76,52 @@ export class ServicePlansController {
   async resume(@CurrentUser() user: JwtPayload, @Param("id") id: string) {
     await assertPermission({ user, permission: "settings.manage", action: "service_plans.resume" });
     return this.servicePlans.resume(user.companyId, user.sub, id);
+  }
+
+  @Get("renewals")
+  @Roles("OWNER", "ADMIN", "STAFF", "READ_ONLY")
+  renewals(@CurrentUser() user: JwtPayload) {
+    return this.servicePlans.listRenewals(user.companyId);
+  }
+
+  @Post(":id/renewals/request")
+  @Roles("OWNER", "ADMIN", "STAFF")
+  async requestRenewal(@CurrentUser() user: JwtPayload, @Param("id") id: string, @Body() dto: RequestServicePlanRenewalDto) {
+    await assertPermission({ user, permission: "settings.manage", action: "service_plans.request_renewal" });
+    return this.servicePlans.requestRenewal(user.companyId, user.sub, id, dto);
+  }
+
+  @Post("renewals/:id/complete")
+  @Roles("OWNER", "ADMIN", "STAFF")
+  async completeRenewal(@CurrentUser() user: JwtPayload, @Param("id") id: string, @Body() dto: CompleteServicePlanRenewalDto) {
+    await assertPermission({ user, permission: "settings.manage", action: "service_plans.complete_renewal" });
+    return this.servicePlans.completeRenewal(user.companyId, user.sub, id, dto.responseNote);
+  }
+
+  @Get("change-requests")
+  @Roles("OWNER", "ADMIN", "STAFF", "READ_ONLY")
+  changeRequests(@CurrentUser() user: JwtPayload, @Query() query: ListServicePlanChangeRequestsDto) {
+    return this.servicePlans.listChangeRequests(user.companyId, query);
+  }
+
+  @Post("change-requests/:id/approve")
+  @Roles("OWNER", "ADMIN", "STAFF")
+  async approveChangeRequest(@CurrentUser() user: JwtPayload, @Param("id") id: string, @Body() dto: RespondServicePlanChangeRequestDto) {
+    await assertPermission({ user, permission: "settings.manage", action: "service_plans.approve_request" });
+    return this.servicePlans.approveChangeRequest(user.companyId, user.sub, id, dto.responseNote);
+  }
+
+  @Post("change-requests/:id/decline")
+  @Roles("OWNER", "ADMIN", "STAFF")
+  async declineChangeRequest(@CurrentUser() user: JwtPayload, @Param("id") id: string, @Body() dto: RespondServicePlanChangeRequestDto) {
+    await assertPermission({ user, permission: "settings.manage", action: "service_plans.decline_request" });
+    return this.servicePlans.declineChangeRequest(user.companyId, user.sub, id, dto.responseNote);
+  }
+
+  @Post("change-requests/:id/complete")
+  @Roles("OWNER", "ADMIN", "STAFF")
+  async completeChangeRequest(@CurrentUser() user: JwtPayload, @Param("id") id: string, @Body() dto: CompleteServicePlanChangeRequestDto) {
+    await assertPermission({ user, permission: "settings.manage", action: "service_plans.complete_request" });
+    return this.servicePlans.completeChangeRequest(user.companyId, user.sub, id, dto.responseNote);
   }
 }

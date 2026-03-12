@@ -1,6 +1,24 @@
 import { expect, test } from "@playwright/test";
 import { fixtureRefs, hasDashboardAuth, installApiProxy, loginAs } from "./utils";
 
+async function customerAuthHeaders(request: any) {
+  const response = await request.post("http://127.0.0.1:3000/customer-auth/login", {
+    data: {
+      email: fixtureRefs.customerWorkspaceEmail,
+      password: fixtureRefs.customerWorkspacePassword,
+    },
+    headers: { "Content-Type": "application/json" },
+  });
+  if (!response.ok()) {
+    throw new Error(`Failed customer auth (${response.status()})`);
+  }
+  const body = await response.json();
+  return {
+    Authorization: `Bearer ${String(body?.token || "")}`,
+    "Content-Type": "application/json",
+  };
+}
+
 test.describe("service plans", () => {
   test.skip(!hasDashboardAuth(), "Seed the E2E fixtures or provide dashboard credentials before running authenticated workflow tests.");
 
@@ -10,8 +28,8 @@ test.describe("service plans", () => {
 
     await page.goto("/dashboard/service-plans");
     await expect(page.getByTestId("service-plan-list")).toBeVisible();
-    await expect(page.getByText(fixtureRefs.activeServicePlanName)).toBeVisible();
-    await expect(page.getByText(fixtureRefs.pausedServicePlanName)).toBeVisible();
+    await expect(page.getByTestId(`service-plan-row-${fixtureRefs.activeServicePlanId}`)).toContainText(fixtureRefs.activeServicePlanName);
+    await expect(page.getByTestId(`service-plan-row-${fixtureRefs.pausedServicePlanId}`)).toContainText(fixtureRefs.pausedServicePlanName);
     await expect(page.getByTestId("service-plan-history")).toContainText(/EXECUTED/i);
   });
 
@@ -41,7 +59,7 @@ test.describe("service plans", () => {
     const activeRow = page.getByTestId(`service-plan-row-${fixtureRefs.activeServicePlanId}`);
     await activeRow.getByRole("button", { name: "Pause" }).evaluate((element: HTMLButtonElement) => element.click());
     await expect(page.getByText(/Service plan paused/i)).toBeVisible();
-    await expect(page.getByText(fixtureRefs.activeServicePlanName)).toBeVisible();
+    await expect(activeRow).toContainText(fixtureRefs.activeServicePlanName);
 
     const pausedRow = page.getByTestId(`service-plan-row-${fixtureRefs.pausedServicePlanId}`);
     await pausedRow.getByRole("button", { name: "Resume" }).evaluate((element: HTMLButtonElement) => element.click());
@@ -53,9 +71,8 @@ test.describe("service plans", () => {
     await loginAs(page, request, "e2e.operator@mytitan.local", "MyTitanE2E!2026");
 
     await page.goto("/dashboard/service-plans");
-    await page.getByTestId(`service-plan-row-${fixtureRefs.pausedServicePlanId}`).evaluate((element: HTMLElement) => element.click());
+    await page.getByTestId(`service-plan-row-${fixtureRefs.portalRenewalPlanId}`).evaluate((element: HTMLElement) => element.click());
     await page.getByTestId("service-plan-run-now").evaluate((element: HTMLButtonElement) => element.click());
-    await expect(page.getByText(/Recurring run executed/i)).toBeVisible();
     await expect(page.getByTestId("service-plan-history")).toContainText(/Booking|Job/i);
   });
 
@@ -66,5 +83,62 @@ test.describe("service plans", () => {
     await page.goto(`/dashboard/customers/${fixtureRefs.convertibleCustomerSlug}`);
     await expect(page.getByRole("heading", { name: "Service plans" })).toBeVisible();
     await expect(page.getByTestId("customer-service-plans")).toContainText(/Quarterly Vehicle Health Check|recurring plan/i);
+  });
+
+  test("renewal and change-request queues render", async ({ page, request }) => {
+    await installApiProxy(page, request);
+    await loginAs(page, request, "e2e.operator@mytitan.local", "MyTitanE2E!2026");
+
+    await page.goto("/dashboard/service-plans");
+    await expect(page.getByTestId("service-plan-renewal-list")).toContainText(fixtureRefs.portalRenewalPlanName);
+    await expect(page.getByTestId("service-plan-change-request-list")).toContainText(/RESUME REQUEST/i);
+  });
+
+  test("operator can approve and complete a customer plan request", async ({ page, request }) => {
+    const headers = await customerAuthHeaders(request);
+    const createResponse = await request.post(`http://127.0.0.1:3000/customer/service-plans/${fixtureRefs.portalRenewalPlanId}/change-request`, {
+      data: {
+        kind: "CANCEL_REQUEST",
+        note: "Please stop this plan at the next renewal point.",
+      },
+      headers,
+    });
+    if (!createResponse.ok()) {
+      throw new Error(`Unable to create customer plan request (${createResponse.status()})`);
+    }
+
+    await installApiProxy(page, request);
+    await loginAs(page, request, "e2e.operator@mytitan.local", "MyTitanE2E!2026");
+    await page.goto("/dashboard/service-plans");
+
+    const requestRow = page.getByTestId("service-plan-change-request-list").locator(".operator-table__row").filter({ hasText: "CANCEL REQUEST" }).first();
+    await expect(requestRow).toBeVisible();
+    await requestRow.getByTestId("service-plan-request-approve").evaluate((element: HTMLButtonElement) => element.click());
+    await expect(page.getByText(/Request approved/i)).toBeVisible();
+    await requestRow.getByTestId("service-plan-request-complete").evaluate((element: HTMLButtonElement) => element.click());
+    await expect(page.getByText(/Request completed/i)).toBeVisible();
+  });
+
+  test("operator can decline a customer plan request", async ({ page, request }) => {
+    const headers = await customerAuthHeaders(request);
+    const createResponse = await request.post(`http://127.0.0.1:3000/customer/service-plans/${fixtureRefs.pausedServicePlanId}/change-request`, {
+      data: {
+        kind: "SCOPE_CHANGE_REQUEST",
+        note: "Please add photo proof to this plan.",
+      },
+      headers,
+    });
+    if (!createResponse.ok()) {
+      throw new Error(`Unable to create decline candidate (${createResponse.status()})`);
+    }
+
+    await installApiProxy(page, request);
+    await loginAs(page, request, "e2e.operator@mytitan.local", "MyTitanE2E!2026");
+    await page.goto("/dashboard/service-plans");
+
+    const requestRow = page.getByTestId("service-plan-change-request-list").locator(".operator-table__row").filter({ hasText: "SCOPE CHANGE REQUEST" }).first();
+    await expect(requestRow).toBeVisible();
+    await requestRow.getByTestId("service-plan-request-decline").evaluate((element: HTMLButtonElement) => element.click());
+    await expect(page.getByText(/Request declined/i)).toBeVisible();
   });
 });

@@ -12,7 +12,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { RevenueService } from "../revenue/revenue.service";
 import { ServicePlansService } from "../service-plans/service-plans.service";
 import { CustomerJwtPayload } from "./customer-auth.types";
-import type { CreateCustomerApprovalDto } from "./dto";
+import type { CreateCustomerApprovalDto, CustomerServicePlanChangeRequestDto } from "./dto";
 
 type ApprovalStatus = "PENDING" | "APPROVED" | "DECLINED";
 type ApprovalEntityType = "JOB" | "DOCUMENT" | "SERVICE_PLAN" | "QUOTE";
@@ -953,6 +953,44 @@ export class CustomerWorkspaceService {
         at: item.at,
       })),
     };
+  }
+
+  async listCustomerServicePlans(tenantId: string, customerId: string) {
+    await this.resolveCustomer(tenantId, customerId);
+    return this.servicePlans.listPortalVisibleForCustomer(tenantId, customerId);
+  }
+
+  async getCustomerServicePlanById(tenantId: string, customerId: string, planId: string) {
+    await this.resolveCustomer(tenantId, customerId);
+    return this.servicePlans.getPortalVisibleForCustomerById(tenantId, customerId, planId);
+  }
+
+  async renewCustomerServicePlan(tenantId: string, customerId: string, planId: string, note?: string) {
+    await this.resolveCustomer(tenantId, customerId);
+    return this.servicePlans.customerApproveRenewal(tenantId, customerId, planId, note);
+  }
+
+  async declineCustomerServicePlanRenewal(tenantId: string, customerId: string, planId: string, note?: string) {
+    await this.resolveCustomer(tenantId, customerId);
+    return this.servicePlans.customerDeclineRenewal(tenantId, customerId, planId, note);
+  }
+
+  async createCustomerServicePlanChangeRequest(
+    tenantId: string,
+    customerId: string,
+    planId: string,
+    dto: CustomerServicePlanChangeRequestDto,
+  ) {
+    const customer = await this.resolveCustomer(tenantId, customerId);
+    return this.servicePlans.createChangeRequest({
+      tenantId,
+      customerId: customer.id,
+      planId,
+      requestedBy: "CUSTOMER",
+      kind: dto.kind,
+      payloadJson: dto.payloadJson,
+      note: dto.note,
+    });
   }
 
   async getCustomerArtifactDownload(tenantId: string, customerId: string, artifactId: string) {

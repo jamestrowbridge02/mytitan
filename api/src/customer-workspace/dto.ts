@@ -1,6 +1,8 @@
 import {
+  IsBoolean,
   IsEmail,
   IsIn,
+  IsObject,
   IsOptional,
   IsString,
   MaxLength,
@@ -9,6 +11,13 @@ import {
 
 export const CUSTOMER_APPROVAL_ENTITY_TYPES = ["JOB", "DOCUMENT", "SERVICE_PLAN", "QUOTE"] as const;
 export const CUSTOMER_APPROVAL_KINDS = ["WORK_AUTHORIZATION", "DOCUMENT_ACKNOWLEDGEMENT", "PLAN_APPROVAL", "QUOTE_ACCEPTANCE"] as const;
+export const CUSTOMER_SERVICE_PLAN_REQUEST_KINDS = [
+  "PAUSE_REQUEST",
+  "RESUME_REQUEST",
+  "CANCEL_REQUEST",
+  "CADENCE_CHANGE_REQUEST",
+  "SCOPE_CHANGE_REQUEST",
+] as const;
 
 export class InviteCustomerAccountDto {
   @IsString()
@@ -70,4 +79,29 @@ export class ListCustomerApprovalsDto {
   @IsOptional()
   @IsIn(["PENDING", "APPROVED", "DECLINED"])
   status?: "PENDING" | "APPROVED" | "DECLINED";
+}
+
+export class CustomerServicePlanDecisionDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  note?: string;
+}
+
+export class CustomerServicePlanChangeRequestDto {
+  @IsIn(CUSTOMER_SERVICE_PLAN_REQUEST_KINDS)
+  kind!: (typeof CUSTOMER_SERVICE_PLAN_REQUEST_KINDS)[number];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  note?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  portalVisible?: boolean;
+
+  @IsOptional()
+  @IsObject()
+  payloadJson?: Record<string, any>;
 }

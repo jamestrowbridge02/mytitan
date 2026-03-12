@@ -68,8 +68,10 @@ test.describe("revenue operations", () => {
     await page.getByTestId("quote-title").fill("Monthly fleet quote");
     await page.getByTestId("quote-line-items").fill("LABOUR | Inspection labour | 1 | 15000\nPART | Service kit | 1 | 9000");
     await page.getByTestId("quote-save").evaluate((element: HTMLButtonElement) => element.click());
+    await expect(page.getByText(/Quote created/i)).toBeVisible();
+    await page.reload();
 
-    const createdRow = page.locator(".operator-table__row").filter({ hasText: "Monthly fleet quote" }).first();
+    const createdRow = page.getByTestId("quote-list").locator(".operator-table__row").filter({ hasText: "Monthly fleet quote" }).first();
     await expect(createdRow).toBeVisible();
     await createdRow.evaluate((element: HTMLElement) => element.click());
     await page.getByTestId("quote-title").fill("Monthly fleet quote revised");

@@ -96,6 +96,8 @@ export class MetricsService {
       overdueInvoices,
       dueServicePlans,
       overduePlanRuns,
+      pendingRenewals,
+      openPlanChangeRequests,
       quotesAwaitingApproval,
       approvedQuotesAwaitingConversion,
       schedulingCapacity,
@@ -265,6 +267,18 @@ export class MetricsService {
           scheduledFor: { lt: now },
         },
       }),
+      db.servicePlanRenewal.count({
+        where: {
+          tenantId,
+          status: 'PENDING',
+        },
+      }),
+      db.servicePlanChangeRequest.count({
+        where: {
+          tenantId,
+          status: { in: ['OPEN', 'APPROVED'] },
+        },
+      }),
       db.quote.count({
         where: {
           tenantId,
@@ -366,6 +380,8 @@ export class MetricsService {
         overdueInvoices,
         dueServicePlans,
         overduePlanRuns,
+        pendingRenewals,
+        openPlanChangeRequests,
         quotesAwaitingApproval,
         approvedQuotesAwaitingConversion,
         overloadedTechnicianDays,
@@ -386,6 +402,12 @@ export class MetricsService {
           : null,
         overduePlanRuns > 0
           ? { key: 'overdue_plan_runs', label: 'Recurring runs need review', count: overduePlanRuns, href: '/dashboard/service-plans', hint: 'Failed or pending service plan runs need operator attention' }
+          : null,
+        pendingRenewals > 0
+          ? { key: 'pending_plan_renewals', label: 'Renewal responses pending', count: pendingRenewals, href: '/dashboard/service-plans', hint: 'Customers have live plan renewal windows still awaiting a response' }
+          : null,
+        openPlanChangeRequests > 0
+          ? { key: 'open_plan_change_requests', label: 'Plan change requests open', count: openPlanChangeRequests, href: '/dashboard/service-plans', hint: 'Customer or operator plan changes still need review or completion' }
           : null,
         overdueBillingFollowUps > 0
           ? { key: 'billing_followups_due', label: 'Overdue billing follow-ups', count: overdueBillingFollowUps, href: '/dashboard/billing/readiness', hint: 'Completed work already has past-due billing reminders' }
@@ -423,6 +445,8 @@ export class MetricsService {
         overdueInvoices > 0 ? { key: 'overdue_invoices', severity: 'warn', label: 'Invoices overdue for payment', count: overdueInvoices, href: '/dashboard/billing/readiness' } : null,
         dueServicePlans > 0 ? { key: 'due_service_plans', severity: 'info', label: 'Service plans due now', count: dueServicePlans, href: '/dashboard/service-plans' } : null,
         overduePlanRuns > 0 ? { key: 'overdue_plan_runs', severity: 'warn', label: 'Recurring runs need review', count: overduePlanRuns, href: '/dashboard/service-plans' } : null,
+        pendingRenewals > 0 ? { key: 'pending_plan_renewals', severity: 'info', label: 'Renewal responses pending', count: pendingRenewals, href: '/dashboard/service-plans' } : null,
+        openPlanChangeRequests > 0 ? { key: 'open_plan_change_requests', severity: 'warn', label: 'Plan change requests open', count: openPlanChangeRequests, href: '/dashboard/service-plans' } : null,
         overloadedTechnicianDays > 0 ? { key: 'overloaded_technician_days', severity: 'warn', label: 'Technician days overloaded', count: overloadedTechnicianDays, href: '/dashboard/scheduling' } : null,
         publicUnlinkedBookings > 0 ? { key: 'public_conversion', severity: 'info', label: 'Public bookings awaiting conversion', count: publicUnlinkedBookings, href: '/dashboard/bookings' } : null,
         agedUnlinkedBookings > 0 ? { key: 'stale_booking_conversion', severity: 'warn', label: 'Unlinked bookings older than 48h', count: agedUnlinkedBookings, href: '/dashboard/bookings' } : null,

@@ -20,6 +20,21 @@ async function operatorToken() {
   }
 }
 
+async function requestRenewalWindow(request: any, planId: string) {
+  const token = await operatorToken();
+  const now = Date.now();
+  return request.post(`http://127.0.0.1:3000/service-plans/${planId}/renewals/request`, {
+    data: {
+      renewalWindowStartAt: new Date(now).toISOString(),
+      renewalWindowEndAt: new Date(now + 14 * 24 * 60 * 60 * 1000).toISOString(),
+    },
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
+}
+
 test.describe("customer accounts and approvals", () => {
   test.skip(!hasDashboardAuth(), "Seed the E2E fixtures or provide dashboard credentials before running authenticated workflow tests.");
 
@@ -102,5 +117,48 @@ test.describe("customer accounts and approvals", () => {
 
     await expect(page.getByTestId("approval-request-list")).toContainText(/WORK AUTHORIZATION/i);
     await expect(page.getByTestId("approval-request-create")).toBeVisible();
+  });
+
+  test("customer can approve a plan renewal", async ({ page, request }) => {
+    await installApiProxy(page, request);
+    await loginCustomerAs(page, request, fixtureRefs.customerWorkspaceEmail, fixtureRefs.customerWorkspacePassword);
+    await page.goto("/customer");
+
+    const planRow = page.locator('[data-testid="customer-plan-list"] .integration-card').filter({ hasText: fixtureRefs.portalRenewalPlanName }).first();
+    await expect(planRow).toBeVisible();
+    await planRow.getByTestId("customer-plan-renew").click();
+    await expect(page.getByText(/Renewal preference recorded/i)).toBeVisible();
+    await expect(planRow).toContainText(/APPROVED/i);
+  });
+
+  test("customer can decline a plan renewal on another visible plan", async ({ page, request }) => {
+    const renewalResponse = await requestRenewalWindow(request, fixtureRefs.pausedServicePlanId);
+    if (!renewalResponse.ok() && renewalResponse.status() !== 409) {
+      throw new Error(`Unable to request renewal (${renewalResponse.status()})`);
+    }
+
+    await installApiProxy(page, request);
+    await loginCustomerAs(page, request, fixtureRefs.customerWorkspaceEmail, fixtureRefs.customerWorkspacePassword);
+    await page.goto("/customer");
+
+    const planRow = page.locator('[data-testid="customer-plan-list"] .integration-card').filter({ hasText: fixtureRefs.pausedServicePlanName }).first();
+    await expect(planRow).toBeVisible();
+    await planRow.getByTestId("customer-plan-decline").click();
+    await expect(page.getByText(/Renewal declined/i)).toBeVisible();
+    await expect(planRow.getByTestId("customer-plan-decline")).toHaveCount(0);
+  });
+
+  test("customer can submit a plan change request", async ({ page, request }) => {
+    await installApiProxy(page, request);
+    await loginCustomerAs(page, request, fixtureRefs.customerWorkspaceEmail, fixtureRefs.customerWorkspacePassword);
+    await page.goto("/customer");
+
+    const planRow = page.locator('[data-testid="customer-plan-list"] .integration-card').filter({ hasText: fixtureRefs.portalRenewalPlanName }).first();
+    await expect(planRow).toBeVisible();
+    await planRow.locator("select").selectOption("SCOPE_CHANGE_REQUEST");
+    await planRow.locator("textarea").fill("Please include a seasonal access checklist.");
+    await planRow.getByTestId("customer-plan-change-request").click();
+    await expect(page.getByText(/Change request submitted/i)).toBeVisible();
+    await expect(planRow.getByTestId("customer-plan-request-list")).toContainText(/SCOPE CHANGE REQUEST/i);
   });
 });

@@ -14,6 +14,15 @@ import {
 
 export const SERVICE_PLAN_STATUSES = ["ACTIVE", "PAUSED", "CANCELLED"] as const;
 export const SERVICE_PLAN_CADENCE_UNITS = ["WEEK", "MONTH", "QUARTER", "YEAR"] as const;
+export const SERVICE_PLAN_RENEWAL_STATUSES = ["PENDING", "APPROVED", "DECLINED", "EXPIRED", "COMPLETED"] as const;
+export const SERVICE_PLAN_REQUEST_STATUSES = ["OPEN", "APPROVED", "DECLINED", "CANCELLED", "COMPLETED"] as const;
+export const SERVICE_PLAN_REQUEST_KINDS = [
+  "PAUSE_REQUEST",
+  "RESUME_REQUEST",
+  "CANCEL_REQUEST",
+  "CADENCE_CHANGE_REQUEST",
+  "SCOPE_CHANGE_REQUEST",
+] as const;
 
 export class ServicePlanTaskDto {
   @IsString()
@@ -133,4 +142,40 @@ export class PatchServicePlanDto {
   @ValidateNested({ each: true })
   @Type(() => ServicePlanTaskDto)
   tasks?: ServicePlanTaskDto[];
+}
+
+export class RequestServicePlanRenewalDto {
+  @IsDateString()
+  renewalWindowStartAt!: string;
+
+  @IsDateString()
+  renewalWindowEndAt!: string;
+
+  @IsOptional()
+  @IsObject()
+  notesJson?: Record<string, any>;
+}
+
+export class CompleteServicePlanRenewalDto {
+  @IsOptional()
+  @IsString()
+  responseNote?: string;
+}
+
+export class ListServicePlanChangeRequestsDto {
+  @IsOptional()
+  @IsIn(SERVICE_PLAN_REQUEST_STATUSES)
+  status?: (typeof SERVICE_PLAN_REQUEST_STATUSES)[number];
+}
+
+export class RespondServicePlanChangeRequestDto {
+  @IsOptional()
+  @IsString()
+  responseNote?: string;
+}
+
+export class CompleteServicePlanChangeRequestDto {
+  @IsOptional()
+  @IsString()
+  responseNote?: string;
 }

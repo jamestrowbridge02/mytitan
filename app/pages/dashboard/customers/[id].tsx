@@ -278,6 +278,16 @@ export default function CustomerTimelinePage() {
                     <p className="muted" style={{ margin: "4px 0 0 0" }}>
                       {plan.status} · Next run {plan.nextRunAt ? new Date(plan.nextRunAt).toLocaleString() : "not scheduled"}
                     </p>
+                    {plan.currentRenewal ? (
+                      <p className="muted" style={{ margin: "4px 0 0 0" }}>
+                        Renewal {plan.currentRenewal.status} · window closes {plan.currentRenewal.renewalWindowEndAt ? new Date(plan.currentRenewal.renewalWindowEndAt).toLocaleString() : "not set"}
+                      </p>
+                    ) : null}
+                    {plan.recentChangeRequests?.length ? (
+                      <p className="muted" style={{ margin: "4px 0 0 0" }}>
+                        Latest request {String(plan.recentChangeRequests[0].kind || "").replaceAll("_", " ")} · {plan.recentChangeRequests[0].status}
+                      </p>
+                    ) : null}
                   </div>
                   <a className="button secondary" href="/dashboard/service-plans">Open plans</a>
                 </div>

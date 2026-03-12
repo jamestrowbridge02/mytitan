@@ -42,7 +42,7 @@ test.describe("analytics and benchmarking", () => {
     const refreshedControls = page.locator(".operator-section").filter({ hasText: "Analytics controls" }).first();
     const refreshedRevenueRow = refreshedControls.locator(".integration-card").filter({ hasText: "revenue-panel" }).first();
     const showButton = refreshedRevenueRow.getByRole("button", { name: "Show widget" });
-    await showButton.scrollIntoViewIfNeeded();
+    await refreshedRevenueRow.scrollIntoViewIfNeeded();
     await showButton.evaluate((element: HTMLButtonElement) => element.click());
     await page.getByRole("button", { name: "Save layout" }).evaluate((element: HTMLButtonElement) => element.click());
     await expect(page.getByTestId("operator-notice-success")).toContainText(/layout saved/i);

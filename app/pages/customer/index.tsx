@@ -22,6 +22,9 @@ export default function CustomerWorkspacePage() {
   const [authLoading, setAuthLoading] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [planBusyId, setPlanBusyId] = useState<string | null>(null);
+  const [planRequestKindById, setPlanRequestKindById] = useState<Record<string, string>>({});
+  const [planRequestNoteById, setPlanRequestNoteById] = useState<Record<string, string>>({});
 
   const hasToken = useMemo(() => Boolean(getCustomerToken()), []);
 
@@ -83,6 +86,47 @@ export default function CustomerWorkspacePage() {
       await loadWorkspace();
     } catch (err: any) {
       setError(err?.message || "Could not update approval");
+    }
+  }
+
+  async function respondToRenewal(planId: string, decision: "renew" | "decline") {
+    setPlanBusyId(planId);
+    setError("");
+    setNotice("");
+    try {
+      await customerApiFetch(`/customer/service-plans/${planId}/${decision === "renew" ? "renew" : "decline-renewal"}`, {
+        method: "POST",
+        body: JSON.stringify({ note: planRequestNoteById[planId] || "" }),
+      });
+      setNotice(decision === "renew" ? "Renewal preference recorded" : "Renewal declined");
+      await loadWorkspace();
+    } catch (err: any) {
+      setError(err?.message || "Could not update renewal");
+    } finally {
+      setPlanBusyId(null);
+    }
+  }
+
+  async function submitChangeRequest(planId: string) {
+    const kind = String(planRequestKindById[planId] || "PAUSE_REQUEST");
+    setPlanBusyId(planId);
+    setError("");
+    setNotice("");
+    try {
+      await customerApiFetch(`/customer/service-plans/${planId}/change-request`, {
+        method: "POST",
+        body: JSON.stringify({
+          kind,
+          note: planRequestNoteById[planId] || "",
+        }),
+      });
+      setNotice("Change request submitted");
+      setPlanRequestNoteById((current) => ({ ...current, [planId]: "" }));
+      await loadWorkspace();
+    } catch (err: any) {
+      setError(err?.message || "Could not submit change request");
+    } finally {
+      setPlanBusyId(null);
     }
   }
 
@@ -275,7 +319,7 @@ export default function CustomerWorkspacePage() {
           )}
         </section>
 
-        <section className="card customer-workspace__section">
+        <section className="card customer-workspace__section" data-testid="customer-plan-list">
           <h2 style={{ marginTop: 0 }}>Service plans</h2>
           {workspace.servicePlans?.length ? (
             <div style={{ display: "grid", gap: 12 }}>
@@ -284,8 +328,82 @@ export default function CustomerWorkspacePage() {
                   <div>
                     <strong>{plan.name}</strong>
                     <p className="muted" style={{ margin: "6px 0 0 0" }}>
-                      {plan.status} • Next run {formatDateTime(plan.nextRunAt)}
+                      {plan.status} • Every {plan.cadenceInterval} {String(plan.cadenceUnit || "month").toLowerCase()}
+                      {Number(plan.cadenceInterval || 0) > 1 ? "s" : ""} • Next run {formatDateTime(plan.nextRunAt)}
                     </p>
+                    {plan.currentRenewal ? (
+                      <p className="muted" style={{ margin: "6px 0 0 0" }}>
+                        Renewal {plan.currentRenewal.status} • Window {formatDateTime(plan.currentRenewal.renewalWindowStartAt)} to {formatDateTime(plan.currentRenewal.renewalWindowEndAt)}
+                      </p>
+                    ) : null}
+                    {plan.tasks?.length ? (
+                      <p className="muted" style={{ margin: "6px 0 0 0" }}>
+                        {plan.tasks.map((task: any) => task.title).join(" • ")}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div style={{ display: "grid", gap: 8, minWidth: 320 }}>
+                    {plan.currentRenewal?.status === "PENDING" ? (
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <button
+                          className="button"
+                          type="button"
+                          onClick={() => void respondToRenewal(plan.id, "renew")}
+                          data-testid="customer-plan-renew"
+                          disabled={planBusyId === plan.id}
+                        >
+                          {planBusyId === plan.id ? "Saving..." : "Approve renewal"}
+                        </button>
+                        <button
+                          className="button secondary"
+                          type="button"
+                          onClick={() => void respondToRenewal(plan.id, "decline")}
+                          data-testid="customer-plan-decline"
+                          disabled={planBusyId === plan.id}
+                        >
+                          {planBusyId === plan.id ? "Saving..." : "Decline renewal"}
+                        </button>
+                      </div>
+                    ) : null}
+                    <div style={{ display: "grid", gap: 8 }}>
+                      <select
+                        className="input"
+                        value={planRequestKindById[plan.id] || (plan.status === "PAUSED" ? "RESUME_REQUEST" : "PAUSE_REQUEST")}
+                        onChange={(event) => setPlanRequestKindById((current) => ({ ...current, [plan.id]: event.target.value }))}
+                      >
+                        <option value="PAUSE_REQUEST">Request pause</option>
+                        <option value="RESUME_REQUEST">Request resume</option>
+                        <option value="CANCEL_REQUEST">Request cancellation</option>
+                        <option value="CADENCE_CHANGE_REQUEST">Request cadence change</option>
+                        <option value="SCOPE_CHANGE_REQUEST">Request scope change</option>
+                      </select>
+                      <textarea
+                        className="textarea"
+                        value={planRequestNoteById[plan.id] || ""}
+                        onChange={(event) => setPlanRequestNoteById((current) => ({ ...current, [plan.id]: event.target.value }))}
+                        placeholder="What should change?"
+                      />
+                      <button
+                        className="button secondary"
+                        type="button"
+                        onClick={() => void submitChangeRequest(plan.id)}
+                        data-testid="customer-plan-change-request"
+                        disabled={planBusyId === plan.id}
+                      >
+                        {planBusyId === plan.id ? "Submitting..." : "Submit request"}
+                      </button>
+                    </div>
+                    <div data-testid="customer-plan-request-list" style={{ display: "grid", gap: 6 }}>
+                      {(plan.changeRequests || []).slice(0, 4).map((request: any) => (
+                        <div key={request.id} className="muted" style={{ fontSize: 13 }}>
+                          {String(request.kind || "").replaceAll("_", " ")} • {request.status} • {formatDateTime(request.requestedAt)}
+                          {request.responseNote ? ` • ${request.responseNote}` : ""}
+                        </div>
+                      ))}
+                      {!plan.changeRequests?.length && !plan.renewals?.length ? (
+                        <div className="muted" style={{ fontSize: 13 }}>No plan requests yet.</div>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
               ))}

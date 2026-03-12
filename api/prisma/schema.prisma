@@ -144,6 +144,35 @@ enum ServicePlanRunStatus {
   FAILED
 }
 
+enum ServicePlanRenewalStatus {
+  PENDING
+  APPROVED
+  DECLINED
+  EXPIRED
+  COMPLETED
+}
+
+enum ServicePlanChangeRequestStatus {
+  OPEN
+  APPROVED
+  DECLINED
+  CANCELLED
+  COMPLETED
+}
+
+enum ServicePlanChangeRequestKind {
+  PAUSE_REQUEST
+  RESUME_REQUEST
+  CANCEL_REQUEST
+  CADENCE_CHANGE_REQUEST
+  SCOPE_CHANGE_REQUEST
+}
+
+enum ServicePlanRequestActor {
+  CUSTOMER
+  OPERATOR
+}
+
 enum CustomerAccountStatus {
   INVITED
   ACTIVE
@@ -271,6 +300,8 @@ model Company {
   documentArtifacts        DocumentArtifact[]
   servicePlans             ServicePlan[]
   servicePlanRuns          ServicePlanRun[]
+  servicePlanRenewals      ServicePlanRenewal[]
+  servicePlanChangeRequests ServicePlanChangeRequest[]
   quotes                   Quote[]
   revenueCollectionTasks   RevenueCollectionTask[]
   tradePackInstalls        TradePackInstall[]
@@ -440,11 +471,13 @@ model Customer {
   company        Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
   jobs           Job[]
   activityEvents ActivityEvent[]
-  servicePlans   ServicePlan[]
-  customerAccount CustomerAccount?
-  approvals      CustomerApproval[]
-  quotes         Quote[]
-  revenueCollectionTasks RevenueCollectionTask[]
+  servicePlans             ServicePlan[]
+  servicePlanRenewals      ServicePlanRenewal[]
+  servicePlanChangeRequests ServicePlanChangeRequest[]
+  customerAccount          CustomerAccount?
+  approvals                CustomerApproval[]
+  quotes                   Quote[]
+  revenueCollectionTasks   RevenueCollectionTask[]
 
   @@unique([companyId, slug])
   @@index([companyId, name])
@@ -1588,6 +1621,8 @@ model ServicePlan {
   customer          Customer                @relation(fields: [customerId], references: [id], onDelete: Cascade)
   tasks             ServicePlanTask[]
   runs              ServicePlanRun[]
+  renewals          ServicePlanRenewal[]
+  changeRequests    ServicePlanChangeRequest[]
 
   @@index([tenantId, status, nextRunAt])
   @@index([tenantId, customerId, createdAt])
@@ -1625,6 +1660,52 @@ model ServicePlanRun {
   @@unique([planId, scheduledFor])
   @@index([tenantId, status, scheduledFor])
   @@index([tenantId, createdAt])
+}
+
+model ServicePlanRenewal {
+  id                   String                   @id @default(cuid())
+  tenantId             String
+  planId               String
+  customerId           String
+  status               ServicePlanRenewalStatus @default(PENDING)
+  renewalWindowStartAt DateTime
+  renewalWindowEndAt   DateTime
+  requestedAt          DateTime                 @default(now())
+  respondedAt          DateTime?
+  completedAt          DateTime?
+  notesJson            Json?
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+  tenant               Company                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan                 ServicePlan              @relation(fields: [planId], references: [id], onDelete: Cascade)
+  customer             Customer                 @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status, renewalWindowStartAt])
+  @@index([tenantId, customerId, status])
+  @@index([tenantId, planId, createdAt])
+}
+
+model ServicePlanChangeRequest {
+  id            String                         @id @default(cuid())
+  tenantId      String
+  planId        String
+  customerId    String
+  status        ServicePlanChangeRequestStatus @default(OPEN)
+  kind          ServicePlanChangeRequestKind
+  requestedBy   ServicePlanRequestActor
+  requestedAt   DateTime                       @default(now())
+  respondedAt   DateTime?
+  responseNote  String?
+  payloadJson   Json?
+  createdAt     DateTime                       @default(now())
+  updatedAt     DateTime                       @updatedAt
+  tenant        Company                        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan          ServicePlan                    @relation(fields: [planId], references: [id], onDelete: Cascade)
+  customer      Customer                       @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status, requestedAt])
+  @@index([tenantId, customerId, status])
+  @@index([tenantId, planId, kind])
 }
 
 model InviteToken {

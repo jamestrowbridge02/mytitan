@@ -7,6 +7,7 @@ import { CustomerAccountsController } from "./customer-accounts.controller";
 import { CustomerApprovalsController } from "./customer-approvals.controller";
 import { CustomerAuthController } from "./customer-auth.controller";
 import { CustomerJwtStrategy } from "./customer-jwt.strategy";
+import { CustomerServicePlansController } from "./customer-service-plans.controller";
 import { CustomerWorkspaceController } from "./customer-workspace.controller";
 import { CustomerJwtAuthGuard } from "./customer-auth.guard";
 import { CustomerWorkspaceService } from "./customer-workspace.service";
@@ -17,6 +18,7 @@ import { CustomerWorkspaceService } from "./customer-workspace.service";
     CustomerAuthController,
     CustomerAccountsController,
     CustomerApprovalsController,
+    CustomerServicePlansController,
     CustomerWorkspaceController,
   ],
   providers: [CustomerWorkspaceService, CustomerJwtStrategy, CustomerJwtAuthGuard],
