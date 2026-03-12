@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/router';
 import { getApiBase } from '../../../lib/api';
 import { isMarketplaceEnabled, isPortalPolishV1Enabled } from '../../../lib/feature-flags';
+import MyTitanLogo from '../../../components/brand/mytitan-logo';
 
 const API_BASE = getApiBase();
 const FALLBACK_SUPPORT_EMAIL = 'support@mytitan.co.uk';
@@ -650,7 +651,9 @@ export default function PublicJobPortal() {
       <div className="card" style={{ padding: 16 }}>
         <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <div>
-            <p className="muted" style={{ margin: 0 }}>MyTitan</p>
+            <div style={{ marginBottom: 8 }}>
+              <MyTitanLogo size="sm" />
+            </div>
             <h1 style={{ margin: '6px 0 0 0', color: brandColor }}>{portal?.brand?.tenantName || 'Customer portal'}</h1>
           </div>
           {portal?.brand?.logoUrl ? (
@@ -659,7 +662,9 @@ export default function PublicJobPortal() {
               alt="Tenant logo"
               style={{ width: 52, height: 52, objectFit: 'contain', borderRadius: 10, background: '#fff' }}
             />
-          ) : null}
+          ) : (
+            <MyTitanLogo variant="mark" size="sm" />
+          )}
         </header>
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 14 }}>

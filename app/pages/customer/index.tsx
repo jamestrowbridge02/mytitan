@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ApiError } from "../../lib/api";
 import { clearCustomerToken, customerApiFetch, getCustomerToken, setCustomerToken } from "../../lib/customer-auth";
+import MyTitanLogo from "../../components/brand/mytitan-logo";
 
 function money(cents: number, currency = "GBP") {
   return new Intl.NumberFormat(undefined, { style: "currency", currency }).format((cents || 0) / 100);
@@ -163,6 +164,9 @@ export default function CustomerWorkspacePage() {
         <div className="card customer-workspace__section" style={{ marginBottom: 16 }}>
           <div className="customer-workspace__hero">
             <div>
+              <div className="customer-workspace__brandRow">
+                <MyTitanLogo size="sm" glimmer />
+              </div>
               <p className="customer-workspace__eyebrow">Customer workspace</p>
               <h1 style={{ marginTop: 8, marginBottom: 8 }}>Track your service records</h1>
               <p className="muted" style={{ margin: 0 }}>
@@ -198,6 +202,9 @@ export default function CustomerWorkspacePage() {
       <div className="card customer-workspace__section" style={{ marginBottom: 16 }}>
         <div className="customer-workspace__hero">
           <div>
+            <div className="customer-workspace__brandRow">
+              <MyTitanLogo size="sm" />
+            </div>
             <p className="customer-workspace__eyebrow">Customer workspace</p>
             <h1 style={{ marginTop: 8, marginBottom: 6 }}>{workspace.customer?.name || "Customer"}</h1>
             <p className="muted" style={{ margin: 0 }}>

@@ -22,8 +22,9 @@ export default function MarketingShell(props: { children: React.ReactNode }) {
       <header className="mkt-topbar">
         <div className="mkt-topbar__inner">
           <Link href="/" className="mkt-brand">
-            <span className="mkt-brand__mark" />
-            <span>MyTitan</span>
+            <span className="mkt-brand__logoWrap">
+              <img src="/brand/mytitan-logo-light.svg" alt="MyTitan" className="mkt-brand__logo" />
+            </span>
           </Link>
 
           <nav className="mkt-topbar__nav" aria-label="Primary">

@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { apiFetch, setToken } from '../lib/api';
 import { isAuthPolishV1Enabled, isStartHereEnabled } from '../lib/feature-flags';
+import MyTitanLogo from '../components/brand/mytitan-logo';
 
 export default function Login() {
   const router = useRouter();
@@ -59,6 +60,9 @@ export default function Login() {
       <div className="auth-shell__frame">
         <section className="auth-shell__panel auth-shell__hero">
           <div>
+            <div className="auth-shell__brandRow">
+              <MyTitanLogo size="lg" glimmer className="auth-shell__brand" />
+            </div>
             <div className="auth-shell__eyebrow">MyTitan operations workspace</div>
             <h1 className="auth-shell__title">Control the day without losing the detail.</h1>
             <p className="auth-shell__lead">
@@ -82,6 +86,9 @@ export default function Login() {
         </section>
 
         <section className="card auth-shell__panel">
+          <div className="auth-shell__formBrand">
+            <MyTitanLogo size="sm" />
+          </div>
           <h1>Welcome back</h1>
           {error ? <p className="auth-shell__status auth-shell__status--error">{error}</p> : null}
           <form className="auth-shell__form" onSubmit={handleSubmit}>

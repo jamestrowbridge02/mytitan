@@ -60,17 +60,51 @@ select {
 .mkt-brand {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
   font-weight: 800;
   letter-spacing: -0.02em;
 }
 
-.mkt-brand__mark {
-  width: 36px;
-  height: 36px;
-  border-radius: 14px;
-  background: linear-gradient(135deg, rgba(17, 122, 120, 0.92), rgba(29, 78, 216, 0.90));
-  box-shadow: 0 14px 28px rgba(17, 122, 120, 0.22);
+.mkt-brand__logoWrap {
+  position: relative;
+  display: inline-flex;
+  overflow: hidden;
+}
+
+.mkt-brand__logo {
+  display: block;
+  height: 32px;
+  width: auto;
+}
+
+.mkt-brand-glimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.mkt-brand-glimmer::after {
+  content: "";
+  position: absolute;
+  inset: -20% auto -20% -34%;
+  width: 28%;
+  transform: skewX(-18deg);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.52), rgba(255, 255, 255, 0));
+  opacity: 0;
+  pointer-events: none;
+  animation: mkt-brand-glimmer 7s ease-in-out infinite;
+}
+
+@keyframes mkt-brand-glimmer {
+  0%, 14%, 100% {
+    opacity: 0;
+    left: -34%;
+  }
+  20% {
+    opacity: 0.5;
+  }
+  30% {
+    opacity: 0;
+    left: 110%;
+  }
 }
 
 .mkt-topbar__nav {
@@ -173,6 +207,18 @@ select {
   padding: 34px;
 }
 
+.mkt-hero__brand {
+  display: inline-flex;
+  margin-bottom: 18px;
+  border-radius: 18px;
+}
+
+.mkt-hero__brandLogo {
+  display: block;
+  height: 42px;
+  width: auto;
+}
+
 .mkt-hero__title {
   margin: 18px 0 14px;
   font-size: clamp(2.6rem, 6vw, 4.5rem);
@@ -206,6 +252,16 @@ select {
   font-weight: 600;
 }
 
+.mkt-footer__logo {
+  margin-bottom: 12px;
+}
+
+.mkt-footer__logoImage {
+  display: block;
+  height: 28px;
+  width: auto;
+}
+
 .mkt-hero__aside {
   padding: 28px;
   display: grid;
@@ -213,6 +269,12 @@ select {
   background:
     radial-gradient(300px 180px at 90% 10%, rgba(17, 122, 120, 0.12), transparent 70%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(239, 245, 255, 0.96));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mkt-brand-glimmer::after {
+    animation: none;
+  }
 }
 
 .mkt-hero__asideLabel {

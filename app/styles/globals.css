@@ -13,6 +13,12 @@
   --tenant-accent: #4fd1c5;
   --tenant-mode: light;
   --line: rgba(15, 23, 42, 0.12);
+  --mt-brand-primary: #0f2b61;
+  --mt-brand-electric: #55b7ff;
+  --mt-brand-enterprise: #1d4ed8;
+  --mt-brand-silver: #b8c7e0;
+  --mt-brand-graphite: #0f172a;
+  --mt-brand-slate: #64748b;
 }
 
 .dark {
@@ -118,6 +124,73 @@ a { color: var(--tenant-accent); text-decoration: none; }
   background: var(--tenant-primary);
   color: #0a0f1a;
   font-weight: 700;
+}
+
+.mt-brand-lockup {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  overflow: hidden;
+}
+
+.mt-brand-lockup__image {
+  display: block;
+  width: auto;
+  height: 100%;
+  max-width: 100%;
+}
+
+.mt-brand-lockup--sm {
+  height: 28px;
+}
+
+.mt-brand-lockup--md {
+  height: 34px;
+}
+
+.mt-brand-lockup--lg {
+  height: 44px;
+}
+
+.mt-brand-lockup--mark.mt-brand-lockup--sm {
+  width: 32px;
+  height: 32px;
+}
+
+.mt-brand-lockup--mark.mt-brand-lockup--md {
+  width: 40px;
+  height: 40px;
+}
+
+.mt-brand-lockup--mark.mt-brand-lockup--lg {
+  width: 52px;
+  height: 52px;
+}
+
+.mt-brand-glimmer::after {
+  content: "";
+  position: absolute;
+  inset: -16% auto -16% -35%;
+  width: 32%;
+  transform: skewX(-20deg);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.52), rgba(255, 255, 255, 0));
+  opacity: 0;
+  pointer-events: none;
+  animation: mt-brand-glimmer 6.8s ease-in-out infinite;
+}
+
+@keyframes mt-brand-glimmer {
+  0%, 12%, 100% {
+    opacity: 0;
+    left: -35%;
+  }
+  18% {
+    opacity: 0.52;
+  }
+  28% {
+    opacity: 0;
+    left: 112%;
+  }
 }
 
 .tab-row {
@@ -1630,6 +1703,29 @@ main {
 
 .mt-sidebar__brand {
   margin-bottom: 8px;
+}
+
+.mt-sidebar__brandLink {
+  border-radius: 18px;
+}
+
+.mt-sidebar__brandLogo {
+  filter: drop-shadow(0 12px 24px rgba(15, 43, 97, 0.18));
+}
+
+.mt-sidebar__brandBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.74);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .mt-sidebar__groupTitle {
@@ -3616,6 +3712,14 @@ table th,
     linear-gradient(180deg, #ffffff 0%, #edf4ff 100%);
 }
 
+.auth-shell__brandRow {
+  margin-bottom: 18px;
+}
+
+.auth-shell__brand {
+  filter: drop-shadow(0 18px 34px rgba(15, 43, 97, 0.16));
+}
+
 .auth-shell__eyebrow {
   display: inline-flex;
   width: fit-content;
@@ -3672,6 +3776,10 @@ table th,
   gap: 12px;
 }
 
+.auth-shell__formBrand {
+  margin-bottom: 18px;
+}
+
 .auth-shell__actions {
   display: flex;
   gap: 10px;
@@ -3721,6 +3829,10 @@ table th,
   font-weight: 700;
 }
 
+.customer-workspace__brandRow {
+  margin-bottom: 12px;
+}
+
 .customer-workspace__stats {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -3739,5 +3851,11 @@ table th,
 
   .auth-shell__panel {
     padding: 24px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mt-brand-glimmer::after {
+    animation: none;
   }
 }

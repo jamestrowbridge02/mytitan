@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { apiFetch, setToken } from '../lib/api';
+import MyTitanLogo from '../components/brand/mytitan-logo';
 
 export default function Signup() {
   const router = useRouter();
@@ -55,6 +56,9 @@ export default function Signup() {
   return (
     <div className="container">
       <div className="card">
+        <div className="auth-shell__formBrand">
+          <MyTitanLogo size="sm" glimmer />
+        </div>
         <h1>Create your MyTitan account</h1>
         <p className="muted">Start with your company and admin user.</p>
         {verifyPrompt ? (

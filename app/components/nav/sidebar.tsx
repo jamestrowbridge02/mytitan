@@ -6,6 +6,7 @@ import { apiFetch } from "../../lib/api";
 import { getBusinessTerms, getCommandCentreHref, getOptionalModuleVisibility } from "../../lib/business-config";
 import { useTenantSettings } from "../../lib/tenant-settings";
 import { emptyPermissionSnapshot, normalizePermissionSnapshot } from "../../lib/workspace-permissions";
+import MyTitanLogo from "../brand/mytitan-logo";
 
 function isActive(pathname: string, href?: string) {
   if (!href) return false;
@@ -149,14 +150,12 @@ export default function Sidebar() {
     <aside className="mt-sidebar hidden md:block h-screen w-[292px] shrink-0">
       <div className="flex h-full flex-col px-3 py-3">
         <div className="mt-sidebar__brand rounded-2xl px-3 py-3">
-          <Link href="/dashboard" className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl bg-[color:var(--brand-600)] shadow-sm" />
-            <div className="leading-tight">
-              <div className="text-[13px] font-semibold tracking-[0.2px] text-foreground">
-                MyTitan
-              </div>
-              <div className="mt-sidebar__kicker text-[11px]">Business OS</div>
+          <Link href="/dashboard" className="mt-sidebar__brandLink flex items-center justify-between gap-3">
+            <div>
+              <MyTitanLogo size="sm" className="mt-sidebar__brandLogo" />
+              <div className="mt-sidebar__kicker mt-2 text-[11px]">Business OS</div>
             </div>
+            <span className="mt-sidebar__brandBadge">Operator</span>
           </Link>
 
           <div className="mt-3">

@@ -20,6 +20,9 @@ export default function MarketingHome() {
     <MarketingShell>
       <section className="mkt-hero">
         <div className="mkt-hero__copy">
+          <div className="mkt-hero__brand mkt-brand-glimmer">
+            <img src="/brand/mytitan-logo-light.svg" alt="MyTitan" className="mkt-hero__brandLogo" />
+          </div>
           <div className="mkt-eyebrow">Operations system for service businesses</div>
           <h1 className="mkt-hero__title">One operating layer for the whole service lifecycle.</h1>
           <p className="mkt-hero__lead">
@@ -217,7 +220,12 @@ export default function MarketingHome() {
             <a className="mkt-btn mkt-btn--primary" href={getStartedHref}>Start workspace</a>
             <a className="mkt-btn" href={signInHref}>Sign in</a>
           </div>
-          <div className="mkt-footer">MyTitan aligns workflow, recurring service delivery, customer approvals, integrations, artifacts, and governance in one operational SaaS platform.</div>
+          <div className="mkt-footer">
+            <div className="mkt-footer__logo">
+              <img src="/brand/mytitan-logo-light.svg" alt="MyTitan" className="mkt-footer__logoImage" />
+            </div>
+            <div>MyTitan aligns workflow, recurring service delivery, customer approvals, integrations, artifacts, and governance in one operational SaaS platform.</div>
+          </div>
         </div>
       </section>
     </MarketingShell>
