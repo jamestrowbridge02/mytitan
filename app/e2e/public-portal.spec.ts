@@ -39,4 +39,11 @@ test.describe("public portal workflow", () => {
       await expect(page.getByTestId("public-portal-decline")).toBeDisabled();
     }
   });
+
+  test("public portal shows customer-safe completion proof", async ({ page, request }) => {
+    await installApiProxy(page, request);
+    await page.goto(`/portal/job/${portalToken}`);
+    await expect(page.getByTestId("public-portal-completion-proof")).toBeVisible();
+    await expect(page.getByTestId("public-portal-completion-proof").getByText(fixtureRefs.seededPortalArtifactLabel).first()).toBeVisible();
+  });
 });

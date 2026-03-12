@@ -47,6 +47,16 @@ type TechQueue = {
     nextStep?: string;
     workflowChecklist?: string[];
     sequenceState?: string;
+    executionRecord?: {
+      id: string;
+      status: string;
+      summary?: string | null;
+      submittedAt?: string | null;
+      acknowledgedAt?: string | null;
+      checklistJson?: Array<{ key?: string; label?: string; completed?: boolean; note?: string | null }> | null;
+      notesJson?: { completionNotes?: string | null } | null;
+      evidenceCount?: number;
+    } | null;
   }>;
   bookings: Array<{
     id: string;
@@ -64,6 +74,10 @@ export default function TechnicianPage() {
   const [data, setData] = useState<TechQueue | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
+  const [executionNoteDrafts, setExecutionNoteDrafts] = useState<Record<string, string>>({});
+  const [executionSummaryDrafts, setExecutionSummaryDrafts] = useState<Record<string, string>>({});
+  const [executionChecklistDrafts, setExecutionChecklistDrafts] = useState<Record<string, Array<{ key: string; label: string; completed: boolean; note?: string }>>>({});
+  const [executionEvidenceDrafts, setExecutionEvidenceDrafts] = useState<Record<string, string>>({});
   const [meId, setMeId] = useState<string | null>(null);
   const [technicianFields, setTechnicianFields] = useState<CustomField[]>([]);
   const [technicianFieldValues, setTechnicianFieldValues] = useState<CustomFieldValue[]>([]);
@@ -183,6 +197,80 @@ export default function TechnicianPage() {
       await load();
     } catch (err: any) {
       showError(err?.message || "Failed to save note");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  function currentChecklist(job: TechQueue["jobs"][number]) {
+    if (executionChecklistDrafts[job.id]) return executionChecklistDrafts[job.id];
+    const seeded = Array.isArray(job.executionRecord?.checklistJson) && job.executionRecord?.checklistJson.length
+      ? job.executionRecord.checklistJson
+      : (job.workflowChecklist || []).map((label, index) => ({ key: `checklist_${index + 1}`, label, completed: false }));
+    return seeded.map((item: any, index: number) => ({
+      key: String(item?.key || `checklist_${index + 1}`),
+      label: String(item?.label || `Checklist item ${index + 1}`),
+      completed: Boolean(item?.completed),
+      note: item?.note || "",
+    }));
+  }
+
+  async function startExecution(job: TechQueue["jobs"][number]) {
+    setBusyId(job.id);
+    try {
+      await apiFetch(`/jobs/${job.id}/execution/start`, {
+        method: "POST",
+        body: JSON.stringify({ summary: executionSummaryDrafts[job.id] || job.executionRecord?.summary || "" }),
+      });
+      showSuccess("Execution record ready");
+      await load();
+    } catch (err: any) {
+      showError(err?.message || "Failed to start execution record");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function saveExecution(job: TechQueue["jobs"][number], submit = false) {
+    setBusyId(job.id);
+    try {
+      await apiFetch(submit ? `/jobs/${job.id}/execution/submit` : `/jobs/${job.id}/execution`, {
+        method: submit ? "POST" : "PATCH",
+        body: JSON.stringify({
+          summary: executionSummaryDrafts[job.id] ?? job.executionRecord?.summary ?? "",
+          checklist: currentChecklist(job),
+          notesJson: {
+            completionNotes: executionNoteDrafts[job.id] ?? job.executionRecord?.notesJson?.completionNotes ?? "",
+          },
+        }),
+      });
+      showSuccess(submit ? "Completion submitted" : "Execution record saved");
+      await load();
+    } catch (err: any) {
+      showError(err?.message || `Failed to ${submit ? "submit" : "save"} execution record`);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function addEvidence(jobId: string) {
+    const label = String(executionEvidenceDrafts[jobId] || "").trim();
+    if (!label) return;
+    setBusyId(jobId);
+    try {
+      await apiFetch(`/jobs/${jobId}/execution/evidence`, {
+        method: "POST",
+        body: JSON.stringify({
+          kind: "NOTE",
+          label,
+          payloadJson: { source: "technician_queue" },
+        }),
+      });
+      setExecutionEvidenceDrafts((current) => ({ ...current, [jobId]: "" }));
+      showSuccess("Evidence reference added");
+      await load();
+    } catch (err: any) {
+      showError(err?.message || "Failed to add evidence");
     } finally {
       setBusyId(null);
     }
@@ -345,6 +433,76 @@ export default function TechnicianPage() {
                         {busyId === job.id ? "Saving..." : "Save note"}
                       </button>
                     </div>
+                    <section className="card" style={{ marginTop: 10, padding: 14 }} data-testid="execution-record-card">
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                        <div>
+                          <strong>Completion record</strong>
+                          <div className="muted" style={{ marginTop: 4, fontSize: 13 }}>
+                            {job.executionRecord?.status || "Not started"}
+                            {job.executionRecord?.submittedAt ? ` • Submitted ${new Date(job.executionRecord.submittedAt).toLocaleString()}` : ""}
+                            {job.executionRecord?.acknowledgedAt ? ` • Acknowledged ${new Date(job.executionRecord.acknowledgedAt).toLocaleString()}` : ""}
+                          </div>
+                        </div>
+                        <button className="button secondary" type="button" onClick={() => void startExecution(job)} disabled={busyId === job.id}>
+                          {job.executionRecord ? "Open draft" : "Start record"}
+                        </button>
+                      </div>
+                      <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
+                        <input
+                          className="input"
+                          value={executionSummaryDrafts[job.id] ?? job.executionRecord?.summary ?? ""}
+                          onChange={(event) => setExecutionSummaryDrafts((current) => ({ ...current, [job.id]: event.target.value }))}
+                          placeholder="Execution summary"
+                        />
+                        <textarea
+                          className="textarea"
+                          value={executionNoteDrafts[job.id] ?? job.executionRecord?.notesJson?.completionNotes ?? ""}
+                          onChange={(event) => setExecutionNoteDrafts((prev) => ({ ...prev, [job.id]: event.target.value }))}
+                          placeholder="Completion notes"
+                          data-testid="execution-notes-input"
+                        />
+                        <div data-testid="execution-checklist" style={{ display: "grid", gap: 6 }}>
+                          {currentChecklist(job).map((item, index) => (
+                            <label key={item.key} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                              <input
+                                type="checkbox"
+                                checked={item.completed}
+                                onChange={(event) =>
+                                  setExecutionChecklistDrafts((current) => {
+                                    const next = [...currentChecklist(job)];
+                                    next[index] = { ...next[index], completed: event.target.checked };
+                                    return { ...current, [job.id]: next };
+                                  })
+                                }
+                              />
+                              <span>{item.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                        <div data-testid="execution-evidence-list" style={{ display: "grid", gap: 6 }}>
+                          <div className="muted" style={{ fontSize: 13 }}>Evidence references: {Number(job.executionRecord?.evidenceCount || 0)}</div>
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <input
+                              className="input"
+                              value={executionEvidenceDrafts[job.id] || ""}
+                              onChange={(event) => setExecutionEvidenceDrafts((current) => ({ ...current, [job.id]: event.target.value }))}
+                              placeholder="Evidence reference"
+                            />
+                            <button className="button secondary" type="button" onClick={() => void addEvidence(job.id)} disabled={busyId === job.id}>
+                              Add
+                            </button>
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          <button className="button secondary" type="button" onClick={() => void saveExecution(job)} disabled={busyId === job.id}>
+                            {busyId === job.id ? "Saving..." : "Save draft"}
+                          </button>
+                          <button className="button" type="button" onClick={() => void saveExecution(job, true)} disabled={busyId === job.id} data-testid="execution-submit">
+                            {busyId === job.id ? "Submitting..." : "Submit completion"}
+                          </button>
+                        </div>
+                      </div>
+                    </section>
                   </div>
                       </>
                     );

@@ -55,6 +55,21 @@ type PortalInfo = {
     lastRunAt?: string | null;
     lastRunStatus?: string | null;
   }>;
+  executionRecord?: {
+    status?: string | null;
+    summary?: string | null;
+    submittedAt?: string | null;
+    acknowledgedAt?: string | null;
+    evidence?: Array<{
+      id: string;
+      label: string;
+      kind: string;
+      artifact?: {
+        id: string;
+        label: string;
+      } | null;
+    }>;
+  } | null;
 };
 
 const formatDateTime = (value?: string | null) => {
@@ -707,6 +722,37 @@ export default function PublicJobPortal() {
             <p className="muted" style={{ marginBottom: 0 }}>No customer-safe documents are available yet.</p>
           )}
         </section>
+
+        {portal?.executionRecord ? (
+          <section className="card" style={{ padding: 16, marginTop: 14 }} data-testid="public-portal-completion-proof">
+            <h3 style={{ marginTop: 0 }}>Completion proof</h3>
+            <p style={{ margin: 0 }}>
+              <strong>Status:</strong> {portal.executionRecord.status || "Submitted"}
+            </p>
+            {portal.executionRecord.summary ? (
+              <p style={{ marginBottom: 0 }}>
+                <strong>Summary:</strong> {portal.executionRecord.summary}
+              </p>
+            ) : null}
+            <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
+              {(portal.executionRecord.evidence || []).length ? (
+                portal.executionRecord.evidence?.map((item) => (
+                  <div key={item.id} style={{ display: "flex", justifyContent: "space-between", gap: 12, border: "1px solid #2a3042", borderRadius: 12, padding: "12px 14px" }}>
+                    <div>
+                      <div style={{ fontWeight: 600 }}>{item.label}</div>
+                      <div className="muted" style={{ marginTop: 4 }}>{String(item.kind || "").replaceAll("_", " ")}</div>
+                    </div>
+                    {item.artifact ? (
+                      <div className="muted">{item.artifact.label}</div>
+                    ) : null}
+                  </div>
+                ))
+              ) : (
+                <p className="muted" style={{ marginBottom: 0 }}>No customer-safe evidence has been published yet.</p>
+              )}
+            </div>
+          </section>
+        ) : null}
 
         {portal?.servicePlans?.length ? (
           <section className="card" style={{ padding: 16, marginTop: 14 }}>

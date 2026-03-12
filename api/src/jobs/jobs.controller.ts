@@ -8,13 +8,17 @@ import { JOB_STATUSES, normalizeJobStatusInput } from "../common/constants";
 import { assertPermission } from "../common/permissions";
 import { Roles } from "../common/roles.decorator";
 import { RolesGuard } from "../common/roles.guard";
-import { BulkJobsDto, BulkJobsV2Dto, CreateJobDto, CreateJobReminderDto, JobsBoardQueryDto, PatchJobDto, UpdateJobStatusDto } from "./dto";
+import { AddJobExecutionEvidenceDto, BulkJobsDto, BulkJobsV2Dto, CreateJobDto, CreateJobReminderDto, JobsBoardQueryDto, PatchJobDto, StartJobExecutionDto, SubmitJobExecutionDto, UpdateJobExecutionDto, UpdateJobStatusDto } from "./dto";
+import { JobExecutionService } from "./job-execution.service";
 import { JobsService } from "./jobs.service";
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller("jobs")
 export class JobsController {
-  constructor(private readonly jobsService: JobsService) {}
+  constructor(
+    private readonly jobsService: JobsService,
+    private readonly jobExecutionService: JobExecutionService,
+  ) {}
 
   @Post()
   @Roles("OWNER", "ADMIN", "STAFF")
@@ -116,6 +120,40 @@ export class JobsController {
   activity(@CurrentUser() user: JwtPayload, @Param("id") id: string) {
     featureGate({ enabled: isCommandCentreV2Enabled(), feature: 'COMMAND_CENTRE_V2', mode: 'read' });
     return this.jobsService.activity(user.companyId, id);
+  }
+
+  @Get(":id/execution")
+  @Roles("OWNER", "ADMIN", "STAFF", "READ_ONLY")
+  execution(@CurrentUser() user: JwtPayload, @Param("id") id: string) {
+    return this.jobExecutionService.getExecutionForJob(user.companyId, id);
+  }
+
+  @Post(":id/execution/start")
+  @Roles("OWNER", "ADMIN", "STAFF")
+  async startExecution(@CurrentUser() user: JwtPayload, @Param("id") id: string, @Body() dto: StartJobExecutionDto) {
+    await assertPermission({ user, permission: "technician.execute", action: "jobs.execution.start" });
+    return this.jobExecutionService.startExecution(user.companyId, user.sub, id, dto.summary);
+  }
+
+  @Patch(":id/execution")
+  @Roles("OWNER", "ADMIN", "STAFF")
+  async updateExecution(@CurrentUser() user: JwtPayload, @Param("id") id: string, @Body() dto: UpdateJobExecutionDto) {
+    await assertPermission({ user, permission: "technician.execute", action: "jobs.execution.update" });
+    return this.jobExecutionService.updateExecution(user.companyId, user.sub, id, dto);
+  }
+
+  @Post(":id/execution/submit")
+  @Roles("OWNER", "ADMIN", "STAFF")
+  async submitExecution(@CurrentUser() user: JwtPayload, @Param("id") id: string, @Body() dto: SubmitJobExecutionDto) {
+    await assertPermission({ user, permission: "technician.execute", action: "jobs.execution.submit" });
+    return this.jobExecutionService.submitExecution(user.companyId, user.sub, id, dto);
+  }
+
+  @Post(":id/execution/evidence")
+  @Roles("OWNER", "ADMIN", "STAFF")
+  async addExecutionEvidence(@CurrentUser() user: JwtPayload, @Param("id") id: string, @Body() dto: AddJobExecutionEvidenceDto) {
+    await assertPermission({ user, permission: "technician.execute", action: "jobs.execution.evidence" });
+    return this.jobExecutionService.addEvidence(user.companyId, user.sub, id, dto);
   }
 
   @Post('undo-last')

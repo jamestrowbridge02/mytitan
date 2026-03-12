@@ -126,6 +126,17 @@ const FIXTURE = {
     jobPortal: { id: "e2e-artifact-job-portal", label: "Customer completion summary", fileName: "completion-summary.txt" },
     customerAttachment: { id: "e2e-artifact-customer", label: "Customer warranty note", fileName: "warranty-note.txt" },
   },
+  executionRecords: {
+    technicianDraft: { id: "e2e-job-execution-technician-draft" },
+    portalSubmitted: { id: "e2e-job-execution-portal-submitted" },
+    technicianRoleSubmitted: { id: "e2e-job-execution-technician-role-submitted" },
+    invoiceAcknowledged: { id: "e2e-job-execution-invoice-acknowledged" },
+  },
+  executionEvidence: {
+    portalDocument: { id: "e2e-job-execution-evidence-portal-document" },
+    portalAcknowledgement: { id: "e2e-job-execution-evidence-portal-acknowledgement" },
+    technicianNote: { id: "e2e-job-execution-evidence-technician-note" },
+  },
   servicePlans: {
     active: { id: "e2e-service-plan-active", name: "Quarterly Vehicle Health Check" },
     paused: { id: "e2e-service-plan-paused", name: "Annual Warranty Review" },
@@ -750,6 +761,22 @@ async function ensureWebhookDelivery(id, payload) {
 
 async function ensureDocumentArtifact(id, payload) {
   await prisma.documentArtifact.upsert({
+    where: { id },
+    create: { id, ...payload },
+    update: payload,
+  });
+}
+
+async function ensureJobExecutionRecord(id, payload) {
+  await prisma.jobExecutionRecord.upsert({
+    where: { id },
+    create: { id, ...payload },
+    update: payload,
+  });
+}
+
+async function ensureJobExecutionEvidence(id, payload) {
+  await prisma.jobExecutionEvidence.upsert({
     where: { id },
     create: { id, ...payload },
     update: payload,
@@ -1730,6 +1757,140 @@ async function main() {
     createdAt: addMinutes(now, -16),
   });
 
+  await prisma.jobExecutionEvidence.deleteMany({
+    where: {
+      tenantId: company.id,
+      id: {
+        notIn: [
+          FIXTURE.executionEvidence.portalDocument.id,
+          FIXTURE.executionEvidence.portalAcknowledgement.id,
+          FIXTURE.executionEvidence.technicianNote.id,
+        ],
+      },
+    },
+  });
+  await prisma.jobExecutionRecord.deleteMany({
+    where: {
+      tenantId: company.id,
+      id: {
+        notIn: [
+          FIXTURE.executionRecords.technicianDraft.id,
+          FIXTURE.executionRecords.portalSubmitted.id,
+          FIXTURE.executionRecords.technicianRoleSubmitted.id,
+          FIXTURE.executionRecords.invoiceAcknowledged.id,
+        ],
+      },
+    },
+  });
+
+  await ensureJobExecutionRecord(FIXTURE.executionRecords.technicianDraft.id, {
+    tenantId: company.id,
+    jobId: technicianJob.id,
+    technicianId: technicianUser.id,
+    status: "IN_PROGRESS",
+    startedAt: addMinutes(now, -25),
+    completedAt: null,
+    submittedAt: null,
+    acknowledgedAt: null,
+    summary: "Technician is still finishing the on-site wheel repair evidence pack.",
+    checklistJson: [
+      { key: "arrival", label: "Confirm site access", completed: true },
+      { key: "repair", label: "Complete repair work", completed: true },
+      { key: "proof", label: "Capture customer-safe proof", completed: false },
+    ],
+    notesJson: {
+      completionNotes: "Need one final customer-safe proof reference before submission.",
+    },
+  });
+  await ensureJobExecutionRecord(FIXTURE.executionRecords.portalSubmitted.id, {
+    tenantId: company.id,
+    jobId: portalActiveJob.id,
+    technicianId: technicianUser.id,
+    status: "SUBMITTED",
+    startedAt: addMinutes(now, -90),
+    completedAt: addMinutes(now, -24),
+    submittedAt: addMinutes(now, -22),
+    acknowledgedAt: null,
+    summary: "Completed compliance review and shared the customer-safe completion summary.",
+    checklistJson: [
+      { key: "arrival", label: "Confirm site access", completed: true },
+      { key: "work", label: "Complete planned service", completed: true },
+      { key: "proof", label: "Share completion proof", completed: true },
+    ],
+    notesJson: {
+      completionNotes: "Customer-safe completion summary published to the portal.",
+    },
+  });
+  await ensureJobExecutionRecord(FIXTURE.executionRecords.technicianRoleSubmitted.id, {
+    tenantId: company.id,
+    jobId: technicianRoleJob.id,
+    technicianId: technicianUser.id,
+    status: "SUBMITTED",
+    startedAt: addMinutes(now, -70),
+    completedAt: addMinutes(now, -68),
+    submittedAt: addMinutes(now, -66),
+    acknowledgedAt: null,
+    summary: "Role-scoped technician completion was submitted and is awaiting acknowledgement.",
+    checklistJson: [
+      { key: "handoff", label: "Confirm work handoff", completed: true },
+      { key: "proof", label: "Submit technician proof", completed: true },
+    ],
+    notesJson: {
+      completionNotes: "Submitted from the technician role coverage path.",
+    },
+  });
+  await ensureJobExecutionRecord(FIXTURE.executionRecords.invoiceAcknowledged.id, {
+    tenantId: company.id,
+    jobId: invoiceReadyJob.id,
+    technicianId: operator.id,
+    status: "ACKNOWLEDGED",
+    startedAt: addMinutes(now, -180),
+    completedAt: addMinutes(now, -178),
+    submittedAt: addMinutes(now, -176),
+    acknowledgedAt: addMinutes(now, -170),
+    summary: "Invoice-ready work completed and acknowledged by the customer.",
+    checklistJson: [
+      { key: "scope", label: "Confirm work scope", completed: true },
+      { key: "finish", label: "Complete job", completed: true },
+      { key: "handoff", label: "Customer acknowledgement", completed: true },
+    ],
+    notesJson: {
+      completionNotes: "Customer confirmed the finished work before billing was issued.",
+      customerAcknowledgementNote: "Looks good on site.",
+    },
+  });
+
+  await ensureJobExecutionEvidence(FIXTURE.executionEvidence.technicianNote.id, {
+    tenantId: company.id,
+    jobId: technicianJob.id,
+    executionRecordId: FIXTURE.executionRecords.technicianDraft.id,
+    kind: "NOTE",
+    label: "Awaiting final proof label",
+    artifactId: null,
+    payloadJson: { source: "seed" },
+    createdBy: technicianUser.id,
+  });
+  await ensureJobExecutionEvidence(FIXTURE.executionEvidence.portalDocument.id, {
+    tenantId: company.id,
+    jobId: portalActiveJob.id,
+    executionRecordId: FIXTURE.executionRecords.portalSubmitted.id,
+    kind: "CHECKLIST_ATTACHMENT",
+    label: FIXTURE.artifacts.jobPortal.label,
+    artifactId: FIXTURE.artifacts.jobPortal.id,
+    payloadJson: { portalVisible: true },
+    createdBy: technicianUser.id,
+  });
+  await ensureJobExecutionEvidence(FIXTURE.executionEvidence.portalAcknowledgement.id, {
+    tenantId: company.id,
+    jobId: invoiceReadyJob.id,
+    executionRecordId: FIXTURE.executionRecords.invoiceAcknowledged.id,
+    kind: "CUSTOMER_ACKNOWLEDGEMENT",
+    label: "Customer acknowledged completion",
+    artifactId: null,
+    payloadJson: { note: "Looks good on site." },
+    createdBy: null,
+  });
+
   await prisma.customerApproval.deleteMany({
     where: {
       tenantId: company.id,
@@ -2097,6 +2258,34 @@ async function main() {
       revenueTaskId: FIXTURE.revenueTasks.overdueInvoice.id,
       kind: "INVOICE_FOLLOW_UP",
       sourceFingerprint: `job:${issuedJob.id}:overdue:${new Date(issuedJob.invoiceDueAt).toISOString()}`,
+    },
+  });
+  await ensureActivityEvent("e2e-activity-execution-submitted", {
+    type: "job.execution.submitted",
+    label: `Submitted completion record for ${portalActiveJob.jobRef}`,
+    at: addMinutes(now, -22),
+    tenantId: company.id,
+    customerId: customers.portalActive.id,
+    customerName: customers.portalActive.name,
+    jobId: portalActiveJob.id,
+    jobRef: portalActiveJob.jobRef,
+    status: portalActiveJob.status,
+    payloadJson: {
+      executionRecordId: FIXTURE.executionRecords.portalSubmitted.id,
+    },
+  });
+  await ensureActivityEvent("e2e-activity-execution-acknowledged", {
+    type: "job.execution.acknowledged",
+    label: `Customer acknowledged completion for ${invoiceReadyJob.jobRef}`,
+    at: addMinutes(now, -170),
+    tenantId: company.id,
+    customerId: customers.invoiceReady.id,
+    customerName: customers.invoiceReady.name,
+    jobId: invoiceReadyJob.id,
+    jobRef: invoiceReadyJob.jobRef,
+    status: invoiceReadyJob.status,
+    payloadJson: {
+      executionRecordId: FIXTURE.executionRecords.invoiceAcknowledged.id,
     },
   });
 

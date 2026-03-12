@@ -1,6 +1,7 @@
 import { Type } from "class-transformer";
 import {
   IsArray,
+  IsBoolean,
   IsDateString,
   IsEmail,
   IsIn,
@@ -9,12 +10,75 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  MaxLength,
   Min,
   ValidateNested,
 } from "class-validator";
 import { JOB_STATUSES } from "../common/constants";
 
 export const JOB_ASSET_KINDS = ["BEFORE", "AFTER", "TORQUE", "SIGN_TECH", "SIGN_CUSTOMER"] as const;
+export const JOB_EXECUTION_EVIDENCE_KINDS = ["PHOTO", "SIGNATURE", "NOTE", "CHECKLIST_ATTACHMENT", "CUSTOMER_ACKNOWLEDGEMENT"] as const;
+
+export class JobExecutionChecklistItemDto {
+  @IsString()
+  @IsNotEmpty()
+  key!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  label!: string;
+
+  @IsBoolean()
+  completed!: boolean;
+
+  @IsOptional()
+  @IsString()
+  note?: string;
+}
+
+export class StartJobExecutionDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(4000)
+  summary?: string;
+}
+
+export class UpdateJobExecutionDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(4000)
+  summary?: string;
+
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => JobExecutionChecklistItemDto)
+  @IsArray()
+  checklist?: JobExecutionChecklistItemDto[];
+
+  @IsOptional()
+  @IsObject()
+  notesJson?: Record<string, any>;
+}
+
+export class SubmitJobExecutionDto extends UpdateJobExecutionDto {}
+
+export class AddJobExecutionEvidenceDto {
+  @IsIn(JOB_EXECUTION_EVIDENCE_KINDS)
+  kind!: (typeof JOB_EXECUTION_EVIDENCE_KINDS)[number];
+
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(120)
+  label!: string;
+
+  @IsOptional()
+  @IsString()
+  artifactId?: string;
+
+  @IsOptional()
+  @IsObject()
+  payloadJson?: Record<string, any>;
+}
 
 export class CreateJobAssetDto {
   @IsIn(JOB_ASSET_KINDS)

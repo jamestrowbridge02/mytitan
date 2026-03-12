@@ -40,6 +40,8 @@ export const fixtureRefs = {
   seededJobArtifactLabel: "Seeded invoice pack",
   seededPortalArtifactLabel: "Customer completion summary",
   seededCustomerArtifactLabel: "Customer warranty note",
+  technicianExecutionRecordId: "e2e-job-execution-technician-draft",
+  portalExecutionRecordId: "e2e-job-execution-portal-submitted",
   draftQuoteId: "e2e-quote-draft",
   draftQuoteNumber: "Q-2026-00010",
   sentQuoteId: "e2e-quote-sent",

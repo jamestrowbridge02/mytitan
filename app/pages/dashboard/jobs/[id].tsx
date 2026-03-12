@@ -107,6 +107,7 @@ export default function JobDetailPage() {
   const [activityItems, setActivityItems] = useState<any[]>([]);
   const [approvalRequests, setApprovalRequests] = useState<any[]>([]);
   const [quotes, setQuotes] = useState<any[]>([]);
+  const [executionRecord, setExecutionRecord] = useState<any>(null);
   const [approvalBusy, setApprovalBusy] = useState(false);
   const [permissions, setPermissions] = useState(() => emptyPermissionSnapshot());
 
@@ -133,6 +134,7 @@ export default function JobDetailPage() {
         if (commsEnabled) {
           await loadComms();
         }
+        await loadExecution();
         await loadApprovals();
       } catch (err: any) {
         setError(err?.message || "Failed to load job");
@@ -173,6 +175,16 @@ export default function JobDetailPage() {
       setApprovalRequests(Array.isArray(rows) ? rows : []);
     } catch {
       setApprovalRequests([]);
+    }
+  }
+
+  async function loadExecution() {
+    if (!id) return;
+    try {
+      const payload = await apiFetch(`/jobs/${id}/execution`);
+      setExecutionRecord(payload?.record || null);
+    } catch {
+      setExecutionRecord(null);
     }
   }
 
@@ -512,6 +524,53 @@ export default function JobDetailPage() {
             entityType="job"
             entityId={id}
           />
+
+          <EntitySection title="Execution record" subtitle="Field completion evidence and technician close-out stay explicit and reviewable.">
+            <div data-testid="execution-record-card" style={{ display: "grid", gap: 10 }}>
+              {executionRecord ? (
+                <>
+                  <div className="integration-card">
+                    <div>
+                      <strong>{executionRecord.status}</strong>
+                      <p className="muted" style={{ margin: "4px 0 0 0" }}>
+                        {executionRecord.summary || "No execution summary recorded yet."}
+                      </p>
+                    </div>
+                    <div className="muted" style={{ textAlign: "right" }}>
+                      {executionRecord.submittedAt ? `Submitted ${formatDateTime(executionRecord.submittedAt)}` : "Draft"}
+                      {executionRecord.acknowledgedAt ? ` • Acknowledged ${formatDateTime(executionRecord.acknowledgedAt)}` : ""}
+                    </div>
+                  </div>
+                  <div data-testid="execution-checklist" style={{ display: "grid", gap: 8 }}>
+                    {(executionRecord.checklist || []).map((item: any) => (
+                      <div key={item.key || item.label} className="integration-card">
+                        <div>
+                          <strong>{item.label}</strong>
+                          <p className="muted" style={{ margin: "4px 0 0 0" }}>{item.completed ? "Completed" : "Still open"}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div data-testid="execution-evidence-list" style={{ display: "grid", gap: 8 }}>
+                    {(executionRecord.evidence || []).length ? (
+                      executionRecord.evidence.map((item: any) => (
+                        <div key={item.id} className="integration-card">
+                          <div>
+                            <strong>{item.label}</strong>
+                            <p className="muted" style={{ margin: "4px 0 0 0" }}>{String(item.kind || "").replaceAll("_", " ")}</p>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="muted">No execution evidence references attached yet.</p>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <p className="muted">No execution record has been started for this job yet.</p>
+              )}
+            </div>
+          </EntitySection>
 
           <EntitySection title="Customer approvals" subtitle="Request explicit customer approval without breaking the existing portal flow.">
             <div data-testid="approval-request-list" style={{ display: "grid", gap: 10 }}>

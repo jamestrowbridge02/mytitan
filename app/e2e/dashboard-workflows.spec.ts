@@ -75,11 +75,11 @@ test.describe("dashboard workflows", () => {
     await installApiProxy(page, request);
     await page.goto("/dashboard/technician");
     await expect(page.getByText(/queue$/i).first()).toBeVisible();
-    await expect(page.getByText(fixtureRefs.technicianJobRef)).toBeVisible();
-    await expect(page.getByText(/Workflow/i).first()).toBeVisible();
+    const technicianRow = page.locator(".operator-table__row", { hasText: fixtureRefs.technicianJobRef }).first();
+    await expect(technicianRow).toBeVisible();
+    await expect(technicianRow.getByText(/Workflow/i).first()).toBeVisible();
     const startButton = page.getByTestId(`technician-start-${"e2e-job-technician"}`);
     await expect(startButton).toBeVisible();
-    const technicianRow = page.locator(".operator-table__row", { hasText: fixtureRefs.technicianJobRef }).first();
     await technicianRow.getByRole("button", { name: /more actions/i }).click();
     await expect(page.getByTestId(`technician-arrive-${"e2e-job-technician"}`)).toBeVisible();
     await page.getByTestId(`technician-note-input-${"e2e-job-technician"}`).fill("E2E note from Playwright");
@@ -87,6 +87,35 @@ test.describe("dashboard workflows", () => {
     await saveNoteButton.scrollIntoViewIfNeeded();
     await saveNoteButton.evaluate((element: HTMLButtonElement) => element.click());
     await expect(page.getByTestId("operator-notice-success")).toContainText(/Field note saved/i);
+    await expect(technicianRow.getByTestId("execution-record-card")).toBeVisible();
+    await expect(technicianRow.getByTestId("execution-checklist")).toBeVisible();
+  });
+
+  test("technician can save and submit a completion record", async ({ page, request }) => {
+    await installApiProxy(page, request);
+    await page.goto("/dashboard/technician");
+    const technicianRow = page.locator(".operator-table__row", { hasText: fixtureRefs.technicianJobRef }).first();
+    await technicianRow.getByRole("button", { name: /start record|open draft/i }).evaluate((element: HTMLButtonElement) => element.click());
+    await technicianRow.getByPlaceholder("Execution summary").fill("Playwright completion summary");
+    await technicianRow.getByTestId("execution-notes-input").fill("Playwright completion notes");
+    await technicianRow.getByTestId("execution-checklist").locator('input[type="checkbox"]').first().check();
+    await technicianRow.getByRole("button", { name: "Save draft" }).evaluate((element: HTMLButtonElement) => element.click());
+    await expect(page.getByTestId("operator-notice-success")).toContainText(/Execution record saved/i);
+    await technicianRow.getByTestId("execution-submit").evaluate((element: HTMLButtonElement) => element.click());
+    await expect(page.getByTestId("operator-notice-success")).toContainText(/Completion submitted/i);
+  });
+
+  test("operator can review a submitted completion record on job detail", async ({ page, request }) => {
+    await installApiProxy(page, request);
+    await page.goto("/dashboard/jobs/e2e-job-portal-active");
+    await expect(page.getByTestId("execution-record-card")).toContainText(/SUBMITTED|ACKNOWLEDGED/i);
+    await expect(page.getByTestId("execution-evidence-list")).toContainText(fixtureRefs.seededPortalArtifactLabel);
+  });
+
+  test("intelligence surfaces completion acknowledgement pressure", async ({ page, request }) => {
+    await installApiProxy(page, request);
+    await page.goto("/dashboard/intelligence");
+    await expect(page.getByText(/Completion proofs awaiting acknowledgement/i).first()).toBeVisible();
   });
 
   test("command centre v2 applies defaults and exposes modernized controls", async ({ page, request }) => {

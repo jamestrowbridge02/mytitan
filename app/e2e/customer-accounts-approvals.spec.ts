@@ -161,4 +161,25 @@ test.describe("customer accounts and approvals", () => {
     await expect(page.getByText(/Change request submitted/i)).toBeVisible();
     await expect(planRow.getByTestId("customer-plan-request-list")).toContainText(/SCOPE CHANGE REQUEST/i);
   });
+
+  test("customer workspace shows submitted completion proof safely", async ({ page, request }) => {
+    await installApiProxy(page, request);
+    await loginCustomerAs(page, request, fixtureRefs.customerWorkspaceEmail, fixtureRefs.customerWorkspacePassword);
+    await page.goto("/customer");
+
+    const jobRow = page.getByTestId("customer-job-row").filter({ hasText: fixtureRefs.portalActiveJobRef }).first();
+    await expect(jobRow).toContainText(/Completion proof/i);
+    await expect(jobRow).toContainText(fixtureRefs.seededPortalArtifactLabel);
+  });
+
+  test("customer can acknowledge a submitted completion record", async ({ page, request }) => {
+    await installApiProxy(page, request);
+    await loginCustomerAs(page, request, fixtureRefs.customerWorkspaceEmail, fixtureRefs.customerWorkspacePassword);
+    await page.goto("/customer");
+
+    const jobRow = page.getByTestId("customer-job-row").filter({ hasText: fixtureRefs.portalActiveJobRef }).first();
+    await jobRow.getByPlaceholder("Acknowledge the completion record").fill("Acknowledged in Playwright");
+    await jobRow.getByTestId("execution-acknowledge").click();
+    await expect(page.getByText(/Completion acknowledgement recorded/i)).toBeVisible();
+  });
 });

@@ -23,8 +23,10 @@ export default function CustomerWorkspacePage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [planBusyId, setPlanBusyId] = useState<string | null>(null);
+  const [jobBusyId, setJobBusyId] = useState<string | null>(null);
   const [planRequestKindById, setPlanRequestKindById] = useState<Record<string, string>>({});
   const [planRequestNoteById, setPlanRequestNoteById] = useState<Record<string, string>>({});
+  const [jobAcknowledgementNotes, setJobAcknowledgementNotes] = useState<Record<string, string>>({});
 
   const hasToken = useMemo(() => Boolean(getCustomerToken()), []);
 
@@ -127,6 +129,24 @@ export default function CustomerWorkspacePage() {
       setError(err?.message || "Could not submit change request");
     } finally {
       setPlanBusyId(null);
+    }
+  }
+
+  async function acknowledgeCompletion(jobId: string) {
+    setJobBusyId(jobId);
+    setError("");
+    setNotice("");
+    try {
+      await customerApiFetch(`/customer-workspace/jobs/${jobId}/acknowledge-completion`, {
+        method: "POST",
+        body: JSON.stringify({ note: jobAcknowledgementNotes[jobId] || "" }),
+      });
+      setNotice("Completion acknowledgement recorded");
+      await loadWorkspace();
+    } catch (err: any) {
+      setError(err?.message || "Could not acknowledge completion");
+    } finally {
+      setJobBusyId(null);
     }
   }
 
@@ -277,16 +297,41 @@ export default function CustomerWorkspacePage() {
           {workspace.jobs?.length ? (
             <div style={{ display: "grid", gap: 12 }}>
               {workspace.jobs.map((job: any) => (
-                <div key={job.id} className="integration-card">
+                <div key={job.id} className="integration-card" data-testid="customer-job-row">
                   <div>
                     <strong>{job.jobRef}</strong>
                     <p className="muted" style={{ margin: "6px 0 0 0" }}>
                       {job.status} • {job.serviceName || "Service"} • {job.vehicleLabel || "Vehicle not supplied"}
                     </p>
+                    {job.executionRecord ? (
+                      <div style={{ display: "grid", gap: 6, marginTop: 8 }}>
+                        <div className="muted">
+                          Completion proof: {job.executionRecord.status} • {job.executionRecord.summary || "Summary shared"}
+                        </div>
+                        {(job.executionRecord.evidence || []).length ? (
+                          <div className="muted">
+                            {(job.executionRecord.evidence || []).map((item: any) => item.label).join(" • ")}
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </div>
-                  <div style={{ textAlign: "right" }}>
+                  <div style={{ textAlign: "right", minWidth: 260 }}>
                     <div>{money(Number(job.totalCents || 0), job.currency || "GBP")}</div>
                     <div className="muted">{job.invoicePaidAt ? "Paid" : job.invoiceIssuedAt ? "Invoice issued" : "In progress"}</div>
+                    {job.executionRecord?.status === "SUBMITTED" ? (
+                      <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
+                        <textarea
+                          className="textarea"
+                          value={jobAcknowledgementNotes[job.id] || ""}
+                          onChange={(event) => setJobAcknowledgementNotes((current) => ({ ...current, [job.id]: event.target.value }))}
+                          placeholder="Acknowledge the completion record"
+                        />
+                        <button className="button secondary" type="button" onClick={() => void acknowledgeCompletion(job.id)} disabled={jobBusyId === job.id} data-testid="execution-acknowledge">
+                          {jobBusyId === job.id ? "Saving..." : "Acknowledge completion"}
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               ))}

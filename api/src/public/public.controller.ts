@@ -25,6 +25,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { ActivityService } from "../events/activity.service";
 import { ArtifactsService } from "../artifacts/artifacts.service";
 import { CustomerWorkspaceService } from "../customer-workspace/customer-workspace.service";
+import { JobExecutionService } from "../jobs/job-execution.service";
 import { ServicePlansService } from "../service-plans/service-plans.service";
 import { ApproveJobDto, DeclineJobDto, SignJobDto } from "./public.dto";
 
@@ -43,6 +44,7 @@ export class PublicController {
     private readonly activity: ActivityService,
     private readonly artifacts: ArtifactsService,
     private readonly customerWorkspace: CustomerWorkspaceService,
+    private readonly jobExecution: JobExecutionService,
     private readonly servicePlans: ServicePlansService,
   ) {}
 
@@ -99,6 +101,9 @@ export class PublicController {
     const portalServicePlans = record.job.customerId
       ? await this.servicePlans.listPortalVisibleForCustomer(record.job.companyId, record.job.customerId)
       : [];
+    const executionRecord = record.job.customerId
+      ? await this.jobExecution.getCustomerVisibleExecution(record.job.companyId, record.job.customerId, record.job.id).catch(() => null)
+      : null;
     const pdfReady = Boolean(record.job.pdf?.contentBase64 || portalDocuments.some((item: any) => item.kind === "INVOICE" || item.kind === "PORTAL_DOCUMENT"));
     const paymentAvailable = Boolean(portalEnabled && paymentsEnabled && stripeReady && (record.job.totalCents || 0) > 0);
     const invoiceOverdue = Boolean(record.job.invoiceDueAt && !record.job.invoicePaidAt && new Date(record.job.invoiceDueAt).getTime() < Date.now());
@@ -202,6 +207,7 @@ export class PublicController {
         },
         documents: portalDocuments,
         servicePlans: portalServicePlans,
+        executionRecord,
         timeline: (record.job.activities || [])
           .filter((item: any) => ['job.status', 'job.reminder.create', 'job.reminder.completed', 'tech.note', 'tech.arrived', 'booking.converted', 'billing.invoice.issued', 'billing.payment.received', 'billing.follow_up.escalated'].includes(String(item.eventType || '')))
           .map((item: any) => ({

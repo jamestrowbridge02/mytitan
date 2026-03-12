@@ -168,6 +168,21 @@ enum ServicePlanChangeRequestKind {
   SCOPE_CHANGE_REQUEST
 }
 
+enum JobExecutionRecordStatus {
+  IN_PROGRESS
+  SUBMITTED
+  ACKNOWLEDGED
+  REVISED
+}
+
+enum JobExecutionEvidenceKind {
+  PHOTO
+  SIGNATURE
+  NOTE
+  CHECKLIST_ATTACHMENT
+  CUSTOMER_ACKNOWLEDGEMENT
+}
+
 enum ServicePlanRequestActor {
   CUSTOMER
   OPERATOR
@@ -348,6 +363,8 @@ model Company {
   customFieldValues        CustomFieldValue[]
   customerAccounts         CustomerAccount[]
   customerApprovals        CustomerApproval[]
+  jobExecutionRecords      JobExecutionRecord[]
+  jobExecutionEvidence     JobExecutionEvidence[]
 }
 
 model User {
@@ -389,6 +406,8 @@ model User {
   technicianCapacityExceptions TechnicianCapacityException[] @relation("TechnicianCapacityExceptionUser")
   requestedCustomerApprovals CustomerApproval[]     @relation("CustomerApprovalRequester")
   createdQuotes            Quote[]                  @relation("QuoteCreator")
+  jobExecutionRecords      JobExecutionRecord[]     @relation("JobExecutionTechnician")
+  createdJobExecutionEvidence JobExecutionEvidence[] @relation("JobExecutionEvidenceCreator")
 
   @@unique([companyId, email])
 }
@@ -601,6 +620,8 @@ model Job {
   signatures               JobSignature[]
   quotes                   Quote[]
   revenueCollectionTasks   RevenueCollectionTask[]
+  executionRecords         JobExecutionRecord[]
+  executionEvidence        JobExecutionEvidence[]
 
   @@unique([companyId, jobRef])
   @@index([companyId, createdAt])
@@ -1514,10 +1535,59 @@ model DocumentArtifact {
   createdAt       DateTime                   @default(now())
   updatedAt       DateTime                   @updatedAt
   tenant          Company                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  executionEvidence JobExecutionEvidence[]
 
   @@index([tenantId, entityType, entityId, createdAt])
   @@index([tenantId, entityType, entityId, kind])
   @@index([tenantId, portalVisible, createdAt])
+}
+
+model JobExecutionRecord {
+  id             String                   @id @default(cuid())
+  tenantId       String
+  jobId          String
+  technicianId   String?
+  status         JobExecutionRecordStatus @default(IN_PROGRESS)
+  startedAt      DateTime?
+  completedAt    DateTime?
+  submittedAt    DateTime?
+  acknowledgedAt DateTime?
+  summary        String?
+  checklistJson  Json?
+  notesJson      Json?
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+  tenant         Company                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  job            Job                      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  technician     User?                    @relation("JobExecutionTechnician", fields: [technicianId], references: [id], onDelete: SetNull)
+  evidence       JobExecutionEvidence[]
+
+  @@index([tenantId, jobId, createdAt])
+  @@index([tenantId, technicianId, status, createdAt])
+  @@index([tenantId, status, updatedAt])
+}
+
+model JobExecutionEvidence {
+  id                String                   @id @default(cuid())
+  tenantId          String
+  jobId             String
+  executionRecordId String
+  kind              JobExecutionEvidenceKind
+  label             String
+  artifactId        String?
+  payloadJson       Json?
+  createdBy         String?
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+  tenant            Company                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  job               Job                      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  executionRecord   JobExecutionRecord       @relation(fields: [executionRecordId], references: [id], onDelete: Cascade)
+  artifact          DocumentArtifact?        @relation(fields: [artifactId], references: [id], onDelete: SetNull)
+  createdByUser     User?                    @relation("JobExecutionEvidenceCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, jobId, createdAt])
+  @@index([tenantId, executionRecordId, createdAt])
+  @@index([tenantId, kind, createdAt])
 }
 
 model Quote {

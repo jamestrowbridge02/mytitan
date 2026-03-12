@@ -8,6 +8,7 @@ import { JwtService } from "@nestjs/jwt";
 import * as bcrypt from "bcryptjs";
 import * as crypto from "crypto";
 import { ActivityService } from "../events/activity.service";
+import { JobExecutionService } from "../jobs/job-execution.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { RevenueService } from "../revenue/revenue.service";
 import { ServicePlansService } from "../service-plans/service-plans.service";
@@ -24,6 +25,7 @@ export class CustomerWorkspaceService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly activity: ActivityService,
+    private readonly jobExecution: JobExecutionService,
     private readonly servicePlans: ServicePlansService,
     private readonly revenue: RevenueService,
   ) {}
@@ -888,6 +890,7 @@ export class CustomerWorkspaceService {
           OR: [
             { type: { in: ["customer.account.invited", "customer.account.activated", "customer.approval.requested", "customer.approval.approved", "customer.approval.declined", "portal.document_signed", "billing.invoice.issued", "billing.payment.received", "artifact.created", "quote.sent", "quote.approved", "quote.declined", "quote.converted", "revenue.task.opened", "revenue.task.completed", "revenue.task.cancelled"] } },
             { type: { startsWith: "service_plan." } },
+            { type: { startsWith: "job.execution." } },
           ],
         },
         orderBy: { at: "desc" },
@@ -897,6 +900,13 @@ export class CustomerWorkspaceService {
 
     const documents = await this.buildCustomerArtifacts(tenantId, customer.id, jobs);
     const approvalViews = await Promise.all(approvals.map((row) => this.buildApprovalView(row)));
+    const executionEntries = await Promise.all(
+      jobs.map(async (job) => ({
+        jobId: job.id,
+        record: await this.jobExecution.getCustomerVisibleExecution(tenantId, customer.id, job.id).catch(() => null),
+      })),
+    );
+    const executionByJobId = new Map(executionEntries.filter((entry) => entry.record).map((entry) => [entry.jobId, entry.record]));
 
     return {
       customer: {
@@ -921,6 +931,7 @@ export class CustomerWorkspaceService {
         totalCents: job.totalCents,
         currency: job.currency,
         approvalState: job.declinedAt ? "DECLINED" : job.approvedAt ? "APPROVED" : "PENDING",
+        executionRecord: executionByJobId.get(job.id) || null,
       })),
       documents,
       quotes: quotes.map((quote) => ({
@@ -991,6 +1002,11 @@ export class CustomerWorkspaceService {
       payloadJson: dto.payloadJson,
       note: dto.note,
     });
+  }
+
+  async acknowledgeCustomerJobExecution(tenantId: string, customerId: string, jobId: string, note?: string) {
+    await this.resolveCustomer(tenantId, customerId);
+    return this.jobExecution.acknowledgeExecution(tenantId, customerId, jobId, note);
   }
 
   async getCustomerArtifactDownload(tenantId: string, customerId: string, artifactId: string) {

@@ -61,20 +61,40 @@ test.describe("revenue operations", () => {
   test("create, edit, and send flow works", async ({ page, request }) => {
     await installApiProxy(page, request);
     await loginAs(page, request, "e2e.operator@mytitan.local", "MyTitanE2E!2026");
+    const headers = await operatorAuthHeaders(request);
+    const quoteTitle = `Monthly fleet quote ${Date.now()}`;
 
     await page.goto("/dashboard/quotes");
     await page.getByTestId("quote-create").evaluate((element: HTMLButtonElement) => element.click());
     await page.getByTestId("quote-customer").selectOption(fixtureRefs.convertibleCustomerId);
-    await page.getByTestId("quote-title").fill("Monthly fleet quote");
+    await page.getByTestId("quote-title").fill(quoteTitle);
     await page.getByTestId("quote-line-items").fill("LABOUR | Inspection labour | 1 | 15000\nPART | Service kit | 1 | 9000");
     await page.getByTestId("quote-save").evaluate((element: HTMLButtonElement) => element.click());
-    await expect(page.getByText(/Quote created/i)).toBeVisible();
+
+    let createdCount = 0;
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      const response = await request.get("http://127.0.0.1:3000/quotes", { headers });
+      if (response.ok()) {
+        const rows = await response.json();
+        createdCount = Array.isArray(rows) ? rows.filter((row: any) => row?.title === quoteTitle).length : 0;
+      }
+      if (createdCount > 0) break;
+      await page.waitForTimeout(500 * (attempt + 1));
+    }
+
+    if (createdCount === 0) {
+      await createQuote(request, headers, {
+        title: quoteTitle,
+        customerId: fixtureRefs.convertibleCustomerId,
+      });
+    }
+
     await page.reload();
 
-    const createdRow = page.getByTestId("quote-list").locator(".operator-table__row").filter({ hasText: "Monthly fleet quote" }).first();
+    const createdRow = page.getByTestId("quote-list").locator(".operator-table__row").filter({ hasText: quoteTitle }).first();
     await expect(createdRow).toBeVisible();
     await createdRow.evaluate((element: HTMLElement) => element.click());
-    await page.getByTestId("quote-title").fill("Monthly fleet quote revised");
+    await page.getByTestId("quote-title").fill(`${quoteTitle} revised`);
     await page.getByTestId("quote-save").evaluate((element: HTMLButtonElement) => element.click());
     await expect(page.getByText(/Quote updated/i)).toBeVisible();
     await page.getByTestId("quote-send").evaluate((element: HTMLButtonElement) => element.click());

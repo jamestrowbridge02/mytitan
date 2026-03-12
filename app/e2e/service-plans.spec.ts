@@ -114,9 +114,9 @@ test.describe("service plans", () => {
     const requestRow = page.getByTestId("service-plan-change-request-list").locator(".operator-table__row").filter({ hasText: "CANCEL REQUEST" }).first();
     await expect(requestRow).toBeVisible();
     await requestRow.getByTestId("service-plan-request-approve").evaluate((element: HTMLButtonElement) => element.click());
-    await expect(page.getByText(/Request approved/i)).toBeVisible();
+    await expect(requestRow).toContainText(/APPROVED/i);
     await requestRow.getByTestId("service-plan-request-complete").evaluate((element: HTMLButtonElement) => element.click());
-    await expect(page.getByText(/Request completed/i)).toBeVisible();
+    await expect(requestRow).toContainText(/COMPLETED/i);
   });
 
   test("operator can decline a customer plan request", async ({ page, request }) => {

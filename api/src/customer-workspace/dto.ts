@@ -105,3 +105,10 @@ export class CustomerServicePlanChangeRequestDto {
   @IsObject()
   payloadJson?: Record<string, any>;
 }
+
+export class CustomerJobExecutionAcknowledgementDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  note?: string;
+}

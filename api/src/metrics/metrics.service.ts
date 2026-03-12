@@ -98,6 +98,7 @@ export class MetricsService {
       overduePlanRuns,
       pendingRenewals,
       openPlanChangeRequests,
+      submittedExecutionAwaitingAcknowledgement,
       quotesAwaitingApproval,
       approvedQuotesAwaitingConversion,
       schedulingCapacity,
@@ -279,6 +280,13 @@ export class MetricsService {
           status: { in: ['OPEN', 'APPROVED'] },
         },
       }),
+      db.jobExecutionRecord.count({
+        where: {
+          tenantId,
+          status: 'SUBMITTED',
+          acknowledgedAt: null,
+        },
+      }),
       db.quote.count({
         where: {
           tenantId,
@@ -382,6 +390,7 @@ export class MetricsService {
         overduePlanRuns,
         pendingRenewals,
         openPlanChangeRequests,
+        submittedExecutionAwaitingAcknowledgement,
         quotesAwaitingApproval,
         approvedQuotesAwaitingConversion,
         overloadedTechnicianDays,
@@ -408,6 +417,9 @@ export class MetricsService {
           : null,
         openPlanChangeRequests > 0
           ? { key: 'open_plan_change_requests', label: 'Plan change requests open', count: openPlanChangeRequests, href: '/dashboard/service-plans', hint: 'Customer or operator plan changes still need review or completion' }
+          : null,
+        submittedExecutionAwaitingAcknowledgement > 0
+          ? { key: 'execution_ack_pending', label: 'Completion proofs awaiting acknowledgement', count: submittedExecutionAwaitingAcknowledgement, href: '/dashboard/technician', hint: 'Field records are submitted but the customer has not acknowledged completion yet' }
           : null,
         overdueBillingFollowUps > 0
           ? { key: 'billing_followups_due', label: 'Overdue billing follow-ups', count: overdueBillingFollowUps, href: '/dashboard/billing/readiness', hint: 'Completed work already has past-due billing reminders' }
@@ -447,6 +459,7 @@ export class MetricsService {
         overduePlanRuns > 0 ? { key: 'overdue_plan_runs', severity: 'warn', label: 'Recurring runs need review', count: overduePlanRuns, href: '/dashboard/service-plans' } : null,
         pendingRenewals > 0 ? { key: 'pending_plan_renewals', severity: 'info', label: 'Renewal responses pending', count: pendingRenewals, href: '/dashboard/service-plans' } : null,
         openPlanChangeRequests > 0 ? { key: 'open_plan_change_requests', severity: 'warn', label: 'Plan change requests open', count: openPlanChangeRequests, href: '/dashboard/service-plans' } : null,
+        submittedExecutionAwaitingAcknowledgement > 0 ? { key: 'execution_ack_pending', severity: 'info', label: 'Completion proofs awaiting acknowledgement', count: submittedExecutionAwaitingAcknowledgement, href: '/dashboard/technician' } : null,
         overloadedTechnicianDays > 0 ? { key: 'overloaded_technician_days', severity: 'warn', label: 'Technician days overloaded', count: overloadedTechnicianDays, href: '/dashboard/scheduling' } : null,
         publicUnlinkedBookings > 0 ? { key: 'public_conversion', severity: 'info', label: 'Public bookings awaiting conversion', count: publicUnlinkedBookings, href: '/dashboard/bookings' } : null,
         agedUnlinkedBookings > 0 ? { key: 'stale_booking_conversion', severity: 'warn', label: 'Unlinked bookings older than 48h', count: agedUnlinkedBookings, href: '/dashboard/bookings' } : null,

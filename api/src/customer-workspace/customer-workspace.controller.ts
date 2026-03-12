@@ -5,7 +5,7 @@ import { resolve } from "path";
 import { CurrentCustomer } from "./current-customer.decorator";
 import { CustomerJwtAuthGuard } from "./customer-auth.guard";
 import { CustomerJwtPayload } from "./customer-auth.types";
-import { CustomerApprovalResponseDto } from "./dto";
+import { CustomerApprovalResponseDto, CustomerJobExecutionAcknowledgementDto } from "./dto";
 import { CustomerWorkspaceService } from "./customer-workspace.service";
 
 @UseGuards(CustomerJwtAuthGuard)
@@ -56,5 +56,14 @@ export class CustomerWorkspaceController {
       res.setHeader("Content-Disposition", `inline; filename=\"${artifact.fileName.replace(/[^a-zA-Z0-9._-]/g, "_")}\"`);
     }
     return res.sendFile(filePath);
+  }
+
+  @Post("jobs/:id/acknowledge-completion")
+  acknowledgeCompletion(
+    @CurrentCustomer() customer: CustomerJwtPayload,
+    @Param("id") id: string,
+    @Body() dto: CustomerJobExecutionAcknowledgementDto,
+  ) {
+    return this.customerWorkspace.acknowledgeCustomerJobExecution(customer.tenantId, customer.customerId, id, dto.note);
   }
 }

@@ -31,6 +31,16 @@ export class TechService {
             orderBy: { createdAt: 'desc' },
             take: 4,
           },
+          executionRecords: {
+            orderBy: [{ updatedAt: 'desc' }, { createdAt: 'desc' }],
+            take: 1,
+            include: {
+              evidence: {
+                orderBy: { createdAt: 'asc' },
+                take: 10,
+              },
+            },
+          },
         },
         orderBy: [{ scheduledAt: 'asc' }, { createdAt: 'desc' }],
       }),
@@ -101,6 +111,19 @@ export class TechService {
             : job.scheduledAt && new Date(job.scheduledAt).getTime() < now.getTime() + 2 * 60 * 60 * 1000
             ? 'due_soon'
             : 'normal',
+        executionRecord: job.executionRecords?.[0]
+          ? {
+              id: job.executionRecords[0].id,
+              status: job.executionRecords[0].status,
+              summary: job.executionRecords[0].summary,
+              startedAt: job.executionRecords[0].startedAt,
+              submittedAt: job.executionRecords[0].submittedAt,
+              acknowledgedAt: job.executionRecords[0].acknowledgedAt,
+              checklistJson: job.executionRecords[0].checklistJson,
+              notesJson: job.executionRecords[0].notesJson,
+              evidenceCount: Array.isArray(job.executionRecords[0].evidence) ? job.executionRecords[0].evidence.length : 0,
+            }
+          : null,
       })),
       bookings,
     };

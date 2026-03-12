@@ -27,7 +27,7 @@ test.describe("documents and artifacts foundation", () => {
 
     await page.goto(`/portal/job/${fixtureRefs.portalToken}`);
     await expect(page.getByTestId("public-portal-documents")).toBeVisible();
-    await expect(page.getByText(fixtureRefs.seededPortalArtifactLabel)).toBeVisible();
+    await expect(page.getByTestId("public-portal-documents").getByText(fixtureRefs.seededPortalArtifactLabel)).toBeVisible();
   });
 
   test("operators can upload a new job artifact", async ({ page, request }) => {
