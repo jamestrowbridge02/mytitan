@@ -50,10 +50,10 @@ test.describe("parts and inventory", () => {
   test("purchase order create flow works", async ({ page, request }) => {
     await installApiProxy(page, request);
     await page.goto("/dashboard/purchase-orders");
-    await page.getByPlaceholder("Supplier name").fill("Playwright Supplier");
-    await page.getByRole("combobox").nth(0).selectOption({ label: fixtureRefs.inventoryWarehouseName });
-    await page.getByRole("combobox").nth(1).selectOption({ label: `${fixtureRefs.lowStockPartSku} · ${fixtureRefs.lowStockPartName}` });
-    await page.getByPlaceholder("Qty ordered").fill("4");
+    await page.getByTestId("purchase-order-supplier").fill("Playwright Supplier");
+    await page.getByTestId("purchase-order-location").selectOption({ label: fixtureRefs.inventoryWarehouseName });
+    await page.getByTestId("purchase-order-part").selectOption({ label: `${fixtureRefs.lowStockPartSku} · ${fixtureRefs.lowStockPartName}` });
+    await page.getByTestId("purchase-order-qty").fill("4");
     await page.getByTestId("purchase-order-save").evaluate((element: HTMLButtonElement) => element.click());
     await expect(page.getByTestId("purchase-order-list")).toContainText("Playwright Supplier");
   });

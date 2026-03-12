@@ -114,10 +114,11 @@ test.describe("service plans", () => {
 
   test("operator can approve and complete a customer plan request", async ({ page, request }) => {
     const headers = await customerAuthHeaders(request);
+    const uniqueNote = `Please stop this plan at the next renewal point. [pw-${Date.now()}]`;
     const createResponse = await request.post(`http://127.0.0.1:3000/customer/service-plans/${fixtureRefs.portalRenewalPlanId}/change-request`, {
       data: {
         kind: "CANCEL_REQUEST",
-        note: "Please stop this plan at the next renewal point.",
+        note: uniqueNote,
       },
       headers,
     });
@@ -130,10 +131,18 @@ test.describe("service plans", () => {
     await loginAs(page, request, "e2e.operator@mytitan.local", "MyTitanE2E!2026");
     await page.goto("/dashboard/service-plans");
 
-    const requestRow = page.getByTestId("service-plan-change-request-list").locator(".operator-table__row").filter({ hasText: "CANCEL REQUEST" }).first();
+    const requestRow = page.getByTestId("service-plan-change-request-list").locator(".operator-table__row").filter({ hasText: uniqueNote }).first();
     await expect(requestRow).toBeVisible();
     await requestRow.getByTestId("service-plan-request-approve").evaluate((element: HTMLButtonElement) => element.click());
     await expect(requestRow).toContainText(/APPROVED/i);
+    await expect.poll(async () => {
+      const listResponse = await request.get("http://127.0.0.1:3000/service-plans/change-requests", {
+        headers: await operatorAuthHeaders(request),
+      });
+      const rows = await listResponse.json();
+      const target = Array.isArray(rows) ? rows.find((row: any) => row?.id === createdRequest?.id) : null;
+      return target?.status || null;
+    }).toBe("APPROVED");
     await requestRow.getByTestId("service-plan-request-complete").evaluate((element: HTMLButtonElement) => element.click());
 
     const operatorHeaders = await operatorAuthHeaders(request);

@@ -16,12 +16,13 @@ test.describe("dashboard workflows", () => {
   test("bookings page handles blocked and successful conversion flows", async ({ page, request }) => {
     await installApiProxy(page, request);
     await page.goto("/dashboard/bookings");
+    await page.getByTestId("location-scope-switcher").locator("select").selectOption({ label: "All locations" });
     await expect(page.getByRole("heading", { name: "Bookings", exact: true })).toBeVisible();
     await expect(page.getByText(`Booking ID ${fixtureRefs.convertibleBookingId}`)).toBeVisible();
     await expect(page.getByText(`Booking ID ${fixtureRefs.blockedBookingId}`)).toBeVisible();
-    await expect(page.getByText(/Conversion blocked: missing customer name/i)).toBeVisible();
 
     const blockedRow = page.locator(".operator-table__row", { hasText: fixtureRefs.blockedBookingId }).first();
+    await expect(blockedRow).toContainText(/Conversion blocked: missing customer name/i);
     await blockedRow.getByRole("button", { name: /more actions/i }).click();
     const blockedConvert = blockedRow.getByTestId(`booking-convert-${fixtureRefs.blockedBookingId}`);
     await expect(blockedConvert).toBeVisible();

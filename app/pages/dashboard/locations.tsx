@@ -63,6 +63,24 @@ export default function LocationsPage() {
     load();
   }, [enabled]);
 
+  function buildLocationPayload() {
+    const normalize = (value: any) => {
+      const next = typeof value === 'string' ? value.trim() : value;
+      return next === '' ? undefined : next;
+    };
+    return {
+      ...form,
+      code: normalize(form.code),
+      addressLine1: normalize(form.addressLine1),
+      city: normalize(form.city),
+      country: normalize(form.country) || 'UK',
+      phone: normalize(form.phone),
+      email: normalize(form.email),
+      timezone: normalize(form.timezone),
+      defaultAssigneeId: normalize(form.defaultAssigneeId),
+    };
+  }
+
   async function createLocation(e: React.FormEvent) {
     e.preventDefault();
     setError('');
@@ -70,7 +88,7 @@ export default function LocationsPage() {
     try {
       await apiFetch(editingId ? `/locations/${editingId}` : '/locations', {
         method: editingId ? 'PATCH' : 'POST',
-        body: JSON.stringify(form),
+        body: JSON.stringify(buildLocationPayload()),
       });
       setForm({
         code: '',
@@ -232,9 +250,20 @@ export default function LocationsPage() {
         <h2 style={{ marginTop: 0 }}>{editingId ? 'Edit Location' : 'Add Location'}</h2>
         <form onSubmit={createLocation}>
           <label>Code</label>
-          <input className="input" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
+          <input
+            className="input"
+            data-testid="location-code-input"
+            value={form.code}
+            onChange={(e) => setForm({ ...form, code: e.target.value })}
+          />
           <label>Name</label>
-          <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+          <input
+            className="input"
+            data-testid="location-name-input"
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            required
+          />
           <label>Kind</label>
           <select className="input" value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value })}>
             <option value="BRANCH">Branch</option>

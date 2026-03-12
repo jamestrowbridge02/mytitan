@@ -18,16 +18,20 @@ test.describe("multi-location operations", () => {
     await installApiProxy(page, request);
     await page.goto("/dashboard/locations");
     const createCard = page.getByTestId("location-create");
-    await createCard.locator("input").nth(0).fill("SOUTH");
-    await createCard.locator("input").nth(1).fill("E2E South Branch");
-    await page.getByTestId("location-save").click();
-    await expect(page.getByTestId("location-list")).toContainText("E2E South Branch");
+    const suffix = Date.now().toString().slice(-6);
+    const code = `S${suffix}`;
+    const name = `E2E South Branch ${suffix}`;
+    const updatedName = `${name} Updated`;
+    await createCard.getByTestId("location-code-input").fill(code);
+    await createCard.getByTestId("location-name-input").fill(name);
+    await page.getByTestId("location-save").evaluate((element: HTMLButtonElement) => element.click());
+    await expect(page.getByTestId("location-list")).toContainText(name);
 
-    const row = page.getByTestId("location-list").locator(".integration-card", { hasText: "E2E South Branch" }).first();
-    await row.getByRole("button", { name: "Edit" }).click();
-    await createCard.locator("input").nth(1).fill("E2E South Branch Updated");
-    await page.getByTestId("location-save").click();
-    await expect(page.getByTestId("location-list")).toContainText("E2E South Branch Updated");
+    const row = page.getByTestId("location-list").locator(".integration-card", { hasText: name }).first();
+    await row.getByRole("button", { name: "Edit" }).evaluate((element: HTMLButtonElement) => element.click());
+    await createCard.getByTestId("location-name-input").fill(updatedName);
+    await page.getByTestId("location-save").evaluate((element: HTMLButtonElement) => element.click());
+    await expect(page.getByTestId("location-list")).toContainText(updatedName);
   });
 
   test("operator can assign a location membership", async ({ page, request }) => {
@@ -36,7 +40,7 @@ test.describe("multi-location operations", () => {
     const memberships = page.getByTestId("location-membership-list");
     await memberships.getByRole("combobox").nth(0).selectOption({ label: fixtureRefs.viewerEmail });
     await memberships.getByRole("combobox").nth(1).selectOption({ label: fixtureRefs.northLocationName });
-    await memberships.getByRole("button", { name: "Assign membership" }).click();
+    await memberships.getByRole("button", { name: "Assign membership" }).evaluate((element: HTMLButtonElement) => element.click());
     await expect(memberships).toContainText(fixtureRefs.viewerEmail);
     await expect(memberships).toContainText(fixtureRefs.northLocationName);
   });

@@ -72,19 +72,23 @@ test.describe("custom fields", () => {
   test("job custom fields render, save, and satisfy stage requirements", async ({ page, request }) => {
     await installApiProxy(page, request);
     await page.goto("/dashboard/jobs");
+    await page.getByTestId("location-scope-switcher").locator("select").selectOption({ label: "All locations" });
     const token = await getToken(page);
     const serialField = await getVisibleField(request, token, "job", fixtureRefs.customFieldJobSerialKey);
     await setCustomFieldValue(request, token, "job", fixtureRefs.commandCentreJobId, serialField.id, null);
     await page.reload();
+    await page.getByTestId("location-scope-switcher").locator("select").selectOption({ label: "All locations" });
     const jobRow = page.locator(".operator-table__row", { hasText: fixtureRefs.commandCentreJobRef }).first();
     await expect(jobRow.getByTestId("custom-field-stage-warning")).toContainText("serial_number required");
 
-    await jobRow.getByRole("button", { name: /more actions/i }).click();
+    await jobRow.scrollIntoViewIfNeeded();
+    await jobRow.getByRole("button", { name: /more actions/i }).evaluate((element: HTMLButtonElement) => element.click());
     await page.getByTestId(`job-custom-fields-${fixtureRefs.commandCentreJobId}`).evaluate((element: HTMLButtonElement) => element.click());
     await expect(page.getByTestId("custom-fields-card-job")).toBeVisible();
     await page.getByTestId(`custom-field-input-${fixtureRefs.customFieldJobSerialKey}`).fill("CC-SN-001");
     await setCustomFieldValue(request, token, "job", fixtureRefs.commandCentreJobId, serialField.id, "CC-SN-001");
     await page.reload();
+    await page.getByTestId("location-scope-switcher").locator("select").selectOption({ label: "All locations" });
     const refreshedRow = page.locator(".operator-table__row", { hasText: fixtureRefs.commandCentreJobRef }).first();
     await expect(refreshedRow.getByTestId("custom-field-stage-warning")).toHaveCount(0);
     await expect(refreshedRow).toContainText("CC-SN-001");

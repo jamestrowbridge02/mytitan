@@ -380,20 +380,20 @@ export function InventoryWorkspace({ initialTab }: { initialTab: InventoryWorksp
             </div>
           </div>
           <form onSubmit={savePurchaseOrder} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10, marginBottom: 16 }}>
-            <input className="input" placeholder="Supplier name" value={poForm.supplierName} onChange={(event) => setPoForm((current) => ({ ...current, supplierName: event.target.value }))} />
-            <select className="input" value={poForm.inventoryLocationId} onChange={(event) => setPoForm((current) => ({ ...current, inventoryLocationId: event.target.value }))} required>
+            <input className="input" data-testid="purchase-order-supplier" placeholder="Supplier name" value={poForm.supplierName} onChange={(event) => setPoForm((current) => ({ ...current, supplierName: event.target.value }))} />
+            <select className="input" data-testid="purchase-order-location" value={poForm.inventoryLocationId} onChange={(event) => setPoForm((current) => ({ ...current, inventoryLocationId: event.target.value }))} required>
               <option value="">Select receiving location</option>
               {locations.map((location) => (
                 <option key={location.id} value={location.id}>{location.name}</option>
               ))}
             </select>
-            <select className="input" value={poForm.stockItemId} onChange={(event) => setPoForm((current) => ({ ...current, stockItemId: event.target.value }))} required>
+            <select className="input" data-testid="purchase-order-part" value={poForm.stockItemId} onChange={(event) => setPoForm((current) => ({ ...current, stockItemId: event.target.value }))} required>
               <option value="">Select part</option>
               {parts.map((part) => (
                 <option key={part.id} value={part.id}>{part.sku} · {part.name}</option>
               ))}
             </select>
-            <input className="input" type="number" min="0.01" step="0.01" placeholder="Qty ordered" value={poForm.qtyOrdered} onChange={(event) => setPoForm((current) => ({ ...current, qtyOrdered: Number(event.target.value || 0) }))} required />
+            <input className="input" data-testid="purchase-order-qty" type="number" min="0.01" step="0.01" placeholder="Qty ordered" value={poForm.qtyOrdered} onChange={(event) => setPoForm((current) => ({ ...current, qtyOrdered: Number(event.target.value || 0) }))} required />
             <input className="input" type="number" min="0" step="0.01" placeholder="Unit cost" value={poForm.unitCost} onChange={(event) => setPoForm((current) => ({ ...current, unitCost: Number(event.target.value || 0) }))} />
             <select className="input" value={poForm.status} onChange={(event) => setPoForm((current) => ({ ...current, status: event.target.value }))}>
               <option value="DRAFT">Draft</option>

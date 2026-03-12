@@ -451,19 +451,19 @@ export default function SchedulingPage() {
             <div className="two-col">
               <div style={{ display: "grid", gap: 10 }}>
                 <h3 style={{ margin: 0 }}>Availability</h3>
-                <select className="input" value={availabilityForm.technicianId} onChange={(event) => setAvailabilityForm((current) => ({ ...current, technicianId: event.target.value }))}>
+                <select className="input" data-testid="scheduling-availability-technician" value={availabilityForm.technicianId} onChange={(event) => setAvailabilityForm((current) => ({ ...current, technicianId: event.target.value }))}>
                   <option value="">Select technician</option>
                   {capacity?.technicians?.map((technician) => (
                     <option key={technician.id} value={technician.id}>{technician.name}</option>
                   ))}
                 </select>
-                <input className="input" type="date" value={availabilityForm.date} onChange={(event) => setAvailabilityForm((current) => ({ ...current, date: event.target.value }))} />
+                <input className="input" data-testid="scheduling-availability-date" type="date" value={availabilityForm.date} onChange={(event) => setAvailabilityForm((current) => ({ ...current, date: event.target.value }))} />
                 <div className="two-col">
-                  <input className="input" type="time" value={availabilityForm.startTime} onChange={(event) => setAvailabilityForm((current) => ({ ...current, startTime: event.target.value }))} />
-                  <input className="input" type="time" value={availabilityForm.endTime} onChange={(event) => setAvailabilityForm((current) => ({ ...current, endTime: event.target.value }))} />
+                  <input className="input" data-testid="scheduling-availability-start" type="time" value={availabilityForm.startTime} onChange={(event) => setAvailabilityForm((current) => ({ ...current, startTime: event.target.value }))} />
+                  <input className="input" data-testid="scheduling-availability-end" type="time" value={availabilityForm.endTime} onChange={(event) => setAvailabilityForm((current) => ({ ...current, endTime: event.target.value }))} />
                 </div>
-                <input className="input" type="number" min={1} value={availabilityForm.capacityMinutes} onChange={(event) => setAvailabilityForm((current) => ({ ...current, capacityMinutes: Number(event.target.value || 0) }))} />
-                <textarea className="textarea" value={availabilityForm.notes} onChange={(event) => setAvailabilityForm((current) => ({ ...current, notes: event.target.value }))} placeholder="Operator notes" />
+                <input className="input" data-testid="scheduling-availability-minutes" type="number" min={1} value={availabilityForm.capacityMinutes} onChange={(event) => setAvailabilityForm((current) => ({ ...current, capacityMinutes: Number(event.target.value || 0) }))} />
+                <textarea className="textarea" data-testid="scheduling-availability-notes" value={availabilityForm.notes} onChange={(event) => setAvailabilityForm((current) => ({ ...current, notes: event.target.value }))} placeholder="Operator notes" />
                 <button className="button" data-testid="scheduling-availability-save" type="button" disabled={saving || !availabilityForm.technicianId} onClick={() => void saveAvailability()}>
                   {saving ? "Saving..." : availabilityForm.id ? "Update availability" : "Save availability"}
                 </button>
@@ -495,25 +495,25 @@ export default function SchedulingPage() {
 
               <div style={{ display: "grid", gap: 10 }}>
                 <h3 style={{ margin: 0 }}>Capacity exceptions</h3>
-                <select className="input" value={exceptionForm.technicianId} onChange={(event) => setExceptionForm((current) => ({ ...current, technicianId: event.target.value }))}>
+                <select className="input" data-testid="scheduling-exception-technician" value={exceptionForm.technicianId} onChange={(event) => setExceptionForm((current) => ({ ...current, technicianId: event.target.value }))}>
                   <option value="">Select technician</option>
                   {capacity?.technicians?.map((technician) => (
                     <option key={technician.id} value={technician.id}>{technician.name}</option>
                   ))}
                 </select>
-                <input className="input" type="date" value={exceptionForm.date} onChange={(event) => setExceptionForm((current) => ({ ...current, date: event.target.value }))} />
-                <select className="input" value={exceptionForm.type} onChange={(event) => setExceptionForm((current) => ({ ...current, type: event.target.value }))}>
+                <input className="input" data-testid="scheduling-exception-date" type="date" value={exceptionForm.date} onChange={(event) => setExceptionForm((current) => ({ ...current, date: event.target.value }))} />
+                <select className="input" data-testid="scheduling-exception-type" value={exceptionForm.type} onChange={(event) => setExceptionForm((current) => ({ ...current, type: event.target.value }))}>
                   <option value="UNAVAILABLE">Unavailable</option>
                   <option value="REDUCED_CAPACITY">Reduced capacity</option>
                   <option value="OVERTIME">Overtime</option>
                 </select>
                 <div className="two-col">
-                  <input className="input" type="time" value={exceptionForm.startTime} onChange={(event) => setExceptionForm((current) => ({ ...current, startTime: event.target.value }))} />
-                  <input className="input" type="time" value={exceptionForm.endTime} onChange={(event) => setExceptionForm((current) => ({ ...current, endTime: event.target.value }))} />
+                  <input className="input" data-testid="scheduling-exception-start" type="time" value={exceptionForm.startTime} onChange={(event) => setExceptionForm((current) => ({ ...current, startTime: event.target.value }))} />
+                  <input className="input" data-testid="scheduling-exception-end" type="time" value={exceptionForm.endTime} onChange={(event) => setExceptionForm((current) => ({ ...current, endTime: event.target.value }))} />
                 </div>
-                <input className="input" type="number" min={1} value={exceptionForm.capacityMinutes} onChange={(event) => setExceptionForm((current) => ({ ...current, capacityMinutes: Number(event.target.value || 0) }))} />
-                <textarea className="textarea" value={exceptionForm.reason} onChange={(event) => setExceptionForm((current) => ({ ...current, reason: event.target.value }))} placeholder="Reason" />
-                <button className="button secondary" type="button" disabled={saving || !exceptionForm.technicianId} onClick={() => void saveException()}>
+                <input className="input" data-testid="scheduling-exception-minutes" type="number" min={1} value={exceptionForm.capacityMinutes} onChange={(event) => setExceptionForm((current) => ({ ...current, capacityMinutes: Number(event.target.value || 0) }))} />
+                <textarea className="textarea" data-testid="scheduling-exception-reason" value={exceptionForm.reason} onChange={(event) => setExceptionForm((current) => ({ ...current, reason: event.target.value }))} placeholder="Reason" />
+                <button className="button secondary" data-testid="scheduling-exception-save" type="button" disabled={saving || !exceptionForm.technicianId} onClick={() => void saveException()}>
                   {saving ? "Saving..." : exceptionForm.id ? "Update exception" : "Save exception"}
                 </button>
                 {capacity?.exceptions?.length ? (
