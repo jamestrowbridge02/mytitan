@@ -23,6 +23,7 @@ import { ApiError, apiFetch } from "../../lib/api";
 import { getBusinessTerms } from "../../lib/business-config";
 import { getMissingRequiredCustomFieldKeys, type CustomField, type CustomFieldValue } from "../../lib/custom-fields";
 import { isMarketplaceEnabled } from "../../lib/feature-flags";
+import { readActiveLocationId, subscribeActiveLocationId } from "../../lib/location-context";
 import { useStickyOperatorView } from "../../lib/operator-view-state";
 import { useTenantSettings } from "../../lib/tenant-settings";
 import { getBookingStages, mapStatusToStage } from "../../lib/workflow-config";
@@ -114,9 +115,8 @@ export default function BookingsPage() {
   };
 
   useEffect(() => {
-    apiFetch('/me/location')
-      .then((ctx) => setActiveLocationId(ctx?.activeLocationId || 'all'))
-      .catch(() => setActiveLocationId('all'));
+    setActiveLocationId(readActiveLocationId());
+    return subscribeActiveLocationId(setActiveLocationId);
   }, []);
 
   useEffect(() => {

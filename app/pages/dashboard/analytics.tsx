@@ -12,6 +12,7 @@ import {
 } from "../../components/ui/operator-page";
 import { apiFetch } from "../../lib/api";
 import { isAnalyticsV1Enabled } from "../../lib/feature-flags";
+import { readActiveLocationId, subscribeActiveLocationId } from "../../lib/location-context";
 import { emptyPermissionSnapshot, hasWorkspacePermission, normalizePermissionSnapshot } from "../../lib/workspace-permissions";
 
 type ExecutiveResponse = {
@@ -162,17 +163,16 @@ export default function AnalyticsPage() {
     setLoading(true);
     try {
       const me = await apiFetch("/me");
-      const locationCtx = await apiFetch("/me/location").catch(() => ({ activeLocationId: 'all' }));
       const normalizedPermissions = normalizePermissionSnapshot(me?.permissions);
       setPermissions(normalizedPermissions);
       setPermissionsReady(true);
-      setActiveLocationId(locationCtx?.activeLocationId || 'all');
       if (!normalizedPermissions["dashboard.view_intelligence"]) {
         setLoading(false);
         return;
       }
 
-      const locationSuffix = `&locationId=${encodeURIComponent(locationCtx?.activeLocationId || 'all')}`;
+      const scopedLocationId = activeLocationId || "all";
+      const locationSuffix = `&locationId=${encodeURIComponent(scopedLocationId)}`;
 
       const requests = [
         apiFetch(`/analytics/executive?windowDays=${selectedWindowDays}${locationSuffix}`),
@@ -208,12 +208,17 @@ export default function AnalyticsPage() {
   }
 
   useEffect(() => {
+    setActiveLocationId(readActiveLocationId());
+    return subscribeActiveLocationId(setActiveLocationId);
+  }, []);
+
+  useEffect(() => {
     if (!enabled) {
       setLoading(false);
       return;
     }
     void load();
-  }, [enabled]);
+  }, [activeLocationId, enabled]);
 
   async function saveLayout(nextOrder = widgetOrder, nextHidden = hiddenWidgets, nextWindowDays = windowDays) {
     if (!canManageLayout) return;

@@ -11,6 +11,7 @@ import {
   OperatorPageHeader,
 } from "../../components/ui/operator-page";
 import { apiFetch } from "../../lib/api";
+import { readActiveLocationId, subscribeActiveLocationId } from "../../lib/location-context";
 import { emptyPermissionSnapshot, hasWorkspacePermission, normalizePermissionSnapshot } from "../../lib/workspace-permissions";
 
 type CapacityCell = {
@@ -137,10 +138,8 @@ export default function SchedulingPage() {
     setLoading(true);
     try {
       const me = await apiFetch("/me");
-      const locationCtx = await apiFetch("/me/location").catch(() => ({ activeLocationId: "all" }));
       const normalizedPermissions = normalizePermissionSnapshot(me?.permissions);
       setPermissions(normalizedPermissions);
-      setActiveLocationId(locationCtx?.activeLocationId || "all");
       const allowed = normalizedPermissions["jobs.transition"]
         || normalizedPermissions["dashboard.view_intelligence"]
         || normalizedPermissions["technician.execute"];
@@ -150,7 +149,8 @@ export default function SchedulingPage() {
         setRecommendations(null);
         return;
       }
-      const locationSuffix = `&locationId=${encodeURIComponent(locationCtx?.activeLocationId || "all")}`;
+      const scopedLocationId = activeLocationId || "all";
+      const locationSuffix = `&locationId=${encodeURIComponent(scopedLocationId)}`;
       const [capacityRes, pressureRes] = await Promise.all([
         apiFetch(`/schedule/capacity?from=${activeDate}&to=${plusDays(activeDate, 5)}${locationSuffix}`),
         apiFetch(`/schedule/pressure?date=${activeDate}${locationSuffix}`),
@@ -184,8 +184,13 @@ export default function SchedulingPage() {
   }
 
   useEffect(() => {
+    setActiveLocationId(readActiveLocationId());
+    return subscribeActiveLocationId(setActiveLocationId);
+  }, []);
+
+  useEffect(() => {
     void loadAll();
-  }, [date]);
+  }, [activeLocationId, date]);
 
   async function loadRecommendations(entityType: string, entityId: string) {
     setSelectedWork({ entityType, entityId });

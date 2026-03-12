@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { useEffect, useMemo, useState } from 'react';
 import { apiFetch, clearToken } from '../lib/api';
 import { useBilling } from '../lib/billing';
+import { writeActiveLocationId } from '../lib/location-context';
 import {
   isBookingProV1Enabled,
   isCommandCentreV2Enabled,
@@ -83,8 +84,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       if (!locationsEnabled) return;
       try {
         const ctx = await apiFetch('/me/location');
+        const nextLocationId = writeActiveLocationId(ctx?.activeLocationId || 'all');
         setLocationCtx({
-          activeLocationId: ctx?.activeLocationId || 'all',
+          activeLocationId: nextLocationId,
           available: Array.isArray(ctx?.available) && ctx.available.length ? ctx.available : [{ id: 'all', name: 'All locations' }],
         });
       } catch {
@@ -137,11 +139,12 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const unreadCount = useMemo(() => notifications.filter((item) => !item.isRead).length, [notifications]);
 
   async function updateLocationContext(nextId: string) {
-    setLocationCtx((prev) => ({ ...prev, activeLocationId: nextId }));
+    const normalized = writeActiveLocationId(nextId);
+    setLocationCtx((prev) => ({ ...prev, activeLocationId: normalized }));
     try {
       await apiFetch('/me/location', {
         method: 'PUT',
-        body: JSON.stringify({ locationId: nextId }),
+        body: JSON.stringify({ locationId: normalized }),
       });
       router.replace(router.asPath);
     } catch {

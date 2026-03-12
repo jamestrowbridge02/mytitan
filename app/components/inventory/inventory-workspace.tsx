@@ -2,6 +2,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../../lib/api";
 import { isInventoryV1Enabled } from "../../lib/feature-flags";
+import { readActiveLocationId, subscribeActiveLocationId } from "../../lib/location-context";
 
 type InventoryWorkspaceTab = "parts" | "inventory" | "purchase-orders";
 
@@ -47,9 +48,8 @@ export function InventoryWorkspace({ initialTab }: { initialTab: InventoryWorksp
 
   useEffect(() => {
     if (!enabled) return;
-    apiFetch('/me/location')
-      .then((ctx) => setActiveLocationId(ctx?.activeLocationId || 'all'))
-      .catch(() => setActiveLocationId('all'));
+    setActiveLocationId(readActiveLocationId());
+    return subscribeActiveLocationId(setActiveLocationId);
   }, [enabled]);
 
   async function loadAll() {

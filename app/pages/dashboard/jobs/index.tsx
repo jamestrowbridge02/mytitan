@@ -20,6 +20,7 @@ import {
 import OpsSignalsBar from "../../../components/entity/OpsSignalsBar";
 import { getBusinessTerms, getCommandCentreHref } from "../../../lib/business-config";
 import { getMissingRequiredCustomFieldKeys, type CustomField, type CustomFieldValue } from "../../../lib/custom-fields";
+import { readActiveLocationId, subscribeActiveLocationId } from "../../../lib/location-context";
 import { useStickyOperatorView } from "../../../lib/operator-view-state";
 import { apiFetch } from "../../../lib/api";
 import { getJobSignals } from "../../../lib/ops-signals";
@@ -83,10 +84,11 @@ export default function Jobs() {
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
   const [customFieldValues, setCustomFieldValues] = useState<CustomFieldValue[]>([]);
   const [customFieldJobId, setCustomFieldJobId] = useState<string | null>(null);
+  const [activeLocationId, setActiveLocationId] = useState("all");
 
   const load = async () => {
     try {
-      const data = await apiFetch("/jobs");
+      const data = await apiFetch(`/jobs?locationId=${encodeURIComponent(activeLocationId)}`);
       setJobs(Array.isArray(data) ? data : []);
       setError("");
     } catch (err: any) {
@@ -95,8 +97,13 @@ export default function Jobs() {
   };
 
   useEffect(() => {
-    void load();
+    setActiveLocationId(readActiveLocationId());
+    return subscribeActiveLocationId(setActiveLocationId);
   }, []);
+
+  useEffect(() => {
+    void load();
+  }, [activeLocationId]);
 
   useEffect(() => {
     async function loadCustomFieldData() {
