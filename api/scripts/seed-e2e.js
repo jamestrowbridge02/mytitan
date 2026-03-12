@@ -183,6 +183,19 @@ const FIXTURE = {
       resolvedInvoiceReview: { id: "e2e-compliance-exception-resolved-invoice-review" },
     },
   },
+  performance: {
+    periods: {
+      current: { id: "e2e-performance-period-current", name: "E2E March Ops Window" },
+    },
+  },
+  compensation: {
+    rules: {
+      technician: { id: "e2e-comp-rule-technician-jobs", name: "Technician completion bonus" },
+    },
+    runs: {
+      technicianDraft: { id: "e2e-comp-run-technician-draft" },
+    },
+  },
   scheduling: {
     availabilityOperator: { id: "e2e-tech-availability-operator" },
     availabilityTechnician: { id: "e2e-tech-availability-technician" },
@@ -1031,6 +1044,30 @@ async function ensureQuote(id, payload, lineItems = []) {
 
 async function ensureRevenueCollectionTask(id, payload) {
   await prisma.revenueCollectionTask.upsert({
+    where: { id },
+    create: { id, ...payload },
+    update: payload,
+  });
+}
+
+async function ensurePerformancePeriod(id, payload) {
+  await prisma.performancePeriod.upsert({
+    where: { id },
+    create: { id, ...payload },
+    update: payload,
+  });
+}
+
+async function ensureCompensationRule(id, payload) {
+  await prisma.compensationRule.upsert({
+    where: { id },
+    create: { id, ...payload },
+    update: payload,
+  });
+}
+
+async function ensureCompensationRun(id, payload) {
+  await prisma.compensationRun.upsert({
     where: { id },
     create: { id, ...payload },
     update: payload,
@@ -3346,6 +3383,73 @@ async function main() {
       availableMinutes: 30,
       scheduledMinutes: 60,
       remainingMinutes: -30,
+    },
+  });
+
+  await prisma.compensationRun.deleteMany({
+    where: {
+      tenantId: company.id,
+      id: {
+        notIn: [FIXTURE.compensation.runs.technicianDraft.id],
+      },
+    },
+  });
+  await prisma.compensationRule.deleteMany({
+    where: {
+      tenantId: company.id,
+      id: {
+        notIn: [FIXTURE.compensation.rules.technician.id],
+      },
+    },
+  });
+  await prisma.performancePeriod.deleteMany({
+    where: {
+      tenantId: company.id,
+      id: {
+        notIn: [FIXTURE.performance.periods.current.id],
+      },
+    },
+  });
+
+  const periodStartsAt = addMinutes(today, -14 * 24 * 60);
+  const periodEndsAt = addMinutes(today, 14 * 24 * 60);
+  await ensurePerformancePeriod(FIXTURE.performance.periods.current.id, {
+    tenantId: company.id,
+    name: FIXTURE.performance.periods.current.name,
+    startsAt: periodStartsAt,
+    endsAt: periodEndsAt,
+    status: "OPEN",
+  });
+  await ensureCompensationRule(FIXTURE.compensation.rules.technician.id, {
+    tenantId: company.id,
+    name: FIXTURE.compensation.rules.technician.name,
+    roleType: "TECHNICIAN",
+    active: true,
+    metricType: "JOBS_COMPLETED",
+    calculationType: "THRESHOLD_BONUS",
+    thresholdJson: {
+      minimum: 1,
+    },
+    payoutJson: {
+      amountCents: 7500,
+      stepAmountCents: 7500,
+    },
+  });
+  await ensureCompensationRun(FIXTURE.compensation.runs.technicianDraft.id, {
+    tenantId: company.id,
+    periodId: FIXTURE.performance.periods.current.id,
+    userId: technicianUser.id,
+    ruleId: FIXTURE.compensation.rules.technician.id,
+    status: "DRAFT",
+    amountCents: 7500,
+    currency: "GBP",
+    calculationJson: {
+      metricType: "JOBS_COMPLETED",
+      metricValue: 1,
+      minimum: 1,
+      metThreshold: true,
+      amountCents: 7500,
+      seeded: true,
     },
   });
 

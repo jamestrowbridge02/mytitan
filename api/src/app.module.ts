@@ -46,6 +46,8 @@ import { ScheduleModule } from './schedule/schedule.module';
 import { CustomerWorkspaceModule } from './customer-workspace/customer-workspace.module';
 import { RevenueModule } from './revenue/revenue.module';
 import { ComplianceModule } from './compliance/compliance.module';
+import { PerformanceModule } from './performance/performance.module';
+import { CompensationModule } from './compensation/compensation.module';
 
 @Module({
   imports: [
@@ -103,6 +105,8 @@ import { ComplianceModule } from './compliance/compliance.module';
     CustomerWorkspaceModule,
     RevenueModule,
     ComplianceModule,
+    PerformanceModule,
+    CompensationModule,
   ],
 })
 export class AppModule {}

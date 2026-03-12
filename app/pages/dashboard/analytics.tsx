@@ -313,6 +313,7 @@ export default function AnalyticsPage() {
           title="Analytics"
           subtitle="Executive-grade operating metrics built from live tenant jobs, quotes, invoices, approvals, service plans, and technician capacity."
           actions={[
+            { label: "Performance", href: "/dashboard/performance", variant: "secondary" },
             { label: "Intelligence", href: "/dashboard/intelligence", variant: "secondary" },
             { label: "Revenue", href: "/dashboard/revenue", variant: "secondary" },
             { label: "Scheduling", href: "/dashboard/scheduling" },

@@ -52,6 +52,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { title: "Intelligence", href: "/dashboard/intelligence" },
       { title: "Compliance", href: "/dashboard/compliance" },
+      { title: "Performance", href: "/dashboard/performance" },
       { title: "Executive", href: "/dashboard/executive" },
       { title: "Technician queue", href: "/dashboard/technician" },
       { title: "Parts", href: "/dashboard/parts" },
@@ -65,6 +66,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { title: "Quotes", href: "/dashboard/quotes" },
       { title: "Revenue tasks", href: "/dashboard/revenue" },
+      { title: "Compensation", href: "/dashboard/compensation" },
       { title: "Billing", href: "/dashboard/billing" },
       { title: "Billing readiness", href: "/dashboard/billing/readiness" },
       { title: "Portal Ops", href: "/dashboard/portal" },

@@ -352,6 +352,10 @@ model Company {
   workflowSlaPolicies      WorkflowSlaPolicy[]
   workflowSlaEvents        WorkflowSlaEvent[]
   complianceExceptions     ComplianceException[]
+  performancePeriods       PerformancePeriod[]
+  performanceScorecards    PerformanceScorecard[]
+  compensationRules        CompensationRule[]
+  compensationRuns         CompensationRun[]
   jobLineItems             JobLineItem[]
   stockItems               StockItem[]
   stockSuppliers           StockSupplier[]
@@ -438,6 +442,8 @@ model User {
   createdJobExecutionEvidence JobExecutionEvidence[] @relation("JobExecutionEvidenceCreator")
   createdComplianceExceptions ComplianceException[] @relation("ComplianceExceptionCreator")
   resolvedComplianceExceptions ComplianceException[] @relation("ComplianceExceptionResolver")
+  performanceScorecards      PerformanceScorecard[]
+  compensationRuns           CompensationRun[]
 
   @@unique([companyId, email])
 }
@@ -485,6 +491,7 @@ model Location {
   servicePlans          ServicePlan[]
   workflowSlaEvents     WorkflowSlaEvent[]
   complianceExceptions  ComplianceException[]
+  performanceScorecards PerformanceScorecard[]
 
   @@index([companyId, isActive])
   @@index([companyId, kind, isActive])
@@ -538,6 +545,41 @@ enum ComplianceExceptionStatus {
   OPEN
   RESOLVED
   DISMISSED
+}
+
+enum PerformancePeriodStatus {
+  OPEN
+  CLOSED
+}
+
+enum PerformanceRoleType {
+  TECHNICIAN
+  DISPATCHER
+  FINANCE
+  MANAGER
+}
+
+enum CompensationMetricType {
+  JOBS_COMPLETED
+  SLA_MET_RATE
+  QUOTE_CONVERSION_RATE
+  COLLECTIONS_COMPLETED
+  UTILIZATION_RATE
+  ACKNOWLEDGEMENT_RATE
+  EXECUTION_SUBMITTED_RATE
+}
+
+enum CompensationCalculationType {
+  FLAT_BONUS
+  PERCENTAGE_BONUS
+  THRESHOLD_BONUS
+}
+
+enum CompensationRunStatus {
+  DRAFT
+  APPROVED
+  PAID
+  CANCELLED
 }
 
 model TradeAccount {
@@ -892,6 +934,83 @@ model ComplianceException {
   @@index([tenantId, severity, status, createdAt])
   @@index([tenantId, locationId, status, createdAt])
   @@index([tenantId, assignedUserId, status, createdAt])
+}
+
+model PerformancePeriod {
+  id         String                  @id @default(cuid())
+  tenantId   String
+  name       String
+  startsAt   DateTime
+  endsAt     DateTime
+  status     PerformancePeriodStatus @default(OPEN)
+  createdAt  DateTime                @default(now())
+  updatedAt  DateTime                @updatedAt
+  tenant     Company                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  scorecards PerformanceScorecard[]
+  runs       CompensationRun[]
+
+  @@index([tenantId, status, startsAt])
+}
+
+model PerformanceScorecard {
+  id          String              @id @default(cuid())
+  tenantId    String
+  userId      String
+  locationId  String?
+  periodId    String
+  roleType    PerformanceRoleType
+  metricsJson Json?
+  scoreJson   Json?
+  notesJson   Json?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  tenant      Company             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  location    Location?           @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  period      PerformancePeriod   @relation(fields: [periodId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId, periodId, roleType, locationId])
+  @@index([tenantId, periodId, roleType])
+  @@index([tenantId, locationId, periodId])
+}
+
+model CompensationRule {
+  id              String                       @id @default(cuid())
+  tenantId        String
+  name            String
+  roleType        PerformanceRoleType
+  active          Boolean                      @default(true)
+  metricType      CompensationMetricType
+  calculationType CompensationCalculationType
+  thresholdJson   Json?
+  payoutJson      Json?
+  createdAt       DateTime                     @default(now())
+  updatedAt       DateTime                     @updatedAt
+  tenant          Company                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  runs            CompensationRun[]
+
+  @@index([tenantId, roleType, active])
+}
+
+model CompensationRun {
+  id              String                @id @default(cuid())
+  tenantId        String
+  periodId        String
+  userId          String
+  ruleId          String
+  status          CompensationRunStatus @default(DRAFT)
+  amountCents     Int
+  currency        String
+  calculationJson Json?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  tenant          Company               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  period          PerformancePeriod     @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  user            User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rule            CompensationRule      @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, periodId, userId, ruleId])
+  @@index([tenantId, status, periodId])
 }
 
 model JobLineItem {

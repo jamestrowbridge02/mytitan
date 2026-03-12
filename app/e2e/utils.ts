@@ -93,6 +93,8 @@ export const fixtureRefs = {
   complianceOpenExceptionSummary: "Manual override on finance-ready workflow needs operator review",
   complianceDismissExceptionSummary: "Portal-active completion evidence review is awaiting operator acknowledgement",
   complianceResolvedExceptionSummary: "Issued invoice review has already been closed out",
+  performancePeriodName: "E2E March Ops Window",
+  compensationRuleName: "Technician completion bonus",
 };
 
 export type E2EMetadata = {

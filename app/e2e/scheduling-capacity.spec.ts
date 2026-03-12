@@ -48,7 +48,7 @@ test.describe("scheduling capacity planning", () => {
     await page.getByTestId("scheduling-availability-minutes").fill("120");
     await page.getByTestId("scheduling-availability-notes").fill("Playwright extra seeded capacity");
     await page.getByTestId("scheduling-availability-save").evaluate((element: HTMLButtonElement) => element.click());
-    await expect(page.getByTestId("operator-notice-success")).toContainText(/Availability saved|updated/i);
+    await expect(page.getByTestId("operator-notice-success").last()).toContainText(/Availability saved|updated/i);
 
     await page.getByTestId("scheduling-exception-technician").selectOption("e2e-user-technician");
     await page.getByTestId("scheduling-exception-date").fill("2026-03-13");
@@ -58,7 +58,7 @@ test.describe("scheduling capacity planning", () => {
     await page.getByTestId("scheduling-exception-minutes").fill("60");
     await page.getByTestId("scheduling-exception-reason").fill("Playwright overtime coverage");
     await page.getByTestId("scheduling-exception-save").evaluate((element: HTMLButtonElement) => element.click());
-    await expect(page.getByTestId("operator-notice-success")).toContainText(/Capacity exception saved|updated/i);
+    await expect(page.getByTestId("operator-notice-success").last()).toContainText(/Capacity exception saved|updated/i);
   });
 
   test("command centre sidepanel shows capacity pressure when assigning work", async ({ page, request }) => {
