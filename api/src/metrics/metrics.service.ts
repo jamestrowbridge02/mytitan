@@ -107,6 +107,9 @@ export class MetricsService {
       completedPrevious7Days,
       recentCompletedByTechnician,
       recentCommunications,
+      inventoryStockRows,
+      purchaseOrdersOpen,
+      jobPartsPending,
     ] = await Promise.all([
       db.job.groupBy({
         by: ['status'],
@@ -332,6 +335,31 @@ export class MetricsService {
         orderBy: { at: 'asc' },
         select: { at: true, type: true },
       }),
+      db.inventoryStock.findMany({
+        where: { tenantId },
+        select: {
+          quantityOnHand: true,
+          quantityReserved: true,
+          reorderPoint: true,
+        },
+      }),
+      db.stockPurchaseOrder.count({
+        where: {
+          tenantId,
+          status: { in: ['DRAFT', 'ORDERED', 'PARTIALLY_RECEIVED'] },
+        },
+      }),
+      db.jobPart.findMany({
+        where: {
+          tenantId,
+          status: { in: ['PLANNED', 'RESERVED'] },
+        },
+        select: {
+          quantityPlanned: true,
+          quantityReserved: true,
+          quantityUsed: true,
+        },
+      }),
     ]);
 
     const assignedIds = technicianLoad.map((row: any) => row.assignedUserId).filter(Boolean);
@@ -348,6 +376,9 @@ export class MetricsService {
     const unassignedDueWorkPressure = Array.isArray(schedulingPressure?.unassignedDueWork)
       ? schedulingPressure.unassignedDueWork.length
       : 0;
+    const lowStockRows = inventoryStockRows.filter((row: any) => Number(row.quantityOnHand || 0) <= Number(row.reorderPoint || 0)).length;
+    const shortageRows = inventoryStockRows.filter((row: any) => Number(row.quantityOnHand || 0) - Number(row.quantityReserved || 0) <= 0).length;
+    const jobPartsAwaitingStock = jobPartsPending.filter((row: any) => Number(row.quantityPlanned || 0) > Number(row.quantityReserved || 0) + Number(row.quantityUsed || 0)).length;
 
     return {
       jobsByStatus: jobsByStatus.map((row: any) => ({
@@ -395,8 +426,24 @@ export class MetricsService {
         approvedQuotesAwaitingConversion,
         overloadedTechnicianDays,
         unassignedDueWorkPressure,
+        lowStockRows,
+        shortageRows,
+        purchaseOrdersOpen,
+        jobPartsAwaitingStock,
       },
       attentionQueue: [
+        lowStockRows > 0
+          ? { key: 'low_stock_rows', label: 'Low-stock parts', count: lowStockRows, href: '/dashboard/inventory', hint: 'On-hand inventory is at or below configured reorder points' }
+          : null,
+        shortageRows > 0
+          ? { key: 'inventory_shortage', label: 'Inventory shortage pressure', count: shortageRows, href: '/dashboard/inventory', hint: 'Reserved and planned work is pressing against available stock' }
+          : null,
+        purchaseOrdersOpen > 0
+          ? { key: 'purchase_orders_open', label: 'Open purchase orders', count: purchaseOrdersOpen, href: '/dashboard/purchase-orders', hint: 'Procurement is still in draft, ordered, or partially received states' }
+          : null,
+        jobPartsAwaitingStock > 0
+          ? { key: 'job_parts_awaiting_stock', label: 'Job parts awaiting stock action', count: jobPartsAwaitingStock, href: '/dashboard/jobs/e2e-job-portal-active', hint: 'Planned job parts still need explicit reservation or usage decisions' }
+          : null,
         quotesAwaitingApproval > 0
           ? { key: 'quotes_awaiting_approval', label: 'Quotes awaiting approval', count: quotesAwaitingApproval, href: '/dashboard/quotes', hint: 'Sent quotes still waiting on customer approval' }
           : null,
@@ -460,6 +507,9 @@ export class MetricsService {
         pendingRenewals > 0 ? { key: 'pending_plan_renewals', severity: 'info', label: 'Renewal responses pending', count: pendingRenewals, href: '/dashboard/service-plans' } : null,
         openPlanChangeRequests > 0 ? { key: 'open_plan_change_requests', severity: 'warn', label: 'Plan change requests open', count: openPlanChangeRequests, href: '/dashboard/service-plans' } : null,
         submittedExecutionAwaitingAcknowledgement > 0 ? { key: 'execution_ack_pending', severity: 'info', label: 'Completion proofs awaiting acknowledgement', count: submittedExecutionAwaitingAcknowledgement, href: '/dashboard/technician' } : null,
+        lowStockRows > 0 ? { key: 'low_stock_rows', severity: 'warn', label: 'Low-stock parts', count: lowStockRows, href: '/dashboard/inventory' } : null,
+        shortageRows > 0 ? { key: 'inventory_shortage', severity: 'warn', label: 'Inventory shortage pressure', count: shortageRows, href: '/dashboard/inventory' } : null,
+        purchaseOrdersOpen > 0 ? { key: 'purchase_orders_open', severity: 'info', label: 'Open purchase orders', count: purchaseOrdersOpen, href: '/dashboard/purchase-orders' } : null,
         overloadedTechnicianDays > 0 ? { key: 'overloaded_technician_days', severity: 'warn', label: 'Technician days overloaded', count: overloadedTechnicianDays, href: '/dashboard/scheduling' } : null,
         publicUnlinkedBookings > 0 ? { key: 'public_conversion', severity: 'info', label: 'Public bookings awaiting conversion', count: publicUnlinkedBookings, href: '/dashboard/bookings' } : null,
         agedUnlinkedBookings > 0 ? { key: 'stale_booking_conversion', severity: 'warn', label: 'Unlinked bookings older than 48h', count: agedUnlinkedBookings, href: '/dashboard/bookings' } : null,

@@ -164,6 +164,38 @@ const FIXTURE = {
     exceptionReduced: { id: "e2e-tech-exception-reduced" },
     exceptionUnavailable: { id: "e2e-tech-exception-unavailable" },
   },
+  inventory: {
+    parts: {
+      alloyKit: { id: "e2e-part-alloy-kit", sku: "E2E-ALLOY-KIT", name: "Alloy Repair Kit" },
+      lacquer: { id: "e2e-part-lacquer", sku: "E2E-LACQUER", name: "Protective Lacquer" },
+      bolts: { id: "e2e-part-wheel-bolts", sku: "E2E-BOLTS", name: "Wheel Bolt Set" },
+    },
+    locations: {
+      warehouse: { id: "e2e-inventory-location-warehouse", name: "Main Warehouse" },
+      van: { id: "e2e-inventory-location-van", name: "Technician Van 01" },
+    },
+    stocks: {
+      alloyWarehouse: { id: "e2e-stock-alloy-warehouse" },
+      lacquerWarehouse: { id: "e2e-stock-lacquer-warehouse" },
+      boltsVan: { id: "e2e-stock-bolts-van" },
+    },
+    jobParts: {
+      portalReserved: { id: "e2e-job-part-portal-reserved" },
+      technicianDraft: { id: "e2e-job-part-technician-draft" },
+      invoiceUsed: { id: "e2e-job-part-invoice-used" },
+    },
+    purchaseOrders: {
+      open: { id: "e2e-po-open" },
+    },
+    purchaseOrderLines: {
+      openLacquer: { id: "e2e-po-line-open-lacquer" },
+    },
+    movements: {
+      reservePortal: { id: "e2e-stock-movement-reserve-portal" },
+      useInvoice: { id: "e2e-stock-movement-use-invoice" },
+      poReceiveSeed: { id: "e2e-stock-movement-po-receive-seed" },
+    },
+  },
 };
 
 function addMinutes(date, minutes) {
@@ -910,6 +942,63 @@ async function ensureTechnicianCapacityException(id, payload) {
   });
 }
 
+async function ensureStockItem(id, payload) {
+  await prisma.stockItem.upsert({
+    where: { id },
+    create: { id, ...payload },
+    update: payload,
+  });
+}
+
+async function ensureInventoryLocation(id, payload) {
+  await prisma.inventoryLocation.upsert({
+    where: { id },
+    create: { id, ...payload },
+    update: payload,
+  });
+}
+
+async function ensureInventoryStock(id, payload) {
+  await prisma.inventoryStock.upsert({
+    where: { id },
+    create: { id, ...payload },
+    update: payload,
+  });
+}
+
+async function ensureJobPart(id, payload) {
+  await prisma.jobPart.upsert({
+    where: { id },
+    create: { id, ...payload },
+    update: payload,
+  });
+}
+
+async function ensureStockMovement(id, payload) {
+  await prisma.stockMovement.upsert({
+    where: { id },
+    create: { id, ...payload },
+    update: payload,
+  });
+}
+
+async function ensureStockPurchaseOrder(id, payload, lines = []) {
+  await prisma.stockPurchaseOrder.upsert({
+    where: { id },
+    create: { id, ...payload },
+    update: payload,
+  });
+  await prisma.stockPOLine.deleteMany({ where: { poId: id } });
+  if (lines.length) {
+    await prisma.stockPOLine.createMany({
+      data: lines.map((line) => ({
+        ...line,
+        poId: id,
+      })),
+    });
+  }
+}
+
 async function ensureCustomField(companyId, field) {
   return prisma.customField.upsert({
     where: {
@@ -1376,6 +1465,168 @@ async function main() {
 
   await ensureReminder("e2e-reminder-billing-overdue", company.id, issuedJob.id, addMinutes(now, -180), "Automation billing follow-up");
   await ensureReminder("e2e-reminder-dispatch-overdue", company.id, openJob.id, addMinutes(now, -90), "Automation dispatch follow-up");
+
+  await ensureStockItem(FIXTURE.inventory.parts.alloyKit.id, {
+    tenantId: company.id,
+    locationId: location.id,
+    sku: FIXTURE.inventory.parts.alloyKit.sku,
+    name: FIXTURE.inventory.parts.alloyKit.name,
+    description: "Seeded alloy repair kit for deterministic inventory coverage.",
+    category: "Repair materials",
+    unit: "kit",
+    minLevel: 4,
+    avgUnitCost: 28,
+    unitPriceCents: 5200,
+    supplierId: null,
+    isActive: true,
+    metadataJson: { seed: true },
+  });
+  await ensureStockItem(FIXTURE.inventory.parts.lacquer.id, {
+    tenantId: company.id,
+    locationId: location.id,
+    sku: FIXTURE.inventory.parts.lacquer.sku,
+    name: FIXTURE.inventory.parts.lacquer.name,
+    description: "Seeded lacquer stock row with low-stock pressure.",
+    category: "Consumables",
+    unit: "can",
+    minLevel: 6,
+    avgUnitCost: 12,
+    unitPriceCents: 2600,
+    supplierId: null,
+    isActive: true,
+    metadataJson: { seed: true },
+  });
+  await ensureStockItem(FIXTURE.inventory.parts.bolts.id, {
+    tenantId: company.id,
+    locationId: location.id,
+    sku: FIXTURE.inventory.parts.bolts.sku,
+    name: FIXTURE.inventory.parts.bolts.name,
+    description: "Seeded van stock row for technician use.",
+    category: "Hardware",
+    unit: "set",
+    minLevel: 2,
+    avgUnitCost: 18,
+    unitPriceCents: 3400,
+    supplierId: null,
+    isActive: true,
+    metadataJson: { seed: true },
+  });
+
+  await ensureInventoryLocation(FIXTURE.inventory.locations.warehouse.id, {
+    tenantId: company.id,
+    name: FIXTURE.inventory.locations.warehouse.name,
+    kind: "WAREHOUSE",
+    active: true,
+  });
+  await ensureInventoryLocation(FIXTURE.inventory.locations.van.id, {
+    tenantId: company.id,
+    name: FIXTURE.inventory.locations.van.name,
+    kind: "VAN",
+    active: true,
+  });
+
+  await ensureInventoryStock(FIXTURE.inventory.stocks.alloyWarehouse.id, {
+    tenantId: company.id,
+    stockItemId: FIXTURE.inventory.parts.alloyKit.id,
+    inventoryLocationId: FIXTURE.inventory.locations.warehouse.id,
+    quantityOnHand: 12,
+    quantityReserved: 3,
+    reorderPoint: 4,
+  });
+  await ensureInventoryStock(FIXTURE.inventory.stocks.lacquerWarehouse.id, {
+    tenantId: company.id,
+    stockItemId: FIXTURE.inventory.parts.lacquer.id,
+    inventoryLocationId: FIXTURE.inventory.locations.warehouse.id,
+    quantityOnHand: 2,
+    quantityReserved: 2,
+    reorderPoint: 6,
+  });
+  await ensureInventoryStock(FIXTURE.inventory.stocks.boltsVan.id, {
+    tenantId: company.id,
+    stockItemId: FIXTURE.inventory.parts.bolts.id,
+    inventoryLocationId: FIXTURE.inventory.locations.van.id,
+    quantityOnHand: 5,
+    quantityReserved: 0,
+    reorderPoint: 2,
+  });
+
+  await ensureJobPart(FIXTURE.inventory.jobParts.portalReserved.id, {
+    tenantId: company.id,
+    jobId: portalActiveJob.id,
+    stockItemId: FIXTURE.inventory.parts.alloyKit.id,
+    quantityPlanned: 3,
+    quantityReserved: 3,
+    quantityUsed: 0,
+    unitCostCents: 2800,
+    unitPriceCents: 5200,
+    sourceLocationId: FIXTURE.inventory.locations.warehouse.id,
+    status: "RESERVED",
+  });
+  await ensureJobPart(FIXTURE.inventory.jobParts.technicianDraft.id, {
+    tenantId: company.id,
+    jobId: technicianJob.id,
+    stockItemId: FIXTURE.inventory.parts.bolts.id,
+    quantityPlanned: 1,
+    quantityReserved: 0,
+    quantityUsed: 0,
+    unitCostCents: 1800,
+    unitPriceCents: 3400,
+    sourceLocationId: FIXTURE.inventory.locations.van.id,
+    status: "PLANNED",
+  });
+  await ensureJobPart(FIXTURE.inventory.jobParts.invoiceUsed.id, {
+    tenantId: company.id,
+    jobId: invoiceReadyJob.id,
+    stockItemId: FIXTURE.inventory.parts.lacquer.id,
+    quantityPlanned: 1,
+    quantityReserved: 0,
+    quantityUsed: 1,
+    unitCostCents: 1200,
+    unitPriceCents: 2600,
+    sourceLocationId: FIXTURE.inventory.locations.warehouse.id,
+    status: "USED",
+  });
+
+  await ensureStockPurchaseOrder(FIXTURE.inventory.purchaseOrders.open.id, {
+    tenantId: company.id,
+    locationId: location.id,
+    inventoryLocationId: FIXTURE.inventory.locations.warehouse.id,
+    supplierId: null,
+    supplierName: "Seeded Supplies Ltd",
+    status: "ORDERED",
+    orderedAt: addMinutes(now, -180),
+    receivedAt: null,
+    notesJson: { seed: true, focus: "lacquer shortage" },
+  }, [
+    {
+      id: FIXTURE.inventory.purchaseOrderLines.openLacquer.id,
+      stockItemId: FIXTURE.inventory.parts.lacquer.id,
+      qtyOrdered: 8,
+      qtyReceived: 0,
+      unitCost: 11,
+    },
+  ]);
+
+  await ensureStockMovement(FIXTURE.inventory.movements.reservePortal.id, {
+    tenantId: company.id,
+    locationId: location.id,
+    inventoryLocationId: FIXTURE.inventory.locations.warehouse.id,
+    stockItemId: FIXTURE.inventory.parts.alloyKit.id,
+    type: "RESERVE",
+    qty: 3,
+    reason: "Seeded reservation for portal-active job",
+    jobId: portalActiveJob.id,
+  });
+  await ensureStockMovement(FIXTURE.inventory.movements.useInvoice.id, {
+    tenantId: company.id,
+    locationId: location.id,
+    inventoryLocationId: FIXTURE.inventory.locations.warehouse.id,
+    stockItemId: FIXTURE.inventory.parts.lacquer.id,
+    type: "USE",
+    qty: 1,
+    reason: "Seeded used quantity on invoice-ready job",
+    jobId: invoiceReadyJob.id,
+  });
 
   await prisma.jobPdf.upsert({
     where: { jobId: portalActiveJob.id },

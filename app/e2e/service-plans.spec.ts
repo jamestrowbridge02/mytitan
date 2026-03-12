@@ -19,6 +19,24 @@ async function customerAuthHeaders(request: any) {
   };
 }
 
+async function operatorAuthHeaders(request: any) {
+  const response = await request.post("http://127.0.0.1:3000/auth/login", {
+    data: {
+      email: "e2e.operator@mytitan.local",
+      password: "MyTitanE2E!2026",
+    },
+    headers: { "Content-Type": "application/json" },
+  });
+  if (!response.ok()) {
+    throw new Error(`Failed operator auth (${response.status()})`);
+  }
+  const body = await response.json();
+  return {
+    Authorization: `Bearer ${String(body?.token || "")}`,
+    "Content-Type": "application/json",
+  };
+}
+
 test.describe("service plans", () => {
   test.skip(!hasDashboardAuth(), "Seed the E2E fixtures or provide dashboard credentials before running authenticated workflow tests.");
 
@@ -106,6 +124,7 @@ test.describe("service plans", () => {
     if (!createResponse.ok()) {
       throw new Error(`Unable to create customer plan request (${createResponse.status()})`);
     }
+    const createdRequest = await createResponse.json();
 
     await installApiProxy(page, request);
     await loginAs(page, request, "e2e.operator@mytitan.local", "MyTitanE2E!2026");
@@ -116,7 +135,16 @@ test.describe("service plans", () => {
     await requestRow.getByTestId("service-plan-request-approve").evaluate((element: HTMLButtonElement) => element.click());
     await expect(requestRow).toContainText(/APPROVED/i);
     await requestRow.getByTestId("service-plan-request-complete").evaluate((element: HTMLButtonElement) => element.click());
-    await expect(requestRow).toContainText(/COMPLETED/i);
+
+    const operatorHeaders = await operatorAuthHeaders(request);
+    await expect.poll(async () => {
+      const listResponse = await request.get("http://127.0.0.1:3000/service-plans/change-requests", {
+        headers: operatorHeaders,
+      });
+      const rows = await listResponse.json();
+      const target = Array.isArray(rows) ? rows.find((row: any) => row?.id === createdRequest?.id) : null;
+      return target?.status || null;
+    }).toBe("COMPLETED");
   });
 
   test("operator can decline a customer plan request", async ({ page, request }) => {

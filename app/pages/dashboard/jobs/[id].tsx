@@ -108,7 +108,12 @@ export default function JobDetailPage() {
   const [approvalRequests, setApprovalRequests] = useState<any[]>([]);
   const [quotes, setQuotes] = useState<any[]>([]);
   const [executionRecord, setExecutionRecord] = useState<any>(null);
+  const [jobParts, setJobParts] = useState<any[]>([]);
+  const [partsCatalog, setPartsCatalog] = useState<any[]>([]);
+  const [inventoryLocations, setInventoryLocations] = useState<any[]>([]);
+  const [jobPartDraft, setJobPartDraft] = useState({ stockItemId: "", quantityPlanned: 1, sourceLocationId: "" });
   const [approvalBusy, setApprovalBusy] = useState(false);
+  const [jobPartsBusy, setJobPartsBusy] = useState(false);
   const [permissions, setPermissions] = useState(() => emptyPermissionSnapshot());
 
   const commandCentreV2Enabled = isCommandCentreV2Enabled();
@@ -136,6 +141,7 @@ export default function JobDetailPage() {
         }
         await loadExecution();
         await loadApprovals();
+        await loadJobParts();
       } catch (err: any) {
         setError(err?.message || "Failed to load job");
         setRequestId(err instanceof ApiError ? err.requestId : undefined);
@@ -185,6 +191,24 @@ export default function JobDetailPage() {
       setExecutionRecord(payload?.record || null);
     } catch {
       setExecutionRecord(null);
+    }
+  }
+
+  async function loadJobParts() {
+    if (!id) return;
+    try {
+      const [partRows, catalogRows, locationRows] = await Promise.all([
+        apiFetch(`/jobs/${id}/parts`).catch(() => []),
+        apiFetch("/parts").catch(() => []),
+        apiFetch("/inventory/locations").catch(() => []),
+      ]);
+      setJobParts(Array.isArray(partRows) ? partRows : []);
+      setPartsCatalog(Array.isArray(catalogRows) ? catalogRows : []);
+      setInventoryLocations(Array.isArray(locationRows) ? locationRows : []);
+    } catch {
+      setJobParts([]);
+      setPartsCatalog([]);
+      setInventoryLocations([]);
     }
   }
 
@@ -247,6 +271,44 @@ export default function JobDetailPage() {
       setError(err?.message || "Failed to create approval request");
     } finally {
       setApprovalBusy(false);
+    }
+  }
+
+  async function addJobPart(event: React.FormEvent) {
+    event.preventDefault();
+    if (!id) return;
+    setJobPartsBusy(true);
+    setError("");
+    try {
+      await apiFetch(`/jobs/${id}/parts`, {
+        method: "POST",
+        body: JSON.stringify(jobPartDraft),
+      });
+      setStatusMessage("Job part planned");
+      setJobPartDraft({ stockItemId: "", quantityPlanned: 1, sourceLocationId: "" });
+      await loadJobParts();
+    } catch (err: any) {
+      setError(err?.message || "Failed to add job part");
+    } finally {
+      setJobPartsBusy(false);
+    }
+  }
+
+  async function actOnJobPart(jobPartId: string, action: "reserve" | "use" | "release") {
+    if (!id) return;
+    setJobPartsBusy(true);
+    setError("");
+    try {
+      await apiFetch(`/jobs/${id}/parts/${jobPartId}/${action}`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      setStatusMessage(`Job part ${action}d`);
+      await Promise.all([loadJobParts(), loadExecution()]);
+    } catch (err: any) {
+      setError(err?.message || `Failed to ${action} job part`);
+    } finally {
+      setJobPartsBusy(false);
     }
   }
 
@@ -568,6 +630,52 @@ export default function JobDetailPage() {
                 </>
               ) : (
                 <p className="muted">No execution record has been started for this job yet.</p>
+              )}
+            </div>
+          </EntitySection>
+
+          <EntitySection title="Parts and inventory" subtitle="Planned, reserved, and used parts stay explicit against the live stock layer.">
+            <form onSubmit={addJobPart} style={{ display: "grid", gridTemplateColumns: "minmax(220px, 1.4fr) minmax(120px, 0.6fr) minmax(220px, 1fr) auto", gap: 10, marginBottom: 14 }}>
+              <select className="input" value={jobPartDraft.stockItemId} onChange={(event) => setJobPartDraft((current) => ({ ...current, stockItemId: event.target.value }))} required>
+                <option value="">Select part</option>
+                {partsCatalog.map((part) => (
+                  <option key={part.id} value={part.id}>{part.sku} · {part.name}</option>
+                ))}
+              </select>
+              <input className="input" type="number" min="0.01" step="0.01" value={jobPartDraft.quantityPlanned} onChange={(event) => setJobPartDraft((current) => ({ ...current, quantityPlanned: Number(event.target.value || 0) }))} required />
+              <select className="input" value={jobPartDraft.sourceLocationId} onChange={(event) => setJobPartDraft((current) => ({ ...current, sourceLocationId: event.target.value }))}>
+                <option value="">Optional source location</option>
+                {inventoryLocations.map((location) => (
+                  <option key={location.id} value={location.id}>{location.name}</option>
+                ))}
+              </select>
+              <button className="button secondary" type="submit" disabled={jobPartsBusy}>Add part</button>
+            </form>
+            <div data-testid="job-parts-list" style={{ display: "grid", gap: 10 }}>
+              {jobParts.length ? (
+                jobParts.map((row) => (
+                  <div key={row.id} className="integration-card">
+                    <div>
+                      <strong>{row.part?.sku} · {row.part?.name}</strong>
+                      <p className="muted" style={{ margin: "4px 0 0 0" }}>
+                        Planned {Number(row.quantityPlanned || 0).toFixed(2)} • Reserved {Number(row.quantityReserved || 0).toFixed(2)} • Used {Number(row.quantityUsed || 0).toFixed(2)} • {row.sourceLocationName || "No source location"} • {row.status}
+                      </p>
+                    </div>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      <button className="button secondary" data-testid="job-part-reserve" type="button" onClick={() => void actOnJobPart(row.id, "reserve")} disabled={jobPartsBusy || !row.sourceLocationId || row.status === "USED" || row.status === "CANCELLED"}>
+                        Reserve
+                      </button>
+                      <button className="button" data-testid="job-part-use" type="button" onClick={() => void actOnJobPart(row.id, "use")} disabled={jobPartsBusy || !row.sourceLocationId || row.status === "CANCELLED"}>
+                        Use
+                      </button>
+                      <button className="button secondary" type="button" onClick={() => void actOnJobPart(row.id, "release")} disabled={jobPartsBusy || Number(row.quantityReserved || 0) <= 0}>
+                        Release
+                      </button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="muted">No parts planned for this job yet.</p>
               )}
             </div>
           </EntitySection>

@@ -36,6 +36,10 @@ type IntelligenceData = {
     approvedQuotesAwaitingConversion: number;
     overloadedTechnicianDays: number;
     unassignedDueWorkPressure: number;
+    lowStockRows: number;
+    shortageRows: number;
+    purchaseOrdersOpen: number;
+    jobPartsAwaitingStock: number;
   };
   attentionQueue: Array<{ key: string; label: string; count: number; href: string; hint: string }>;
   alerts: Array<{ key: string; severity: string; label: string; count: number; href: string }>;
@@ -73,6 +77,10 @@ const EMPTY: IntelligenceData = {
     approvedQuotesAwaitingConversion: 0,
     overloadedTechnicianDays: 0,
     unassignedDueWorkPressure: 0,
+    lowStockRows: 0,
+    shortageRows: 0,
+    purchaseOrdersOpen: 0,
+    jobPartsAwaitingStock: 0,
   },
   attentionQueue: [],
   alerts: [],
@@ -113,6 +121,8 @@ export default function IntelligencePage() {
       { label: "Overdue invoices", value: String(data.summary.overdueInvoices), hint: "Issued invoices already past due" },
       { label: "Portal ready", value: String(data.summary.portalReadyJobs), hint: "Jobs with active customer access" },
       { label: "Plans due", value: String(data.summary.dueServicePlans), hint: "Recurring work ready to generate now" },
+      { label: "Low stock", value: String(data.summary.lowStockRows), hint: "Inventory rows at or below reorder point" },
+      { label: "Open POs", value: String(data.summary.purchaseOrdersOpen), hint: "Procurement rows still not fully received" },
       { label: "Overloaded days", value: String(data.summary.overloadedTechnicianDays), hint: "Technician days already beyond capacity" },
       { label: "Portal expired", value: String(data.summary.expiredPortalLinks), hint: "Links that already need customer access recovery" },
       { label: "Converted", value: String(data.summary.bookingsConvertedLast7Days), hint: "Bookings turned into jobs in the last 7 days" },
@@ -231,6 +241,10 @@ export default function IntelligencePage() {
               ["Recurring runs needing review", data.summary.overduePlanRuns, "Pending or failed recurring runs that need operator action"],
               ["Quotes awaiting approval", data.summary.quotesAwaitingApproval, "Sent quotes still waiting on customer acceptance"],
               ["Approved quotes awaiting conversion", data.summary.approvedQuotesAwaitingConversion, "Approved pricing ready to become real work"],
+              ["Low-stock parts", data.summary.lowStockRows, "Inventory rows already at or below their reorder threshold"],
+              ["Inventory shortage pressure", data.summary.shortageRows, "Available stock is zero or negative after reservations"],
+              ["Open purchase orders", data.summary.purchaseOrdersOpen, "Procurement rows still waiting on full receipt"],
+              ["Job parts awaiting stock action", data.summary.jobPartsAwaitingStock, "Planned job parts still need reserve or use decisions"],
               ["Unassigned due work", data.summary.unassignedDueWorkPressure, "Upcoming work and recurring pressure without technician ownership"],
               ["Technician days overloaded", data.summary.overloadedTechnicianDays, "Technician schedules already exceed daily capacity"],
               ["Portal links expiring soon", data.summary.portalLinksExpiringSoon, "Customer access links that need refresh before they go stale"],

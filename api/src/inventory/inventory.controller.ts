@@ -6,7 +6,15 @@ import { featureGate } from '../common/feature-gate';
 import { isInventoryV1Enabled } from '../common/feature-flags';
 import { Roles } from '../common/roles.decorator';
 import { RolesGuard } from '../common/roles.guard';
-import { AllocateToJobDto, CreateStockMovementDto, UpsertPurchaseOrderDto, UpsertStockItemDto } from './dto';
+import {
+  AdjustInventoryStockDto,
+  AllocateToJobDto,
+  CreateStockMovementDto,
+  ReceivePurchaseOrderDto,
+  UpsertInventoryLocationDto,
+  UpsertPurchaseOrderDto,
+  UpsertStockItemDto,
+} from './dto';
 import { InventoryService } from './inventory.service';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -83,9 +91,46 @@ export class InventoryController {
 
   @Post('purchase-orders/:id/receive')
   @Roles('OWNER', 'ADMIN', 'STAFF')
-  receivePo(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+  receivePo(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Body() dto: ReceivePurchaseOrderDto) {
     featureGate({ enabled: isInventoryV1Enabled(), feature: 'INVENTORY_V1', mode: 'mutation' });
-    return this.inventoryService.receivePurchaseOrder(user.companyId, user.sub, id);
+    return this.inventoryService.receivePurchaseOrder(user.companyId, user.sub, id, dto);
+  }
+
+  @Get('locations')
+  @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
+  locations(@CurrentUser() user: JwtPayload) {
+    const fallback = featureGate({ enabled: isInventoryV1Enabled(), feature: 'INVENTORY_V1', mode: 'read', fallback: [] });
+    if (fallback) return fallback;
+    return this.inventoryService.listInventoryLocations(user.companyId);
+  }
+
+  @Post('locations')
+  @Roles('OWNER', 'ADMIN', 'STAFF')
+  createLocation(@CurrentUser() user: JwtPayload, @Body() dto: UpsertInventoryLocationDto) {
+    featureGate({ enabled: isInventoryV1Enabled(), feature: 'INVENTORY_V1', mode: 'mutation' });
+    return this.inventoryService.createInventoryLocation(user.companyId, user.sub, dto);
+  }
+
+  @Patch('locations/:id')
+  @Roles('OWNER', 'ADMIN', 'STAFF')
+  patchLocation(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Body() dto: Partial<UpsertInventoryLocationDto>) {
+    featureGate({ enabled: isInventoryV1Enabled(), feature: 'INVENTORY_V1', mode: 'mutation' });
+    return this.inventoryService.patchInventoryLocation(user.companyId, user.sub, id, dto);
+  }
+
+  @Get('stock')
+  @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
+  stock(@CurrentUser() user: JwtPayload, @Query('inventoryLocationId') inventoryLocationId?: string, @Query('q') q?: string) {
+    const fallback = featureGate({ enabled: isInventoryV1Enabled(), feature: 'INVENTORY_V1', mode: 'read', fallback: [] });
+    if (fallback) return fallback;
+    return this.inventoryService.listStock(user.companyId, { inventoryLocationId, q });
+  }
+
+  @Post('stock/adjust')
+  @Roles('OWNER', 'ADMIN', 'STAFF')
+  adjustStock(@CurrentUser() user: JwtPayload, @Body() dto: AdjustInventoryStockDto) {
+    featureGate({ enabled: isInventoryV1Enabled(), feature: 'INVENTORY_V1', mode: 'mutation' });
+    return this.inventoryService.adjustStock(user.companyId, user.sub, dto);
   }
 
   @Post('items/:id/allocate-to-job')

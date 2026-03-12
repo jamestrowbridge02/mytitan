@@ -556,6 +556,9 @@ export class AnalyticsService {
       documentArtifacts,
       pendingRenewals,
       openPlanChangeRequests,
+      inventoryStockRows,
+      purchaseOrdersOpen,
+      jobParts,
     ] = await Promise.all([
       db.job.findMany({
         where: {
@@ -657,6 +660,27 @@ export class AnalyticsService {
           status: { in: ['OPEN', 'APPROVED'] },
         },
       }),
+      db.inventoryStock.findMany({
+        where: { tenantId },
+        select: {
+          quantityOnHand: true,
+          quantityReserved: true,
+          reorderPoint: true,
+        },
+      }),
+      db.stockPurchaseOrder.count({
+        where: {
+          tenantId,
+          status: { in: ['DRAFT', 'ORDERED', 'PARTIALLY_RECEIVED'] },
+        },
+      }),
+      db.jobPart.findMany({
+        where: { tenantId },
+        select: {
+          quantityReserved: true,
+          quantityUsed: true,
+        },
+      }),
     ]);
 
     const jobCreatedSeries = this.buildSeries(
@@ -685,6 +709,10 @@ export class AnalyticsService {
         scheduledFor: { lt: now },
       },
     });
+    const lowStockRows = inventoryStockRows.filter((row: any) => Number(row.quantityOnHand || 0) <= Number(row.reorderPoint || 0)).length;
+    const shortageRows = inventoryStockRows.filter((row: any) => Number(row.quantityOnHand || 0) - Number(row.quantityReserved || 0) <= 0).length;
+    const reservedUnits = inventoryStockRows.reduce((sum: number, row: any) => sum + Number(row.quantityReserved || 0), 0);
+    const usedUnits = jobParts.reduce((sum: number, row: any) => sum + Number(row.quantityUsed || 0), 0);
 
     return {
       windowDays,
@@ -746,6 +774,13 @@ export class AnalyticsService {
         activePortalAccounts,
         activePortalTokens,
         documentArtifacts,
+      },
+      inventory: {
+        lowStockRows,
+        shortageRows,
+        reservedUnits,
+        usedUnits,
+        openPurchaseOrders: purchaseOrdersOpen,
       },
     };
   }

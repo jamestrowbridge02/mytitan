@@ -9,6 +9,8 @@ import { assertPermission } from "../common/permissions";
 import { Roles } from "../common/roles.decorator";
 import { RolesGuard } from "../common/roles.guard";
 import { AddJobExecutionEvidenceDto, BulkJobsDto, BulkJobsV2Dto, CreateJobDto, CreateJobReminderDto, JobsBoardQueryDto, PatchJobDto, StartJobExecutionDto, SubmitJobExecutionDto, UpdateJobExecutionDto, UpdateJobStatusDto } from "./dto";
+import { JobPartQuantityActionDto, PatchJobPartDto, UpsertJobPartDto } from "../inventory/dto";
+import { InventoryService } from "../inventory/inventory.service";
 import { JobExecutionService } from "./job-execution.service";
 import { JobsService } from "./jobs.service";
 
@@ -18,6 +20,7 @@ export class JobsController {
   constructor(
     private readonly jobsService: JobsService,
     private readonly jobExecutionService: JobExecutionService,
+    private readonly inventoryService: InventoryService,
   ) {}
 
   @Post()
@@ -154,6 +157,42 @@ export class JobsController {
   async addExecutionEvidence(@CurrentUser() user: JwtPayload, @Param("id") id: string, @Body() dto: AddJobExecutionEvidenceDto) {
     await assertPermission({ user, permission: "technician.execute", action: "jobs.execution.evidence" });
     return this.jobExecutionService.addEvidence(user.companyId, user.sub, id, dto);
+  }
+
+  @Get(":id/parts")
+  @Roles("OWNER", "ADMIN", "STAFF", "READ_ONLY")
+  listParts(@CurrentUser() user: JwtPayload, @Param("id") id: string) {
+    return this.inventoryService.listJobParts(user.companyId, id);
+  }
+
+  @Post(":id/parts")
+  @Roles("OWNER", "ADMIN", "STAFF")
+  addPart(@CurrentUser() user: JwtPayload, @Param("id") id: string, @Body() dto: UpsertJobPartDto) {
+    return this.inventoryService.createJobPart(user.companyId, user.sub, id, dto);
+  }
+
+  @Patch(":id/parts/:jobPartId")
+  @Roles("OWNER", "ADMIN", "STAFF")
+  patchPart(@CurrentUser() user: JwtPayload, @Param("id") id: string, @Param("jobPartId") jobPartId: string, @Body() dto: PatchJobPartDto) {
+    return this.inventoryService.patchJobPart(user.companyId, user.sub, id, jobPartId, dto);
+  }
+
+  @Post(":id/parts/:jobPartId/reserve")
+  @Roles("OWNER", "ADMIN", "STAFF")
+  reservePart(@CurrentUser() user: JwtPayload, @Param("id") id: string, @Param("jobPartId") jobPartId: string, @Body() dto: JobPartQuantityActionDto) {
+    return this.inventoryService.reserveJobPart(user.companyId, user.sub, id, jobPartId, dto);
+  }
+
+  @Post(":id/parts/:jobPartId/use")
+  @Roles("OWNER", "ADMIN", "STAFF")
+  usePart(@CurrentUser() user: JwtPayload, @Param("id") id: string, @Param("jobPartId") jobPartId: string, @Body() dto: JobPartQuantityActionDto) {
+    return this.inventoryService.useJobPart(user.companyId, user.sub, id, jobPartId, dto);
+  }
+
+  @Post(":id/parts/:jobPartId/release")
+  @Roles("OWNER", "ADMIN", "STAFF")
+  releasePart(@CurrentUser() user: JwtPayload, @Param("id") id: string, @Param("jobPartId") jobPartId: string, @Body() dto: JobPartQuantityActionDto) {
+    return this.inventoryService.releaseJobPart(user.companyId, user.sub, id, jobPartId, dto);
   }
 
   @Post('undo-last')

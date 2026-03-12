@@ -20,8 +20,10 @@ export const fixtureRefs = {
   issuedJobRef: "E2E-ISSUED-001",
   financeReadyJobRef: "E2E-FIN-READY-001",
   portalActiveJobRef: "E2E-PORTAL-ACTIVE-001",
+  portalActiveJobId: "e2e-job-portal-active",
   portalExpiredJobRef: "E2E-PORTAL-EXPIRED-001",
   technicianJobRef: "E2E-TECH-001",
+  technicianJobId: "e2e-job-technician",
   technicianRoleJobRef: "E2E-TECH-ROLE-001",
   automationJobRef: "E2E-AUTO-001",
   commandCentreJobRef: "E2E-OPEN-001",
@@ -73,6 +75,13 @@ export const fixtureRefs = {
   customerWorkspacePassword: "MyTitanCustomer!2026",
   customerWorkspaceInviteToken: "custinvite_e2e_customer_invited",
   blockedCustomerSlug: "e2e-blocked",
+  lowStockPartSku: "E2E-LACQUER",
+  lowStockPartName: "Protective Lacquer",
+  reservedPartSku: "E2E-ALLOY-KIT",
+  plannedPartSku: "E2E-BOLTS",
+  inventoryWarehouseName: "Main Warehouse",
+  inventoryVanName: "Technician Van 01",
+  openPurchaseOrderId: "e2e-po-open",
 };
 
 export type E2EMetadata = {

@@ -274,6 +274,7 @@ enum JobAssetKind {
 enum StockPurchaseOrderStatus {
   DRAFT
   ORDERED
+  PARTIALLY_RECEIVED
   RECEIVED
   CANCELLED
 }
@@ -282,6 +283,23 @@ enum StockMovementType {
   IN
   OUT
   ADJUST
+  RESERVE
+  RELEASE
+  USE
+}
+
+enum InventoryLocationKind {
+  WAREHOUSE
+  VAN
+  OFFICE
+  SUPPLIER_VIRTUAL
+}
+
+enum JobPartStatus {
+  PLANNED
+  RESERVED
+  USED
+  CANCELLED
 }
 
 model Company {
@@ -335,6 +353,9 @@ model Company {
   stockSuppliers           StockSupplier[]
   stockPurchaseOrders      StockPurchaseOrder[]
   stockMovements           StockMovement[]
+  inventoryLocations       InventoryLocation[]
+  inventoryStocks          InventoryStock[]
+  jobParts                 JobPart[]
   jobActivities            JobActivity[]
   jobTags                  JobTag[]
   savedBoardViews          SavedBoardView[]
@@ -622,6 +643,7 @@ model Job {
   revenueCollectionTasks   RevenueCollectionTask[]
   executionRecords         JobExecutionRecord[]
   executionEvidence        JobExecutionEvidence[]
+  jobParts                 JobPart[]
 
   @@unique([companyId, jobRef])
   @@index([companyId, createdAt])
@@ -1956,13 +1978,17 @@ model StockItem {
   id           String          @id @default(cuid())
   tenantId     String
   locationId   String?
+  description  String?
+  category     String?
   sku          String
   name         String
   unit         String
   minLevel     Decimal         @default(0) @db.Decimal(14, 2)
   avgUnitCost  Decimal         @default(0) @db.Decimal(14, 2)
+  unitPriceCents Int           @default(0)
   supplierId   String?
   isActive     Boolean         @default(true)
+  metadataJson Json?
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
   tenant       Company         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -1971,6 +1997,8 @@ model StockItem {
   poLines      StockPOLine[]
   movements    StockMovement[]
   jobLineItems JobLineItem[]
+  inventoryStocks InventoryStock[]
+  jobParts     JobPart[]
 
   @@unique([tenantId, sku])
   @@index([tenantId, locationId])
@@ -1997,17 +2025,24 @@ model StockPurchaseOrder {
   id         String                   @id @default(cuid())
   tenantId   String
   locationId String?
+  inventoryLocationId String?
   supplierId String?
+  supplierName String?
   status     StockPurchaseOrderStatus @default(DRAFT)
+  orderedAt  DateTime?
+  receivedAt DateTime?
+  notesJson  Json?
   createdAt  DateTime                 @default(now())
   updatedAt  DateTime                 @updatedAt
   tenant     Company                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   location   Location?                @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  inventoryLocation InventoryLocation? @relation(fields: [inventoryLocationId], references: [id], onDelete: SetNull)
   supplier   StockSupplier?           @relation(fields: [supplierId], references: [id], onDelete: SetNull)
   lines      StockPOLine[]
 
   @@index([tenantId, createdAt])
   @@index([tenantId, locationId])
+  @@index([tenantId, inventoryLocationId])
 }
 
 model StockPOLine {
@@ -2015,6 +2050,7 @@ model StockPOLine {
   poId        String
   stockItemId String
   qtyOrdered  Decimal            @db.Decimal(14, 2)
+  qtyReceived Decimal            @default(0) @db.Decimal(14, 2)
   unitCost    Decimal            @default(0) @db.Decimal(14, 2)
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
@@ -2028,6 +2064,7 @@ model StockMovement {
   id          String            @id @default(cuid())
   tenantId    String
   locationId  String?
+  inventoryLocationId String?
   stockItemId String
   type        StockMovementType
   qty         Decimal           @db.Decimal(14, 2)
@@ -2036,11 +2073,74 @@ model StockMovement {
   createdAt   DateTime          @default(now())
   tenant      Company           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   location    Location?         @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  inventoryLocation InventoryLocation? @relation(fields: [inventoryLocationId], references: [id], onDelete: SetNull)
   stockItem   StockItem         @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
   job         Job?              @relation(fields: [jobId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, stockItemId, createdAt])
   @@index([tenantId, locationId, createdAt])
+  @@index([tenantId, inventoryLocationId, createdAt])
+}
+
+model InventoryLocation {
+  id                String                @id @default(cuid())
+  tenantId          String
+  name              String
+  kind              InventoryLocationKind
+  active            Boolean               @default(true)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  tenant            Company               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  stocks            InventoryStock[]
+  jobParts          JobPart[]
+  purchaseOrders    StockPurchaseOrder[]
+  stockMovements    StockMovement[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, kind, active])
+}
+
+model InventoryStock {
+  id                  String            @id @default(cuid())
+  tenantId            String
+  stockItemId         String
+  inventoryLocationId String
+  quantityOnHand      Decimal           @default(0) @db.Decimal(14, 2)
+  quantityReserved    Decimal           @default(0) @db.Decimal(14, 2)
+  reorderPoint        Decimal           @default(0) @db.Decimal(14, 2)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  tenant              Company           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  stockItem           StockItem         @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+  inventoryLocation   InventoryLocation @relation(fields: [inventoryLocationId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, stockItemId, inventoryLocationId])
+  @@index([tenantId, inventoryLocationId, updatedAt])
+  @@index([tenantId, stockItemId, updatedAt])
+}
+
+model JobPart {
+  id               String             @id @default(cuid())
+  tenantId         String
+  jobId            String
+  stockItemId      String
+  quantityPlanned  Decimal            @default(0) @db.Decimal(14, 2)
+  quantityReserved Decimal            @default(0) @db.Decimal(14, 2)
+  quantityUsed     Decimal            @default(0) @db.Decimal(14, 2)
+  unitCostCents    Int                @default(0)
+  unitPriceCents   Int                @default(0)
+  sourceLocationId String?
+  status           JobPartStatus      @default(PLANNED)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  tenant           Company            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  job              Job                @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  stockItem        StockItem          @relation(fields: [stockItemId], references: [id], onDelete: Restrict)
+  sourceLocation   InventoryLocation? @relation(fields: [sourceLocationId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, jobId, status, createdAt])
+  @@index([tenantId, stockItemId, status])
+  @@index([tenantId, sourceLocationId, status])
 }
 
 model PasswordResetToken {
