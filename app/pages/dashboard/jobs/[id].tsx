@@ -106,6 +106,7 @@ export default function JobDetailPage() {
   const [statusMessage, setStatusMessage] = useState("");
   const [activityItems, setActivityItems] = useState<any[]>([]);
   const [approvalRequests, setApprovalRequests] = useState<any[]>([]);
+  const [complianceExceptions, setComplianceExceptions] = useState<any[]>([]);
   const [quotes, setQuotes] = useState<any[]>([]);
   const [executionRecord, setExecutionRecord] = useState<any>(null);
   const [jobParts, setJobParts] = useState<any[]>([]);
@@ -141,6 +142,7 @@ export default function JobDetailPage() {
         }
         await loadExecution();
         await loadApprovals();
+        await loadCompliance();
         await loadJobParts();
       } catch (err: any) {
         setError(err?.message || "Failed to load job");
@@ -181,6 +183,16 @@ export default function JobDetailPage() {
       setApprovalRequests(Array.isArray(rows) ? rows : []);
     } catch {
       setApprovalRequests([]);
+    }
+  }
+
+  async function loadCompliance() {
+    if (!id) return;
+    try {
+      const rows = await apiFetch(`/compliance/exceptions?entityType=JOB&entityId=${encodeURIComponent(id)}`);
+      setComplianceExceptions(Array.isArray(rows) ? rows : []);
+    } catch {
+      setComplianceExceptions([]);
     }
   }
 
@@ -676,6 +688,26 @@ export default function JobDetailPage() {
                 ))
               ) : (
                 <p className="muted">No parts planned for this job yet.</p>
+              )}
+            </div>
+          </EntitySection>
+
+          <EntitySection title="Compliance controls" subtitle="Internal workflow controls remain auditable and attached to the real job state only.">
+            <div data-testid="job-compliance-exceptions" style={{ display: "grid", gap: 10 }}>
+              {complianceExceptions.length ? (
+                complianceExceptions.map((exception) => (
+                  <div key={exception.id} className="integration-card">
+                    <div>
+                      <strong>{exception.summary}</strong>
+                      <p className="muted" style={{ margin: "4px 0 0 0" }}>
+                        {exception.kind.replaceAll("_", " ")} • {exception.severity} • {exception.status}
+                      </p>
+                    </div>
+                    <Link href="/dashboard/compliance">Open compliance workspace</Link>
+                  </div>
+                ))
+              ) : (
+                <p className="muted">No open compliance exceptions are currently attached to this job.</p>
               )}
             </div>
           </EntitySection>

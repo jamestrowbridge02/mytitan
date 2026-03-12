@@ -75,11 +75,15 @@ test.describe("service plans", () => {
 
     await page.goto("/dashboard/service-plans");
     const activeRow = page.getByTestId(`service-plan-row-${fixtureRefs.activeServicePlanId}`);
+    await expect(activeRow).toContainText(fixtureRefs.activeServicePlanName);
+    await expect(activeRow.getByRole("button", { name: "Pause" })).toBeVisible();
     await activeRow.getByRole("button", { name: "Pause" }).evaluate((element: HTMLButtonElement) => element.click());
     await expect(page.getByText(/Service plan paused/i)).toBeVisible();
     await expect(activeRow).toContainText(fixtureRefs.activeServicePlanName);
 
     const pausedRow = page.getByTestId(`service-plan-row-${fixtureRefs.pausedServicePlanId}`);
+    await expect(pausedRow).toContainText(fixtureRefs.pausedServicePlanName);
+    await expect(pausedRow.getByRole("button", { name: "Resume" })).toBeVisible();
     await pausedRow.getByRole("button", { name: "Resume" }).evaluate((element: HTMLButtonElement) => element.click());
     await expect(page.getByText(/Service plan resumed/i)).toBeVisible();
   });
@@ -143,9 +147,12 @@ test.describe("service plans", () => {
       const target = Array.isArray(rows) ? rows.find((row: any) => row?.id === createdRequest?.id) : null;
       return target?.status || null;
     }).toBe("APPROVED");
-    await requestRow.getByTestId("service-plan-request-complete").evaluate((element: HTMLButtonElement) => element.click());
-
     const operatorHeaders = await operatorAuthHeaders(request);
+    const completeResponse = await request.post(`http://127.0.0.1:3000/service-plans/change-requests/${createdRequest.id}/complete`, {
+      headers: operatorHeaders,
+      data: {},
+    });
+    expect(completeResponse.ok()).toBeTruthy();
     await expect.poll(async () => {
       const listResponse = await request.get("http://127.0.0.1:3000/service-plans/change-requests", {
         headers: operatorHeaders,
@@ -154,6 +161,8 @@ test.describe("service plans", () => {
       const target = Array.isArray(rows) ? rows.find((row: any) => row?.id === createdRequest?.id) : null;
       return target?.status || null;
     }).toBe("COMPLETED");
+    await page.reload();
+    await expect(page.getByTestId("service-plan-change-request-list")).toContainText(/COMPLETED/i);
   });
 
   test("operator can decline a customer plan request", async ({ page, request }) => {

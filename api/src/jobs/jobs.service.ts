@@ -7,6 +7,7 @@ import { ActivityService } from "../events/activity.service";
 import { EventsService } from "../events/events.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { AutomationsService } from "../automations/automations.service";
+import { ComplianceService } from "../compliance/compliance.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { TemplatesService } from "../templates/templates.service";
 import { assertWorkflowStageReadiness, resolveWorkflowStageReadiness } from "../config/workflow-stage-readiness";
@@ -130,6 +131,7 @@ export class JobsService {
     private readonly templatesService: TemplatesService,
     private readonly notifications: NotificationsService,
     private readonly automations: AutomationsService,
+    private readonly compliance: ComplianceService,
   ) {}
 
   private asNumber(value: any, fallback = 0) {
@@ -772,6 +774,21 @@ export class JobsService {
       invoiceIssuedAt: created.invoiceIssuedAt || null,
       invoicePaidAt: created.invoicePaidAt || null,
     });
+    await this.compliance.evaluateSlaTransition({
+      tenantId: companyId,
+      actorUserId: userId,
+      entityType: "JOB",
+      entityId: created.id,
+      currentStatus: created.status || "OPEN",
+      locationId: created.locationId || null,
+      assignedUserId: created.assignedUserId || null,
+      customerId: created.customerId || null,
+      customerName: created.customerName || null,
+      jobId: created.id,
+      jobRef: created.jobRef || null,
+      label: created.jobRef || created.id,
+    });
+    await this.compliance.syncSlaForEntity(companyId, "JOB", created.id);
 
     if (wheelsEnabled && submittedForm) {
       await this.templatesService.ensureWheelsDefaultTemplate();
@@ -824,6 +841,7 @@ export class JobsService {
 
   async getById(companyId: string, id: string) {
     const db = this.prisma as any;
+    await this.compliance.syncSlaForEntity(companyId, "JOB", id);
     const job = await db.job.findFirst({
       where: { id, companyId },
       include: {
@@ -928,6 +946,23 @@ export class JobsService {
       });
     }
 
+    await this.compliance.evaluateSlaTransition({
+      tenantId: companyId,
+      actorUserId: userId,
+      entityType: "JOB",
+      entityId: updated.id,
+      previousStatus: job.status,
+      currentStatus: updated.status,
+      locationId: updated.locationId || null,
+      assignedUserId: updated.assignedUserId || null,
+      customerId: updated.customerId || null,
+      customerName: updated.customerName || null,
+      jobId: updated.id,
+      jobRef: updated.jobRef || null,
+      label: updated.jobRef || updated.id,
+    });
+    await this.compliance.syncSlaForEntity(companyId, "JOB", updated.id);
+
     return this.decorateJobWithWorkflowReadiness(db, companyId, updated, settings);
   }
 
@@ -1016,6 +1051,22 @@ export class JobsService {
     }
     await this.maybeRunCompletionAutomation(companyId, userId, job, updated);
     await this.maybeRunContactGapAutomation(companyId, userId, updated.id);
+    await this.compliance.evaluateSlaTransition({
+      tenantId: companyId,
+      actorUserId: userId,
+      entityType: "JOB",
+      entityId: updated.id,
+      previousStatus: job.status,
+      currentStatus: updated.status,
+      locationId: updated.locationId || null,
+      assignedUserId: updated.assignedUserId || null,
+      customerId: updated.customerId || null,
+      customerName: updated.customerName || null,
+      jobId: updated.id,
+      jobRef: updated.jobRef || null,
+      label: updated.jobRef || updated.id,
+    });
+    await this.compliance.syncSlaForEntity(companyId, "JOB", updated.id);
     return this.decorateJobWithWorkflowReadiness(db, companyId, updated, settings);
   }
 

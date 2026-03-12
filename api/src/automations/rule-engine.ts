@@ -6,12 +6,14 @@ import { resolveWorkflowStageReadiness } from "../config/workflow-stage-readines
 
 export const AUTOMATION_RULE_TRIGGERS = [
   "booking.converted",
+  "compliance.exception_created",
   "job.created",
   "job.completed",
   "invoice.issued",
   "invoice.overdue",
   "quote.sent",
   "quote.approved",
+  "sla.breached",
   "technician.arrived",
   "portal.document_signed",
 ] as const;

@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { BookingsService } from "../bookings/bookings.service";
+import { ComplianceService } from "../compliance/compliance.service";
 import { ActivityService } from "../events/activity.service";
 import { JobsService } from "../jobs/jobs.service";
 import { PrismaService } from "../prisma/prisma.service";
@@ -27,6 +28,7 @@ export class ServicePlansService {
     private readonly bookings: BookingsService,
     private readonly jobs: JobsService,
     private readonly activity: ActivityService,
+    private readonly compliance: ComplianceService,
   ) {}
 
   private normalizeDate(value?: string | Date | null) {
@@ -526,6 +528,17 @@ export class ServicePlansService {
         cadenceInterval: created.cadenceInterval,
       },
     });
+    await this.compliance.evaluateSlaTransition({
+      tenantId,
+      actorUserId: userId,
+      entityType: "SERVICE_PLAN",
+      entityId: created.id,
+      currentStatus: created.status,
+      locationId: created.locationId || null,
+      customerId: created.customerId,
+      customerName: customer.name,
+      label: created.name,
+    });
     return this.getById(tenantId, created.id);
   }
 
@@ -566,6 +579,18 @@ export class ServicePlansService {
         status: updated.status,
       },
     });
+    await this.compliance.evaluateSlaTransition({
+      tenantId,
+      actorUserId: _userId,
+      entityType: "SERVICE_PLAN",
+      entityId: updated.id,
+      previousStatus: existing.status,
+      currentStatus: updated.status,
+      locationId: updated.locationId || null,
+      customerId: updated.customerId,
+      customerName: customer.name,
+      label: updated.name,
+    });
     return this.getById(tenantId, existing.id);
   }
 
@@ -588,6 +613,7 @@ export class ServicePlansService {
   }
 
   async getById(tenantId: string, id: string) {
+    await this.compliance.syncSlaForEntity(tenantId, "SERVICE_PLAN", id);
     const plan = await this.resolvePlan(tenantId, id);
     return this.serializePlan(plan);
   }
@@ -804,6 +830,18 @@ export class ServicePlansService {
       type: "service_plan.paused",
       label: `Paused recurring plan ${plan.name}`,
     });
+    await this.compliance.evaluateSlaTransition({
+      tenantId,
+      actorUserId: _userId,
+      entityType: "SERVICE_PLAN",
+      entityId: updated.id,
+      previousStatus: plan.status,
+      currentStatus: updated.status,
+      locationId: plan.locationId || null,
+      customerId: plan.customer.id,
+      customerName: plan.customer.name,
+      label: plan.name,
+    });
     return this.getById(tenantId, updated.id);
   }
 
@@ -824,6 +862,18 @@ export class ServicePlansService {
       planId: plan.id,
       type: "service_plan.resumed",
       label: `Resumed recurring plan ${plan.name}`,
+    });
+    await this.compliance.evaluateSlaTransition({
+      tenantId,
+      actorUserId: _userId,
+      entityType: "SERVICE_PLAN",
+      entityId: updated.id,
+      previousStatus: plan.status,
+      currentStatus: updated.status,
+      locationId: plan.locationId || null,
+      customerId: plan.customer.id,
+      customerName: plan.customer.name,
+      label: plan.name,
     });
     return this.getById(tenantId, updated.id);
   }

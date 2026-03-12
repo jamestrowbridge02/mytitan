@@ -51,6 +51,7 @@ export const NAV_GROUPS: NavGroup[] = [
     title: "Operations",
     items: [
       { title: "Intelligence", href: "/dashboard/intelligence" },
+      { title: "Compliance", href: "/dashboard/compliance" },
       { title: "Executive", href: "/dashboard/executive" },
       { title: "Technician queue", href: "/dashboard/technician" },
       { title: "Parts", href: "/dashboard/parts" },

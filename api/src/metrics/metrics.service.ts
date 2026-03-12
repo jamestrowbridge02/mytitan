@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { ComplianceService } from '../compliance/compliance.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScheduleService } from '../schedule/schedule.service';
 
@@ -7,6 +8,7 @@ export class MetricsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly schedule: ScheduleService,
+    private readonly compliance: ComplianceService,
   ) {}
 
   private getMonthStart(date: Date) {
@@ -64,6 +66,7 @@ export class MetricsService {
   }
 
   async getIntelligence(tenantId: string) {
+    await this.compliance.syncTenantState(tenantId);
     const db = this.prisma as any;
     const now = new Date();
     const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -110,6 +113,8 @@ export class MetricsService {
       inventoryStockRows,
       purchaseOrdersOpen,
       jobPartsPending,
+      openComplianceExceptions,
+      breachedSlaEvents,
     ] = await Promise.all([
       db.job.groupBy({
         by: ['status'],
@@ -360,6 +365,18 @@ export class MetricsService {
           quantityUsed: true,
         },
       }),
+      db.complianceException.count({
+        where: {
+          tenantId,
+          status: 'OPEN',
+        },
+      }),
+      db.workflowSlaEvent.count({
+        where: {
+          tenantId,
+          status: 'BREACHED',
+        },
+      }),
     ]);
 
     const assignedIds = technicianLoad.map((row: any) => row.assignedUserId).filter(Boolean);
@@ -430,6 +447,8 @@ export class MetricsService {
         shortageRows,
         purchaseOrdersOpen,
         jobPartsAwaitingStock,
+        openComplianceExceptions,
+        breachedSlaEvents,
       },
       attentionQueue: [
         lowStockRows > 0
@@ -495,6 +514,9 @@ export class MetricsService {
         inProgressTechnicianJobs > 0
           ? { key: 'technician_completion_pressure', label: 'Technician completion queue', count: inProgressTechnicianJobs, href: '/dashboard/technician', hint: 'Field work is active and should be closed out promptly' }
           : null,
+        openComplianceExceptions > 0
+          ? { key: 'compliance_queue', label: 'Compliance queue', count: openComplianceExceptions, href: '/dashboard/compliance', hint: 'Open exceptions are signalling workflow, evidence, or approval debt.' }
+          : null,
       ].filter(Boolean),
       alerts: [
         stalledJobs > 0 ? { key: 'stalled_jobs', severity: 'warn', label: 'Stalled active jobs', count: stalledJobs, href: '/dashboard/jobs' } : null,
@@ -515,6 +537,7 @@ export class MetricsService {
         agedUnlinkedBookings > 0 ? { key: 'stale_booking_conversion', severity: 'warn', label: 'Unlinked bookings older than 48h', count: agedUnlinkedBookings, href: '/dashboard/bookings' } : null,
         portalLinksExpiringSoon > 0 ? { key: 'portal_links_expiring', severity: 'info', label: 'Portal links expiring within 7 days', count: portalLinksExpiringSoon, href: '/dashboard/portal' } : null,
         expiredPortalLinks > 0 ? { key: 'portal_links_expired', severity: 'warn', label: 'Portal links already expired', count: expiredPortalLinks, href: '/dashboard/portal' } : null,
+        breachedSlaEvents > 0 ? { key: 'sla_breaches', severity: 'warn', label: 'Breached SLAs', count: breachedSlaEvents, href: '/dashboard/compliance' } : null,
       ].filter(Boolean),
       trends: {
         completedLast7Days,

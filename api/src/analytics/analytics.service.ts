@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { ComplianceService } from '../compliance/compliance.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScheduleService } from '../schedule/schedule.service';
 
@@ -34,7 +35,12 @@ export class AnalyticsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly schedule: ScheduleService,
+    private readonly compliance: ComplianceService,
   ) {}
+
+  private get db() {
+    return this.prisma as any;
+  }
 
   private startOfDay(date: Date) {
     const value = new Date(date);
@@ -1203,12 +1209,29 @@ export class AnalyticsService {
   }
 
   async getExecutive(tenantId: string, windowDays: number, locationId?: string) {
+    await this.compliance.syncTenantState(tenantId);
     const [operations, capacity, customers, revenue, benchmarks] = await Promise.all([
       this.getOperations(tenantId, windowDays, locationId),
       this.getCapacityAnalytics(tenantId, 7, locationId),
       this.getCustomers(tenantId, windowDays, undefined, locationId),
       this.getRevenue(tenantId, windowDays, locationId),
       this.getBenchmarks(tenantId, windowDays, locationId),
+    ]);
+    const [openComplianceExceptions, breachedSlaEvents] = await Promise.all([
+      this.db.complianceException.count({
+        where: {
+          tenantId,
+          status: 'OPEN',
+          ...(locationId && locationId !== 'all' ? { locationId } : {}),
+        },
+      }),
+      this.db.workflowSlaEvent.count({
+        where: {
+          tenantId,
+          status: 'BREACHED',
+          ...(locationId && locationId !== 'all' ? { locationId } : {}),
+        },
+      }),
     ]);
 
     const pressureAreas = this.buildPressureAreas([
@@ -1247,6 +1270,20 @@ export class AnalyticsService {
         detail: 'Quote and collections follow-up is accumulating in the revenue queue.',
         href: '/dashboard/revenue',
       },
+      {
+        key: 'compliance_exceptions',
+        label: 'Open compliance exceptions',
+        value: openComplianceExceptions,
+        detail: 'Required-field, evidence, approval, or SLA issues are still unresolved.',
+        href: '/dashboard/compliance',
+      },
+      {
+        key: 'sla_breaches',
+        label: 'Breached SLAs',
+        value: breachedSlaEvents,
+        detail: 'Configured workflow SLAs are already beyond due time.',
+        href: '/dashboard/compliance',
+      },
     ]);
 
     const focusSignals = this.buildFocusSignals([
@@ -1269,6 +1306,11 @@ export class AnalyticsService {
         label: 'Retention focus',
         value: operations.servicePlans.pendingRenewals + operations.servicePlans.openChangeRequests,
         context: 'Renewal responses and plan-change requests are the clearest customer-retention queue.',
+      },
+      {
+        label: 'Compliance focus',
+        value: openComplianceExceptions + breachedSlaEvents,
+        context: 'Internal controls are now signalling workflow debt that needs operator action.',
       },
     ]);
 

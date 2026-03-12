@@ -84,6 +84,15 @@ export const fixtureRefs = {
   openPurchaseOrderId: "e2e-po-open",
   hqLocationName: "E2E HQ",
   northLocationName: "E2E North Branch",
+  complianceQuotePolicyName: "Quote approval response",
+  complianceServicePlanPolicyName: "Service plan execution follow-through",
+  complianceBreachedQuoteNumber: "Q-2026-00011",
+  complianceOpenServicePlanName: "Semi-Annual Compliance Review",
+  complianceOpenManualOverrideId: "e2e-compliance-exception-open-manual-override",
+  complianceOpenEvidenceReviewId: "e2e-compliance-exception-open-evidence-review",
+  complianceOpenExceptionSummary: "Manual override on finance-ready workflow needs operator review",
+  complianceDismissExceptionSummary: "Portal-active completion evidence review is awaiting operator acknowledgement",
+  complianceResolvedExceptionSummary: "Issued invoice review has already been closed out",
 };
 
 export type E2EMetadata = {

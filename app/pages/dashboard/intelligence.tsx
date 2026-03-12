@@ -40,6 +40,8 @@ type IntelligenceData = {
     shortageRows: number;
     purchaseOrdersOpen: number;
     jobPartsAwaitingStock: number;
+    openComplianceExceptions: number;
+    breachedSlaEvents: number;
   };
   attentionQueue: Array<{ key: string; label: string; count: number; href: string; hint: string }>;
   alerts: Array<{ key: string; severity: string; label: string; count: number; href: string }>;
@@ -81,6 +83,8 @@ const EMPTY: IntelligenceData = {
     shortageRows: 0,
     purchaseOrdersOpen: 0,
     jobPartsAwaitingStock: 0,
+    openComplianceExceptions: 0,
+    breachedSlaEvents: 0,
   },
   attentionQueue: [],
   alerts: [],
@@ -123,6 +127,8 @@ export default function IntelligencePage() {
       { label: "Plans due", value: String(data.summary.dueServicePlans), hint: "Recurring work ready to generate now" },
       { label: "Low stock", value: String(data.summary.lowStockRows), hint: "Inventory rows at or below reorder point" },
       { label: "Open POs", value: String(data.summary.purchaseOrdersOpen), hint: "Procurement rows still not fully received" },
+      { label: "Compliance queue", value: String(data.summary.openComplianceExceptions), hint: "Open internal workflow and evidence exceptions" },
+      { label: "SLA breached", value: String(data.summary.breachedSlaEvents), hint: "Workflow timers already beyond their due point" },
       { label: "Overloaded days", value: String(data.summary.overloadedTechnicianDays), hint: "Technician days already beyond capacity" },
       { label: "Portal expired", value: String(data.summary.expiredPortalLinks), hint: "Links that already need customer access recovery" },
       { label: "Converted", value: String(data.summary.bookingsConvertedLast7Days), hint: "Bookings turned into jobs in the last 7 days" },
@@ -245,6 +251,8 @@ export default function IntelligencePage() {
               ["Inventory shortage pressure", data.summary.shortageRows, "Available stock is zero or negative after reservations"],
               ["Open purchase orders", data.summary.purchaseOrdersOpen, "Procurement rows still waiting on full receipt"],
               ["Job parts awaiting stock action", data.summary.jobPartsAwaitingStock, "Planned job parts still need reserve or use decisions"],
+              ["Open compliance exceptions", data.summary.openComplianceExceptions, "Internal workflow, evidence, or approval issues still need operator action"],
+              ["Breached SLA events", data.summary.breachedSlaEvents, "Configured workflow timers are already beyond their due time"],
               ["Unassigned due work", data.summary.unassignedDueWorkPressure, "Upcoming work and recurring pressure without technician ownership"],
               ["Technician days overloaded", data.summary.overloadedTechnicianDays, "Technician schedules already exceed daily capacity"],
               ["Portal links expiring soon", data.summary.portalLinksExpiringSoon, "Customer access links that need refresh before they go stale"],

@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable, Logger } from '@nes
 import crypto from 'crypto';
 import { AuditService } from '../audit/audit.service';
 import { AutomationsService } from '../automations/automations.service';
+import { ComplianceService } from '../compliance/compliance.service';
 import { isAutomationsV1Enabled, isBookingProV1Enabled, isLocationsAdvancedV1Enabled } from '../common/feature-flags';
 import { ActivityService } from '../events/activity.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -27,6 +28,7 @@ export class BookingsService {
     private readonly automations: AutomationsService,
     private readonly activity: ActivityService,
     private readonly conversion: BookingConversionService,
+    private readonly compliance: ComplianceService,
   ) {}
   private readonly logger = new Logger(BookingsService.name);
 
@@ -170,6 +172,18 @@ export class BookingsService {
 
     await this.audit.log(companyId, 'booking.create', `Created booking ${booking.id}`, userId);
     await this.maybeQueueBookingReminders(companyId, userId, booking);
+    await this.compliance.evaluateSlaTransition({
+      tenantId: companyId,
+      actorUserId: userId,
+      entityType: "BOOKING",
+      entityId: booking.id,
+      currentStatus: booking.status || "PLANNED",
+      locationId: booking.locationId || null,
+      assignedUserId: booking.assignedUserId || null,
+      customerName: booking.customerName || null,
+      jobId: booking.jobId || null,
+      label: booking.customerName || booking.id,
+    });
     return booking;
   }
 

@@ -349,6 +349,9 @@ model Company {
   locationBusinessHours    LocationBusinessHour[]
   locationStaffAssignments LocationStaffAssignment[]
   locationMemberships      LocationMembership[]
+  workflowSlaPolicies      WorkflowSlaPolicy[]
+  workflowSlaEvents        WorkflowSlaEvent[]
+  complianceExceptions     ComplianceException[]
   jobLineItems             JobLineItem[]
   stockItems               StockItem[]
   stockSuppliers           StockSupplier[]
@@ -407,6 +410,8 @@ model User {
   defaultAssignedLocations Location[]                @relation("LocationDefaultAssignee")
   locationAssignments      LocationStaffAssignment[]
   locationMemberships      LocationMembership[]
+  assignedWorkflowSlaEvents WorkflowSlaEvent[]      @relation("WorkflowSlaAssignedUser")
+  assignedComplianceExceptions ComplianceException[] @relation("ComplianceExceptionAssignee")
   savedCommandViews        SavedCommandView[]
   savedBoardViews          SavedBoardView[]
   undoActions              UserUndoAction[]
@@ -431,6 +436,8 @@ model User {
   createdQuotes            Quote[]                  @relation("QuoteCreator")
   jobExecutionRecords      JobExecutionRecord[]     @relation("JobExecutionTechnician")
   createdJobExecutionEvidence JobExecutionEvidence[] @relation("JobExecutionEvidenceCreator")
+  createdComplianceExceptions ComplianceException[] @relation("ComplianceExceptionCreator")
+  resolvedComplianceExceptions ComplianceException[] @relation("ComplianceExceptionResolver")
 
   @@unique([companyId, email])
 }
@@ -476,6 +483,8 @@ model Location {
   savedBoardViews       SavedBoardView[]
   homeCustomers         Customer[]                @relation("CustomerHomeLocation")
   servicePlans          ServicePlan[]
+  workflowSlaEvents     WorkflowSlaEvent[]
+  complianceExceptions  ComplianceException[]
 
   @@index([companyId, isActive])
   @@index([companyId, kind, isActive])
@@ -488,6 +497,47 @@ enum LocationKind {
   WAREHOUSE
   SERVICE_REGION
   FRANCHISE
+}
+
+enum WorkflowSlaEntityType {
+  JOB
+  BOOKING
+  QUOTE
+  APPROVAL
+  SERVICE_PLAN
+}
+
+enum WorkflowSlaSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum WorkflowSlaEventStatus {
+  OPEN
+  MET
+  BREACHED
+  CANCELLED
+}
+
+enum ComplianceExceptionKind {
+  MISSING_REQUIRED_FIELD
+  MISSING_EXECUTION_EVIDENCE
+  MISSING_APPROVAL
+  SLA_BREACH
+  INVENTORY_SHORTAGE_BLOCK
+  MANUAL_OVERRIDE
+}
+
+enum ComplianceExceptionSeverity {
+  WARNING
+  CRITICAL
+}
+
+enum ComplianceExceptionStatus {
+  OPEN
+  RESOLVED
+  DISMISSED
 }
 
 model TradeAccount {
@@ -764,6 +814,84 @@ model LocationMembership {
   @@unique([tenantId, userId, locationId])
   @@index([tenantId, userId, active])
   @@index([tenantId, locationId, active])
+}
+
+model WorkflowSlaPolicy {
+  id            String                @id @default(cuid())
+  tenantId      String
+  name          String
+  entityType    WorkflowSlaEntityType
+  triggerStatus String
+  targetStatus  String
+  targetMinutes Int
+  severity      WorkflowSlaSeverity   @default(WARNING)
+  active        Boolean               @default(true)
+  metadataJson  Json?
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+  tenant        Company               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  events        WorkflowSlaEvent[]
+
+  @@index([tenantId, entityType, active])
+  @@index([tenantId, active, severity])
+}
+
+model WorkflowSlaEvent {
+  id             String                 @id @default(cuid())
+  tenantId       String
+  policyId       String
+  entityType     WorkflowSlaEntityType
+  entityId       String
+  locationId     String?
+  assignedUserId String?
+  startedAt      DateTime
+  dueAt          DateTime
+  completedAt    DateTime?
+  breachedAt     DateTime?
+  status         WorkflowSlaEventStatus @default(OPEN)
+  contextJson    Json?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  tenant         Company                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  policy         WorkflowSlaPolicy      @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  location       Location?              @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  assignedUser   User?                  @relation("WorkflowSlaAssignedUser", fields: [assignedUserId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, entityType, entityId, status])
+  @@index([tenantId, policyId, status, dueAt])
+  @@index([tenantId, status, dueAt])
+  @@index([tenantId, locationId, status, dueAt])
+  @@index([tenantId, assignedUserId, status, dueAt])
+}
+
+model ComplianceException {
+  id             String                      @id @default(cuid())
+  tenantId       String
+  entityType     WorkflowSlaEntityType
+  entityId       String
+  locationId     String?
+  assignedUserId String?
+  kind           ComplianceExceptionKind
+  severity       ComplianceExceptionSeverity @default(WARNING)
+  status         ComplianceExceptionStatus   @default(OPEN)
+  summary        String
+  detailsJson    Json?
+  createdBy      String?
+  resolvedBy     String?
+  createdAt      DateTime                    @default(now())
+  resolvedAt     DateTime?
+  updatedAt      DateTime                    @updatedAt
+  tenant         Company                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  location       Location?                   @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  assignedUser   User?                       @relation("ComplianceExceptionAssignee", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  createdByUser  User?                       @relation("ComplianceExceptionCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  resolvedByUser User?                       @relation("ComplianceExceptionResolver", fields: [resolvedBy], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, entityType, entityId, status])
+  @@index([tenantId, kind, status, createdAt])
+  @@index([tenantId, severity, status, createdAt])
+  @@index([tenantId, locationId, status, createdAt])
+  @@index([tenantId, assignedUserId, status, createdAt])
 }
 
 model JobLineItem {

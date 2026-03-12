@@ -66,6 +66,7 @@ export default function CommandCentreV2Page() {
   const [dragStatusTarget, setDragStatusTarget] = useState<string>("");
   const [capacityPressure, setCapacityPressure] = useState<any>(null);
   const [assignmentRecommendations, setAssignmentRecommendations] = useState<any[]>([]);
+  const [complianceSummary, setComplianceSummary] = useState<any>(null);
   const [pendingBulk, setPendingBulk] = useState<{ op: string; payload: Record<string, any>; label: string } | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [pendingInlineJobId, setPendingInlineJobId] = useState<string>("");
@@ -145,6 +146,17 @@ export default function CommandCentreV2Page() {
     }
   }
 
+  async function loadComplianceSummary() {
+    try {
+      const selectedLocationIds = locationIds.filter((x) => x !== 'all');
+      const scope = selectedLocationIds.length === 1 ? `?locationId=${encodeURIComponent(selectedLocationIds[0])}` : '';
+      const data = await apiFetch(`/compliance/summary${scope}`);
+      setComplianceSummary(data || null);
+    } catch {
+      setComplianceSummary(null);
+    }
+  }
+
   useEffect(() => {
     if (!enabled) return;
     Promise.all([
@@ -152,6 +164,7 @@ export default function CommandCentreV2Page() {
       loadViews(),
       loadBoard(),
       loadActivity(),
+      loadComplianceSummary(),
     ]).then(([l]) => setLocations(Array.isArray(l) ? l : []));
   }, [enabled]);
 
@@ -164,6 +177,11 @@ export default function CommandCentreV2Page() {
   useEffect(() => {
     loadBoard();
   }, [search, status, locationIds.join(',')]);
+
+  useEffect(() => {
+    if (!enabled) return;
+    void loadComplianceSummary();
+  }, [enabled, locationIds.join(',')]);
 
   useEffect(() => {
     if (!openedJob) return;
@@ -640,6 +658,22 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
             <span key={stage.id} className="ccv2-status-pill ccv2-status-pill--open">{stage.label}</span>
           ))}
         </div>
+        {complianceSummary ? (
+          <div data-testid="ccv2-compliance-pressure" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 10, marginTop: 12 }}>
+            <div className="integration-card">
+              <strong>SLA pressure</strong>
+              <div className="muted" style={{ marginTop: 6 }}>
+                {Number(complianceSummary?.totals?.breachedEvents || 0)} breached SLA event{Number(complianceSummary?.totals?.breachedEvents || 0) === 1 ? '' : 's'}
+              </div>
+              <div className="muted">
+                {Number(complianceSummary?.totals?.openExceptions || 0)} open compliance exception{Number(complianceSummary?.totals?.openExceptions || 0) === 1 ? '' : 's'}
+              </div>
+              <button className="button secondary ccv2-button" type="button" style={{ marginTop: 10 }} onClick={() => void router.push('/dashboard/compliance')}>
+                Open compliance
+              </button>
+            </div>
+          </div>
+        ) : null}
         <OperatorNotice notice={notice} onDismiss={clearNotice} />
         {liveNotice ? <div aria-live="polite" className="ccv2-live-notice" role="status">{liveNotice}</div> : null}
       </div>

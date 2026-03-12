@@ -168,6 +168,21 @@ const FIXTURE = {
   revenueTasks: {
     overdueInvoice: { id: "e2e-revenue-task-overdue-invoice" },
   },
+  compliance: {
+    policies: {
+      quoteApproval: { id: "e2e-sla-policy-quote-approval", name: "Quote approval response" },
+      servicePlanExecution: { id: "e2e-sla-policy-service-plan-execution", name: "Service plan execution follow-through" },
+    },
+    events: {
+      openServicePlan: { id: "e2e-sla-event-open-service-plan" },
+      breachedQuote: { id: "e2e-sla-event-breached-quote" },
+    },
+    exceptions: {
+      openManualOverride: { id: "e2e-compliance-exception-open-manual-override" },
+      openEvidenceReview: { id: "e2e-compliance-exception-open-evidence-review" },
+      resolvedInvoiceReview: { id: "e2e-compliance-exception-resolved-invoice-review" },
+    },
+  },
   scheduling: {
     availabilityOperator: { id: "e2e-tech-availability-operator" },
     availabilityTechnician: { id: "e2e-tech-availability-technician" },
@@ -426,6 +441,10 @@ async function ensureTenantSettings(companyId, defaultLocationId, planId) {
       businessConfigJson: {
         defaults: { commandCentreVersion: "v2" },
         navigation: { showIntelligence: true, showPortalOps: true, showTechnicianQueue: true },
+        compliance: {
+          requireExecutionEvidenceForCompletedJobs: true,
+          executionAcknowledgementThresholdHours: 24,
+        },
         analytics: {
           defaultWindowDays: 30,
           widgetOrder: ["executive-summary", "pressure-panel", "revenue-panel", "capacity-panel", "benchmark-delta"],
@@ -477,6 +496,10 @@ async function ensureTenantSettings(companyId, defaultLocationId, planId) {
       businessConfigJson: {
         defaults: { commandCentreVersion: "v2" },
         navigation: { showIntelligence: true, showPortalOps: true, showTechnicianQueue: true },
+        compliance: {
+          requireExecutionEvidenceForCompletedJobs: true,
+          executionAcknowledgementThresholdHours: 24,
+        },
         analytics: {
           defaultWindowDays: 30,
           widgetOrder: ["executive-summary", "pressure-panel", "revenue-panel", "capacity-panel", "benchmark-delta"],
@@ -518,7 +541,7 @@ async function ensureAutomations(companyId) {
     where: {
       tenantId: companyId,
       id: {
-        notIn: ["e2e-rule-booking-dispatch"],
+        notIn: ["e2e-rule-booking-dispatch", "e2e-rule-sla-breached", "e2e-rule-compliance-exception"],
       },
     },
   });
@@ -565,6 +588,64 @@ async function ensureAutomations(companyId) {
         type: "send_internal_notification",
         title: "Dispatch review needed",
         body: "Converted booking should be reviewed by dispatch.",
+      },
+    },
+  });
+
+  await prisma.automationRule.upsert({
+    where: { id: "e2e-rule-sla-breached" },
+    create: {
+      id: "e2e-rule-sla-breached",
+      tenantId: companyId,
+      name: "E2E SLA breach escalation",
+      trigger: "sla.breached",
+      enabled: true,
+      conditionJson: null,
+      actionJson: {
+        type: "send_internal_notification",
+        title: "Workflow SLA breached",
+        body: "Review the affected workflow entity and decide on the next operator action.",
+      },
+    },
+    update: {
+      tenantId: companyId,
+      name: "E2E SLA breach escalation",
+      trigger: "sla.breached",
+      enabled: true,
+      conditionJson: null,
+      actionJson: {
+        type: "send_internal_notification",
+        title: "Workflow SLA breached",
+        body: "Review the affected workflow entity and decide on the next operator action.",
+      },
+    },
+  });
+
+  await prisma.automationRule.upsert({
+    where: { id: "e2e-rule-compliance-exception" },
+    create: {
+      id: "e2e-rule-compliance-exception",
+      tenantId: companyId,
+      name: "E2E compliance exception escalation",
+      trigger: "compliance.exception_created",
+      enabled: true,
+      conditionJson: null,
+      actionJson: {
+        type: "send_internal_notification",
+        title: "Compliance exception created",
+        body: "An operator should review the new compliance exception queue item.",
+      },
+    },
+    update: {
+      tenantId: companyId,
+      name: "E2E compliance exception escalation",
+      trigger: "compliance.exception_created",
+      enabled: true,
+      conditionJson: null,
+      actionJson: {
+        type: "send_internal_notification",
+        title: "Compliance exception created",
+        body: "An operator should review the new compliance exception queue item.",
       },
     },
   });
@@ -2882,6 +2963,376 @@ async function main() {
     endTime: "16:00",
     capacityMinutes: 420,
     reason: "Training day blocks the full shift",
+  });
+
+  await prisma.workflowSlaEvent.deleteMany({
+    where: {
+      tenantId: company.id,
+      id: {
+        notIn: [
+          FIXTURE.compliance.events.openServicePlan.id,
+          FIXTURE.compliance.events.breachedQuote.id,
+        ],
+      },
+    },
+  });
+  await prisma.workflowSlaPolicy.deleteMany({
+    where: {
+      tenantId: company.id,
+      id: {
+        notIn: [
+          FIXTURE.compliance.policies.quoteApproval.id,
+          FIXTURE.compliance.policies.servicePlanExecution.id,
+        ],
+      },
+    },
+  });
+  await prisma.complianceException.deleteMany({
+    where: {
+      tenantId: company.id,
+      id: {
+        notIn: [
+          FIXTURE.compliance.exceptions.openManualOverride.id,
+          FIXTURE.compliance.exceptions.openEvidenceReview.id,
+          FIXTURE.compliance.exceptions.resolvedInvoiceReview.id,
+        ],
+      },
+    },
+  });
+
+  await prisma.workflowSlaPolicy.upsert({
+    where: { id: FIXTURE.compliance.policies.quoteApproval.id },
+    create: {
+      id: FIXTURE.compliance.policies.quoteApproval.id,
+      tenantId: company.id,
+      name: FIXTURE.compliance.policies.quoteApproval.name,
+      entityType: "QUOTE",
+      triggerStatus: "SENT",
+      targetStatus: "APPROVED",
+      targetMinutes: 60,
+      severity: "WARNING",
+      active: true,
+      metadataJson: { seed: true, focus: "quote approval lag" },
+    },
+    update: {
+      tenantId: company.id,
+      name: FIXTURE.compliance.policies.quoteApproval.name,
+      entityType: "QUOTE",
+      triggerStatus: "SENT",
+      targetStatus: "APPROVED",
+      targetMinutes: 60,
+      severity: "WARNING",
+      active: true,
+      metadataJson: { seed: true, focus: "quote approval lag" },
+    },
+  });
+  await prisma.workflowSlaPolicy.upsert({
+    where: { id: FIXTURE.compliance.policies.servicePlanExecution.id },
+    create: {
+      id: FIXTURE.compliance.policies.servicePlanExecution.id,
+      tenantId: company.id,
+      name: FIXTURE.compliance.policies.servicePlanExecution.name,
+      entityType: "SERVICE_PLAN",
+      triggerStatus: "ACTIVE",
+      targetStatus: "PAUSED",
+      targetMinutes: 720,
+      severity: "CRITICAL",
+      active: true,
+      metadataJson: { seed: true, focus: "service plan operator follow-through" },
+    },
+    update: {
+      tenantId: company.id,
+      name: FIXTURE.compliance.policies.servicePlanExecution.name,
+      entityType: "SERVICE_PLAN",
+      triggerStatus: "ACTIVE",
+      targetStatus: "PAUSED",
+      targetMinutes: 720,
+      severity: "CRITICAL",
+      active: true,
+      metadataJson: { seed: true, focus: "service plan operator follow-through" },
+    },
+  });
+
+  await prisma.workflowSlaEvent.upsert({
+    where: { id: FIXTURE.compliance.events.openServicePlan.id },
+    create: {
+      id: FIXTURE.compliance.events.openServicePlan.id,
+      tenantId: company.id,
+      policyId: FIXTURE.compliance.policies.servicePlanExecution.id,
+      entityType: "SERVICE_PLAN",
+      entityId: FIXTURE.servicePlans.portalRenewal.id,
+      locationId: locations.hq.id,
+      assignedUserId: operator.id,
+      startedAt: addMinutes(now, -45),
+      dueAt: addMinutes(now, 180),
+      completedAt: null,
+      breachedAt: null,
+      status: "OPEN",
+      contextJson: {
+        label: FIXTURE.servicePlans.portalRenewal.name,
+        href: "/dashboard/service-plans",
+        seed: true,
+      },
+    },
+    update: {
+      tenantId: company.id,
+      policyId: FIXTURE.compliance.policies.servicePlanExecution.id,
+      entityType: "SERVICE_PLAN",
+      entityId: FIXTURE.servicePlans.portalRenewal.id,
+      locationId: locations.hq.id,
+      assignedUserId: operator.id,
+      startedAt: addMinutes(now, -45),
+      dueAt: addMinutes(now, 180),
+      completedAt: null,
+      breachedAt: null,
+      status: "OPEN",
+      contextJson: {
+        label: FIXTURE.servicePlans.portalRenewal.name,
+        href: "/dashboard/service-plans",
+        seed: true,
+      },
+    },
+  });
+  await prisma.workflowSlaEvent.upsert({
+    where: { id: FIXTURE.compliance.events.breachedQuote.id },
+    create: {
+      id: FIXTURE.compliance.events.breachedQuote.id,
+      tenantId: company.id,
+      policyId: FIXTURE.compliance.policies.quoteApproval.id,
+      entityType: "QUOTE",
+      entityId: FIXTURE.quotes.sent.id,
+      locationId: locations.hq.id,
+      assignedUserId: operator.id,
+      startedAt: addMinutes(now, -240),
+      dueAt: addMinutes(now, -120),
+      completedAt: null,
+      breachedAt: addMinutes(now, -60),
+      status: "BREACHED",
+      contextJson: {
+        label: FIXTURE.quotes.sent.number,
+        href: "/dashboard/quotes",
+        seed: true,
+      },
+    },
+    update: {
+      tenantId: company.id,
+      policyId: FIXTURE.compliance.policies.quoteApproval.id,
+      entityType: "QUOTE",
+      entityId: FIXTURE.quotes.sent.id,
+      locationId: locations.hq.id,
+      assignedUserId: operator.id,
+      startedAt: addMinutes(now, -240),
+      dueAt: addMinutes(now, -120),
+      completedAt: null,
+      breachedAt: addMinutes(now, -60),
+      status: "BREACHED",
+      contextJson: {
+        label: FIXTURE.quotes.sent.number,
+        href: "/dashboard/quotes",
+        seed: true,
+      },
+    },
+  });
+
+  await prisma.complianceException.upsert({
+    where: { id: FIXTURE.compliance.exceptions.openManualOverride.id },
+    create: {
+      id: FIXTURE.compliance.exceptions.openManualOverride.id,
+      tenantId: company.id,
+      entityType: "JOB",
+      entityId: FIXTURE.jobs.financeReady.id,
+      locationId: locations.hq.id,
+      assignedUserId: operator.id,
+      kind: "MANUAL_OVERRIDE",
+      severity: "WARNING",
+      status: "OPEN",
+      summary: "Manual override on finance-ready workflow needs operator review",
+      detailsJson: {
+        reason: "Seeded compliance queue row for operator review coverage.",
+        href: `/dashboard/jobs/${FIXTURE.jobs.financeReady.id}`,
+      },
+      createdBy: operator.id,
+      resolvedBy: null,
+      resolvedAt: null,
+      createdAt: addMinutes(now, -30),
+    },
+    update: {
+      tenantId: company.id,
+      entityType: "JOB",
+      entityId: FIXTURE.jobs.financeReady.id,
+      locationId: locations.hq.id,
+      assignedUserId: operator.id,
+      kind: "MANUAL_OVERRIDE",
+      severity: "WARNING",
+      status: "OPEN",
+      summary: "Manual override on finance-ready workflow needs operator review",
+      detailsJson: {
+        reason: "Seeded compliance queue row for operator review coverage.",
+        href: `/dashboard/jobs/${FIXTURE.jobs.financeReady.id}`,
+      },
+      createdBy: operator.id,
+      resolvedBy: null,
+      resolvedAt: null,
+      createdAt: addMinutes(now, -30),
+    },
+  });
+  await prisma.complianceException.upsert({
+    where: { id: FIXTURE.compliance.exceptions.resolvedInvoiceReview.id },
+    create: {
+      id: FIXTURE.compliance.exceptions.resolvedInvoiceReview.id,
+      tenantId: company.id,
+      entityType: "JOB",
+      entityId: FIXTURE.jobs.issued.id,
+      locationId: locations.north.id,
+      assignedUserId: technicianUser.id,
+      kind: "SLA_BREACH",
+      severity: "CRITICAL",
+      status: "RESOLVED",
+      summary: "Issued invoice review has already been closed out",
+      detailsJson: {
+        reason: "Seeded resolved exception row for history coverage.",
+      },
+      createdBy: operator.id,
+      resolvedBy: operator.id,
+      resolvedAt: addMinutes(now, -15),
+      createdAt: addMinutes(now, -120),
+    },
+    update: {
+      tenantId: company.id,
+      entityType: "JOB",
+      entityId: FIXTURE.jobs.issued.id,
+      locationId: locations.north.id,
+      assignedUserId: technicianUser.id,
+      kind: "SLA_BREACH",
+      severity: "CRITICAL",
+      status: "RESOLVED",
+      summary: "Issued invoice review has already been closed out",
+      detailsJson: {
+        reason: "Seeded resolved exception row for history coverage.",
+      },
+      createdBy: operator.id,
+      resolvedBy: operator.id,
+      resolvedAt: addMinutes(now, -15),
+      createdAt: addMinutes(now, -120),
+    },
+  });
+  await prisma.complianceException.upsert({
+    where: { id: FIXTURE.compliance.exceptions.openEvidenceReview.id },
+    create: {
+      id: FIXTURE.compliance.exceptions.openEvidenceReview.id,
+      tenantId: company.id,
+      entityType: "JOB",
+      entityId: FIXTURE.jobs.portalActive.id,
+      locationId: locations.hq.id,
+      assignedUserId: technicianUser.id,
+      kind: "MANUAL_OVERRIDE",
+      severity: "CRITICAL",
+      status: "OPEN",
+      summary: "Portal-active completion evidence review is awaiting operator acknowledgement",
+      detailsJson: {
+        reason: "Seeded dismissable compliance queue row for operator workflow coverage.",
+      },
+      createdBy: operator.id,
+      resolvedBy: null,
+      resolvedAt: null,
+      createdAt: addMinutes(now, -28),
+    },
+    update: {
+      tenantId: company.id,
+      entityType: "JOB",
+      entityId: FIXTURE.jobs.portalActive.id,
+      locationId: locations.hq.id,
+      assignedUserId: technicianUser.id,
+      kind: "MANUAL_OVERRIDE",
+      severity: "CRITICAL",
+      status: "OPEN",
+      summary: "Portal-active completion evidence review is awaiting operator acknowledgement",
+      detailsJson: {
+        reason: "Seeded dismissable compliance queue row for operator workflow coverage.",
+      },
+      createdBy: operator.id,
+      resolvedBy: null,
+      resolvedAt: null,
+      createdAt: addMinutes(now, -28),
+    },
+  });
+
+  await ensureActivityEvent("e2e-activity-compliance-policy-created", {
+    type: "compliance.policy_created",
+    label: `Created SLA policy ${FIXTURE.compliance.policies.quoteApproval.name}`,
+    at: addMinutes(now, -235),
+    tenantId: company.id,
+    payloadJson: {
+      workflowSlaPolicyId: FIXTURE.compliance.policies.quoteApproval.id,
+      entityType: "QUOTE",
+    },
+  });
+  await ensureActivityEvent("e2e-activity-sla-breached", {
+    type: "sla.breached",
+    label: `${FIXTURE.compliance.policies.quoteApproval.name} breached`,
+    at: addMinutes(now, -60),
+    tenantId: company.id,
+    customerId: customers.portalActive.id,
+    customerName: customers.portalActive.name,
+    jobId: portalActiveJob.id,
+    jobRef: portalActiveJob.jobRef,
+    status: "SENT",
+    payloadJson: {
+      workflowSlaEventId: FIXTURE.compliance.events.breachedQuote.id,
+      policyId: FIXTURE.compliance.policies.quoteApproval.id,
+      entityType: "QUOTE",
+      entityId: FIXTURE.quotes.sent.id,
+    },
+  });
+  await ensureActivityEvent("e2e-activity-compliance-exception-created", {
+    type: "compliance.exception_created",
+    label: "Manual override on finance-ready workflow needs operator review",
+    at: addMinutes(now, -30),
+    tenantId: company.id,
+    customerId: customers.financeOps.id,
+    customerName: customers.financeOps.name,
+    jobId: financeReadyJob.id,
+    jobRef: financeReadyJob.jobRef,
+    status: financeReadyJob.status,
+    payloadJson: {
+      complianceExceptionId: FIXTURE.compliance.exceptions.openManualOverride.id,
+      kind: "MANUAL_OVERRIDE",
+      entityType: "JOB",
+      entityId: financeReadyJob.id,
+    },
+  });
+  await ensureActivityEvent("e2e-activity-compliance-exception-created-evidence", {
+    type: "compliance.exception_created",
+    label: "Portal-active completion evidence review is awaiting operator acknowledgement",
+    at: addMinutes(now, -28),
+    tenantId: company.id,
+    customerId: customers.portalActive.id,
+    customerName: customers.portalActive.name,
+    jobId: portalActiveJob.id,
+    jobRef: portalActiveJob.jobRef,
+    status: portalActiveJob.status,
+    payloadJson: {
+      complianceExceptionId: FIXTURE.compliance.exceptions.openEvidenceReview.id,
+      kind: "MANUAL_OVERRIDE",
+      entityType: "JOB",
+      entityId: portalActiveJob.id,
+    },
+  });
+  await ensureActivityEvent("e2e-activity-compliance-exception-resolved", {
+    type: "compliance.exception_resolved",
+    label: "Issued invoice review has already been closed out",
+    at: addMinutes(now, -15),
+    tenantId: company.id,
+    customerId: customers.issued.id,
+    customerName: customers.issued.name,
+    jobId: issuedJob.id,
+    jobRef: issuedJob.jobRef,
+    status: issuedJob.status,
+    payloadJson: {
+      complianceExceptionId: FIXTURE.compliance.exceptions.resolvedInvoiceReview.id,
+      entityType: "JOB",
+      entityId: issuedJob.id,
+    },
   });
 
   await ensureActivityEvent("e2e-activity-schedule-overload", {

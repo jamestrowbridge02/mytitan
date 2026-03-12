@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AuditModule } from '../audit/audit.module';
 import { AutomationsModule } from '../automations/automations.module';
+import { ComplianceModule } from '../compliance/compliance.module';
 import { FeatureGuard } from '../common/feature.guard';
 import { EventsModule } from '../events/events.module';
 import { JobsModule } from '../jobs/jobs.module';
@@ -12,7 +13,7 @@ import { BookingsController } from './bookings.controller';
 import { BookingsService } from './bookings.service';
 
 @Module({
-  imports: [AuditModule, TenantModule, NotificationsModule, AutomationsModule, EventsModule, JobsModule],
+  imports: [AuditModule, TenantModule, NotificationsModule, AutomationsModule, EventsModule, JobsModule, ComplianceModule],
   controllers: [BookingsController, BookingProController],
   providers: [BookingsService, BookingConversionService, FeatureGuard],
   exports: [BookingsService],

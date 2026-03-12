@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { AutomationsService } from "../automations/automations.service";
+import { ComplianceService } from "../compliance/compliance.service";
 import { ActivityService } from "../events/activity.service";
 import { JobsService } from "../jobs/jobs.service";
 import { PrismaService } from "../prisma/prisma.service";
@@ -40,6 +41,7 @@ export class RevenueService {
     private readonly jobs: JobsService,
     private readonly activity: ActivityService,
     private readonly automations: AutomationsService,
+    private readonly compliance: ComplianceService,
   ) {}
 
   private moneyDecimal(cents: number) {
@@ -240,7 +242,7 @@ export class RevenueService {
       },
       include: {
         customer: { select: { id: true, name: true } },
-        job: { select: { id: true, jobRef: true, status: true } },
+        job: { select: { id: true, jobRef: true, status: true, locationId: true, assignedUserId: true } },
       },
       take: 50,
     });
@@ -282,6 +284,7 @@ export class RevenueService {
 
   async listQuotes(tenantId: string, filters: QuoteListFilters = {}) {
     await this.expireDueQuotes(tenantId);
+    await this.compliance.syncTenantState(tenantId);
     const rows = await this.prisma.quote.findMany({
       where: {
         tenantId,
@@ -290,7 +293,7 @@ export class RevenueService {
       },
       include: {
         customer: { select: { id: true, name: true } },
-        job: { select: { id: true, jobRef: true, status: true } },
+        job: { select: { id: true, jobRef: true, status: true, locationId: true, assignedUserId: true } },
         booking: { select: { id: true, status: true } },
         lineItems: { orderBy: { sortOrder: "asc" } },
       },
@@ -301,11 +304,12 @@ export class RevenueService {
 
   async getQuote(tenantId: string, quoteId: string) {
     await this.expireDueQuotes(tenantId);
+    await this.compliance.syncSlaForEntity(tenantId, "QUOTE", quoteId);
     const row = await this.prisma.quote.findFirst({
       where: { tenantId, id: quoteId },
       include: {
         customer: { select: { id: true, name: true } },
-        job: { select: { id: true, jobRef: true, status: true } },
+        job: { select: { id: true, jobRef: true, status: true, locationId: true, assignedUserId: true } },
         booking: { select: { id: true, status: true } },
         lineItems: { orderBy: { sortOrder: "asc" } },
       },
@@ -350,7 +354,7 @@ export class RevenueService {
       },
       include: {
         customer: { select: { id: true, name: true } },
-        job: { select: { id: true, jobRef: true, status: true } },
+        job: { select: { id: true, jobRef: true, status: true, locationId: true, assignedUserId: true } },
         booking: { select: { id: true, status: true } },
         lineItems: { orderBy: { sortOrder: "asc" } },
       },
@@ -370,6 +374,20 @@ export class RevenueService {
         quoteNumber: created.quoteNumber,
         totalCents: created.totalCents,
       },
+    });
+    await this.compliance.evaluateSlaTransition({
+      tenantId,
+      actorUserId: userId,
+      entityType: "QUOTE",
+      entityId: created.id,
+      currentStatus: created.status,
+      locationId: created.job?.locationId || null,
+      assignedUserId: created.job?.assignedUserId || null,
+      customerId: created.customerId,
+      customerName: created.customer?.name || null,
+      jobId: created.jobId || null,
+      jobRef: created.job?.jobRef || null,
+      label: created.quoteNumber,
     });
 
     return this.serializeQuote(created);
@@ -436,7 +454,7 @@ export class RevenueService {
       },
       include: {
         customer: { select: { id: true, name: true } },
-        job: { select: { id: true, jobRef: true, status: true } },
+        job: { select: { id: true, jobRef: true, status: true, locationId: true, assignedUserId: true } },
         booking: { select: { id: true, status: true } },
         lineItems: { orderBy: { sortOrder: "asc" } },
       },
@@ -452,6 +470,21 @@ export class RevenueService {
       jobRef: job?.jobRef || null,
       status: updated.status,
       payloadJson: { quoteId: updated.id, quoteNumber: updated.quoteNumber },
+    });
+    await this.compliance.evaluateSlaTransition({
+      tenantId,
+      actorUserId: userId,
+      entityType: "QUOTE",
+      entityId: updated.id,
+      previousStatus: existing.status,
+      currentStatus: updated.status,
+      locationId: updated.job?.locationId || null,
+      assignedUserId: updated.job?.assignedUserId || null,
+      customerId: updated.customerId,
+      customerName: updated.customer?.name || null,
+      jobId: updated.jobId || null,
+      jobRef: updated.job?.jobRef || null,
+      label: updated.quoteNumber,
     });
 
     return this.serializeQuote(updated);
@@ -500,7 +533,7 @@ export class RevenueService {
       where: { tenantId, id: quoteId },
       include: {
         customer: { select: { id: true, name: true } },
-        job: { select: { id: true, jobRef: true, status: true } },
+        job: { select: { id: true, jobRef: true, status: true, locationId: true, assignedUserId: true } },
         lineItems: true,
       },
     });
@@ -517,7 +550,7 @@ export class RevenueService {
       data: { status: "SENT" },
       include: {
         customer: { select: { id: true, name: true } },
-        job: { select: { id: true, jobRef: true, status: true } },
+        job: { select: { id: true, jobRef: true, status: true, locationId: true, assignedUserId: true } },
         lineItems: { orderBy: { sortOrder: "asc" } },
       },
     });
@@ -545,6 +578,22 @@ export class RevenueService {
       status: updated.status,
       totalCents: updated.totalCents,
     });
+    await this.compliance.evaluateSlaTransition({
+      tenantId,
+      actorUserId: userId,
+      entityType: "QUOTE",
+      entityId: updated.id,
+      previousStatus: quote.status,
+      currentStatus: updated.status,
+      locationId: updated.job?.locationId || null,
+      assignedUserId: updated.job?.assignedUserId || null,
+      customerId: updated.customerId,
+      customerName: updated.customer?.name || null,
+      jobId: updated.jobId || null,
+      jobRef: updated.job?.jobRef || null,
+      label: updated.quoteNumber,
+    });
+    await this.compliance.syncSlaForEntity(tenantId, "QUOTE", updated.id);
     await this.syncRevenueTasks(tenantId);
     return this.getQuote(tenantId, updated.id);
   }
@@ -565,7 +614,7 @@ export class RevenueService {
       },
       include: {
         customer: { select: { id: true, name: true } },
-        job: { select: { id: true, jobRef: true, status: true } },
+        job: { select: { id: true, jobRef: true, status: true, locationId: true, assignedUserId: true } },
         lineItems: { orderBy: { sortOrder: "asc" } },
       },
     });
@@ -583,7 +632,7 @@ export class RevenueService {
       },
       include: {
         customer: { select: { id: true, name: true } },
-        job: { select: { id: true, jobRef: true, status: true } },
+        job: { select: { id: true, jobRef: true, status: true, locationId: true, assignedUserId: true } },
         lineItems: { orderBy: { sortOrder: "asc" } },
       },
     });
@@ -649,6 +698,22 @@ export class RevenueService {
         totalCents: updated.totalCents,
       });
     }
+    await this.compliance.evaluateSlaTransition({
+      tenantId,
+      actorUserId,
+      entityType: "QUOTE",
+      entityId: updated.id,
+      previousStatus: quote.status,
+      currentStatus: updated.status,
+      locationId: updated.job?.locationId || null,
+      assignedUserId: updated.job?.assignedUserId || null,
+      customerId: updated.customerId,
+      customerName: updated.customer?.name || null,
+      jobId: updated.jobId || null,
+      jobRef: updated.job?.jobRef || null,
+      label: updated.quoteNumber,
+    });
+    await this.compliance.syncSlaForEntity(tenantId, "QUOTE", updated.id);
     await this.syncRevenueTasks(tenantId);
     return this.getQuote(tenantId, updated.id);
   }
@@ -757,7 +822,7 @@ export class RevenueService {
         },
         include: {
           customer: { select: { id: true, name: true } },
-          job: { select: { id: true, jobRef: true, status: true } },
+          job: { select: { id: true, jobRef: true, status: true, locationId: true, assignedUserId: true } },
           booking: { select: { id: true, status: true } },
           lineItems: { orderBy: { sortOrder: "asc" } },
         },
@@ -776,6 +841,22 @@ export class RevenueService {
       status: result.job.status || null,
       payloadJson: { quoteId: result.quote.id, quoteNumber: result.quote.quoteNumber, jobId: result.job.id },
     });
+    await this.compliance.evaluateSlaTransition({
+      tenantId,
+      actorUserId: userId,
+      entityType: "QUOTE",
+      entityId: result.quote.id,
+      previousStatus: existing.status,
+      currentStatus: result.quote.status,
+      locationId: result.job.locationId || null,
+      assignedUserId: result.job.assignedUserId || null,
+      customerId: result.quote.customerId,
+      customerName: result.quote.customer?.name || null,
+      jobId: result.job.id,
+      jobRef: result.job.jobRef || null,
+      label: result.quote.quoteNumber,
+    });
+    await this.compliance.syncSlaForEntity(tenantId, "QUOTE", result.quote.id);
     await this.syncRevenueTasks(tenantId);
     return {
       quote: this.serializeQuote(result.quote),
@@ -893,7 +974,7 @@ export class RevenueService {
         },
         include: {
           customer: { select: { id: true, name: true } },
-          job: { select: { id: true, jobRef: true, status: true } },
+          job: { select: { id: true, jobRef: true, status: true, locationId: true, assignedUserId: true } },
         },
       }),
       this.prisma.job.findMany({

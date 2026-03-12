@@ -45,6 +45,7 @@ import { ServicePlansModule } from './service-plans/service-plans.module';
 import { ScheduleModule } from './schedule/schedule.module';
 import { CustomerWorkspaceModule } from './customer-workspace/customer-workspace.module';
 import { RevenueModule } from './revenue/revenue.module';
+import { ComplianceModule } from './compliance/compliance.module';
 
 @Module({
   imports: [
@@ -101,6 +102,7 @@ import { RevenueModule } from './revenue/revenue.module';
     ScheduleModule,
     CustomerWorkspaceModule,
     RevenueModule,
+    ComplianceModule,
   ],
 })
 export class AppModule {}

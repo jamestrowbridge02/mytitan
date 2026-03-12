@@ -28,6 +28,7 @@ export default function CommandPalette() {
         { label: "Scheduling", href: "/dashboard/scheduling" },
         { label: terms.customers, href: "/dashboard/customers" },
         moduleVisibility.showIntelligence ? { label: "Intelligence", href: "/dashboard/intelligence" } : null,
+        moduleVisibility.showIntelligence ? { label: "Compliance", href: "/dashboard/compliance" } : null,
         { label: "Billing readiness", href: "/dashboard/billing/readiness" },
         moduleVisibility.showPortalOps ? { label: "Portal Ops", href: "/dashboard/portal" } : null,
         moduleVisibility.showTechnicianQueue ? { label: `${terms.technicians} queue`, href: "/dashboard/technician" } : null,

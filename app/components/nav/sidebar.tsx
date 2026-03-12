@@ -115,6 +115,7 @@ export default function Sidebar() {
     { title: "Dashboard", href: "/dashboard" },
     { title: "Command Centre", href: commandCentreHref },
     { title: "Analytics", href: "/dashboard/analytics" },
+    { title: "Compliance", href: "/dashboard/compliance" },
     { title: terms.jobs, href: "/dashboard/jobs" },
     { title: terms.customers, href: "/dashboard/customers" },
     { title: "Calendar", href: "/dashboard/calendar" },
@@ -138,6 +139,7 @@ export default function Sidebar() {
     if (href.startsWith("/dashboard/portal")) return permissions["portal.manage"];
     if (href.startsWith("/dashboard/technician")) return permissions["technician.execute"];
     if (href.startsWith("/dashboard/analytics")) return permissions["dashboard.view_intelligence"];
+    if (href.startsWith("/dashboard/compliance")) return permissions["dashboard.view_intelligence"];
     if (href.startsWith("/dashboard/executive")) return permissions["dashboard.view_intelligence"];
     if (href.startsWith("/dashboard/intelligence")) return permissions["dashboard.view_intelligence"];
     return true;
@@ -225,6 +227,7 @@ export default function Sidebar() {
               .filter((item) => {
                 if (!canAccessHref(item.href)) return false;
                 if (item.href === "/dashboard/intelligence") return moduleVisibility.showIntelligence;
+                if (item.href === "/dashboard/compliance") return moduleVisibility.showIntelligence;
                 if (item.href === "/dashboard/executive") return moduleVisibility.showIntelligence;
                 if (item.href === "/dashboard/portal") return moduleVisibility.showPortalOps;
                 if (item.href === "/dashboard/technician") return moduleVisibility.showTechnicianQueue;

@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { ComplianceService } from "../compliance/compliance.service";
 import { getTechnicianChecklist } from "../common/business-config";
 import { ActivityService } from "../events/activity.service";
 import { PrismaService } from "../prisma/prisma.service";
@@ -15,6 +16,7 @@ export class JobExecutionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly activity: ActivityService,
+    private readonly compliance: ComplianceService,
   ) {}
 
   private async resolveJob(tenantId: string, jobId: string) {
@@ -353,6 +355,7 @@ export class JobExecutionService {
       kind: input.kind,
       artifactId,
     });
+    await this.compliance.syncSlaForEntity(tenantId, "JOB", job.id);
     return this.serializeRecord(refreshed, fallbackChecklist, false);
   }
 
@@ -402,6 +405,7 @@ export class JobExecutionService {
       executionRecordId: updated.id,
       status: updated.status,
     });
+    await this.compliance.syncSlaForEntity(tenantId, "JOB", job.id);
     return this.serializeRecord(updated, fallbackChecklist, false);
   }
 
@@ -459,6 +463,7 @@ export class JobExecutionService {
     });
 
     const refreshed = await this.getLatestRecord(tenantId, job.id);
+    await this.compliance.syncSlaForEntity(tenantId, "JOB", job.id);
     return this.serializeRecord(refreshed, fallbackChecklist, true);
   }
 }
