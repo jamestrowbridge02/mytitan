@@ -329,6 +329,11 @@ async function ensureTenantSettings(companyId, defaultLocationId, planId) {
       businessConfigJson: {
         defaults: { commandCentreVersion: "v2" },
         navigation: { showIntelligence: true, showPortalOps: true, showTechnicianQueue: true },
+        analytics: {
+          defaultWindowDays: 30,
+          widgetOrder: ["executive-summary", "pressure-panel", "revenue-panel", "capacity-panel", "benchmark-delta"],
+          hiddenWidgets: [],
+        },
         workflowStages: {
           bookings: [
             { id: "lead", label: "Lead Intake", statuses: ["PENDING", "PLANNED"], visible: true },
@@ -375,6 +380,11 @@ async function ensureTenantSettings(companyId, defaultLocationId, planId) {
       businessConfigJson: {
         defaults: { commandCentreVersion: "v2" },
         navigation: { showIntelligence: true, showPortalOps: true, showTechnicianQueue: true },
+        analytics: {
+          defaultWindowDays: 30,
+          widgetOrder: ["executive-summary", "pressure-panel", "revenue-panel", "capacity-panel", "benchmark-delta"],
+          hiddenWidgets: [],
+        },
         workflowStages: {
           bookings: [
             { id: "lead", label: "Lead Intake", statuses: ["PENDING", "PLANNED"], visible: true },

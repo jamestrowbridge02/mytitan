@@ -20,6 +20,7 @@ export default function CustomerTimelinePage() {
   const [quotes, setQuotes] = useState<any[]>([]);
   const [accountStatus, setAccountStatus] = useState<any>(null);
   const [approvalRequests, setApprovalRequests] = useState<any[]>([]);
+  const [customerCommercial, setCustomerCommercial] = useState<any>(null);
   const [inviteLink, setInviteLink] = useState("");
   const [actionBusy, setActionBusy] = useState(false);
   const [permissions, setPermissions] = useState(() => emptyPermissionSnapshot());
@@ -96,6 +97,20 @@ export default function CustomerTimelinePage() {
     }
   }
 
+  async function loadCustomerCommercial(activeCustomer?: any) {
+    const customerId = String(activeCustomer?.id || "");
+    if (!customerId) {
+      setCustomerCommercial(null);
+      return;
+    }
+    try {
+      const analytics = await apiFetch(`/analytics/customers?windowDays=30&customerId=${encodeURIComponent(customerId)}`);
+      setCustomerCommercial(analytics?.customerSummary || null);
+    } catch {
+      setCustomerCommercial(null);
+    }
+  }
+
   useEffect(() => {
     if (!router.isReady) return;
     const run = async () => {
@@ -111,7 +126,7 @@ export default function CustomerTimelinePage() {
       } catch {
         setCustomer(null);
       }
-      await Promise.all([loadTimeline(resolved), loadServicePlans(resolved), loadWorkspaceGovernance(resolved), loadQuotes(resolved)]);
+      await Promise.all([loadTimeline(resolved), loadServicePlans(resolved), loadWorkspaceGovernance(resolved), loadQuotes(resolved), loadCustomerCommercial(resolved)]);
     };
     void run();
   }, [router.isReady, id, name]);
@@ -284,6 +299,27 @@ export default function CustomerTimelinePage() {
             </div>
           ) : (
             <p className="muted">No linked service plans yet.</p>
+          )}
+        </div>
+
+        <div className="card customer-comms-card" data-testid="customer-commercial-summary">
+          <div className="customer-comms-head">
+            <h3 style={{ margin: 0 }}>Commercial summary</h3>
+          </div>
+          {customerCommercial ? (
+            <div style={{ display: "grid", gap: 8 }}>
+              <p className="muted" style={{ margin: 0 }}>
+                {customerCommercial.quoteCount} quotes total • {customerCommercial.openQuoteCount} still open
+              </p>
+              <p className="muted" style={{ margin: 0 }}>
+                {customerCommercial.activeServicePlans} active service plans • {customerCommercial.unpaidInvoiceCount} unpaid invoices
+              </p>
+              <p className="muted" style={{ margin: 0 }}>
+                Overdue balance {(Number(customerCommercial.overdueBalanceCents || 0) / 100).toLocaleString("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 })}
+              </p>
+            </div>
+          ) : (
+            <p className="muted">Commercial analytics will appear once this customer has quotes, invoices, or recurring-plan activity.</p>
           )}
         </div>
 

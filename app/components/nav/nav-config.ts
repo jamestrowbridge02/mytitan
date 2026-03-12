@@ -17,6 +17,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { title: "Dashboard", href: "/dashboard" },
       { title: "Command Centre", href: "/dashboard/command-centre-v2" },
+      { title: "Analytics", href: "/dashboard/analytics" },
     ],
   },
   {
@@ -50,6 +51,7 @@ export const NAV_GROUPS: NavGroup[] = [
     title: "Operations",
     items: [
       { title: "Intelligence", href: "/dashboard/intelligence" },
+      { title: "Executive", href: "/dashboard/executive" },
       { title: "Technician queue", href: "/dashboard/technician" },
       { title: "Inventory", href: "/dashboard/inventory" },
       { title: "Locations", href: "/dashboard/locations" },

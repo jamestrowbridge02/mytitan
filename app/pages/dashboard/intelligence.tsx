@@ -129,6 +129,7 @@ export default function IntelligencePage() {
           title="Intelligence"
           subtitle="DB-backed operational intelligence built from real jobs, bookings, customer activity, billing readiness, and technician assignment data."
           actions={[
+            { label: "Analytics", href: "/dashboard/analytics", variant: "secondary" },
             { label: "Portal Ops", href: "/dashboard/portal", variant: "secondary" },
             { label: "Billing readiness", href: "/dashboard/billing/readiness" },
           ]}
