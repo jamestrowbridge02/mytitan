@@ -1,5 +1,8 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { OperatorNotice } from "../feedback/OperatorNotice";
+import { useOperatorNotice } from "../feedback/useOperatorNotice";
+import { OperatorEmptyStateCard, OperatorFilterBar, OperatorPageHeader, OperatorStatusBadge } from "../ui/operator-page";
 import { apiFetch } from "../../lib/api";
 import { isInventoryV1Enabled } from "../../lib/feature-flags";
 import { readActiveLocationId, subscribeActiveLocationId } from "../../lib/location-context";
@@ -34,13 +37,12 @@ export function InventoryWorkspace({ initialTab }: { initialTab: InventoryWorksp
   const [purchaseOrders, setPurchaseOrders] = useState<any[]>([]);
   const [alerts, setAlerts] = useState<any[]>([]);
   const [activeLocationId, setActiveLocationId] = useState('all');
-  const [error, setError] = useState("");
-  const [status, setStatus] = useState("");
   const [query, setQuery] = useState("");
   const [partForm, setPartForm] = useState({ sku: "", name: "", category: "", unit: "pcs", minLevel: 0, avgUnitCost: 0, unitPriceCents: 0 });
   const [locationForm, setLocationForm] = useState({ name: "", kind: "WAREHOUSE" });
   const [adjustForm, setAdjustForm] = useState({ stockItemId: "", inventoryLocationId: "", quantityDelta: 0, reorderPoint: 0, reason: "" });
   const [poForm, setPoForm] = useState({ supplierName: "", inventoryLocationId: "", stockItemId: "", qtyOrdered: 1, unitCost: 0, status: "ORDERED" });
+  const { notice, showError, showSuccess, clearNotice } = useOperatorNotice();
 
   useEffect(() => {
     setTab(initialTab);
@@ -67,9 +69,9 @@ export function InventoryWorkspace({ initialTab }: { initialTab: InventoryWorksp
       setStock(Array.isArray(stockRes) ? stockRes : []);
       setPurchaseOrders(Array.isArray(poRes) ? poRes : []);
       setAlerts(Array.isArray(alertsRes) ? alertsRes : []);
-      setError("");
+      if (notice?.kind === "error") clearNotice();
     } catch (err: any) {
-      setError(err?.message || "Failed to load parts and inventory workspace");
+      showError(err?.message || "Failed to load parts and inventory workspace");
     }
   }
 
@@ -103,10 +105,10 @@ export function InventoryWorkspace({ initialTab }: { initialTab: InventoryWorksp
         body: JSON.stringify(partForm),
       });
       setPartForm({ sku: "", name: "", category: "", unit: "pcs", minLevel: 0, avgUnitCost: 0, unitPriceCents: 0 });
-      setStatus("Part created");
+      showSuccess("Part created");
       await loadAll();
     } catch (err: any) {
-      setError(err?.message || "Failed to create part");
+      showError(err?.message || "Failed to create part");
     }
   }
 
@@ -118,10 +120,10 @@ export function InventoryWorkspace({ initialTab }: { initialTab: InventoryWorksp
         body: JSON.stringify(locationForm),
       });
       setLocationForm({ name: "", kind: "WAREHOUSE" });
-      setStatus("Inventory location created");
+      showSuccess("Inventory location created");
       await loadAll();
     } catch (err: any) {
-      setError(err?.message || "Failed to create inventory location");
+      showError(err?.message || "Failed to create inventory location");
     }
   }
 
@@ -133,10 +135,10 @@ export function InventoryWorkspace({ initialTab }: { initialTab: InventoryWorksp
         body: JSON.stringify(adjustForm),
       });
       setAdjustForm({ stockItemId: "", inventoryLocationId: "", quantityDelta: 0, reorderPoint: 0, reason: "" });
-      setStatus("Stock adjusted");
+      showSuccess("Stock adjusted");
       await loadAll();
     } catch (err: any) {
-      setError(err?.message || "Failed to adjust stock");
+      showError(err?.message || "Failed to adjust stock");
     }
   }
 
@@ -159,20 +161,20 @@ export function InventoryWorkspace({ initialTab }: { initialTab: InventoryWorksp
         }),
       });
       setPoForm({ supplierName: "", inventoryLocationId: "", stockItemId: "", qtyOrdered: 1, unitCost: 0, status: "ORDERED" });
-      setStatus("Purchase order created");
+      showSuccess("Purchase order created");
       await loadAll();
     } catch (err: any) {
-      setError(err?.message || "Failed to create purchase order");
+      showError(err?.message || "Failed to create purchase order");
     }
   }
 
   async function receivePurchaseOrder(id: string) {
     try {
       await apiFetch(`/purchase-orders/${id}/receive`, { method: "POST", body: JSON.stringify({}) });
-      setStatus("Purchase order received");
+      showSuccess("Purchase order received");
       await loadAll();
     } catch (err: any) {
-      setError(err?.message || "Failed to receive purchase order");
+      showError(err?.message || "Failed to receive purchase order");
     }
   }
 
@@ -180,28 +182,38 @@ export function InventoryWorkspace({ initialTab }: { initialTab: InventoryWorksp
 
   return (
     <div className="operator-stack">
+      <OperatorPageHeader
+        eyebrow="Operations system of record"
+        title={meta.title}
+        subtitle={meta.subtitle}
+        actions={[
+          { label: "Open seeded job", href: "/dashboard/jobs/e2e-job-portal-active", variant: "secondary" },
+          { label: "Analytics", href: "/dashboard/analytics", variant: "secondary" },
+          { label: "Intelligence", href: "/dashboard/intelligence", variant: "secondary" },
+        ]}
+        stats={[
+          { label: "Parts", value: String(parts.length), hint: "Catalog entries" },
+          { label: "On hand", value: stockSummary.onHand.toFixed(0), hint: "Units across locations" },
+          { label: "Low stock", value: String(stockSummary.lowStock), hint: "Below reorder point" },
+          { label: "Open POs", value: String(openPurchaseOrders.length), hint: "Procurement still active" },
+        ]}
+      />
+      {!enabled ? <OperatorEmptyStateCard title="Inventory is disabled" description="Enable inventory features to work with parts, stock, and purchase orders." /> : null}
+      {notice ? <OperatorNotice notice={notice} onDismiss={clearNotice} /> : null}
       <section className="card" style={{ marginBottom: 16 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap", alignItems: "flex-start" }}>
-          <div>
-            <p className="muted" style={{ margin: 0, textTransform: "uppercase", letterSpacing: "0.08em" }}>Operations system of record</p>
-            <h1 style={{ margin: "8px 0 6px 0" }}>{meta.title}</h1>
-            <p className="muted" style={{ margin: 0, maxWidth: 760 }}>{meta.subtitle}</p>
-          </div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <Link className="button secondary" href="/dashboard/jobs/e2e-job-portal-active">Open seeded job</Link>
-            <Link className="button secondary" href="/dashboard/analytics">Analytics</Link>
-            <Link className="button secondary" href="/dashboard/intelligence">Intelligence</Link>
-          </div>
-        </div>
-        {!enabled ? <p className="muted" style={{ marginTop: 12 }}>Inventory is currently disabled.</p> : null}
-        {status ? <p style={{ color: "#0b7a5f", marginTop: 12 }}>{status}</p> : null}
-        {error ? <p style={{ color: "#c2410c", marginTop: 12 }}>{error}</p> : null}
         <div className="tab-row" style={{ marginTop: 14 }}>
           <button className={`tab-button ${tab === "parts" ? "active" : ""}`} type="button" onClick={() => setTab("parts")}>Parts</button>
           <button className={`tab-button ${tab === "inventory" ? "active" : ""}`} type="button" onClick={() => setTab("inventory")}>Inventory</button>
           <button className={`tab-button ${tab === "purchase-orders" ? "active" : ""}`} type="button" onClick={() => setTab("purchase-orders")}>Purchase Orders</button>
         </div>
       </section>
+
+      <OperatorFilterBar
+        searchPlaceholder="Search by SKU, name, or category"
+        searchValue={query}
+        onSearchChange={setQuery}
+        resultsLabel={`${parts.length} parts · ${stock.length} stock rows`}
+      />
 
       <section className="card operator-section" style={{ marginBottom: 16 }}>
         <div className="operator-section__header">
@@ -236,11 +248,6 @@ export function InventoryWorkspace({ initialTab }: { initialTab: InventoryWorksp
             <p>{openPurchaseOrders.length}</p>
           </div>
         </div>
-      </section>
-
-      <section className="card" style={{ marginBottom: 16 }}>
-        <label htmlFor="inventory-query">Search parts or stock</label>
-        <input id="inventory-query" className="input" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search by SKU, name, or category" />
       </section>
 
       {tab === "parts" ? (
@@ -278,7 +285,7 @@ export function InventoryWorkspace({ initialTab }: { initialTab: InventoryWorksp
                 </div>
               </div>
             ))}
-            {parts.length === 0 ? <p className="muted">No parts yet.</p> : null}
+            {parts.length === 0 ? <OperatorEmptyStateCard title="No parts yet" description="Create a catalog entry to start pricing, stock, and procurement tracking." /> : null}
           </div>
         </section>
       ) : null}
@@ -343,12 +350,12 @@ export function InventoryWorkspace({ initialTab }: { initialTab: InventoryWorksp
                     </p>
                   </div>
                   <div style={{ display: "grid", gap: 6, justifyItems: "end" }}>
-                    {row.lowStock ? <span className="badge warn">Low stock</span> : <span className="badge">Healthy</span>}
-                    {row.lowStock || row.shortage || Number(row.availableQuantity || 0) <= 0 ? <span className="badge warn">Shortage pressure</span> : null}
+                    {row.lowStock ? <OperatorStatusBadge label="Low stock" tone="warning" /> : <OperatorStatusBadge label="Healthy" tone="success" />}
+                    {row.lowStock || row.shortage || Number(row.availableQuantity || 0) <= 0 ? <OperatorStatusBadge label="Shortage pressure" tone="critical" /> : null}
                   </div>
                 </div>
               ))}
-              {stock.length === 0 ? <p className="muted">No stock rows yet.</p> : null}
+              {stock.length === 0 ? <OperatorEmptyStateCard title="No stock rows yet" description="Create an inventory location and adjust stock to establish the first live inventory rows." /> : null}
             </div>
             {alerts.length ? (
               <div style={{ marginTop: 14 }}>
@@ -420,7 +427,7 @@ export function InventoryWorkspace({ initialTab }: { initialTab: InventoryWorksp
                 </div>
               </div>
             ))}
-            {purchaseOrders.length === 0 ? <p className="muted">No purchase orders yet.</p> : null}
+            {purchaseOrders.length === 0 ? <OperatorEmptyStateCard title="No purchase orders yet" description="Create a draft or ordered purchase order to track procurement against your stock locations." /> : null}
           </div>
         </section>
       ) : null}

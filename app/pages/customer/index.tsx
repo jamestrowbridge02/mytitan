@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ApiError } from "../../lib/api";
+import { OperatorStatusBadge } from "../../components/ui/operator-page";
 import { clearCustomerToken, customerApiFetch, getCustomerToken, setCustomerToken } from "../../lib/customer-auth";
 import MyTitanLogo from "../../components/brand/mytitan-logo";
 
@@ -221,38 +222,43 @@ export default function CustomerWorkspacePage() {
       </div>
 
       <div className="customer-workspace__stats">
-        <div className="card" style={{ padding: 20 }}>
+        <div className="card customer-workspace__statCard">
           <h3 style={{ marginTop: 0 }}>Account</h3>
           <p className="muted" style={{ marginBottom: 4 }}>Status</p>
-          <p style={{ marginTop: 0 }}>{workspace.account?.status || "Unavailable"}</p>
+          <p className="customer-workspace__statValue">{workspace.account?.status || "Unavailable"}</p>
           <p className="muted" style={{ marginBottom: 4 }}>Last login</p>
           <p style={{ marginTop: 0 }}>{formatDateTime(workspace.account?.lastLoginAt)}</p>
         </div>
-        <div className="card" style={{ padding: 20 }}>
+        <div className="card customer-workspace__statCard">
           <h3 style={{ marginTop: 0 }}>Pending approvals</h3>
-          <p style={{ margin: 0 }}>{workspace.approvals?.filter((item: any) => item.status === "PENDING").length || 0}</p>
+          <p className="customer-workspace__statValue">{workspace.approvals?.filter((item: any) => item.status === "PENDING").length || 0}</p>
         </div>
-        <div className="card" style={{ padding: 20 }}>
+        <div className="card customer-workspace__statCard">
           <h3 style={{ marginTop: 0 }}>Visible plans</h3>
-          <p style={{ margin: 0 }}>{workspace.servicePlans?.length || 0}</p>
+          <p className="customer-workspace__statValue">{workspace.servicePlans?.length || 0}</p>
         </div>
-        <div className="card" style={{ padding: 20 }}>
+        <div className="card customer-workspace__statCard">
           <h3 style={{ marginTop: 0 }}>Quotes</h3>
-          <p style={{ margin: 0 }}>{workspace.quotes?.length || 0}</p>
+          <p className="customer-workspace__statValue">{workspace.quotes?.length || 0}</p>
         </div>
       </div>
 
       <div style={{ display: "grid", gap: 16 }}>
         <section className="card customer-workspace__section">
-          <h2 style={{ marginTop: 0 }}>Quotes</h2>
+          <div className="customer-workspace__sectionHeader">
+            <h2 className="customer-workspace__sectionTitle">Quotes</h2>
+          </div>
           {workspace.quotes?.length ? (
-            <div style={{ display: "grid", gap: 12 }}>
+            <div className="customer-workspace__list">
               {workspace.quotes.map((quote: any) => (
                 <div key={quote.id} className="integration-card" data-testid="customer-quote-row">
                   <div>
-                    <strong>{quote.quoteNumber}</strong>
+                    <div className="customer-workspace__metaStack">
+                      <strong>{quote.quoteNumber}</strong>
+                      <OperatorStatusBadge label={quote.status} />
+                    </div>
                     <p className="muted" style={{ margin: "6px 0 0 0" }}>
-                      {quote.title} • {quote.status} • {money(Number(quote.totalCents || 0), quote.currency || "GBP")}
+                      {quote.title} • {money(Number(quote.totalCents || 0), quote.currency || "GBP")}
                     </p>
                   </div>
                   <div className="muted" style={{ textAlign: "right" }}>
@@ -267,15 +273,17 @@ export default function CustomerWorkspacePage() {
         </section>
 
         <section className="card customer-workspace__section">
-          <h2 style={{ marginTop: 0 }}>Pending approvals</h2>
+          <div className="customer-workspace__sectionHeader">
+            <h2 className="customer-workspace__sectionTitle">Pending approvals</h2>
+          </div>
           {workspace.approvals?.length ? (
-            <div style={{ display: "grid", gap: 12 }}>
+            <div className="customer-workspace__list">
               {workspace.approvals.map((approval: any) => (
                 <div key={approval.id} className="integration-card" data-testid="customer-approval-row">
                   <div>
-                    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    <div className="customer-workspace__metaStack">
                       <strong>{approval.entityLabel || approval.kind}</strong>
-                      <span className={`badge${approval.status === "DECLINED" ? " warn" : ""}`}>{approval.status}</span>
+                      <OperatorStatusBadge label={approval.status} />
                     </div>
                     <p className="muted" style={{ margin: "6px 0 0 0" }}>
                       {approval.kind.replaceAll("_", " ")} • Requested {formatDateTime(approval.requestedAt)}
@@ -300,15 +308,20 @@ export default function CustomerWorkspacePage() {
         </section>
 
         <section className="card customer-workspace__section">
-          <h2 style={{ marginTop: 0 }}>Jobs</h2>
+          <div className="customer-workspace__sectionHeader">
+            <h2 className="customer-workspace__sectionTitle">Jobs</h2>
+          </div>
           {workspace.jobs?.length ? (
-            <div style={{ display: "grid", gap: 12 }}>
+            <div className="customer-workspace__list">
               {workspace.jobs.map((job: any) => (
                 <div key={job.id} className="integration-card" data-testid="customer-job-row">
                   <div>
-                    <strong>{job.jobRef}</strong>
+                    <div className="customer-workspace__metaStack">
+                      <strong>{job.jobRef}</strong>
+                      <OperatorStatusBadge label={job.status} />
+                    </div>
                     <p className="muted" style={{ margin: "6px 0 0 0" }}>
-                      {job.status} • {job.serviceName || "Service"} • {job.vehicleLabel || "Vehicle not supplied"}
+                      {job.serviceName || "Service"} • {job.vehicleLabel || "Vehicle not supplied"}
                     </p>
                     {job.executionRecord ? (
                       <div style={{ display: "grid", gap: 6, marginTop: 8 }}>
@@ -349,9 +362,11 @@ export default function CustomerWorkspacePage() {
         </section>
 
         <section className="card customer-workspace__section">
-          <h2 style={{ marginTop: 0 }}>Documents</h2>
+          <div className="customer-workspace__sectionHeader">
+            <h2 className="customer-workspace__sectionTitle">Documents</h2>
+          </div>
           {workspace.documents?.length ? (
-            <div style={{ display: "grid", gap: 12 }}>
+            <div className="customer-workspace__list">
               {workspace.documents.map((document: any) => (
                 <div key={document.id} className="integration-card">
                   <div>
@@ -372,15 +387,20 @@ export default function CustomerWorkspacePage() {
         </section>
 
         <section className="card customer-workspace__section" data-testid="customer-plan-list">
-          <h2 style={{ marginTop: 0 }}>Service plans</h2>
+          <div className="customer-workspace__sectionHeader">
+            <h2 className="customer-workspace__sectionTitle">Service plans</h2>
+          </div>
           {workspace.servicePlans?.length ? (
-            <div style={{ display: "grid", gap: 12 }}>
+            <div className="customer-workspace__list">
               {workspace.servicePlans.map((plan: any) => (
                 <div key={plan.id} className="integration-card">
                   <div>
-                    <strong>{plan.name}</strong>
+                    <div className="customer-workspace__metaStack">
+                      <strong>{plan.name}</strong>
+                      <OperatorStatusBadge label={plan.status} />
+                    </div>
                     <p className="muted" style={{ margin: "6px 0 0 0" }}>
-                      {plan.status} • Every {plan.cadenceInterval} {String(plan.cadenceUnit || "month").toLowerCase()}
+                      Every {plan.cadenceInterval} {String(plan.cadenceUnit || "month").toLowerCase()}
                       {Number(plan.cadenceInterval || 0) > 1 ? "s" : ""} • Next run {formatDateTime(plan.nextRunAt)}
                     </p>
                     {plan.currentRenewal ? (
@@ -466,9 +486,11 @@ export default function CustomerWorkspacePage() {
         </section>
 
         <section className="card" style={{ padding: 24 }}>
-          <h2 style={{ marginTop: 0 }}>Recent activity</h2>
+          <div className="customer-workspace__sectionHeader">
+            <h2 className="customer-workspace__sectionTitle">Recent activity</h2>
+          </div>
           {workspace.recentActivity?.length ? (
-            <div style={{ display: "grid", gap: 10 }}>
+            <div className="customer-workspace__list">
               {workspace.recentActivity.map((item: any) => (
                 <div key={item.id} className="integration-card">
                   <div>
