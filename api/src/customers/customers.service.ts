@@ -5,10 +5,13 @@ import { PrismaService } from "../prisma/prisma.service";
 export class CustomersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async list(companyId: string, params?: { search?: string; limit?: number }) {
+  async list(companyId: string, params?: { search?: string; limit?: number; locationId?: string }) {
     const take = Math.max(1, Math.min(Number(params?.limit || 50), 200));
     const search = String(params?.search || "").trim();
     const where: any = { companyId };
+    if (params?.locationId && params.locationId !== 'all') {
+      where.homeLocationId = params.locationId;
+    }
     if (search) {
       where.OR = [
         { name: { contains: search, mode: "insensitive" } },
@@ -38,6 +41,7 @@ export class CustomersService {
       name: row.name,
       email: row.email,
       phone: row.phone,
+      homeLocationId: (row as any).homeLocationId || null,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
       jobCount: row._count.jobs,

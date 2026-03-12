@@ -69,10 +69,10 @@ export class InventoryController {
 
   @Get('purchase-orders')
   @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
-  purchaseOrders(@CurrentUser() user: JwtPayload) {
+  purchaseOrders(@CurrentUser() user: JwtPayload, @Query('locationId') locationId?: string) {
     const fallback = featureGate({ enabled: isInventoryV1Enabled(), feature: 'INVENTORY_V1', mode: 'read', fallback: [] });
     if (fallback) return fallback;
-    return this.inventoryService.listPurchaseOrders(user.companyId);
+    return this.inventoryService.listPurchaseOrders(user.companyId, locationId);
   }
 
   @Post('purchase-orders')
@@ -98,10 +98,10 @@ export class InventoryController {
 
   @Get('locations')
   @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
-  locations(@CurrentUser() user: JwtPayload) {
+  locations(@CurrentUser() user: JwtPayload, @Query('locationId') locationId?: string) {
     const fallback = featureGate({ enabled: isInventoryV1Enabled(), feature: 'INVENTORY_V1', mode: 'read', fallback: [] });
     if (fallback) return fallback;
-    return this.inventoryService.listInventoryLocations(user.companyId);
+    return this.inventoryService.listInventoryLocations(user.companyId, locationId);
   }
 
   @Post('locations')
@@ -120,10 +120,15 @@ export class InventoryController {
 
   @Get('stock')
   @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
-  stock(@CurrentUser() user: JwtPayload, @Query('inventoryLocationId') inventoryLocationId?: string, @Query('q') q?: string) {
+  stock(
+    @CurrentUser() user: JwtPayload,
+    @Query('inventoryLocationId') inventoryLocationId?: string,
+    @Query('locationId') locationId?: string,
+    @Query('q') q?: string,
+  ) {
     const fallback = featureGate({ enabled: isInventoryV1Enabled(), feature: 'INVENTORY_V1', mode: 'read', fallback: [] });
     if (fallback) return fallback;
-    return this.inventoryService.listStock(user.companyId, { inventoryLocationId, q });
+    return this.inventoryService.listStock(user.companyId, { inventoryLocationId, locationId, q });
   }
 
   @Post('stock/adjust')
@@ -142,10 +147,10 @@ export class InventoryController {
 
   @Get('alerts')
   @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
-  alerts(@CurrentUser() user: JwtPayload) {
+  alerts(@CurrentUser() user: JwtPayload, @Query('locationId') locationId?: string) {
     const fallback = featureGate({ enabled: isInventoryV1Enabled(), feature: 'INVENTORY_V1', mode: 'read', fallback: [] });
     if (fallback) return fallback;
-    return this.inventoryService.lowStockAlerts(user.companyId);
+    return this.inventoryService.lowStockAlerts(user.companyId, locationId);
   }
 
   @Get('valuation')

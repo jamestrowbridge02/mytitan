@@ -1,5 +1,5 @@
-import { IsArray, IsBoolean, IsInt, IsOptional, IsString, Max, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
+import { IsArray, IsBoolean, IsEmail, IsIn, IsInt, IsOptional, IsString, Max, Min, ValidateNested } from 'class-validator';
 
 export class LocationHourDto {
   @IsInt()
@@ -25,8 +25,16 @@ export class LocationHourDto {
 }
 
 export class UpsertLocationDto {
+  @IsOptional()
+  @IsString()
+  code?: string;
+
   @IsString()
   name!: string;
+
+  @IsOptional()
+  @IsIn(['BRANCH', 'WAREHOUSE', 'SERVICE_REGION', 'FRANCHISE'])
+  kind?: string;
 
   @IsOptional()
   @IsString()
@@ -57,6 +65,10 @@ export class UpsertLocationDto {
   phone?: string;
 
   @IsOptional()
+  @IsEmail()
+  email?: string;
+
+  @IsOptional()
   @IsBoolean()
   isActive?: boolean;
 
@@ -68,6 +80,9 @@ export class UpsertLocationDto {
   @IsInt()
   @Min(0)
   bookingLeadTimeMins?: number;
+
+  @IsOptional()
+  metadataJson?: Record<string, unknown>;
 
   @IsOptional()
   @IsString()
@@ -83,4 +98,30 @@ export class UpsertLocationDto {
   @ValidateNested({ each: true })
   @Type(() => LocationHourDto)
   hours?: LocationHourDto[];
+}
+
+export class UpsertLocationMembershipDto {
+  @IsString()
+  userId!: string;
+
+  @IsString()
+  locationId!: string;
+
+  @IsOptional()
+  @IsIn(['OWNER', 'ADMIN', 'STAFF', 'READ_ONLY', 'TECHNICIAN', 'FINANCE'])
+  roleOverride?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  active?: boolean;
+}
+
+export class PatchLocationMembershipDto {
+  @IsOptional()
+  @IsIn(['OWNER', 'ADMIN', 'STAFF', 'READ_ONLY', 'TECHNICIAN', 'FINANCE'])
+  roleOverride?: string | null;
+
+  @IsOptional()
+  @IsBoolean()
+  active?: boolean;
 }

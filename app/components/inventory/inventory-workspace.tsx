@@ -32,6 +32,7 @@ export function InventoryWorkspace({ initialTab }: { initialTab: InventoryWorksp
   const [stock, setStock] = useState<any[]>([]);
   const [purchaseOrders, setPurchaseOrders] = useState<any[]>([]);
   const [alerts, setAlerts] = useState<any[]>([]);
+  const [activeLocationId, setActiveLocationId] = useState('all');
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
   const [query, setQuery] = useState("");
@@ -44,15 +45,22 @@ export function InventoryWorkspace({ initialTab }: { initialTab: InventoryWorksp
     setTab(initialTab);
   }, [initialTab]);
 
+  useEffect(() => {
+    if (!enabled) return;
+    apiFetch('/me/location')
+      .then((ctx) => setActiveLocationId(ctx?.activeLocationId || 'all'))
+      .catch(() => setActiveLocationId('all'));
+  }, [enabled]);
+
   async function loadAll() {
     if (!enabled) return;
     try {
       const [partsRes, locationsRes, stockRes, poRes, alertsRes] = await Promise.all([
         apiFetch(`/parts?q=${encodeURIComponent(query)}`),
-        apiFetch("/inventory/locations"),
-        apiFetch(`/inventory/stock?inventoryLocationId=all&q=${encodeURIComponent(query)}`),
-        apiFetch("/purchase-orders"),
-        apiFetch("/inventory/alerts").catch(() => []),
+        apiFetch(`/inventory/locations?locationId=${encodeURIComponent(activeLocationId)}`),
+        apiFetch(`/inventory/stock?inventoryLocationId=all&locationId=${encodeURIComponent(activeLocationId)}&q=${encodeURIComponent(query)}`),
+        apiFetch(`/purchase-orders?locationId=${encodeURIComponent(activeLocationId)}`),
+        apiFetch(`/inventory/alerts?locationId=${encodeURIComponent(activeLocationId)}`).catch(() => []),
       ]);
       setParts(Array.isArray(partsRes) ? partsRes : []);
       setLocations(Array.isArray(locationsRes) ? locationsRes : []);
@@ -67,7 +75,7 @@ export function InventoryWorkspace({ initialTab }: { initialTab: InventoryWorksp
 
   useEffect(() => {
     void loadAll();
-  }, [enabled, query]);
+  }, [enabled, query, activeLocationId]);
 
   const stockSummary = useMemo(() => {
     return stock.reduce(

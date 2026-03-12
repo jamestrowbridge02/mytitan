@@ -1,7 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { UpsertLocationDto } from './dto';
+import { PatchLocationMembershipDto, UpsertLocationDto, UpsertLocationMembershipDto } from './dto';
 
 @Injectable()
 export class LocationsService {
@@ -21,6 +21,38 @@ export class LocationsService {
     }));
   }
 
+  async getAccessibleLocations(companyId: string, userId: string, role?: string) {
+    const db = this.prisma as any;
+    const membershipRows = await db.locationMembership.findMany({
+      where: {
+        tenantId: companyId,
+        userId,
+        active: true,
+        location: { companyId, isActive: true },
+      },
+      include: {
+        location: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            kind: true,
+            isActive: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (role === 'OWNER' || role === 'ADMIN' || membershipRows.length === 0) {
+      return db.location.findMany({
+        where: { companyId, isActive: true },
+        select: { id: true, name: true, code: true, kind: true, isActive: true },
+        orderBy: { name: 'asc' },
+      });
+    }
+    return membershipRows.map((row: any) => row.location);
+  }
+
   async list(companyId: string) {
     const db = this.prisma as any;
     return db.location.findMany({
@@ -28,9 +60,15 @@ export class LocationsService {
       include: {
         businessHours: { orderBy: { weekday: 'asc' } },
         staffAssignments: { include: { user: { select: { id: true, email: true, role: true } } } },
+        memberships: {
+          include: {
+            user: { select: { id: true, email: true, role: true } },
+          },
+          orderBy: { createdAt: 'asc' },
+        },
         defaultAssignee: { select: { id: true, email: true } },
       },
-      orderBy: [{ isActive: 'desc' }, { createdAt: 'asc' }],
+      orderBy: [{ isActive: 'desc' }, { name: 'asc' }],
     });
   }
 
@@ -39,7 +77,9 @@ export class LocationsService {
     const created = await db.location.create({
       data: {
         companyId,
+        code: dto.code?.trim() || null,
         name: dto.name,
+        kind: (dto.kind as any) || 'BRANCH',
         addressLine1: dto.addressLine1 || '-',
         addressLine2: dto.addressLine2 || null,
         city: dto.city || '-',
@@ -47,8 +87,10 @@ export class LocationsService {
         postalCode: dto.postalCode || null,
         country: dto.country || 'UK',
         phone: dto.phone || null,
+        email: dto.email || null,
         isActive: dto.isActive ?? true,
         timezone: dto.timezone || null,
+        metadataJson: dto.metadataJson ?? null,
         bookingLeadTimeMins: dto.bookingLeadTimeMins ?? 0,
         defaultAssigneeId: dto.defaultAssigneeId || null,
       },
@@ -59,6 +101,15 @@ export class LocationsService {
     if (Array.isArray(dto.staffUserIds) && dto.staffUserIds.length) {
       await db.locationStaffAssignment.createMany({
         data: dto.staffUserIds.map((uid) => ({ companyId, locationId: created.id, userId: uid })),
+        skipDuplicates: true,
+      });
+      await db.locationMembership.createMany({
+        data: dto.staffUserIds.map((uid) => ({
+          tenantId: companyId,
+          userId: uid,
+          locationId: created.id,
+          active: true,
+        })),
         skipDuplicates: true,
       });
     }
@@ -89,6 +140,8 @@ export class LocationsService {
       where: { id },
       data: {
         name: dto.name ?? undefined,
+        code: dto.code !== undefined ? dto.code?.trim() || null : undefined,
+        kind: dto.kind !== undefined ? (dto.kind as any) : undefined,
         addressLine1: dto.addressLine1 ?? undefined,
         addressLine2: dto.addressLine2 ?? undefined,
         city: dto.city ?? undefined,
@@ -96,8 +149,10 @@ export class LocationsService {
         postalCode: dto.postalCode ?? undefined,
         country: dto.country ?? undefined,
         phone: dto.phone ?? undefined,
+        email: dto.email ?? undefined,
         isActive: dto.isActive ?? undefined,
         timezone: dto.timezone ?? undefined,
+        metadataJson: dto.metadataJson !== undefined ? dto.metadataJson ?? null : undefined,
         bookingLeadTimeMins: dto.bookingLeadTimeMins ?? undefined,
         defaultAssigneeId: dto.defaultAssigneeId !== undefined ? dto.defaultAssigneeId || null : undefined,
       },
@@ -109,6 +164,29 @@ export class LocationsService {
         await db.locationStaffAssignment.createMany({
           data: dto.staffUserIds.map((uid) => ({ companyId, locationId: id, userId: uid })),
           skipDuplicates: true,
+        });
+      }
+      await db.locationMembership.updateMany({
+        where: { tenantId: companyId, locationId: id },
+        data: { active: false },
+      });
+      if (dto.staffUserIds.length > 0) {
+        await db.locationMembership.createMany({
+          data: dto.staffUserIds.map((uid) => ({
+            tenantId: companyId,
+            userId: uid,
+            locationId: id,
+            active: true,
+          })),
+          skipDuplicates: true,
+        });
+        await db.locationMembership.updateMany({
+          where: {
+            tenantId: companyId,
+            locationId: id,
+            userId: { in: dto.staffUserIds },
+          },
+          data: { active: true },
         });
       }
     }
@@ -133,6 +211,12 @@ export class LocationsService {
       include: {
         businessHours: { orderBy: { weekday: 'asc' } },
         staffAssignments: { include: { user: { select: { id: true, email: true, role: true } } } },
+        memberships: {
+          include: {
+            user: { select: { id: true, email: true, role: true } },
+          },
+          orderBy: { createdAt: 'asc' },
+        },
         defaultAssignee: { select: { id: true, email: true } },
       },
     });
@@ -158,5 +242,198 @@ export class LocationsService {
     });
     await this.audit.log(companyId, 'location.restriction', `Set only-my-location=${Boolean(enabled)}`, userId);
     return { ok: true, onlyMyLocation: Boolean(enabled) };
+  }
+
+  async listMemberships(companyId: string) {
+    const db = this.prisma as any;
+    return db.locationMembership.findMany({
+      where: { tenantId: companyId },
+      include: {
+        user: { select: { id: true, email: true, role: true } },
+        location: { select: { id: true, name: true, code: true, kind: true, isActive: true } },
+      },
+      orderBy: [{ active: 'desc' }, { createdAt: 'asc' }],
+    });
+  }
+
+  async createMembership(companyId: string, actorUserId: string, dto: UpsertLocationMembershipDto) {
+    const db = this.prisma as any;
+    const [user, location] = await Promise.all([
+      db.user.findFirst({ where: { id: dto.userId, companyId }, select: { id: true, email: true } }),
+      db.location.findFirst({ where: { id: dto.locationId, companyId }, select: { id: true, name: true } }),
+    ]);
+    if (!user) throw new BadRequestException('User not found for this tenant');
+    if (!location) throw new BadRequestException('Location not found for this tenant');
+
+    const membership = await db.locationMembership.upsert({
+      where: {
+        tenantId_userId_locationId: {
+          tenantId: companyId,
+          userId: dto.userId,
+          locationId: dto.locationId,
+        },
+      },
+      update: {
+        active: dto.active ?? true,
+        roleOverride: dto.roleOverride || null,
+      },
+      create: {
+        tenantId: companyId,
+        userId: dto.userId,
+        locationId: dto.locationId,
+        active: dto.active ?? true,
+        roleOverride: dto.roleOverride || null,
+      },
+      include: {
+        user: { select: { id: true, email: true, role: true } },
+        location: { select: { id: true, name: true, code: true, kind: true, isActive: true } },
+      },
+    });
+
+    await db.locationStaffAssignment.upsert({
+      where: {
+        locationId_userId: {
+          locationId: dto.locationId,
+          userId: dto.userId,
+        },
+      },
+      update: {},
+      create: {
+        companyId,
+        locationId: dto.locationId,
+        userId: dto.userId,
+      },
+    });
+
+    await this.audit.log(companyId, 'location.membership.create', `Assigned ${user.email} to ${location.name}`, actorUserId);
+    return membership;
+  }
+
+  async patchMembership(companyId: string, actorUserId: string, id: string, dto: PatchLocationMembershipDto) {
+    const db = this.prisma as any;
+    const membership = await db.locationMembership.findFirst({
+      where: { id, tenantId: companyId },
+      include: {
+        user: { select: { email: true } },
+        location: { select: { name: true } },
+      },
+    });
+    if (!membership) throw new NotFoundException('Location membership not found');
+
+    const updated = await db.locationMembership.update({
+      where: { id },
+      data: {
+        active: dto.active ?? undefined,
+        roleOverride: dto.roleOverride !== undefined ? dto.roleOverride || null : undefined,
+      },
+      include: {
+        user: { select: { id: true, email: true, role: true } },
+        location: { select: { id: true, name: true, code: true, kind: true, isActive: true } },
+      },
+    });
+
+    if (dto.active === false) {
+      await db.locationStaffAssignment.deleteMany({
+        where: {
+          companyId,
+          locationId: membership.locationId,
+          userId: membership.userId,
+        },
+      });
+    } else if (dto.active === true) {
+      await db.locationStaffAssignment.upsert({
+        where: {
+          locationId_userId: {
+            locationId: membership.locationId,
+            userId: membership.userId,
+          },
+        },
+        update: {},
+        create: {
+          companyId,
+          locationId: membership.locationId,
+          userId: membership.userId,
+        },
+      });
+    }
+
+    await this.audit.log(
+      companyId,
+      'location.membership.update',
+      `Updated location membership for ${membership.user.email} at ${membership.location.name}`,
+      actorUserId,
+    );
+    return updated;
+  }
+
+  async getSummary(companyId: string) {
+    const db = this.prisma as any;
+    const [locations, memberships, jobs, bookings, customers, servicePlans, inventoryLocations] = await Promise.all([
+      db.location.findMany({
+        where: { companyId },
+        select: { id: true, name: true, code: true, kind: true, isActive: true },
+        orderBy: { name: 'asc' },
+      }),
+      db.locationMembership.findMany({
+        where: { tenantId: companyId, active: true },
+        select: { locationId: true },
+      }),
+      db.job.groupBy({
+        by: ['locationId'],
+        where: { companyId, locationId: { not: null } },
+        _count: { _all: true },
+      }),
+      db.booking.groupBy({
+        by: ['locationId'],
+        where: { companyId, locationId: { not: null } },
+        _count: { _all: true },
+      }),
+      db.customer.groupBy({
+        by: ['homeLocationId'],
+        where: { companyId, homeLocationId: { not: null } },
+        _count: { _all: true },
+      }),
+      db.servicePlan.groupBy({
+        by: ['locationId'],
+        where: { tenantId: companyId, locationId: { not: null } },
+        _count: { _all: true },
+      }),
+      db.inventoryLocation.groupBy({
+        by: ['businessLocationId'],
+        where: { tenantId: companyId, businessLocationId: { not: null } },
+        _count: { _all: true },
+      }),
+    ]);
+
+    const countsByKey = (rows: any[], key: string) =>
+      new Map(rows.map((row: any) => [String(row[key]), Number(row._count?._all || 0)]));
+
+    const membershipMap = new Map<string, number>();
+    for (const row of memberships) {
+      membershipMap.set(String(row.locationId), (membershipMap.get(String(row.locationId)) || 0) + 1);
+    }
+
+    const jobMap = countsByKey(jobs, 'locationId');
+    const bookingMap = countsByKey(bookings, 'locationId');
+    const customerMap = countsByKey(customers, 'homeLocationId');
+    const planMap = countsByKey(servicePlans, 'locationId');
+    const inventoryMap = countsByKey(inventoryLocations, 'businessLocationId');
+
+    return {
+      totals: {
+        locations: locations.length,
+        activeLocations: locations.filter((location: any) => location.isActive).length,
+        memberships: memberships.length,
+      },
+      locations: locations.map((location: any) => ({
+        ...location,
+        membershipCount: membershipMap.get(location.id) || 0,
+        jobsCount: jobMap.get(location.id) || 0,
+        bookingsCount: bookingMap.get(location.id) || 0,
+        customersCount: customerMap.get(location.id) || 0,
+        servicePlansCount: planMap.get(location.id) || 0,
+        inventoryLocationsCount: inventoryMap.get(location.id) || 0,
+      })),
+    };
   }
 }

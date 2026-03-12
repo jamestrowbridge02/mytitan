@@ -148,6 +148,7 @@ export default function AnalyticsPage() {
   const [windowDays, setWindowDays] = useState(30);
   const [widgetOrder, setWidgetOrder] = useState<string[]>(DEFAULT_WIDGET_ORDER);
   const [hiddenWidgets, setHiddenWidgets] = useState<string[]>([]);
+  const [activeLocationId, setActiveLocationId] = useState('all');
   const [loading, setLoading] = useState(true);
   const [savingLayout, setSavingLayout] = useState(false);
   const { notice, showError, showSuccess, clearNotice } = useOperatorNotice();
@@ -161,23 +162,27 @@ export default function AnalyticsPage() {
     setLoading(true);
     try {
       const me = await apiFetch("/me");
+      const locationCtx = await apiFetch("/me/location").catch(() => ({ activeLocationId: 'all' }));
       const normalizedPermissions = normalizePermissionSnapshot(me?.permissions);
       setPermissions(normalizedPermissions);
       setPermissionsReady(true);
+      setActiveLocationId(locationCtx?.activeLocationId || 'all');
       if (!normalizedPermissions["dashboard.view_intelligence"]) {
         setLoading(false);
         return;
       }
 
+      const locationSuffix = `&locationId=${encodeURIComponent(locationCtx?.activeLocationId || 'all')}`;
+
       const requests = [
-        apiFetch(`/analytics/executive?windowDays=${selectedWindowDays}`),
-        apiFetch(`/analytics/operations?windowDays=${selectedWindowDays}`),
-        apiFetch(`/analytics/customers?windowDays=${selectedWindowDays}`),
-        apiFetch("/analytics/capacity?windowDays=7"),
-        apiFetch(`/analytics/benchmarks?windowDays=${selectedWindowDays}`),
+        apiFetch(`/analytics/executive?windowDays=${selectedWindowDays}${locationSuffix}`),
+        apiFetch(`/analytics/operations?windowDays=${selectedWindowDays}${locationSuffix}`),
+        apiFetch(`/analytics/customers?windowDays=${selectedWindowDays}${locationSuffix}`),
+        apiFetch(`/analytics/capacity?windowDays=7${locationSuffix}`),
+        apiFetch(`/analytics/benchmarks?windowDays=${selectedWindowDays}${locationSuffix}`),
       ];
       if (normalizedPermissions["billing.manage"]) {
-        requests.push(apiFetch(`/analytics/revenue?windowDays=${selectedWindowDays}`));
+        requests.push(apiFetch(`/analytics/revenue?windowDays=${selectedWindowDays}${locationSuffix}`));
       }
 
       const results = await Promise.all(requests);
@@ -313,6 +318,12 @@ export default function AnalyticsPage() {
           ]}
           stats={stats}
         />
+
+        {activeLocationId !== "all" ? (
+          <div className="card" style={{ marginBottom: 16 }}>
+            <p className="muted" style={{ margin: 0 }}>Analytics scope is filtered to the active business location selection.</p>
+          </div>
+        ) : null}
 
         <OperatorGuidance
           title="How to read this surface"

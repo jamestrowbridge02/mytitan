@@ -1,17 +1,20 @@
 export type ScheduleCapacityQuery = {
   from?: string;
   to?: string;
+  locationId?: string;
 };
 
 export type SchedulePressureQuery = {
   date?: string;
   technicianId?: string;
+  locationId?: string;
 };
 
 export type ScheduleRecommendationQuery = {
   entityType?: string;
   entityId?: string;
   scheduledAt?: string;
+  locationId?: string;
 };
 
 export type UpsertTechnicianAvailabilityDto = {

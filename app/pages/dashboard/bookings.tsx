@@ -87,12 +87,13 @@ export default function BookingsPage() {
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
   const [customFieldValues, setCustomFieldValues] = useState<CustomFieldValue[]>([]);
   const [customFieldBookingId, setCustomFieldBookingId] = useState<string | null>(null);
+  const [activeLocationId, setActiveLocationId] = useState('all');
   const { notice, showError, showSuccess, clearNotice } = useOperatorNotice();
   const marketplaceEnabled = isMarketplaceEnabled();
 
   const load = async () => {
     try {
-      const data = await apiFetch("/bookings");
+      const data = await apiFetch(`/bookings?locationId=${encodeURIComponent(activeLocationId)}`);
       setBookings(Array.isArray(data) ? data : []);
       if (notice?.kind === "error") clearNotice();
     } catch (err: any) {
@@ -113,9 +114,15 @@ export default function BookingsPage() {
   };
 
   useEffect(() => {
+    apiFetch('/me/location')
+      .then((ctx) => setActiveLocationId(ctx?.activeLocationId || 'all'))
+      .catch(() => setActiveLocationId('all'));
+  }, []);
+
+  useEffect(() => {
     void load();
     void loadSettings();
-  }, [marketplaceEnabled]);
+  }, [marketplaceEnabled, activeLocationId]);
 
   useEffect(() => {
     async function loadCustomFieldData() {

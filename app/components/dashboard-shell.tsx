@@ -27,7 +27,7 @@ import { AiAssistant } from './ai-assistant';
 
 type LocationCtx = {
   activeLocationId: string;
-  available: Array<{ id: string; name: string }>;
+  available: Array<{ id: string; name: string; code?: string | null; kind?: string | null }>;
 };
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
@@ -210,6 +210,30 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             <Link className="button secondary" href="/dashboard/trade-accounts?status=ACTIVE">Try: CRM Active Accounts</Link>
             <Link className="button secondary" href="/dashboard/jobs/new?guided=1">Try: Guided Wheels Job</Link>
             <Link className="button secondary" href="/dashboard/booking/settings">Try: Booking Setup</Link>
+          </div>
+        </div>
+      ) : null}
+
+      {locationsEnabled && locationCtx.available.length > 1 ? (
+        <div className="card" style={{ marginBottom: 12 }} data-testid="location-scope-switcher">
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+            <div>
+              <strong>Location scope</strong>
+              <p className="muted" style={{ margin: '6px 0 0 0' }}>Filter location-aware dashboards without changing tenant boundaries.</p>
+            </div>
+            <select
+              className="input"
+              style={{ minWidth: 240, margin: 0 }}
+              value={locationCtx.activeLocationId}
+              onChange={(event) => updateLocationContext(event.target.value)}
+            >
+              {locationCtx.available.map((location) => (
+                <option key={location.id} value={location.id}>
+                  {location.name}
+                  {location.code ? ` (${location.code})` : ''}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
       ) : null}

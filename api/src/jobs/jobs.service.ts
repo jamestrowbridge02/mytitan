@@ -808,10 +808,13 @@ export class JobsService {
     };
   }
 
-  list(companyId: string) {
+  list(companyId: string, locationId?: string) {
     const db = this.prisma as any;
     return db.job.findMany({
-      where: { companyId },
+      where: {
+        companyId,
+        ...(locationId && locationId !== 'all' ? { locationId } : {}),
+      },
       orderBy: { createdAt: "desc" },
     }).then(async (jobs: any[]) => {
       const settings = await this.getWorkflowSettings(db, companyId);

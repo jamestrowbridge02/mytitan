@@ -25,8 +25,13 @@ export class BookingsController {
   @Get()
   @Feature('bookings_enabled')
   @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
-  list(@CurrentUser() user: JwtPayload, @Query('from') from?: string, @Query('to') to?: string) {
-    return this.bookingsService.list(user.companyId, from, to);
+  list(
+    @CurrentUser() user: JwtPayload,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('locationId') locationId?: string,
+  ) {
+    return this.bookingsService.list(user.companyId, from, to, locationId);
   }
 
   @Post(':id/convert')

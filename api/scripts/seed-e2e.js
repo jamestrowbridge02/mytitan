@@ -15,9 +15,19 @@ const FIXTURE = {
     timezone: "UTC",
     currency: "GBP",
   },
-  location: {
-    id: "e2e-location-hq",
-    name: "E2E HQ",
+  locations: {
+    hq: {
+      id: "e2e-location-hq",
+      code: "HQ",
+      name: "E2E HQ",
+      kind: "BRANCH",
+    },
+    north: {
+      id: "e2e-location-north",
+      code: "NORTH",
+      name: "E2E North Branch",
+      kind: "FRANCHISE",
+    },
   },
   operator: {
     id: "e2e-user-operator",
@@ -269,27 +279,62 @@ async function ensureCompany() {
   });
 }
 
-async function ensureLocation(companyId) {
+async function ensureLocation(companyId, fixture, addressLine1, city) {
   return prisma.location.upsert({
-    where: { id: FIXTURE.location.id },
+    where: { id: fixture.id },
     create: {
-      id: FIXTURE.location.id,
+      id: fixture.id,
       companyId,
-      name: FIXTURE.location.name,
-      addressLine1: "1 E2E Way",
-      city: "London",
+      code: fixture.code,
+      kind: fixture.kind,
+      name: fixture.name,
+      addressLine1,
+      city,
       postalCode: "E20 1AA",
       country: "GB",
       timezone: "Europe/London",
+      email: `${fixture.code.toLowerCase()}@mytitan.local`,
     },
     update: {
       companyId,
-      name: FIXTURE.location.name,
-      addressLine1: "1 E2E Way",
-      city: "London",
+      code: fixture.code,
+      kind: fixture.kind,
+      name: fixture.name,
+      addressLine1,
+      city,
       postalCode: "E20 1AA",
       country: "GB",
       timezone: "Europe/London",
+      email: `${fixture.code.toLowerCase()}@mytitan.local`,
+    },
+  });
+}
+
+async function ensureLocations(companyId) {
+  const hq = await ensureLocation(companyId, FIXTURE.locations.hq, "1 E2E Way", "London");
+  const north = await ensureLocation(companyId, FIXTURE.locations.north, "88 E2E North Way", "Manchester");
+  return { hq, north };
+}
+
+async function ensureLocationMembership(companyId, locationId, userId, roleOverride = null) {
+  await prisma.locationMembership.upsert({
+    where: {
+      tenantId_userId_locationId: {
+        tenantId: companyId,
+        userId,
+        locationId,
+      },
+    },
+    create: {
+      tenantId: companyId,
+      userId,
+      locationId,
+      roleOverride,
+      active: true,
+    },
+    update: {
+      roleOverride,
+      active: true,
     },
   });
 }
@@ -335,6 +380,7 @@ async function ensureWorkspaceUser(companyId, locationId, fixture) {
       companyId,
     },
   });
+  await ensureLocationMembership(companyId, locationId, user.id);
 
   return user;
 }
@@ -550,20 +596,23 @@ async function ensureService(companyId) {
   });
 }
 
-async function ensureCustomers(companyId) {
+async function ensureCustomers(companyId, locationIds) {
   const customers = {};
   for (const [key, value] of Object.entries(FIXTURE.customers)) {
+    const homeLocationId = ["open", "blocked", "financeOps"].includes(key) ? locationIds.north : locationIds.hq;
     customers[key] = await prisma.customer.upsert({
       where: { companyId_slug: { companyId, slug: value.slug } },
       create: {
         id: value.id,
         companyId,
+        homeLocationId,
         slug: value.slug,
         name: value.name,
         email: value.email,
         phone: value.phone,
       },
       update: {
+        homeLocationId,
         name: value.name,
         email: value.email,
         phone: value.phone,
@@ -1117,12 +1166,25 @@ async function main() {
   console.log("Seeding deterministic MyTitan E2E fixtures...");
 
   const company = await ensureCompany();
-  const location = await ensureLocation(company.id);
+  const locations = await ensureLocations(company.id);
+  const location = locations.hq;
   const operator = await ensureOperator(company.id, location.id);
   const dispatcherUser = await ensureWorkspaceUser(company.id, location.id, FIXTURE.workspaceUsers.dispatcher);
   const financeUser = await ensureWorkspaceUser(company.id, location.id, FIXTURE.workspaceUsers.finance);
   const technicianUser = await ensureWorkspaceUser(company.id, location.id, FIXTURE.workspaceUsers.technician);
   const viewerUser = await ensureWorkspaceUser(company.id, location.id, FIXTURE.workspaceUsers.viewer);
+  await ensureLocationMembership(company.id, locations.north.id, operator.id);
+  await ensureLocationMembership(company.id, locations.north.id, dispatcherUser.id);
+  await prisma.locationStaffAssignment.upsert({
+    where: { locationId_userId: { locationId: locations.north.id, userId: operator.id } },
+    create: { companyId: company.id, locationId: locations.north.id, userId: operator.id },
+    update: { companyId: company.id },
+  });
+  await prisma.locationStaffAssignment.upsert({
+    where: { locationId_userId: { locationId: locations.north.id, userId: dispatcherUser.id } },
+    create: { companyId: company.id, locationId: locations.north.id, userId: dispatcherUser.id },
+    update: { companyId: company.id },
+  });
   const planId = await ensurePlan();
 
   await ensureInvoiceCounter(company.id);
@@ -1130,7 +1192,7 @@ async function main() {
   await ensureAutomations(company.id);
   await resetCustomFields(company.id);
   const service = await ensureService(company.id);
-  const customers = await ensureCustomers(company.id);
+  const customers = await ensureCustomers(company.id, { hq: locations.hq.id, north: locations.north.id });
 
   const now = new Date();
   const bookingBase = setUtcTime(now, 9, 0);
@@ -1348,7 +1410,7 @@ async function main() {
 
   const openJob = await ensureJob({
     companyId: company.id,
-    locationId: location.id,
+    locationId: locations.north.id,
     userId: operator.id,
     customerId: customers.open.id,
     jobId: FIXTURE.jobs.open.id,
@@ -1383,7 +1445,7 @@ async function main() {
 
   const financeReadyJob = await ensureJob({
     companyId: company.id,
-    locationId: location.id,
+    locationId: locations.north.id,
     userId: operator.id,
     customerId: customers.financeOps.id,
     jobId: FIXTURE.jobs.financeReady.id,
@@ -1517,12 +1579,14 @@ async function main() {
     name: FIXTURE.inventory.locations.warehouse.name,
     kind: "WAREHOUSE",
     active: true,
+    businessLocationId: locations.hq.id,
   });
   await ensureInventoryLocation(FIXTURE.inventory.locations.van.id, {
     tenantId: company.id,
     name: FIXTURE.inventory.locations.van.name,
     kind: "VAN",
     active: true,
+    businessLocationId: locations.north.id,
   });
 
   await ensureInventoryStock(FIXTURE.inventory.stocks.alloyWarehouse.id, {
@@ -1589,7 +1653,7 @@ async function main() {
 
   await ensureStockPurchaseOrder(FIXTURE.inventory.purchaseOrders.open.id, {
     tenantId: company.id,
-    locationId: location.id,
+    locationId: locations.hq.id,
     inventoryLocationId: FIXTURE.inventory.locations.warehouse.id,
     supplierId: null,
     supplierName: "Seeded Supplies Ltd",
@@ -1609,7 +1673,7 @@ async function main() {
 
   await ensureStockMovement(FIXTURE.inventory.movements.reservePortal.id, {
     tenantId: company.id,
-    locationId: location.id,
+    locationId: locations.hq.id,
     inventoryLocationId: FIXTURE.inventory.locations.warehouse.id,
     stockItemId: FIXTURE.inventory.parts.alloyKit.id,
     type: "RESERVE",
@@ -1619,7 +1683,7 @@ async function main() {
   });
   await ensureStockMovement(FIXTURE.inventory.movements.useInvoice.id, {
     tenantId: company.id,
-    locationId: location.id,
+    locationId: locations.hq.id,
     inventoryLocationId: FIXTURE.inventory.locations.warehouse.id,
     stockItemId: FIXTURE.inventory.parts.lacquer.id,
     type: "USE",
@@ -1707,7 +1771,7 @@ async function main() {
     create: {
       id: FIXTURE.bookings.blocked.id,
       companyId: company.id,
-      locationId: location.id,
+      locationId: locations.north.id,
       serviceId: service.id,
       customerName: null,
       customerEmail: customers.blocked.email,
@@ -1719,7 +1783,7 @@ async function main() {
       assignedUserId: operator.id,
     },
     update: {
-      locationId: location.id,
+      locationId: locations.north.id,
       jobId: null,
       serviceId: service.id,
       customerName: null,
@@ -1770,7 +1834,7 @@ async function main() {
     create: {
       id: FIXTURE.bookings.technicianRole.id,
       companyId: company.id,
-      locationId: location.id,
+      locationId: locations.north.id,
       jobId: technicianRoleJob.id,
       serviceId: service.id,
       customerName: customers.technicianRole.name,
@@ -1783,7 +1847,7 @@ async function main() {
       assignedUserId: technicianUser.id,
     },
     update: {
-      locationId: location.id,
+      locationId: locations.north.id,
       jobId: technicianRoleJob.id,
       serviceId: service.id,
       customerName: customers.technicianRole.name,
@@ -2575,6 +2639,7 @@ async function main() {
   await ensureServicePlan(FIXTURE.servicePlans.active.id, {
     tenantId: company.id,
     customerId: customers.convertible.id,
+    locationId: locations.hq.id,
     name: FIXTURE.servicePlans.active.name,
     description: "Recurring quarterly check for high-value fleet customers.",
     status: "ACTIVE",
@@ -2595,6 +2660,7 @@ async function main() {
   await ensureServicePlan(FIXTURE.servicePlans.paused.id, {
     tenantId: company.id,
     customerId: customers.portalActive.id,
+    locationId: locations.north.id,
     name: FIXTURE.servicePlans.paused.name,
     description: "Annual review kept paused for operator-controlled resume coverage.",
     status: "PAUSED",
@@ -2614,6 +2680,7 @@ async function main() {
   await ensureServicePlan(FIXTURE.servicePlans.portalRenewal.id, {
     tenantId: company.id,
     customerId: customers.portalActive.id,
+    locationId: locations.hq.id,
     name: FIXTURE.servicePlans.portalRenewal.name,
     description: "Customer-visible plan seeded for renewal decisions.",
     status: "ACTIVE",

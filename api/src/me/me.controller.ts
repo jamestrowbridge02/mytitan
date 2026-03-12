@@ -6,6 +6,7 @@ import { JwtPayload } from '../auth/auth.types';
 import { AuditService } from '../audit/audit.service';
 import { isLocationsV1Enabled } from '../common/feature-flags';
 import { getPermissionSnapshot } from '../common/permissions';
+import { LocationsService } from '../locations/locations.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 @UseGuards(JwtAuthGuard)
@@ -14,6 +15,7 @@ export class MeController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly locationsService: LocationsService,
   ) {}
 
   @Get('me')
@@ -28,19 +30,25 @@ export class MeController {
   async getLocationContext(@CurrentUser() user: JwtPayload) {
     const db = this.prisma as any;
     const locations = isLocationsV1Enabled()
-      ? await db.location.findMany({
-          where: { companyId: user.companyId, isActive: true },
-          orderBy: { name: 'asc' },
-        })
+      ? await this.locationsService.getAccessibleLocations(user.companyId, user.sub, user.role)
       : [];
     const me = await db.user.findFirst({
       where: { id: user.sub, companyId: user.companyId },
       select: { defaultLocationId: true, onlyMyLocation: true },
     });
+    const availableIds = new Set(locations.map((location: any) => String(location.id)));
+    const activeLocationId = me?.defaultLocationId && availableIds.has(String(me.defaultLocationId))
+      ? me.defaultLocationId
+      : 'all';
     return {
-      activeLocationId: me?.defaultLocationId || 'all',
+      activeLocationId,
       onlyMyLocation: Boolean(me?.onlyMyLocation),
-      available: [{ id: 'all', name: 'All locations' }, ...locations.map((l: any) => ({ id: l.id, name: l.name }))],
+      available: [{ id: 'all', name: 'All locations', kind: 'GLOBAL' }, ...locations.map((l: any) => ({
+        id: l.id,
+        name: l.name,
+        code: l.code || null,
+        kind: l.kind || 'BRANCH',
+      }))],
     };
   }
 
@@ -49,9 +57,10 @@ export class MeController {
     if (!isLocationsV1Enabled()) return { activeLocationId: 'all' };
     const db = this.prisma as any;
     const selected = body?.locationId && body.locationId !== 'all' ? String(body.locationId) : null;
+    const accessible = await this.locationsService.getAccessibleLocations(user.companyId, user.sub, user.role);
+    const accessibleIds = new Set(accessible.map((location: any) => String(location.id)));
     if (selected) {
-      const location = await db.location.findFirst({ where: { id: selected, companyId: user.companyId, isActive: true } });
-      if (!location) {
+      if (!accessibleIds.has(selected)) {
         return { activeLocationId: 'all' };
       }
     }

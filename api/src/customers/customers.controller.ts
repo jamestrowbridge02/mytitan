@@ -17,10 +17,12 @@ export class CustomersController {
     @CurrentUser() user: JwtPayload,
     @Query("search") search?: string,
     @Query("limit") limit?: string,
+    @Query("locationId") locationId?: string,
   ) {
     return this.customers.list(user.companyId, {
       search: search || "",
       limit: Number(limit || 50),
+      locationId: locationId || undefined,
     });
   }
 

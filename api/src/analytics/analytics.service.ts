@@ -108,6 +108,22 @@ export class AnalyticsService {
     };
   }
 
+  private jobLocationWhere(locationId?: string) {
+    return locationId && locationId !== 'all' ? { locationId } : {};
+  }
+
+  private bookingLocationWhere(locationId?: string) {
+    return locationId && locationId !== 'all' ? { locationId } : {};
+  }
+
+  private servicePlanLocationWhere(locationId?: string) {
+    return locationId && locationId !== 'all' ? { locationId } : {};
+  }
+
+  private customerLocationWhere(locationId?: string) {
+    return locationId && locationId !== 'all' ? { homeLocationId: locationId } : {};
+  }
+
   private buildSeries(rows: Date[], range: PeriodRange, label: string) {
     const byDay = new Map<string, number>();
     for (const row of rows) {
@@ -536,12 +552,13 @@ export class AnalyticsService {
     };
   }
 
-  async getOperations(tenantId: string, windowDays: number) {
+  async getOperations(tenantId: string, windowDays: number, locationId?: string) {
     const db = this.prisma as any;
     const now = new Date();
     const range = this.getRange(windowDays, now);
     const pressure = await this.schedule.getTechnicianSchedulePressure(tenantId, {
       date: this.startOfDay(now).toISOString().slice(0, 10),
+      locationId,
     });
 
     const [
@@ -563,6 +580,7 @@ export class AnalyticsService {
       db.job.findMany({
         where: {
           companyId: tenantId,
+          ...this.jobLocationWhere(locationId),
           OR: [
             { createdAt: { gte: range.start, lt: range.end } },
             { completedAt: { gte: range.start, lt: range.end } },
@@ -579,6 +597,7 @@ export class AnalyticsService {
       db.booking.findMany({
         where: {
           companyId: tenantId,
+          ...this.bookingLocationWhere(locationId),
           createdAt: { gte: range.start, lt: range.end },
         },
         select: {
@@ -590,6 +609,7 @@ export class AnalyticsService {
       db.quote.findMany({
         where: {
           tenantId,
+          ...(locationId && locationId !== 'all' ? { job: { locationId } } : {}),
           createdAt: { gte: range.start, lt: range.end },
         },
         select: {
@@ -614,6 +634,7 @@ export class AnalyticsService {
       db.servicePlanRun.findMany({
         where: {
           tenantId,
+          ...(locationId && locationId !== 'all' ? { plan: { locationId } } : {}),
           scheduledFor: { gte: range.start, lt: range.end },
         },
         select: {
@@ -651,17 +672,22 @@ export class AnalyticsService {
       db.servicePlanRenewal.count({
         where: {
           tenantId,
+          ...(locationId && locationId !== 'all' ? { plan: { locationId } } : {}),
           status: 'PENDING',
         },
       }),
       db.servicePlanChangeRequest.count({
         where: {
           tenantId,
+          ...(locationId && locationId !== 'all' ? { plan: { locationId } } : {}),
           status: { in: ['OPEN', 'APPROVED'] },
         },
       }),
       db.inventoryStock.findMany({
-        where: { tenantId },
+        where: {
+          tenantId,
+          ...(locationId && locationId !== 'all' ? { inventoryLocation: { businessLocationId: locationId } } : {}),
+        },
         select: {
           quantityOnHand: true,
           quantityReserved: true,
@@ -671,11 +697,15 @@ export class AnalyticsService {
       db.stockPurchaseOrder.count({
         where: {
           tenantId,
+          ...(locationId && locationId !== 'all' ? { OR: [{ locationId }, { inventoryLocation: { businessLocationId: locationId } }] } : {}),
           status: { in: ['DRAFT', 'ORDERED', 'PARTIALLY_RECEIVED'] },
         },
       }),
       db.jobPart.findMany({
-        where: { tenantId },
+        where: {
+          tenantId,
+          ...(locationId && locationId !== 'all' ? { job: { locationId } } : {}),
+        },
         select: {
           quantityReserved: true,
           quantityUsed: true,
@@ -705,6 +735,7 @@ export class AnalyticsService {
     const overdueRecurringRuns = await db.servicePlanRun.count({
       where: {
         tenantId,
+        ...(locationId && locationId !== 'all' ? { plan: { locationId } } : {}),
         status: { in: ['FAILED', 'PENDING'] },
         scheduledFor: { lt: now },
       },
@@ -785,7 +816,7 @@ export class AnalyticsService {
     };
   }
 
-  async getRevenue(tenantId: string, windowDays: number) {
+  async getRevenue(tenantId: string, windowDays: number, locationId?: string) {
     const db = this.prisma as any;
     const now = new Date();
     const range = this.getRange(windowDays, now);
@@ -794,6 +825,7 @@ export class AnalyticsService {
       db.quote.findMany({
         where: {
           tenantId,
+          ...(locationId && locationId !== 'all' ? { job: { locationId } } : {}),
           createdAt: { gte: range.start, lt: range.end },
         },
         select: {
@@ -807,6 +839,7 @@ export class AnalyticsService {
       db.job.findMany({
         where: {
           companyId: tenantId,
+          ...this.jobLocationWhere(locationId),
           invoiceIssuedAt: { gte: range.start, lt: range.end },
         },
         select: {
@@ -819,6 +852,7 @@ export class AnalyticsService {
       db.job.findMany({
         where: {
           companyId: tenantId,
+          ...this.jobLocationWhere(locationId),
           invoiceIssuedAt: { not: null },
           invoicePaidAt: null,
           invoiceDueAt: { lt: now },
@@ -834,6 +868,7 @@ export class AnalyticsService {
         by: ['kind'],
         where: {
           tenantId,
+          ...(locationId && locationId !== 'all' ? { job: { locationId } } : {}),
           status: 'OPEN',
         },
         _count: { _all: true },
@@ -875,7 +910,7 @@ export class AnalyticsService {
     };
   }
 
-  async getCustomers(tenantId: string, windowDays: number, customerId?: string) {
+  async getCustomers(tenantId: string, windowDays: number, customerId?: string, locationId?: string) {
     const db = this.prisma as any;
     const now = new Date();
     const range = this.getRange(windowDays, now);
@@ -892,6 +927,7 @@ export class AnalyticsService {
       db.customer.count({
         where: {
           companyId: tenantId,
+          ...this.customerLocationWhere(locationId),
           OR: [
             { jobs: { some: { createdAt: { gte: activityStart } } } },
             { quotes: { some: { createdAt: { gte: activityStart } } } },
@@ -904,6 +940,7 @@ export class AnalyticsService {
         by: ['customerId'],
         where: {
           tenantId,
+          ...this.servicePlanLocationWhere(locationId),
           status: 'ACTIVE',
         },
       }),
@@ -911,6 +948,7 @@ export class AnalyticsService {
         by: ['customerId'],
         where: {
           companyId: tenantId,
+          ...this.jobLocationWhere(locationId),
           customerId: { not: null },
           invoiceIssuedAt: { not: null },
           invoicePaidAt: null,
@@ -921,6 +959,7 @@ export class AnalyticsService {
         by: ['customerId'],
         where: {
           tenantId,
+          ...(locationId && locationId !== 'all' ? { job: { locationId } } : {}),
           createdAt: { gte: range.start, lt: range.end },
         },
         _count: { _all: true },
@@ -930,6 +969,7 @@ export class AnalyticsService {
       db.customerApproval.findMany({
         where: {
           tenantId,
+          ...(locationId && locationId !== 'all' ? { customer: { homeLocationId: locationId } } : {}),
           requestedAt: { gte: range.start, lt: range.end },
           ...(customerId ? { customerId } : {}),
         },
@@ -945,16 +985,17 @@ export class AnalyticsService {
       customerId
         ? Promise.all([
             db.quote.findMany({
-              where: { tenantId, customerId },
+              where: { tenantId, customerId, ...(locationId && locationId !== 'all' ? { job: { locationId } } : {}) },
               select: { id: true, status: true, totalCents: true, createdAt: true },
               orderBy: { createdAt: 'desc' },
               take: 10,
             }),
-            db.servicePlan.count({ where: { tenantId, customerId, status: 'ACTIVE' } }),
+            db.servicePlan.count({ where: { tenantId, customerId, status: 'ACTIVE', ...this.servicePlanLocationWhere(locationId) } }),
             db.job.findMany({
               where: {
                 companyId: tenantId,
                 customerId,
+                ...this.jobLocationWhere(locationId),
                 invoiceIssuedAt: { not: null },
               },
               select: {
@@ -972,7 +1013,7 @@ export class AnalyticsService {
     const customerRows = topCustomerIds.length
       ? await db.customer.findMany({
           where: { companyId: tenantId, id: { in: topCustomerIds } },
-          select: { id: true, name: true },
+          select: { id: true, name: true, homeLocationId: true },
         })
       : [];
     const customerNameMap = new Map(customerRows.map((row: any) => [row.id, row.name]));
@@ -1039,16 +1080,18 @@ export class AnalyticsService {
     };
   }
 
-  async getCapacityAnalytics(tenantId: string, windowDays: number) {
+  async getCapacityAnalytics(tenantId: string, windowDays: number, locationId?: string) {
     const now = new Date();
     const from = this.startOfDay(now);
     const to = new Date(from.getTime() + windowDays * 24 * 60 * 60 * 1000);
     const capacity = await this.schedule.getCapacity(tenantId, {
       from: from.toISOString().slice(0, 10),
       to: to.toISOString().slice(0, 10),
+      locationId,
     });
     const pressure = await this.schedule.getTechnicianSchedulePressure(tenantId, {
       date: from.toISOString().slice(0, 10),
+      locationId,
     });
 
     const technicianSummary = (capacity.rows || []).map((row: any) => {
@@ -1079,7 +1122,7 @@ export class AnalyticsService {
     };
   }
 
-  async getBenchmarks(tenantId: string, windowDays: number) {
+  async getBenchmarks(tenantId: string, windowDays: number, locationId?: string) {
     const db = this.prisma as any;
     const now = new Date();
     const current7 = this.getRange(7, now);
@@ -1102,13 +1145,14 @@ export class AnalyticsService {
       invoices7Previous,
       settings,
     ] = await Promise.all([
-      db.job.count({ where: { companyId: tenantId, completedAt: { gte: current7.start, lt: current7.end } } }),
-      db.job.count({ where: { companyId: tenantId, completedAt: { gte: previous7.start, lt: previous7.end } } }),
-      db.job.count({ where: { companyId: tenantId, completedAt: { gte: current30.start, lt: current30.end } } }),
-      db.job.count({ where: { companyId: tenantId, completedAt: { gte: previous30.start, lt: previous30.end } } }),
+      db.job.count({ where: { companyId: tenantId, ...this.jobLocationWhere(locationId), completedAt: { gte: current7.start, lt: current7.end } } }),
+      db.job.count({ where: { companyId: tenantId, ...this.jobLocationWhere(locationId), completedAt: { gte: previous7.start, lt: previous7.end } } }),
+      db.job.count({ where: { companyId: tenantId, ...this.jobLocationWhere(locationId), completedAt: { gte: current30.start, lt: current30.end } } }),
+      db.job.count({ where: { companyId: tenantId, ...this.jobLocationWhere(locationId), completedAt: { gte: previous30.start, lt: previous30.end } } }),
       db.job.count({
         where: {
           companyId: tenantId,
+          ...this.jobLocationWhere(locationId),
           invoicePaidAt: null,
           invoiceDueAt: { lt: now },
         },
@@ -1116,16 +1160,17 @@ export class AnalyticsService {
       db.job.count({
         where: {
           companyId: tenantId,
+          ...this.jobLocationWhere(locationId),
           invoicePaidAt: null,
           invoiceDueAt: { lt: current7.start },
         },
       }),
-      db.booking.count({ where: { companyId: tenantId, createdAt: { gte: current7.start, lt: current7.end }, jobId: { not: null } } }),
-      db.booking.count({ where: { companyId: tenantId, createdAt: { gte: previous7.start, lt: previous7.end }, jobId: { not: null } } }),
-      db.quote.count({ where: { tenantId, createdAt: { gte: current7.start, lt: current7.end }, status: { in: ['APPROVED', 'CONVERTED'] } } }),
-      db.quote.count({ where: { tenantId, createdAt: { gte: previous7.start, lt: previous7.end }, status: { in: ['APPROVED', 'CONVERTED'] } } }),
-      db.job.count({ where: { companyId: tenantId, invoicePaidAt: { gte: current7.start, lt: current7.end } } }),
-      db.job.count({ where: { companyId: tenantId, invoicePaidAt: { gte: previous7.start, lt: previous7.end } } }),
+      db.booking.count({ where: { companyId: tenantId, ...this.bookingLocationWhere(locationId), createdAt: { gte: current7.start, lt: current7.end }, jobId: { not: null } } }),
+      db.booking.count({ where: { companyId: tenantId, ...this.bookingLocationWhere(locationId), createdAt: { gte: previous7.start, lt: previous7.end }, jobId: { not: null } } }),
+      db.quote.count({ where: { tenantId, ...(locationId && locationId !== 'all' ? { job: { locationId } } : {}), createdAt: { gte: current7.start, lt: current7.end }, status: { in: ['APPROVED', 'CONVERTED'] } } }),
+      db.quote.count({ where: { tenantId, ...(locationId && locationId !== 'all' ? { job: { locationId } } : {}), createdAt: { gte: previous7.start, lt: previous7.end }, status: { in: ['APPROVED', 'CONVERTED'] } } }),
+      db.job.count({ where: { companyId: tenantId, ...this.jobLocationWhere(locationId), invoicePaidAt: { gte: current7.start, lt: current7.end } } }),
+      db.job.count({ where: { companyId: tenantId, ...this.jobLocationWhere(locationId), invoicePaidAt: { gte: previous7.start, lt: previous7.end } } }),
       db.tenantSetting.findUnique({
         where: { tenantId },
         select: { businessConfigJson: true },
@@ -1157,13 +1202,13 @@ export class AnalyticsService {
     };
   }
 
-  async getExecutive(tenantId: string, windowDays: number) {
+  async getExecutive(tenantId: string, windowDays: number, locationId?: string) {
     const [operations, capacity, customers, revenue, benchmarks] = await Promise.all([
-      this.getOperations(tenantId, windowDays),
-      this.getCapacityAnalytics(tenantId, 7),
-      this.getCustomers(tenantId, windowDays),
-      this.getRevenue(tenantId, windowDays),
-      this.getBenchmarks(tenantId, windowDays),
+      this.getOperations(tenantId, windowDays, locationId),
+      this.getCapacityAnalytics(tenantId, 7, locationId),
+      this.getCustomers(tenantId, windowDays, undefined, locationId),
+      this.getRevenue(tenantId, windowDays, locationId),
+      this.getBenchmarks(tenantId, windowDays, locationId),
     ]);
 
     const pressureAreas = this.buildPressureAreas([

@@ -6,7 +6,7 @@ import { featureGate } from '../common/feature-gate';
 import { isLocationsAdvancedV1Enabled, isLocationsV1Enabled } from '../common/feature-flags';
 import { Roles } from '../common/roles.decorator';
 import { RolesGuard } from '../common/roles.guard';
-import { UpsertLocationDto } from './dto';
+import { PatchLocationMembershipDto, UpsertLocationDto, UpsertLocationMembershipDto } from './dto';
 import { LocationsService } from './locations.service';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -20,6 +20,36 @@ export class LocationsController {
     const fallback = featureGate({ enabled: isLocationsV1Enabled(), feature: 'LOCATIONS_V1', mode: 'read', fallback: [] });
     if (fallback) return fallback;
     return this.locationsService.list(user.companyId);
+  }
+
+  @Get('memberships')
+  @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
+  memberships(@CurrentUser() user: JwtPayload) {
+    const fallback = featureGate({ enabled: isLocationsV1Enabled(), feature: 'LOCATIONS_V1', mode: 'read', fallback: [] });
+    if (fallback) return fallback;
+    return this.locationsService.listMemberships(user.companyId);
+  }
+
+  @Post('memberships')
+  @Roles('OWNER', 'ADMIN')
+  createMembership(@CurrentUser() user: JwtPayload, @Body() dto: UpsertLocationMembershipDto) {
+    featureGate({ enabled: isLocationsV1Enabled(), feature: 'LOCATIONS_V1', mode: 'mutation' });
+    return this.locationsService.createMembership(user.companyId, user.sub, dto);
+  }
+
+  @Patch('memberships/:id')
+  @Roles('OWNER', 'ADMIN')
+  patchMembership(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Body() dto: PatchLocationMembershipDto) {
+    featureGate({ enabled: isLocationsV1Enabled(), feature: 'LOCATIONS_V1', mode: 'mutation' });
+    return this.locationsService.patchMembership(user.companyId, user.sub, id, dto);
+  }
+
+  @Get('summary')
+  @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
+  summary(@CurrentUser() user: JwtPayload) {
+    const fallback = featureGate({ enabled: isLocationsV1Enabled(), feature: 'LOCATIONS_V1', mode: 'read', fallback: { totals: {}, locations: [] } });
+    if (fallback) return fallback;
+    return this.locationsService.getSummary(user.companyId);
   }
 
   @Post()

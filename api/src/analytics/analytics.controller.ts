@@ -23,26 +23,26 @@ export class AnalyticsController {
 
   @Get('executive')
   @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
-  async getExecutive(@CurrentUser() user: JwtPayload, @Query('windowDays') windowDays?: string) {
+  async getExecutive(@CurrentUser() user: JwtPayload, @Query('windowDays') windowDays?: string, @Query('locationId') locationId?: string) {
     requireAnalyticsV1Enabled();
     await assertPermission({ user, permission: 'dashboard.view_intelligence', action: 'analytics.executive' });
-    return this.analytics.getExecutive(user.companyId, this.getWindowDays(windowDays));
+    return this.analytics.getExecutive(user.companyId, this.getWindowDays(windowDays), locationId);
   }
 
   @Get('operations')
   @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
-  async getOperations(@CurrentUser() user: JwtPayload, @Query('windowDays') windowDays?: string) {
+  async getOperations(@CurrentUser() user: JwtPayload, @Query('windowDays') windowDays?: string, @Query('locationId') locationId?: string) {
     requireAnalyticsV1Enabled();
     await assertPermission({ user, permission: 'dashboard.view_intelligence', action: 'analytics.operations' });
-    return this.analytics.getOperations(user.companyId, this.getWindowDays(windowDays));
+    return this.analytics.getOperations(user.companyId, this.getWindowDays(windowDays), locationId);
   }
 
   @Get('revenue')
   @Roles('OWNER', 'ADMIN', 'FINANCE', 'STAFF')
-  async getRevenue(@CurrentUser() user: JwtPayload, @Query('windowDays') windowDays?: string) {
+  async getRevenue(@CurrentUser() user: JwtPayload, @Query('windowDays') windowDays?: string, @Query('locationId') locationId?: string) {
     requireAnalyticsV1Enabled();
     await assertPermission({ user, permission: 'billing.manage', action: 'analytics.revenue' });
-    return this.analytics.getRevenue(user.companyId, this.getWindowDays(windowDays));
+    return this.analytics.getRevenue(user.companyId, this.getWindowDays(windowDays), locationId);
   }
 
   @Get('customers')
@@ -51,26 +51,27 @@ export class AnalyticsController {
     @CurrentUser() user: JwtPayload,
     @Query('windowDays') windowDays?: string,
     @Query('customerId') customerId?: string,
+    @Query('locationId') locationId?: string,
   ) {
     requireAnalyticsV1Enabled();
     await assertPermission({ user, permission: 'dashboard.view_intelligence', action: 'analytics.customers' });
-    return this.analytics.getCustomers(user.companyId, this.getWindowDays(windowDays), customerId);
+    return this.analytics.getCustomers(user.companyId, this.getWindowDays(windowDays), customerId, locationId);
   }
 
   @Get('capacity')
   @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
-  async getCapacity(@CurrentUser() user: JwtPayload, @Query('windowDays') windowDays?: string) {
+  async getCapacity(@CurrentUser() user: JwtPayload, @Query('windowDays') windowDays?: string, @Query('locationId') locationId?: string) {
     requireAnalyticsV1Enabled();
     await assertPermission({ user, permission: 'dashboard.view_intelligence', action: 'analytics.capacity' });
-    return this.analytics.getCapacityAnalytics(user.companyId, this.getWindowDays(windowDays, 7));
+    return this.analytics.getCapacityAnalytics(user.companyId, this.getWindowDays(windowDays, 7), locationId);
   }
 
   @Get('benchmarks')
   @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
-  async getBenchmarks(@CurrentUser() user: JwtPayload, @Query('windowDays') windowDays?: string) {
+  async getBenchmarks(@CurrentUser() user: JwtPayload, @Query('windowDays') windowDays?: string, @Query('locationId') locationId?: string) {
     requireAnalyticsV1Enabled();
     await assertPermission({ user, permission: 'dashboard.view_intelligence', action: 'analytics.benchmarks' });
-    return this.analytics.getBenchmarks(user.companyId, this.getWindowDays(windowDays));
+    return this.analytics.getBenchmarks(user.companyId, this.getWindowDays(windowDays), locationId);
   }
 
   @Get('ops-insights')

@@ -82,6 +82,8 @@ export const fixtureRefs = {
   inventoryWarehouseName: "Main Warehouse",
   inventoryVanName: "Technician Van 01",
   openPurchaseOrderId: "e2e-po-open",
+  hqLocationName: "E2E HQ",
+  northLocationName: "E2E North Branch",
 };
 
 export type E2EMetadata = {

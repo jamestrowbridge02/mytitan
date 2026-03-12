@@ -61,6 +61,10 @@ export class UpsertInventoryLocationDto {
   @IsOptional()
   @IsBoolean()
   active?: boolean;
+
+  @IsOptional()
+  @IsString()
+  businessLocationId?: string;
 }
 
 export class CreateStockMovementDto {

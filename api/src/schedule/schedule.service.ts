@@ -179,7 +179,7 @@ export class ScheduleService {
     return technician;
   }
 
-  private async loadCapacityContext(tenantId: string, from: Date, to: Date) {
+  private async loadCapacityContext(tenantId: string, from: Date, to: Date, locationId?: string) {
     const db = this.prisma as any;
     const technicians = await this.listAssignableTechnicians(tenantId);
     const techIds = technicians.map((row) => row.id);
@@ -217,6 +217,7 @@ export class ScheduleService {
           db.booking.findMany({
             where: {
               companyId: tenantId,
+              ...(locationId && locationId !== "all" ? { locationId } : {}),
               status: { not: "CANCELLED" },
               startsAt: { lt: to },
               endsAt: { gt: from },
@@ -242,6 +243,7 @@ export class ScheduleService {
       ? await db.job.findMany({
           where: {
             companyId: tenantId,
+            ...(locationId && locationId !== "all" ? { locationId } : {}),
             status: { in: ["OPEN", "SCHEDULED", "IN_PROGRESS"] },
             scheduledAt: { gte: from, lt: to },
             ...(bookingLinkedJobIds.length ? { id: { notIn: bookingLinkedJobIds } } : {}),
@@ -261,6 +263,7 @@ export class ScheduleService {
     const dueServicePlans = await db.servicePlan.findMany({
       where: {
         tenantId,
+        ...(locationId && locationId !== "all" ? { locationId } : {}),
         status: "ACTIVE",
         nextRunAt: { lt: to },
       },
@@ -452,7 +455,7 @@ export class ScheduleService {
   async getTechnicianSchedulePressure(tenantId: string, query: SchedulePressureQuery) {
     const date = query.date ? this.parseDateOnly(query.date) : this.startOfDay(new Date());
     const rangeEnd = this.endOfDay(date);
-    const context = await this.loadCapacityContext(tenantId, date, rangeEnd);
+    const context = await this.loadCapacityContext(tenantId, date, rangeEnd, query.locationId);
     const technicians = query.technicianId
       ? context.technicians.filter((technician) => technician.id === query.technicianId)
       : context.technicians;
@@ -570,7 +573,7 @@ export class ScheduleService {
 
     const scheduledDay = this.startOfDay(scheduledAt || new Date());
     const windowEnd = new Date((scheduledAt || new Date()).getTime() + durationMinutes * 60000);
-    const context = await this.loadCapacityContext(tenantId, scheduledDay, this.endOfDay(scheduledDay));
+    const context = await this.loadCapacityContext(tenantId, scheduledDay, this.endOfDay(scheduledDay), query.locationId);
     const bookingIntervals = context.bookings
       .filter((row: any) => row.assignedUserId)
       .map((row: any) => ({
@@ -711,7 +714,7 @@ export class ScheduleService {
   async getCapacity(tenantId: string, query: ScheduleCapacityQuery) {
     const range = this.normalizeRange(query);
     const days = this.buildDayRange(range.from, range.to);
-    const context = await this.loadCapacityContext(tenantId, range.from, range.to);
+    const context = await this.loadCapacityContext(tenantId, range.from, range.to, query.locationId);
     const rows = await Promise.all(
       context.technicians.map(async (technician) => {
         const daily = await Promise.all(
@@ -769,6 +772,7 @@ export class ScheduleService {
         capacityMinutes: row.capacityMinutes,
         reason: row.reason || null,
       })),
+      locationId: query.locationId && query.locationId !== 'all' ? query.locationId : 'all',
       rows,
     };
   }

@@ -348,6 +348,7 @@ model Company {
   userUndoActions          UserUndoAction[]
   locationBusinessHours    LocationBusinessHour[]
   locationStaffAssignments LocationStaffAssignment[]
+  locationMemberships      LocationMembership[]
   jobLineItems             JobLineItem[]
   stockItems               StockItem[]
   stockSuppliers           StockSupplier[]
@@ -405,6 +406,7 @@ model User {
   defaultLocation          Location?                 @relation("UserDefaultLocation", fields: [defaultLocationId], references: [id], onDelete: SetNull)
   defaultAssignedLocations Location[]                @relation("LocationDefaultAssignee")
   locationAssignments      LocationStaffAssignment[]
+  locationMemberships      LocationMembership[]
   savedCommandViews        SavedCommandView[]
   savedBoardViews          SavedBoardView[]
   undoActions              UserUndoAction[]
@@ -436,7 +438,9 @@ model User {
 model Location {
   id                    String                    @id @default(cuid())
   companyId             String
+  code                  String?
   name                  String
+  kind                  LocationKind              @default(BRANCH)
   addressLine1          String
   addressLine2          String?
   city                  String
@@ -444,8 +448,10 @@ model Location {
   postalCode            String?
   country               String
   phone                 String?
+  email                 String?
   isActive              Boolean                   @default(true)
   timezone              String?
+  metadataJson          Json?
   bookingLeadTimeMins   Int                       @default(0)
   defaultAssigneeId     String?
   createdAt             DateTime                  @default(now())
@@ -456,19 +462,32 @@ model Location {
   bookings              Booking[]
   businessHours         LocationBusinessHour[]
   staffAssignments      LocationStaffAssignment[]
+  memberships           LocationMembership[]
   defaultUsers          User[]                    @relation("UserDefaultLocation")
   stockItems            StockItem[]
   stockPurchaseOrders   StockPurchaseOrder[]
   stockMovements        StockMovement[]
+  inventoryLocations    InventoryLocation[]
   tenantSettingsDefault TenantSetting[]           @relation("TenantDefaultLocation")
   services              Service[]
   staffAvailabilities   StaffAvailability[]
   blackoutDates         BlackoutDate[]
   bookingQuestions      BookingQuestion[]
   savedBoardViews       SavedBoardView[]
+  homeCustomers         Customer[]                @relation("CustomerHomeLocation")
+  servicePlans          ServicePlan[]
 
   @@index([companyId, isActive])
+  @@index([companyId, kind, isActive])
   @@index([companyId, defaultAssigneeId])
+  @@unique([companyId, code])
+}
+
+enum LocationKind {
+  BRANCH
+  WAREHOUSE
+  SERVICE_REGION
+  FRANCHISE
 }
 
 model TradeAccount {
@@ -502,6 +521,7 @@ model TradeAccount {
 model Customer {
   id             String          @id @default(cuid())
   companyId      String
+  homeLocationId String?
   slug           String?
   name           String
   email          String?
@@ -509,6 +529,7 @@ model Customer {
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   company        Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  homeLocation   Location?       @relation("CustomerHomeLocation", fields: [homeLocationId], references: [id], onDelete: SetNull)
   jobs           Job[]
   activityEvents ActivityEvent[]
   servicePlans             ServicePlan[]
@@ -524,6 +545,7 @@ model Customer {
   @@index([companyId, email])
   @@index([companyId, phone])
   @@index([companyId, createdAt])
+  @@index([companyId, homeLocationId, createdAt])
 }
 
 model CustomerAccount {
@@ -724,6 +746,24 @@ model LocationStaffAssignment {
   @@unique([locationId, userId])
   @@index([companyId, userId])
   @@index([companyId, locationId])
+}
+
+model LocationMembership {
+  id           String    @id @default(cuid())
+  tenantId     String
+  userId       String
+  locationId   String
+  roleOverride UserRole?
+  active       Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  tenant       Company   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  location     Location  @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId, locationId])
+  @@index([tenantId, userId, active])
+  @@index([tenantId, locationId, active])
 }
 
 model JobLineItem {
@@ -1695,6 +1735,7 @@ model ServicePlan {
   id                String                  @id @default(cuid())
   tenantId          String
   customerId        String
+  locationId        String?
   name              String
   description       String?
   status            ServicePlanStatus       @default(ACTIVE)
@@ -1711,6 +1752,7 @@ model ServicePlan {
   updatedAt         DateTime                @updatedAt
   tenant            Company                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   customer          Customer                @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  location          Location?               @relation(fields: [locationId], references: [id], onDelete: SetNull)
   tasks             ServicePlanTask[]
   runs              ServicePlanRun[]
   renewals          ServicePlanRenewal[]
@@ -1718,6 +1760,7 @@ model ServicePlan {
 
   @@index([tenantId, status, nextRunAt])
   @@index([tenantId, customerId, createdAt])
+  @@index([tenantId, locationId, status, nextRunAt])
 }
 
 model ServicePlanTask {
@@ -2085,12 +2128,14 @@ model StockMovement {
 model InventoryLocation {
   id                String                @id @default(cuid())
   tenantId          String
+  businessLocationId String?
   name              String
   kind              InventoryLocationKind
   active            Boolean               @default(true)
   createdAt         DateTime              @default(now())
   updatedAt         DateTime              @updatedAt
   tenant            Company               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  businessLocation  Location?             @relation(fields: [businessLocationId], references: [id], onDelete: SetNull)
   stocks            InventoryStock[]
   jobParts          JobPart[]
   purchaseOrders    StockPurchaseOrder[]
@@ -2098,6 +2143,7 @@ model InventoryLocation {
 
   @@unique([tenantId, name])
   @@index([tenantId, kind, active])
+  @@index([tenantId, businessLocationId, active])
 }
 
 model InventoryStock {

@@ -103,6 +103,7 @@ export default function SchedulingPage() {
   const [capacity, setCapacity] = useState<CapacityData | null>(null);
   const [pressure, setPressure] = useState<PressureData | null>(null);
   const [recommendations, setRecommendations] = useState<RecommendationData | null>(null);
+  const [activeLocationId, setActiveLocationId] = useState("all");
   const [selectedWork, setSelectedWork] = useState<{ entityType: string; entityId: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -136,8 +137,10 @@ export default function SchedulingPage() {
     setLoading(true);
     try {
       const me = await apiFetch("/me");
+      const locationCtx = await apiFetch("/me/location").catch(() => ({ activeLocationId: "all" }));
       const normalizedPermissions = normalizePermissionSnapshot(me?.permissions);
       setPermissions(normalizedPermissions);
+      setActiveLocationId(locationCtx?.activeLocationId || "all");
       const allowed = normalizedPermissions["jobs.transition"]
         || normalizedPermissions["dashboard.view_intelligence"]
         || normalizedPermissions["technician.execute"];
@@ -147,9 +150,10 @@ export default function SchedulingPage() {
         setRecommendations(null);
         return;
       }
+      const locationSuffix = `&locationId=${encodeURIComponent(locationCtx?.activeLocationId || "all")}`;
       const [capacityRes, pressureRes] = await Promise.all([
-        apiFetch(`/schedule/capacity?from=${activeDate}&to=${plusDays(activeDate, 5)}`),
-        apiFetch(`/schedule/pressure?date=${activeDate}`),
+        apiFetch(`/schedule/capacity?from=${activeDate}&to=${plusDays(activeDate, 5)}${locationSuffix}`),
+        apiFetch(`/schedule/pressure?date=${activeDate}${locationSuffix}`),
       ]);
       setCapacity(capacityRes || null);
       setPressure(pressureRes || null);
@@ -162,7 +166,7 @@ export default function SchedulingPage() {
         : null);
       setSelectedWork(nextSelection);
       if (nextSelection) {
-        const recommendationRes = await apiFetch(`/schedule/recommendations?entityType=${encodeURIComponent(nextSelection.entityType)}&entityId=${encodeURIComponent(nextSelection.entityId)}`);
+        const recommendationRes = await apiFetch(`/schedule/recommendations?entityType=${encodeURIComponent(nextSelection.entityType)}&entityId=${encodeURIComponent(nextSelection.entityId)}${locationSuffix}`);
         setRecommendations(recommendationRes || null);
       } else {
         setRecommendations(null);
@@ -186,7 +190,9 @@ export default function SchedulingPage() {
   async function loadRecommendations(entityType: string, entityId: string) {
     setSelectedWork({ entityType, entityId });
     try {
-      const response = await apiFetch(`/schedule/recommendations?entityType=${encodeURIComponent(entityType)}&entityId=${encodeURIComponent(entityId)}`);
+      const response = await apiFetch(
+        `/schedule/recommendations?entityType=${encodeURIComponent(entityType)}&entityId=${encodeURIComponent(entityId)}&locationId=${encodeURIComponent(activeLocationId)}`,
+      );
       setRecommendations(response || null);
     } catch (error: any) {
       showError(error?.message || "Failed to load recommendations");

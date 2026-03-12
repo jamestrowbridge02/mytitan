@@ -31,8 +31,8 @@ export class JobsController {
 
   @Get()
   @Roles("OWNER", "ADMIN", "STAFF", "READ_ONLY")
-  list(@CurrentUser() user: JwtPayload) {
-    return this.jobsService.list(user.companyId);
+  list(@CurrentUser() user: JwtPayload, @Query("locationId") locationId?: string) {
+    return this.jobsService.list(user.companyId, locationId);
   }
 
   @Get("board")

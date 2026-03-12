@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtPayload } from '../auth/auth.types';
@@ -16,10 +16,10 @@ export class PurchaseOrdersController {
 
   @Get()
   @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
-  list(@CurrentUser() user: JwtPayload) {
+  list(@CurrentUser() user: JwtPayload, @Query('locationId') locationId?: string) {
     const fallback = featureGate({ enabled: isInventoryV1Enabled(), feature: 'INVENTORY_V1', mode: 'read', fallback: [] });
     if (fallback) return fallback;
-    return this.inventoryService.listPurchaseOrders(user.companyId);
+    return this.inventoryService.listPurchaseOrders(user.companyId, locationId);
   }
 
   @Post()

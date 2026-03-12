@@ -173,7 +173,7 @@ export class BookingsService {
     return booking;
   }
 
-  list(companyId: string, from?: string, to?: string) {
+  list(companyId: string, from?: string, to?: string, locationId?: string) {
     const db = this.prisma as any;
     const startsAt: Record<string, Date> = {};
 
@@ -194,6 +194,7 @@ export class BookingsService {
     return db.booking.findMany({
       where: {
         companyId,
+        ...(locationId && locationId !== 'all' ? { locationId } : {}),
         ...(Object.keys(startsAt).length ? { startsAt } : {}),
       },
       orderBy: { startsAt: 'asc' },

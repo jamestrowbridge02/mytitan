@@ -283,15 +283,25 @@ export class InventoryService {
     return this.serializePart(updated, updated.inventoryStocks || []);
   }
 
-  async listInventoryLocations(tenantId: string) {
+  async listInventoryLocations(tenantId: string, locationId?: string) {
     const rows = await this.db().inventoryLocation.findMany({
-      where: { tenantId },
+      where: {
+        tenantId,
+        ...(locationId && locationId !== 'all' ? { businessLocationId: locationId } : {}),
+      },
+      include: {
+        businessLocation: {
+          select: { id: true, name: true, code: true, kind: true },
+        },
+      },
       orderBy: [{ active: 'desc' }, { name: 'asc' }],
     });
     return rows.map((row: any) => ({
       id: row.id,
       name: row.name,
       kind: row.kind,
+      businessLocationId: row.businessLocationId || null,
+      businessLocationName: row.businessLocation?.name || null,
       active: Boolean(row.active),
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
@@ -299,12 +309,20 @@ export class InventoryService {
   }
 
   async createInventoryLocation(tenantId: string, userId: string, dto: UpsertInventoryLocationDto) {
+    if (dto.businessLocationId) {
+      const businessLocation = await this.db().location.findFirst({
+        where: { id: dto.businessLocationId, companyId: tenantId },
+        select: { id: true },
+      });
+      if (!businessLocation) throw new BadRequestException('Business location not found');
+    }
     const row = await this.db().inventoryLocation.create({
       data: {
         tenantId,
         name: dto.name.trim(),
         kind: dto.kind,
         active: dto.active ?? true,
+        businessLocationId: dto.businessLocationId || null,
       },
     });
     await this.audit.log(tenantId, 'inventory.location.create', `Created inventory location ${row.name}`, userId);
@@ -313,22 +331,33 @@ export class InventoryService {
 
   async patchInventoryLocation(tenantId: string, userId: string, id: string, dto: Partial<UpsertInventoryLocationDto>) {
     await this.resolveInventoryLocation(tenantId, id);
+    if (dto.businessLocationId) {
+      const businessLocation = await this.db().location.findFirst({
+        where: { id: dto.businessLocationId, companyId: tenantId },
+        select: { id: true },
+      });
+      if (!businessLocation) throw new BadRequestException('Business location not found');
+    }
     const updated = await this.db().inventoryLocation.update({
       where: { id },
       data: {
         name: dto.name?.trim(),
         kind: dto.kind,
         active: dto.active !== undefined ? Boolean(dto.active) : undefined,
+        businessLocationId: dto.businessLocationId !== undefined ? dto.businessLocationId || null : undefined,
       },
     });
     await this.audit.log(tenantId, 'inventory.location.update', `Updated inventory location ${updated.name}`, userId);
     return updated;
   }
 
-  async listStock(tenantId: string, query: { inventoryLocationId?: string; q?: string }) {
+  async listStock(tenantId: string, query: { inventoryLocationId?: string; locationId?: string; q?: string }) {
     const where: any = { tenantId };
     if (query.inventoryLocationId && query.inventoryLocationId !== 'all') {
       where.inventoryLocationId = query.inventoryLocationId;
+    }
+    if (query.locationId && query.locationId !== 'all') {
+      where.inventoryLocation = { ...(where.inventoryLocation || {}), businessLocationId: query.locationId };
     }
     if (query.q) {
       const q = String(query.q).trim();
@@ -344,7 +373,13 @@ export class InventoryService {
       where,
       include: {
         stockItem: true,
-        inventoryLocation: true,
+        inventoryLocation: {
+          include: {
+            businessLocation: {
+              select: { id: true, name: true, code: true, kind: true },
+            },
+          },
+        },
       },
       orderBy: [{ inventoryLocation: { name: 'asc' } }, { stockItem: { name: 'asc' } }],
     });
@@ -357,6 +392,8 @@ export class InventoryService {
         inventoryLocationId: row.inventoryLocationId,
         locationName: row.inventoryLocation?.name || null,
         locationKind: row.inventoryLocation?.kind || null,
+        businessLocationId: row.inventoryLocation?.businessLocationId || null,
+        businessLocationName: row.inventoryLocation?.businessLocation?.name || null,
         partId: row.stockItemId,
         sku: row.stockItem?.sku || null,
         name: row.stockItem?.name || null,
@@ -676,9 +713,12 @@ export class InventoryService {
     return this.serializeJobPart(result.updated);
   }
 
-  async listPurchaseOrders(tenantId: string) {
+  async listPurchaseOrders(tenantId: string, locationId?: string) {
     const rows = await this.db().stockPurchaseOrder.findMany({
-      where: { tenantId },
+      where: {
+        tenantId,
+        ...(locationId && locationId !== 'all' ? { OR: [{ locationId }, { inventoryLocation: { businessLocationId: locationId } }] } : {}),
+      },
       include: {
         inventoryLocation: true,
         supplier: true,
@@ -695,8 +735,10 @@ export class InventoryService {
       id: row.id,
       status: row.status,
       supplierName: row.supplierName || row.supplier?.name || null,
+      locationId: row.locationId || null,
       inventoryLocationId: row.inventoryLocationId || null,
       inventoryLocationName: row.inventoryLocation?.name || null,
+      businessLocationId: row.inventoryLocation?.businessLocationId || row.locationId || null,
       orderedAt: row.orderedAt,
       receivedAt: row.receivedAt,
       notesJson: row.notesJson ?? null,
@@ -906,8 +948,8 @@ export class InventoryService {
     }));
   }
 
-  async lowStockAlerts(tenantId: string) {
-    const rows = await this.listStock(tenantId, { inventoryLocationId: 'all' });
+  async lowStockAlerts(tenantId: string, locationId?: string) {
+    const rows = await this.listStock(tenantId, { inventoryLocationId: 'all', locationId });
     return rows.filter((row: any) => row.lowStock || row.availableQuantity <= 0);
   }
 
