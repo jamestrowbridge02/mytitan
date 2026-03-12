@@ -87,21 +87,24 @@ select {
   inset: -20% auto -20% -34%;
   width: 28%;
   transform: skewX(-18deg);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.52), rgba(255, 255, 255, 0));
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.24) 40%, rgba(255, 255, 255, 0.72) 52%, rgba(255, 255, 255, 0.18) 64%, rgba(255, 255, 255, 0) 100%);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent);
+  mix-blend-mode: screen;
   opacity: 0;
   pointer-events: none;
-  animation: mkt-brand-glimmer 7s ease-in-out infinite;
+  animation: mkt-brand-glimmer 2.5s ease-in-out infinite;
 }
 
 @keyframes mkt-brand-glimmer {
-  0%, 14%, 100% {
+  0%, 56%, 100% {
     opacity: 0;
     left: -34%;
   }
-  20% {
-    opacity: 0.5;
+  16% {
+    opacity: 0.82;
   }
-  30% {
+  36% {
     opacity: 0;
     left: 110%;
   }
@@ -204,23 +207,23 @@ select {
 }
 
 .mkt-hero__copy {
-  padding: 34px;
+  padding: 38px;
 }
 
 .mkt-hero__brand {
   display: inline-flex;
-  margin-bottom: 18px;
+  margin-bottom: 22px;
   border-radius: 18px;
 }
 
 .mkt-hero__brandLogo {
   display: block;
-  height: 42px;
+  height: 52px;
   width: auto;
 }
 
 .mkt-hero__title {
-  margin: 18px 0 14px;
+  margin: 20px 0 16px;
   font-size: clamp(2.6rem, 6vw, 4.5rem);
   line-height: 0.95;
   letter-spacing: -0.06em;
