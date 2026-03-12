@@ -5,6 +5,7 @@ type MyTitanLogoProps = {
   surface?: "light" | "dark";
   size?: "sm" | "md" | "lg";
   glimmer?: boolean;
+  animated?: boolean;
   className?: string;
   alt?: string;
 };
@@ -33,19 +34,20 @@ export default function MyTitanLogo({
   surface = "light",
   size = "md",
   glimmer = false,
+  animated = false,
   className,
   alt = "MyTitan",
 }: MyTitanLogoProps) {
+  const shouldAnimate = glimmer || animated;
   return (
     <span
       className={cx(
         "mt-brand-lockup",
         `mt-brand-lockup--${variant}`,
         `mt-brand-lockup--${size}`,
-        glimmer && "mt-brand-glimmer",
+        shouldAnimate && "mt-brand-glimmer",
         className,
       )}
-      aria-label={alt}
     >
       <img src={srcByVariant[variant][surface]} alt={alt} className="mt-brand-lockup__image" />
     </span>
