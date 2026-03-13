@@ -94,7 +94,7 @@ export function MarketingCtaBand({
   const secondaryIsInternal = secondaryHref.startsWith("/");
   return (
     <section className="mkt-section">
-      <div className="mkt-final">
+      <div className="mkt-final mkt-final--compact">
         <div className="mkt-eyebrow">Next step</div>
         <h2 className="mkt-sectionTitle" style={{ marginTop: 14 }}>{title}</h2>
         <p>{copy}</p>

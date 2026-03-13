@@ -14,18 +14,18 @@ export default function SolutionsPage() {
     <MarketingShell>
       <MarketingSeo
         title="Solutions"
-        description="See how MyTitan supports operations leaders, finance and revenue teams, and enterprise buyers with one controlled operating system."
+        description="See how MyTitan supports operations leadership, revenue teams, and platform owners with one controlled operating system."
         path="/solutions"
       />
 
       <MarketingPageHero
         eyebrow="Solutions"
-        title="The same platform works for operations, finance, and enterprise rollout."
-        lead="MyTitan is designed so the dispatch floor, finance team, and platform owner do not need separate systems to get their view of the business."
+        title="One platform for the teams that run the business."
+        lead="MyTitan is designed so operations, revenue, and platform owners do not need separate systems to get their view of the business."
         actions={
           <>
             <Link className="mkt-btn mkt-btn--primary" href="/demo">
-              Talk to sales
+              Request demo
             </Link>
             <Link className="mkt-btn" href="/platform">
               See platform
@@ -37,7 +37,7 @@ export default function SolutionsPage() {
       <section className="mkt-section">
         <MarketingSectionHeading
           eyebrow="Buyer framing"
-          title="A solution set built around real operating roles."
+          title="A solution set built around real operating responsibilities."
           lead="Each group below maps to product depth already implemented in the platform."
         />
         <div className="mkt-solutionGrid">
@@ -59,12 +59,12 @@ export default function SolutionsPage() {
         <div className="mkt-grid--2">
           <article className="mkt-card">
             <div className="mkt-eyebrow">Replace fragmentation</div>
-            <h2 className="mkt-sectionTitle">Stop buying separate tools for workflow, portal, evidence, finance, and reporting.</h2>
-            <p>MyTitan keeps the operational and commercial layers connected so every team is working from the same durable model.</p>
+            <h2 className="mkt-sectionTitle">Stop buying separate tools for workflow, portal, finance, and reporting.</h2>
+            <p>MyTitan keeps the operational and commercial layers connected so every team works from the same durable model.</p>
           </article>
           <article className="mkt-card">
             <div className="mkt-eyebrow">Scale safely</div>
-            <h2 className="mkt-sectionTitle">Move from one team to multi-location operations without reinventing process control.</h2>
+            <h2 className="mkt-sectionTitle">Move from one team to multi-location operations without rebuilding control from scratch.</h2>
             <p>Location-aware filtering, compliance, analytics, permissions, and performance reporting are already part of the operating system.</p>
           </article>
         </div>
@@ -72,11 +72,11 @@ export default function SolutionsPage() {
 
       <MarketingCtaBand
         title="See the solution path that fits your operating model."
-        copy="Start with your highest-pressure workflow, then evaluate how MyTitan handles the rest of the service lifecycle without creating more system sprawl."
+        copy="Start with your highest-pressure workflow, then evaluate how MyTitan closes the rest of the operating gaps without creating more system sprawl."
         primaryLabel="Request demo"
         primaryHref="/demo"
-        secondaryLabel="View industries"
-        secondaryHref="/industries"
+        secondaryLabel="See platform"
+        secondaryHref="/platform"
       />
     </MarketingShell>
   );

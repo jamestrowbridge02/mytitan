@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { FormEvent, useState } from "react";
 
 import MarketingSeo from "../components/MarketingSeo";
@@ -40,14 +41,24 @@ export default function DemoPage() {
     <MarketingShell>
       <MarketingSeo
         title="Request a Demo"
-        description="Request a MyTitan demo and walk through command-centre operations, recurring service delivery, revenue control, compliance, and multi-location scale."
+        description="Request a MyTitan demo and walk through operations control, revenue continuity, customer workspace, governance, and multi-location scale."
         path="/demo"
       />
 
       <MarketingPageHero
         eyebrow="Request a demo"
-        title="Walk the platform against your real operating pressure."
+        title="Walk the platform against your operating model."
         lead="Use the demo path to review the workflows, commercial controls, customer experience, governance model, and rollout shape that matter to your team."
+        actions={
+          <>
+            <Link className="mkt-btn mkt-btn--primary" href="/demo">
+              Request demo
+            </Link>
+            <Link className="mkt-btn" href="/platform">
+              See platform
+            </Link>
+          </>
+        }
       />
 
       <section className="mkt-section">
@@ -56,8 +67,8 @@ export default function DemoPage() {
             <div className="mkt-eyebrow">What the demo covers</div>
             <h2 className="mkt-sectionTitle">A practical walkthrough, not a feature recital.</h2>
             <p>
-              We can focus the conversation around command-centre operations, multi-location scale, recurring service delivery,
-              revenue operations, compliance controls, or leadership visibility depending on where the pressure is highest.
+              We can focus the conversation around command-centre operations, multi-location scale, customer workspace,
+              revenue continuity, compliance controls, or leadership visibility depending on where the pressure is highest.
             </p>
           </article>
           <article className="mkt-panel mkt-demoPanel">

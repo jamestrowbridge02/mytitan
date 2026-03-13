@@ -41,6 +41,9 @@ export default function MarketingShell(props: { children: React.ReactNode }) {
           </Link>
 
           <nav className="mkt-topbar__nav" aria-label="Primary">
+            <a className="mkt-navLink mkt-navLink--utility" href={SIGN_IN_URL}>
+              Sign in
+            </a>
             {navItems.map((item) => {
               const active = router.pathname === item.href;
               return (
@@ -51,14 +54,14 @@ export default function MarketingShell(props: { children: React.ReactNode }) {
             })}
           </nav>
 
-          <div className="mkt-actions">
-            <a className="mkt-btn" href={SIGN_IN_URL}>
-              Sign in
-            </a>
-            <Link className="mkt-btn" href="/demo">
+          <div className="mkt-actions mkt-actions--header">
+            <Link className="mkt-btn mkt-btn--primary" href="/demo">
               Request demo
             </Link>
-            <a className="mkt-btn mkt-btn--primary" href={SIGN_UP_URL}>
+            <Link className="mkt-btn" href="/platform">
+              See platform
+            </Link>
+            <a className="mkt-btn mkt-btn--ghost" href={SIGN_UP_URL}>
               Get started
             </a>
           </div>
@@ -72,26 +75,27 @@ export default function MarketingShell(props: { children: React.ReactNode }) {
           <div className="mkt-siteFooter__brand">
             <img src="/brand/mytitan-logo-light.svg" alt="MyTitan" className="mkt-siteFooter__logo" />
             <p>
-              MyTitan is the enterprise operations system for service businesses that need workflow control, commercial
-              visibility, customer-safe records, and platform-grade governance in one place.
+              MyTitan is the operating system for service businesses that need one controlled model for operations,
+              revenue, customer experience, and governance.
             </p>
           </div>
           <div className="mkt-siteFooter__links">
             <div>
               <h3>Explore</h3>
               <Link href="/platform">Platform</Link>
+              <Link href="/solutions">Solutions</Link>
               <Link href="/security">Security</Link>
-              <Link href="/pricing">Pricing</Link>
             </div>
             <div>
-              <h3>Next step</h3>
+              <h3>Evaluate</h3>
               <Link href="/demo">Request demo</Link>
+              <Link href="/pricing">Pricing</Link>
               <a href={SIGN_IN_URL}>Sign in</a>
-              <a href={`mailto:${SALES_EMAIL}`}>{SALES_EMAIL}</a>
             </div>
             <div>
-              <h3>Launch</h3>
-              <p>See the platform in context, then open the workspace when you are ready.</p>
+              <h3>Contact</h3>
+              <p>Review the platform in context, then open the workspace when the fit is clear.</p>
+              <a className="mkt-siteFooter__mail" href={`mailto:${SALES_EMAIL}`}>{SALES_EMAIL}</a>
               <div className="mkt-actions" style={{ justifyContent: "flex-start" }}>
                 <a className="mkt-btn mkt-btn--primary" href={SIGN_UP_URL}>
                   Get started

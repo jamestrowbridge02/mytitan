@@ -6,62 +6,72 @@ export const SALES_EMAIL = "sales@mytitan.co.uk";
 
 export const platformPillars = [
   {
-    title: "Command centre and workflow control",
+    title: "Operations control",
     description:
-      "Run bookings, jobs, dispatch pressure, required-field enforcement, and day-of-work coordination from one operating layer.",
+      "Run bookings, jobs, dispatch pressure, required-field enforcement, and technician coordination from one operating layer.",
     bullets: [
-      "Configurable terminology and workflow stages",
+      "Command centre, workflow control, and booking intake",
+      "Scheduling pressure, technician execution, and completion records",
       "Required-field enforcement with visible operational pressure",
-      "Command centre and technician execution visibility",
     ],
   },
   {
-    title: "Revenue, recurring work, and customer follow-through",
+    title: "Revenue continuity",
     description:
-      "Move from quote to collections, recurring service delivery, approvals, and customer-safe records without handing work across disconnected tools.",
+      "Move from quote to collections, approvals, billing readiness, and recurring service delivery without handoff drift.",
     bullets: [
       "Quotes, approvals, collections, and billing readiness",
       "Recurring service plans that create real operational work",
-      "Customer workspace, portal routes, and completion acknowledgement",
+      "Revenue visibility tied directly to live operational context",
     ],
   },
   {
-    title: "Governance, compliance, and extensibility",
+    title: "Customer workspace",
     description:
-      "Keep growth controllable with tenant-scoped permissions, SLA/compliance pressure, integrations, auditability, and operational evidence.",
+      "Give customers one controlled place for approvals, records, status, and completion follow-through.",
+    bullets: [
+      "Customer accounts, approvals, and portal-safe records",
+      "Completion acknowledgement, documents, and workspace access",
+      "Visibility that stays separate from internal operator controls",
+    ],
+  },
+  {
+    title: "Governance at scale",
+    description:
+      "Keep growth controllable with tenant scope, location context, integrations, compliance, and auditability built in.",
     bullets: [
       "Workspace governance, RBAC, and audit-friendly automation",
-      "API tokens, outbound webhooks, and delivery logs",
-      "Compliance exceptions, SLA tracking, and execution evidence",
+      "API tokens, webhooks, and delivery logs",
+      "Compliance exceptions, analytics, and multi-location visibility",
     ],
   },
 ];
 
 export const solutionGroups = [
   {
-    title: "Operations leaders",
+    title: "Operations leadership",
     description:
-      "Reduce handoff drift across bookings, jobs, dispatch, scheduling, and recurring service execution.",
+      "For teams running daily service delivery across bookings, jobs, dispatch, scheduling, and recurring work.",
     points: [
-      "Keep missing required data explicit before work advances",
+      "Keep missing required data visible before work advances",
       "Surface unassigned, overdue, and breached work in one command layer",
-      "Scale cleanly across teams, branches, and franchise-style structures",
+      "Hold together field execution, service plans, and inventory pressure",
     ],
   },
   {
-    title: "Finance and revenue operators",
+    title: "Revenue and finance teams",
     description:
-      "Protect the commercial lifecycle from quote follow-up through invoice collections and compensation-ready performance signals.",
+      "For operators who need quotes, approvals, collections, and billing controls to stay close to the job lifecycle.",
     points: [
-      "Track quote conversion and collections tasks in the same system as operations",
+      "Track quote conversion and collections in the same system as operations",
       "Keep billing actions governed by permissions and activity visibility",
-      "Use real commercial signals in analytics, performance, and accountability reviews",
+      "Use commercial signals in analytics, performance, and accountability reviews",
     ],
   },
   {
-    title: "Enterprise buyers and platform owners",
+    title: "Platform and branch owners",
     description:
-      "Adopt one controllable platform instead of stitching workflow, portal, scheduling, documents, and reporting together.",
+      "For businesses standardizing across locations, teams, and governance expectations without creating new system sprawl.",
     points: [
       "Tenant-scoped custom fields, automations, and integrations",
       "Multi-location operating context without fake org-chart theater",
@@ -72,20 +82,20 @@ export const solutionGroups = [
 
 export const industries = [
   {
-    title: "Field service operators",
-    description: "Teams that need dispatch control, technician execution, completion records, and customer follow-through in one governed system.",
+    title: "Field service and mobile teams",
+    description: "Businesses coordinating dispatch, technician execution, completion records, and customer follow-through without splitting the operating model.",
   },
   {
-    title: "Multi-location service businesses",
+    title: "Multi-location service operators",
     description: "Operators coordinating branches, warehouses, service regions, or franchise-style footprints with shared governance and explicit location context.",
   },
   {
-    title: "Maintenance and recurring service businesses",
-    description: "Businesses managing service plans, renewals, change requests, recurring run history, and proof of completed work.",
+    title: "Recurring maintenance businesses",
+    description: "Teams managing service plans, renewals, change requests, recurring run history, and proof of completed work.",
   },
   {
     title: "Commercial service providers",
-    description: "Businesses where approvals, documents, quotes, collections, and auditability matter as much as day-of-work execution.",
+    description: "Operators where approvals, documents, quotes, collections, and auditability matter as much as day-of-work execution.",
   },
 ];
 
@@ -121,7 +131,7 @@ export const pricingTiers = [
     priceMonthly: "From GBP 299 per month",
     priceAnnual: "From GBP 239 per month, billed annually",
     summary: "Multi-location deployment, broader governance, integration-first rollout, and support for more complex operating models.",
-    cta: "Talk to sales",
+    cta: "Request demo",
     href: "/demo",
   },
 ];

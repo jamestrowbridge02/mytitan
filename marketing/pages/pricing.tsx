@@ -17,14 +17,14 @@ export default function PricingPage() {
     <MarketingShell>
       <MarketingSeo
         title="Pricing"
-        description="Review MyTitan pricing across smaller operators, business teams, and enterprise multi-location deployments."
+        description="Review MyTitan pricing across focused operators, growing teams, and enterprise multi-location deployments."
         path="/pricing"
       />
 
       <MarketingPageHero
         eyebrow="Pricing"
-        title="Premium SaaS pricing aligned to the operating footprint."
-        lead="MyTitan pricing is positioned around operational depth, team control, and platform scale, not feature-flag theater."
+        title="Pricing aligned to operating complexity."
+        lead="MyTitan pricing is positioned around operational depth, team control, and platform scale."
         actions={
           <>
             <Link className="mkt-btn mkt-btn--primary" href="/demo">
@@ -42,7 +42,7 @@ export default function PricingPage() {
           <MarketingSectionHeading
             eyebrow="Commercial model"
             title="Choose the tier that matches the team and operating complexity."
-            lead="Enterprise buyers can use the demo path for rollout and governance planning. Smaller teams can self-start directly."
+            lead="Enterprise buyers can use the demo path for rollout and governance planning. Smaller teams can start directly."
           />
           <div className="mkt-actions">
             <button className={`mkt-btn${annual ? "" : " mkt-btn--primary"}`} type="button" onClick={() => setAnnual(false)}>
@@ -77,10 +77,10 @@ export default function PricingPage() {
       <MarketingCtaBand
         title="Use a commercial walkthrough if you need a broader rollout plan."
         copy="The demo path is the right place to review deployment shape, multi-location scope, governance expectations, and how the platform maps to your operating pressure."
-        primaryLabel="Talk to sales"
+        primaryLabel="Request demo"
         primaryHref="/demo"
-        secondaryLabel="View security"
-        secondaryHref="/security"
+        secondaryLabel="See platform"
+        secondaryHref="/platform"
       />
     </MarketingShell>
   );

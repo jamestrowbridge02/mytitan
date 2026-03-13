@@ -20,7 +20,7 @@ export default function SecurityPage() {
 
       <MarketingPageHero
         eyebrow="Security and governance"
-        title="Built for controlled operations, not just visible workflows."
+        title="Built for controlled operations."
         lead="MyTitan keeps tenant boundaries, permissions, auditability, compliance visibility, and customer-safe access explicit across the platform."
         actions={
           <>
@@ -54,7 +54,7 @@ export default function SecurityPage() {
         <MarketingSectionHeading
           eyebrow="Control points"
           title="A governance posture grounded in implemented platform seams."
-          lead="The site does not claim certifications or controls that are not represented in the product. It reflects the operating guardrails already in place."
+          lead="The site does not claim controls that are not represented in the product. It reflects the operating guardrails already in place."
         />
         <div className="mkt-securityList">
           {securityPoints.map((point) => (
@@ -67,11 +67,11 @@ export default function SecurityPage() {
 
       <MarketingCtaBand
         title="Review the platform with security, control, and auditability in scope."
-        copy="Walk through the permissions, integrations, activity visibility, compliance queueing, and customer-safe access model with the product team."
-        primaryLabel="Talk to sales"
+        copy="Walk through permissions, integrations, activity visibility, compliance queueing, and the customer-safe access model with the product team."
+        primaryLabel="Request demo"
         primaryHref="/demo"
-        secondaryLabel="See pricing"
-        secondaryHref="/pricing"
+        secondaryLabel="See platform"
+        secondaryHref="/platform"
       />
     </MarketingShell>
   );
