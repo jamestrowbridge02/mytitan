@@ -13,71 +13,37 @@ export type NavGroup = {
 
 export const NAV_GROUPS: NavGroup[] = [
   {
-    title: "Overview",
+    title: "",
     items: [
       { title: "Dashboard", href: "/dashboard" },
       { title: "Command Centre", href: "/dashboard/command-centre-v2" },
       { title: "Analytics", href: "/dashboard/analytics" },
-    ],
-  },
-  {
-    title: "Work",
-    items: [
-      {
-        title: "Jobs",
-        children: [
-          { title: "All jobs", href: "/dashboard/jobs" },
-          { title: "New job", href: "/dashboard/jobs/new" },
-        ],
-      },
-      {
-        title: "Scheduling",
-        children: [
-          { title: "Calendar", href: "/dashboard/calendar" },
-          { title: "Capacity planning", href: "/dashboard/scheduling" },
-          { title: "Bookings", href: "/dashboard/bookings" },
-        ],
-      },
-      {
-        title: "Customers",
-        children: [
-          { title: "CRM", href: "/dashboard/customers" },
-          { title: "Service plans", href: "/dashboard/service-plans" },
-        ],
-      },
+      { title: "Compliance", href: "/dashboard/compliance" },
     ],
   },
   {
     title: "Operations",
     items: [
-      { title: "Intelligence", href: "/dashboard/intelligence" },
-      { title: "Compliance", href: "/dashboard/compliance" },
-      { title: "Performance", href: "/dashboard/performance" },
-      { title: "Executive", href: "/dashboard/executive" },
-      { title: "Technician queue", href: "/dashboard/technician" },
-      { title: "Parts", href: "/dashboard/parts" },
-      { title: "Inventory", href: "/dashboard/inventory" },
-      { title: "Purchase orders", href: "/dashboard/purchase-orders" },
-      { title: "Locations", href: "/dashboard/locations" },
+      { title: "Jobs", href: "/dashboard/jobs" },
+      { title: "Scheduling", href: "/dashboard/scheduling" },
+      { title: "Bookings", href: "/dashboard/bookings" },
+      { title: "Customers", href: "/dashboard/customers" },
+      { title: "Service Plans", href: "/dashboard/service-plans" },
     ],
   },
   {
-    title: "Money",
+    title: "Commercial",
     items: [
       { title: "Quotes", href: "/dashboard/quotes" },
-      { title: "Revenue tasks", href: "/dashboard/revenue" },
-      { title: "Compensation", href: "/dashboard/compensation" },
-      { title: "Billing", href: "/dashboard/billing" },
-      { title: "Billing readiness", href: "/dashboard/billing/readiness" },
-      { title: "Portal Ops", href: "/dashboard/portal" },
+      { title: "Revenue", href: "/dashboard/revenue" },
     ],
   },
   {
-    title: "Settings",
+    title: "Platform",
     items: [
-      { title: "Settings", href: "/dashboard/settings" },
-      { title: "Automations", href: "/dashboard/settings/automations" },
       { title: "Integrations", href: "/dashboard/integrations" },
+      { title: "Automations", href: "/dashboard/settings/automations" },
+      { title: "Settings", href: "/dashboard/settings" },
     ],
   },
   {
