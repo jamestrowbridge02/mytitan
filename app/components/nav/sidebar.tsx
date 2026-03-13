@@ -87,7 +87,7 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="mt-sidebar hidden md:block h-screen w-[292px] shrink-0">
+    <aside className="mt-sidebar relative z-0 hidden md:block h-screen shrink-0" style={{ width: 292, flex: "0 0 292px" }}>
       <div className="flex h-full flex-col px-3 py-3">
         <div className="mt-sidebar__brand rounded-2xl px-3 py-3">
           <Link href="/dashboard" className="mt-sidebar__brandLink flex items-center justify-between gap-3">

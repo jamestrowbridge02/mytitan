@@ -194,17 +194,17 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="dashboard-shell-content">
       {isDemoUser ? (
-        <div className="card" style={{ marginBottom: 12, borderColor: '#8cc8ff' }}>
-          <strong> Mode</strong>
-          <p className="muted" style={{ margin: '6px 0 10px 0' }}>You are in a  workspace. Changes are safe and temporary.</p>
-          <button className="button secondary" onClick={signOut}>Exit </button>
+        <div className="card" style={{ marginBottom: 8, borderColor: '#8cc8ff' }}>
+          <strong>Demo mode</strong>
+          <p className="muted" style={{ margin: '6px 0 10px 0' }}>You are in a demo workspace. Changes are safe and temporary.</p>
+          <button className="button secondary" onClick={signOut}>Exit demo</button>
         </div>
       ) : null}
       {isDemoUser && demoPolishEnabled && !demoBannerDismissed ? (
-        <div className="card" style={{ marginBottom: 12, borderColor: '#6ea8fe' }}>
+        <div className="card" style={{ marginBottom: 8, borderColor: '#6ea8fe' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
             <div>
-              <strong> Tour</strong>
+              <strong>Demo tour</strong>
               <p className="muted" style={{ margin: '6px 0 10px 0' }}>Try these guided actions to explore real screens with filters applied.</p>
             </div>
             <button className="button secondary" type="button" onClick={() => setDemoBannerDismissed(true)}>Dismiss</button>
@@ -220,7 +220,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       ) : null}
 
       {locationsEnabled && locationCtx.available.length > 1 ? (
-        <div className="card" style={{ marginBottom: 12 }} data-testid="location-scope-switcher">
+        <div className="card" style={{ marginBottom: 8 }} data-testid="location-scope-switcher">
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
             <div>
               <strong>Location scope</strong>

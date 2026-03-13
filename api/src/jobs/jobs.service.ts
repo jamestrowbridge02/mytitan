@@ -467,11 +467,9 @@ export class JobsService {
       });
     };
 
-    if (isMediaSignatureV1Enabled()) {
-      for (const item of Array.isArray(dto.beforeMedia) ? dto.beforeMedia.slice(0, 6) : []) addMediaPayload("BEFORE", item);
-      for (const item of Array.isArray(dto.afterMedia) ? dto.afterMedia.slice(0, 6) : []) addMediaPayload("AFTER", item);
-      if (dto.torqueEvidenceMedia) addMediaPayload("TORQUE", dto.torqueEvidenceMedia);
-    }
+    for (const item of Array.isArray(dto.beforeMedia) ? dto.beforeMedia.slice(0, 6) : []) addMediaPayload("BEFORE", item);
+    for (const item of Array.isArray(dto.afterMedia) ? dto.afterMedia.slice(0, 6) : []) addMediaPayload("AFTER", item);
+    if (dto.torqueEvidenceMedia) addMediaPayload("TORQUE", dto.torqueEvidenceMedia);
 
     if (!formData) return normalized;
 
@@ -506,13 +504,11 @@ export class JobsService {
       normalized.push({ kind: "SIGN_CUSTOMER", dataUrl: formData.customerSignature.trim() });
     }
 
-    if (isMediaSignatureV1Enabled()) {
-      if (formData.torqueEvidenceMedia && typeof formData.torqueEvidenceMedia === "object") {
-        addMediaPayload("TORQUE", formData.torqueEvidenceMedia);
-      }
-      addList("BEFORE", formData.beforeMedia);
-      addList("AFTER", formData.afterMedia);
+    if (formData.torqueEvidenceMedia && typeof formData.torqueEvidenceMedia === "object") {
+      addMediaPayload("TORQUE", formData.torqueEvidenceMedia);
     }
+    addList("BEFORE", formData.beforeMedia);
+    addList("AFTER", formData.afterMedia);
 
     return normalized;
   }

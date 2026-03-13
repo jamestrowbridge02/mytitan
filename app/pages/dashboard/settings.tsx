@@ -780,6 +780,9 @@ export default function SettingsPage() {
           method: 'POST',
           body: JSON.stringify({ logoUrl: form.logoUrl }),
         });
+      } else {
+        showError('Choose a logo file or enter a logo URL before updating branding.');
+        return;
       }
       showSuccess('Logo updated');
       await refresh();
@@ -875,18 +878,18 @@ export default function SettingsPage() {
         <h1 className="settings-premium-title">Tenant Settings</h1>
         <div style={{ marginBottom: 16 }}>
           <h2 style={{ marginTop: 0 }}>Appearance</h2>
-          <p className="muted settings-premium-muted">Theme mode</p>
+          <p className="muted settings-premium-muted">Theme mode and guided setup controls stay live in this workspace.</p>
           <div style={{ display: 'flex', gap: 10 }}>
             <button
               type="button"
-              className={`button ${themeMode === 'light' ? '' : 'secondary'}`}
+              className={`button settings-premium-button ${themeMode === 'light' ? '' : 'secondary'}`}
               onClick={() => updateThemeMode('light')}
             >
               Light
             </button>
             <button
               type="button"
-              className={`button ${themeMode === 'dark' ? '' : 'secondary'}`}
+              className={`button settings-premium-button ${themeMode === 'dark' ? '' : 'secondary'}`}
               onClick={() => updateThemeMode('dark')}
             >
               Dark
@@ -894,7 +897,7 @@ export default function SettingsPage() {
           </div>
           <div style={{ marginTop: 10 }}>
             <button type="button" className="button secondary settings-premium-button" onClick={restartDemoTour}>
-              Restart  tour
+              Restart demo tour
             </button>
           </div>
         </div>

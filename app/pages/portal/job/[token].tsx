@@ -191,6 +191,7 @@ export default function PublicJobPortal() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawingRef = useRef(false);
   const signatureHistoryRef = useRef<ImageData[]>([]);
+  const signatureDirtyRef = useRef(false);
   const marketplaceEnabled = isMarketplaceEnabled();
   const portalPolishV1Enabled = isPortalPolishV1Enabled();
 
@@ -248,17 +249,22 @@ export default function PublicJobPortal() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tokenValue, sessionIdValue, marketplaceEnabled, portalPolishV1Enabled]);
 
-  const startDraw = (x: number, y: number) => {
+  const startDraw = (x: number, y: number, pointerId?: number) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+    signatureHistoryRef.current.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
     drawingRef.current = true;
     ctx.lineWidth = 2;
     ctx.lineCap = 'round';
     ctx.strokeStyle = '#111';
     ctx.beginPath();
     ctx.moveTo(x, y);
+    signatureDirtyRef.current = true;
+    if (typeof pointerId === 'number') {
+      canvas.setPointerCapture(pointerId);
+    }
   };
 
   const continueDraw = (x: number, y: number) => {
@@ -269,12 +275,14 @@ export default function PublicJobPortal() {
     ctx.stroke();
   };
 
-  const stopDraw = () => {
+  const stopDraw = (pointerId?: number) => {
     const canvas = canvasRef.current;
     if (canvas) {
       const ctx = canvas.getContext('2d');
       if (ctx) {
-        signatureHistoryRef.current.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+        if (typeof pointerId === 'number' && canvas.hasPointerCapture(pointerId)) {
+          canvas.releasePointerCapture(pointerId);
+        }
       }
     }
     drawingRef.current = false;
@@ -295,6 +303,7 @@ export default function PublicJobPortal() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.beginPath();
     signatureHistoryRef.current = [];
+    signatureDirtyRef.current = false;
   };
 
   const undoCanvas = () => {
@@ -309,6 +318,7 @@ export default function PublicJobPortal() {
       return;
     }
     ctx.putImageData(previous, 0, 0);
+    signatureDirtyRef.current = signatureHistoryRef.current.length > 1;
   };
 
   async function approve() {
@@ -362,6 +372,9 @@ export default function PublicJobPortal() {
     setStatus('');
     setPendingAction('sign');
     try {
+      if (!signatureDirtyRef.current) {
+        throw new Error('Add a signature before saving');
+      }
       const dataUrl = canvasRef.current?.toDataURL('image/png');
       const res = await fetch(`${API_BASE}/public/job/${tokenValue}/sign`, {
         method: 'POST',
@@ -511,14 +524,16 @@ export default function PublicJobPortal() {
                   ref={canvasRef}
                   width={400}
                   height={180}
-                  style={{ border: '1px solid #ccc', borderRadius: 6, background: '#fff' }}
-                  onMouseDown={(e) => {
+                  data-testid="public-portal-signature-pad"
+                  style={{ border: '1px solid #ccc', borderRadius: 6, background: '#fff', touchAction: 'none' }}
+                  onPointerDown={(e) => {
                     const p = getCanvasPos(e.clientX, e.clientY);
-                    startDraw(p.x, p.y);
+                    startDraw(p.x, p.y, e.pointerId);
                   }}
-                  onMouseUp={stopDraw}
-                  onMouseLeave={stopDraw}
-                  onMouseMove={(e) => {
+                  onPointerUp={(e) => stopDraw(e.pointerId)}
+                  onPointerLeave={(e) => stopDraw(e.pointerId)}
+                  onPointerCancel={(e) => stopDraw(e.pointerId)}
+                  onPointerMove={(e) => {
                     const p = getCanvasPos(e.clientX, e.clientY);
                     continueDraw(p.x, p.y);
                   }}
@@ -857,29 +872,17 @@ export default function PublicJobPortal() {
             width={400}
             height={180}
             style={{ border: '1px solid #ccc', borderRadius: 8, background: '#fff', width: '100%', maxWidth: 420 }}
-            onMouseDown={(e) => {
+            onPointerDown={(e) => {
               const p = getCanvasPos(e.clientX, e.clientY);
-              startDraw(p.x, p.y);
+              startDraw(p.x, p.y, e.pointerId);
             }}
-            onMouseUp={stopDraw}
-            onMouseLeave={stopDraw}
-            onMouseMove={(e) => {
+            onPointerUp={(e) => stopDraw(e.pointerId)}
+            onPointerLeave={(e) => stopDraw(e.pointerId)}
+            onPointerCancel={(e) => stopDraw(e.pointerId)}
+            onPointerMove={(e) => {
               const p = getCanvasPos(e.clientX, e.clientY);
               continueDraw(p.x, p.y);
             }}
-            onTouchStart={(e) => {
-              const touch = e.touches[0];
-              if (!touch) return;
-              const p = getCanvasPos(touch.clientX, touch.clientY);
-              startDraw(p.x, p.y);
-            }}
-            onTouchMove={(e) => {
-              const touch = e.touches[0];
-              if (!touch) return;
-              const p = getCanvasPos(touch.clientX, touch.clientY);
-              continueDraw(p.x, p.y);
-            }}
-            onTouchEnd={stopDraw}
           />
           <div style={{ display: 'grid', gap: 10, marginTop: 10 }}>
             <button className="button secondary" type="button" onClick={clearCanvas} disabled={pendingAction !== ''} style={{ width: '100%', minHeight: 46 }}>

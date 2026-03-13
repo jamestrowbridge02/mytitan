@@ -30,11 +30,11 @@ export function PageShell(props: {
   return (
     <div data-shell="app" className="min-h-screen bg-[var(--bg)] text-[var(--fg)]">
       <CommandPalette />
-      <div className="flex min-h-screen">
+      <div className="min-h-screen md:grid md:grid-cols-[292px_minmax(0,1fr)]">
         <Sidebar />
-        <div className="min-w-0 flex-1">
+        <div className="relative z-10 min-w-0 flex-1">
           <div className="sticky top-0 z-20 hidden border-b border-border/60 bg-[color:var(--surface-0)]/90 backdrop-blur md:block">
-            <div className="mx-auto w-full max-w-[1400px] px-6 py-3">
+            <div className="mx-auto w-full max-w-[1400px] px-6 py-3 md:px-10 lg:px-12">
               {showHeader ? (
                 <div className="flex items-start justify-between gap-4">
                   <div>
@@ -59,7 +59,7 @@ export function PageShell(props: {
             ) : null}
           </div>
 
-          <div className="mx-auto w-full max-w-[1400px] px-6 pb-8 pt-0 md:pt-1">{props.children}</div>
+          <div className="mx-auto w-full max-w-[1400px] px-6 pb-8 pt-0 md:px-10 md:pt-1 lg:px-12">{props.children}</div>
         </div>
       </div>
     </div>

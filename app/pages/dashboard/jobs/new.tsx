@@ -2,6 +2,7 @@ import { Dispatch, SetStateAction, useEffect, useMemo, useRef, useState } from "
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { DashboardShell } from "../../../components/dashboard-shell";
+import { OperatorPageHeader } from "../../../components/ui/operator-page";
 import { apiFetch } from "../../../lib/api";
 import { isInventoryV1Enabled, isMediaSignatureV1Enabled, isWheelsAutomationV1Enabled, isWheelsFormV1Enabled } from "../../../lib/feature-flags";
 import { resolveGuidedMode, setGuidedMode } from "../../../lib/guided-mode";
@@ -44,6 +45,8 @@ type SelectedMedia = {
   previewUrl: string | null;
 };
 
+const JOB_MEDIA_MAX_BYTES = 8 * 1024 * 1024;
+
 function SignaturePad({
   value,
   onChange,
@@ -56,6 +59,7 @@ function SignaturePad({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawingRef = useRef(false);
   const historyRef = useRef<ImageData[]>([]);
+  const dirtyRef = useRef(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -71,6 +75,8 @@ function SignaturePad({
       ctx.fillStyle = "#ffffff";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      historyRef.current = [ctx.getImageData(0, 0, canvas.width, canvas.height)];
+      dirtyRef.current = true;
     };
     img.src = value;
   }, [value]);
@@ -88,12 +94,14 @@ function SignaturePad({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     drawingRef.current = true;
+    historyRef.current.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
     const p = pos(e);
     ctx.lineWidth = 2;
     ctx.lineCap = "round";
     ctx.strokeStyle = "#111827";
     ctx.beginPath();
     ctx.moveTo(p.x, p.y);
+    dirtyRef.current = true;
     canvas.setPointerCapture(e.pointerId);
   }
 
@@ -115,7 +123,6 @@ function SignaturePad({
     drawingRef.current = false;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    historyRef.current.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
     onChange(canvas.toDataURL("image/png"));
     canvas.releasePointerCapture(e.pointerId);
   }
@@ -129,6 +136,7 @@ function SignaturePad({
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     historyRef.current = [];
+    dirtyRef.current = false;
     onChange("");
   }
 
@@ -144,6 +152,7 @@ function SignaturePad({
       return;
     }
     ctx.putImageData(last, 0, 0);
+    dirtyRef.current = historyRef.current.length > 1;
     onChange(canvas.toDataURL("image/png"));
   }
 
@@ -155,11 +164,13 @@ function SignaturePad({
           ref={canvasRef}
           width={420}
           height={140}
+          data-testid={`jobs-signature-pad-${label.toLowerCase().includes("customer") ? "customer" : "technician"}`}
           style={{ width: "100%", border: "1px solid #2a3348", borderRadius: 8, touchAction: "none", background: "#fff" }}
           onPointerDown={start}
           onPointerMove={move}
           onPointerUp={end}
           onPointerCancel={end}
+          onPointerLeave={end}
         />
       </div>
       <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
@@ -224,7 +235,45 @@ function extensionFor(file: File, fallback = "bin") {
   return fallback;
 }
 
-async function readFileAsDataURL(file: File, _opts?: { compressImage?: boolean; quality?: number }) {
+function formatFileSize(bytes: number) {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${bytes} B`;
+}
+
+async function compressImageFile(file: File, quality = 0.85) {
+  if (typeof window === "undefined" || typeof document === "undefined") return null;
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const next = new Image();
+      next.onload = () => resolve(next);
+      next.onerror = () => reject(new Error("Failed to load image"));
+      next.src = objectUrl;
+    });
+    const maxDimension = 1800;
+    const scale = Math.min(1, maxDimension / Math.max(image.width || 1, image.height || 1));
+    const width = Math.max(1, Math.round(image.width * scale));
+    const height = Math.max(1, Math.round(image.height * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, width, height);
+    ctx.drawImage(image, 0, 0, width, height);
+    return canvas.toDataURL("image/jpeg", quality);
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+async function readFileAsDataURL(file: File, opts?: { compressImage?: boolean; quality?: number }) {
+  if (opts?.compressImage && file.type.startsWith("image/")) {
+    const compressed = await compressImageFile(file, opts.quality ?? 0.85);
+    if (compressed) return compressed;
+  }
   return await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result || ""));
@@ -287,6 +336,7 @@ export default function NewJobPage() {
   const [saving, setSaving] = useState(false);
   const [draftSyncState, setDraftSyncState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [error, setError] = useState("");
+  const [mediaError, setMediaError] = useState("");
   const [guidedMode, setGuidedModeState] = useState(false);
   const [activeSectionIndex, setActiveSectionIndex] = useState(0);
   const [guidedSectionError, setGuidedSectionError] = useState("");
@@ -549,11 +599,18 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
 
   function appendMediaFiles(nextFiles: FileList | null, setter: Dispatch<SetStateAction<SelectedMedia[]>>) {
     if (!nextFiles || nextFiles.length === 0) return;
+    setMediaError("");
     const parsed = Array.from(nextFiles).map((file) => ({
       id: `${Date.now()}-${Math.random()}`,
       file,
       previewUrl: makePreviewURL(file),
     }));
+    const tooLarge = parsed.find((item) => item.file.size > JOB_MEDIA_MAX_BYTES);
+    if (tooLarge) {
+      setMediaError(`${tooLarge.file.name} is too large. Keep uploads under ${formatFileSize(JOB_MEDIA_MAX_BYTES)}.`);
+      parsed.forEach((item) => revokePreviewURL(item));
+      return;
+    }
     setter((prev) => [...prev, ...parsed].slice(0, 6));
   }
 
@@ -577,8 +634,15 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
     revokePreviewURL(torqueFile);
     if (!file) {
       setTorqueFile(null);
+      setMediaError("");
       return;
     }
+    if (file.size > JOB_MEDIA_MAX_BYTES) {
+      setMediaError(`${file.name} is too large. Keep uploads under ${formatFileSize(JOB_MEDIA_MAX_BYTES)}.`);
+      setTorqueFile(null);
+      return;
+    }
+    setMediaError("");
     setTorqueFile({
       id: `${Date.now()}-${Math.random()}`,
       file,
@@ -636,6 +700,9 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
     if (stepIndex === 4) {
       if (torqueFile && !(torqueFile.file.type.startsWith("image/") || torqueFile.file.type.startsWith("video/"))) {
         return humanError("Torque evidence must be an image or video file.");
+      }
+      if (torqueFile && torqueFile.file.size > JOB_MEDIA_MAX_BYTES) {
+        return humanError(`Torque evidence must stay under ${formatFileSize(JOB_MEDIA_MAX_BYTES)}.`);
       }
       return true;
     }
@@ -940,6 +1007,7 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
     e.preventDefault();
     setSaving(true);
     setError("");
+    setMediaError("");
 
     if (guidedExperienceEnabled && !validateGuidedStep(5)) {
       setSaving(false);
@@ -958,33 +1026,41 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
       return;
     }
 
-    const guidedBeforeMedia = guidedExperienceEnabled
-      ? await Promise.all(
+    let guidedBeforeMedia: any[] = parsePhotoList(beforeInput);
+    let guidedAfterMedia: any[] = parsePhotoList(afterInput);
+    let torqueEvidenceMedia: { data: string; filename: string; mimeType: string } | null = null;
+
+    try {
+      if (guidedExperienceEnabled) {
+        guidedBeforeMedia = await Promise.all(
           beforeFiles.map(async (item, idx) => ({
             data: await readFileAsDataURL(item.file, { compressImage: item.file.type.startsWith("image/"), quality: 0.85 }),
             filename: `Before_${idx + 1}.${extensionFor(item.file, "jpeg")}`,
             mimeType: item.file.type || "application/octet-stream",
           })),
-        )
-      : parsePhotoList(beforeInput);
+        );
 
-    const guidedAfterMedia = guidedExperienceEnabled
-      ? await Promise.all(
+        guidedAfterMedia = await Promise.all(
           afterFiles.map(async (item, idx) => ({
             data: await readFileAsDataURL(item.file, { compressImage: item.file.type.startsWith("image/"), quality: 0.85 }),
             filename: `After_${idx + 1}.${extensionFor(item.file, "jpeg")}`,
             mimeType: item.file.type || "application/octet-stream",
           })),
-        )
-      : parsePhotoList(afterInput);
+        );
 
-    const torqueEvidenceMedia = guidedExperienceEnabled && torqueFile
-      ? {
-          data: await readFileAsDataURL(torqueFile.file, { compressImage: torqueFile.file.type.startsWith("image/"), quality: 0.85 }),
-          filename: `TorqueEvidence.${extensionFor(torqueFile.file, "jpeg")}`,
-          mimeType: torqueFile.file.type || "application/octet-stream",
-        }
-      : null;
+        torqueEvidenceMedia = torqueFile
+          ? {
+              data: await readFileAsDataURL(torqueFile.file, { compressImage: torqueFile.file.type.startsWith("image/"), quality: 0.85 }),
+              filename: `TorqueEvidence.${extensionFor(torqueFile.file, "jpeg")}`,
+              mimeType: torqueFile.file.type || "application/octet-stream",
+            }
+          : null;
+      }
+    } catch (err: any) {
+      setSaving(false);
+      setMediaError(err?.message || "Unable to prepare media for upload.");
+      return;
+    }
 
     const payloadForm = {
       ...formData,
@@ -996,9 +1072,9 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
       vehicleReg: formData.vehicleReg || formData.carRegOrChassis || vehicleReg,
       beforePhotos: guidedBeforeMedia,
       afterPhotos: guidedAfterMedia,
-      beforeMedia: mediaSignatureEnabled ? guidedBeforeMedia : [],
-      afterMedia: mediaSignatureEnabled ? guidedAfterMedia : [],
-      torqueEvidenceMedia: mediaSignatureEnabled ? torqueEvidenceMedia : null,
+      beforeMedia: guidedBeforeMedia,
+      afterMedia: guidedAfterMedia,
+      torqueEvidenceMedia,
       torqueEvidence: guidedExperienceEnabled ? "" : torqueInput || formData.torqueEvidence || "",
       wheelCount: Number(formData.wheelCount || 0),
       quantity: Number(formData.serviceQuantity || formData.quantity || 1),
@@ -1026,13 +1102,9 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
           serviceName: (payloadForm as any).serviceName || "Wheels Job",
           tradeCode: "WHEELS",
           jobType: (payloadForm as any).jobType,
-          ...(mediaSignatureEnabled
-            ? {
-                beforeMedia: (payloadForm as any).beforeMedia,
-                afterMedia: (payloadForm as any).afterMedia,
-                torqueEvidenceMedia: (payloadForm as any).torqueEvidenceMedia,
-              }
-            : {}),
+          beforeMedia: (payloadForm as any).beforeMedia,
+          afterMedia: (payloadForm as any).afterMedia,
+          torqueEvidenceMedia: (payloadForm as any).torqueEvidenceMedia,
           formData: payloadForm,
         }),
       });
@@ -1277,6 +1349,7 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
           <label className="jobs-new-label">Torque evidence (image/video)</label>
           <input
             ref={torqueFileInputRef}
+            data-testid="jobs-torque-upload"
             className="input jobs-new-input"
             type="file"
             accept="image/*,video/*"
@@ -1314,6 +1387,7 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
           <label style={{ marginTop: 12 }}>Before photos (up to 6)</label>
           <input
             ref={beforeFileInputRef}
+            data-testid="jobs-before-upload"
             className="input jobs-new-input"
             type="file"
             accept="image/*"
@@ -1342,6 +1416,7 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
           <label style={{ marginTop: 12 }}>After photos (up to 6)</label>
           <input
             ref={afterFileInputRef}
+            data-testid="jobs-after-upload"
             className="input jobs-new-input"
             type="file"
             accept="image/*"
@@ -1380,7 +1455,7 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
 
     return sectionCard("Step 6: Pricing + Invoice + WhatsApp + Signatures", (
       <>
-        <p className="muted" style={{ marginTop: 0 }}>Preview only — server recalculates totals.</p>
+        <p className="muted" style={{ marginTop: 0 }}>Preview only. Server-side billing and workflow rules still apply when the job is created.</p>
 
         <label className="jobs-new-label">Service name</label>
         <input className="input jobs-new-input" value={formData.serviceName || ""} onChange={(e) => setField("serviceName", e.target.value)} />
@@ -1445,42 +1520,28 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
         <label className="jobs-new-label">Technician signature name</label>
         <input className="input jobs-new-input" value={formData.technicianSignatureName || ""} onChange={(e) => setField("technicianSignatureName", e.target.value)} />
 
-        {mediaSignatureEnabled ? (
-          <SignaturePad
-            label="Technician signature (required)"
-            value={formData.technicianSignature || ""}
-            onChange={(next) => setField("technicianSignature", next)}
-          />
-        ) : (
-          <>
-            <label className="jobs-new-label">Technician signature (required)</label>
-            <textarea className="input jobs-new-input" rows={2} value={formData.technicianSignature || ""} onChange={(e) => setField("technicianSignature", e.target.value)} />
-          </>
-        )}
+        <SignaturePad
+          label="Technician signature (required)"
+          value={formData.technicianSignature || ""}
+          onChange={(next) => setField("technicianSignature", next)}
+        />
 
         <label className="jobs-new-label">Customer signature name (optional)</label>
         <input className="input jobs-new-input" value={formData.customerSignatureName || ""} onChange={(e) => setField("customerSignatureName", e.target.value)} />
 
-        {mediaSignatureEnabled ? (
-          <SignaturePad
-            label="Customer signature (optional)"
-            value={formData.customerSignature || ""}
-            onChange={(next) => setField("customerSignature", next)}
-          />
-        ) : (
-          <>
-            <label className="jobs-new-label">Customer signature (optional)</label>
-            <textarea className="input jobs-new-input" rows={2} value={formData.customerSignature || ""} onChange={(e) => setField("customerSignature", e.target.value)} />
-          </>
-        )}
+        <SignaturePad
+          label="Customer signature (optional)"
+          value={formData.customerSignature || ""}
+          onChange={(next) => setField("customerSignature", next)}
+        />
       </>
     ));
   }
   if (!wheelsFeature) {
     return (
       <DashboardShell>
-<div className="jobs-new-shell">
-        {__mtDebugTenantSettings ? (
+        <div className="jobs-new-shell">
+          {__mtDebugTenantSettings ? (
           <div
             data-debug-tenant-settings="on"
             style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}
@@ -1490,48 +1551,69 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
             settingsTenantId={String((settings as any)?.tenantId ?? "")}{" "}
             settingsPlanId={String((settings as any)?.planId ?? "")}
           </div>
-        ) : null}
-<div className="card jobs-new-card jobs-new-card--legacy">
-          <h1 className="jobs-new-title">New Job</h1>
-          {error && <p style={{ color: "#ff8a8a" }}>{error}</p>}
-          <p className="muted" style={{ marginBottom: 12 }}>
-            Wheels Form v1 is off or your primary trade is not WHEELS. Using standard quick job form.
-          </p>
-          <form className="jobs-new-form" onSubmit={submitLegacy}>
-            <label className="jobs-new-label">Customer name</label>
-            <input className="input jobs-new-input" value={customerName} onChange={(e) => setCustomerName(e.target.value)} required />
-            <label className="jobs-new-label">Customer email</label>
-            <input className="input jobs-new-input" type="email" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} />
-            <label className="jobs-new-label">Customer phone</label>
-            <input className="input jobs-new-input" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
-            <label className="jobs-new-label">Vehicle make</label>
-            <input className="input jobs-new-input" value={vehicleMake} onChange={(e) => setVehicleMake(e.target.value)} />
-            <label className="jobs-new-label">Vehicle model</label>
-            <input className="input jobs-new-input" value={vehicleModel} onChange={(e) => setVehicleModel(e.target.value)} />
-            <label className="jobs-new-label">Vehicle registration</label>
-            <input className="input jobs-new-input" value={vehicleReg} onChange={(e) => setVehicleReg(e.target.value)} />
-            <button className="button jobs-new-submit" type="submit">Create Job</button>
-          </form>
+          ) : null}
+          <OperatorPageHeader
+            eyebrow="Operations"
+            title="New job"
+            subtitle="Create a service record with the core customer and vehicle details your team needs."
+            stats={[
+              { label: "Mode", value: "Standard", hint: "Quick entry form" },
+              { label: "Trade", value: settings?.primaryTrade || "General", hint: "Current workspace configuration" },
+            ]}
+          />
+          <div className="card jobs-new-card jobs-new-card--legacy">
+            <h2 className="jobs-new-title">Quick job entry</h2>
+            {error ? <p style={{ color: "#b42318" }}>{error}</p> : null}
+            <p className="muted" style={{ marginBottom: 12 }}>
+              Wheels Form v1 is off or your primary trade is not WHEELS, so MyTitan is using the standard quick job form.
+            </p>
+            <form className="jobs-new-form" onSubmit={submitLegacy}>
+              <label className="jobs-new-label">Customer name</label>
+              <input className="input jobs-new-input" value={customerName} onChange={(e) => setCustomerName(e.target.value)} required />
+              <label className="jobs-new-label">Customer email</label>
+              <input className="input jobs-new-input" type="email" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} />
+              <label className="jobs-new-label">Customer phone</label>
+              <input className="input jobs-new-input" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
+              <label className="jobs-new-label">Vehicle make</label>
+              <input className="input jobs-new-input" value={vehicleMake} onChange={(e) => setVehicleMake(e.target.value)} />
+              <label className="jobs-new-label">Vehicle model</label>
+              <input className="input jobs-new-input" value={vehicleModel} onChange={(e) => setVehicleModel(e.target.value)} />
+              <label className="jobs-new-label">Vehicle registration</label>
+              <input className="input jobs-new-input" value={vehicleReg} onChange={(e) => setVehicleReg(e.target.value)} />
+              <button className="button jobs-new-submit" type="submit">Create job</button>
+            </form>
         </div>
-      </div>
-</DashboardShell>
+        </div>
+      </DashboardShell>
     );
   }
 
   return (
     <DashboardShell>
-      <div className="card jobs-new-card jobs-new-card--wheels">
-        <h1 className="jobs-new-title">WHEELS Job Form</h1>
-        <p className="muted">Friendly step-by-step form based on your Wheels template.</p>
+      <div className="jobs-new-shell">
+        <OperatorPageHeader
+          eyebrow="Operations"
+          title="New job"
+          subtitle="Create a complete service record with customer details, evidence, pricing, and sign-off in one operator-ready workflow."
+          shortcuts={guidedExperienceEnabled ? ["Guided mode saves your draft as you move", "Save and exit any time"] : ["Use guided mode for field capture", "PDF is generated after submit"]}
+          stats={[
+            { label: "Trade", value: "Wheels", hint: "Template-driven service workflow" },
+            { label: "Evidence", value: mediaSignatureEnabled ? "Media + signatures" : "Links + notes", hint: "Depends on current tenant flags" },
+            { label: "Billing", value: "Server checked", hint: "Totals are recalculated on submit" },
+          ]}
+        />
+        <div className="card jobs-new-card jobs-new-card--wheels">
+          <h2 className="jobs-new-title">Wheels service record</h2>
+          <p className="muted">Capture the job once, keep the workflow clear, and hand off a customer-safe record without duplicating the same details across separate tools.</p>
 
-        {guidedExperienceEnabled ? (
-          <div className="card" style={{ marginBottom: 16, padding: 12, border: "1px solid rgba(79, 209, 197, 0.55)" }}>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
-              <strong>Guided mode is ON</strong>
-              <button className="button secondary" type="button" onClick={disableGuidedMode}>Turn off</button>
+          {guidedExperienceEnabled ? (
+            <div className="card" style={{ marginBottom: 16, padding: 12, border: "1px solid rgba(17, 122, 120, 0.22)" }}>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
+                <strong>Guided mode is on</strong>
+                <button className="button secondary" type="button" onClick={disableGuidedMode}>Switch to standard entry</button>
+              </div>
             </div>
-          </div>
-        ) : null}
+          ) : null}
 
         {resumePrompt && guidedExperienceEnabled ? (
           <div className="card" style={{ marginBottom: 16, padding: 12, border: "1px solid rgba(111, 175, 255, 0.55)" }}>
@@ -1543,8 +1625,9 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
           </div>
         ) : null}
 
-        {error && <p style={{ color: "#ff8a8a" }}>{error}</p>}
-        {success ? (
+          {error ? <p style={{ color: "#b42318" }}>{error}</p> : null}
+          {mediaError ? <p style={{ color: "#b42318" }}>{mediaError}</p> : null}
+          {success ? (
           <div className="card jobs-new-success" style={{ padding: 16, border: "1px solid #1f8f5a" }}>
             <h3>Job created</h3>
             <p>Job ID: {success.jobId}</p>
@@ -1557,9 +1640,9 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
             {copyNotice ? <p className="muted">{copyNotice}</p> : null}
             {emailNotice ? <p className="muted">{emailNotice}</p> : null}
           </div>
-        ) : null}
+          ) : null}
 
-        <form ref={formRef} className="jobs-new-form jobs-new-form--wheels" onSubmit={submitWheels}>
+          <form ref={formRef} className="jobs-new-form jobs-new-form--wheels" onSubmit={submitWheels}>
           {guidedExperienceEnabled ? (
             <div className="card jobs-new-step-card" style={{ marginBottom: 16, padding: 12 }}>
               <p className="muted" style={{ marginTop: 0 }}>Step {activeSectionIndex + 1} of {totalSteps}</p>
@@ -1631,12 +1714,13 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
             </div>
           ) : null}
 
-          {guidedExperienceEnabled ? null : (
-            <button className="button" type="submit" disabled={saving}>{saving ? "Saving..." : "Create Job + Generate PDF"}</button>
-          )}
+            {guidedExperienceEnabled ? null : (
+              <button className="button" type="submit" disabled={saving}>{saving ? "Saving..." : "Create job and generate PDF"}</button>
+            )}
 
-          <GuidedSectionNav />
-        </form>
+            <GuidedSectionNav />
+          </form>
+        </div>
       </div>
     </DashboardShell>
   );
