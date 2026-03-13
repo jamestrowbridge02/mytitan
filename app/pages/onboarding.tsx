@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { AiAssistant } from '../components/ai-assistant';
 import { apiFetch } from '../lib/api';
-import { isMarketplaceEnabled, isStartHereEnabled } from '../lib/feature-flags';
+import { isGuidedSetupV2Enabled, isMarketplaceEnabled, isStartHereEnabled } from '../lib/feature-flags';
 import { useTenantSettings } from '../lib/tenant-settings';
 
 type Integration = {
@@ -81,6 +81,7 @@ export default function OnboardingPage() {
 
   const marketplaceEnabled = isMarketplaceEnabled();
   const startHereEnabled = isStartHereEnabled();
+  const guidedSetupV2Enabled = isGuidedSetupV2Enabled();
   const guidedEnabled = marketplaceEnabled || startHereEnabled;
   const stepTitles = startHereEnabled ? START_HERE_TITLES : CLASSIC_TITLES;
   const progress = useMemo(() => Math.round(((step + 1) / stepTitles.length) * 100), [step, stepTitles.length]);
@@ -88,6 +89,11 @@ export default function OnboardingPage() {
   const index = startHereEnabled
     ? { trade: 0, branding: 1, email: 2, pack: -1, services: 3, bookings: 4, billing: 5, live: 6 }
     : { trade: -1, branding: 0, email: 1, pack: 2, services: 3, bookings: 4, billing: 5, live: 6 };
+
+  useEffect(() => {
+    if (!guidedSetupV2Enabled) return;
+    router.replace('/dashboard/setup-wizard');
+  }, [guidedSetupV2Enabled, router]);
 
   useEffect(() => {
     if (!guidedEnabled) return;

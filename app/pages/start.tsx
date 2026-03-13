@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { DashboardShell } from '../components/dashboard-shell';
 import { apiFetch, getToken } from '../lib/api';
-import { isStartHereEnabled } from '../lib/feature-flags';
+import { isGuidedSetupV2Enabled, isStartHereEnabled } from '../lib/feature-flags';
 
 type ChecklistSummary = {
   completedCount: number;
@@ -15,6 +15,7 @@ export default function StartHerePage() {
   const [summary, setSummary] = useState<ChecklistSummary | null>(null);
   const [error, setError] = useState('');
   const enabled = isStartHereEnabled();
+  const guidedSetupV2Enabled = isGuidedSetupV2Enabled();
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -31,7 +32,7 @@ export default function StartHerePage() {
       try {
         const status = await apiFetch('/onboarding/status');
         if (status?.onboardingCompleted === false) {
-          router.replace('/onboarding');
+          router.replace(guidedSetupV2Enabled ? '/dashboard/setup-wizard' : '/onboarding');
           return;
         }
         const checklist = await apiFetch('/setup/checklist');
@@ -45,7 +46,7 @@ export default function StartHerePage() {
     };
 
     load();
-  }, [enabled, router]);
+  }, [enabled, guidedSetupV2Enabled, router]);
 
   return (
     <DashboardShell>

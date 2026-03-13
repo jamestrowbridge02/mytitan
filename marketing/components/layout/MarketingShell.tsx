@@ -78,22 +78,25 @@ export default function MarketingShell(props: { children: React.ReactNode }) {
           </div>
           <div className="mkt-siteFooter__links">
             <div>
-              <h3>Platform</h3>
-              <Link href="/platform">Platform overview</Link>
-              <Link href="/solutions">Solutions</Link>
-              <Link href="/industries">Industries</Link>
-            </div>
-            <div>
-              <h3>Company</h3>
+              <h3>Explore</h3>
+              <Link href="/platform">Platform</Link>
               <Link href="/security">Security</Link>
               <Link href="/pricing">Pricing</Link>
-              <Link href="/demo">Request demo</Link>
             </div>
             <div>
-              <h3>Contact</h3>
+              <h3>Next step</h3>
+              <Link href="/demo">Request demo</Link>
               <a href={SIGN_IN_URL}>Sign in</a>
-              <a href={SIGN_UP_URL}>Get started</a>
               <a href={`mailto:${SALES_EMAIL}`}>{SALES_EMAIL}</a>
+            </div>
+            <div>
+              <h3>Launch</h3>
+              <p>See the platform in context, then open the workspace when you are ready.</p>
+              <div className="mkt-actions" style={{ justifyContent: "flex-start" }}>
+                <a className="mkt-btn mkt-btn--primary" href={SIGN_UP_URL}>
+                  Get started
+                </a>
+              </div>
             </div>
           </div>
         </div>

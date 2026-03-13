@@ -9,6 +9,7 @@ import {
   isCommandCentreV2Enabled,
   isCrmProV1Enabled,
   isDemoPolishV1Enabled,
+  isGuidedSetupV2Enabled,
   isInventoryV1Enabled,
   isLocationsV1Enabled,
   isLogoutV1Enabled,
@@ -36,6 +37,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const { settings } = useTenantSettings();
   const { features } = useBilling();
   const marketplaceEnabled = isMarketplaceEnabled();
+  const guidedSetupV2Enabled = isGuidedSetupV2Enabled();
   const tradePacksEnabled = isTradePacksEnabled();
   const startHereEnabled = isStartHereEnabled();
   const locationsEnabled = isLocationsV1Enabled();
@@ -115,7 +117,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   }, [notificationsEnabled]);
 
   useEffect(() => {
-    if (!marketplaceEnabled && !startHereEnabled) return;
+    if (guidedSetupV2Enabled || (!marketplaceEnabled && !startHereEnabled)) return;
     const path = router.pathname || '';
     if (path.startsWith('/onboarding')) return;
     const check = async () => {

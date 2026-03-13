@@ -791,7 +791,6 @@ export default function SettingsPage() {
   async function runGuidedSetup() {
     clearNotice();
     try {
-      await apiFetch('/guided-setup/reset', { method: 'POST' });
       router.push('/dashboard/setup-wizard');
     } catch (err: any) {
       showError(err.message || 'Failed to start guided setup');
@@ -866,7 +865,7 @@ export default function SettingsPage() {
         subtitle="Keep appearance, defaults, and tenant capability controls in one consistent workspace."
         actions={[
           { label: 'Integrations', href: '/dashboard/integrations', variant: 'secondary' },
-          { label: 'Run guided setup', onClick: () => void runGuidedSetup() },
+          { label: settings?.guidedSetupCompletedAt ? 'Review guided setup' : 'Resume guided setup', onClick: () => void runGuidedSetup() },
         ]}
         shortcuts={['Tabs keep configuration areas compact', 'Save once after grouped edits']}
         stats={stats}
@@ -902,7 +901,7 @@ export default function SettingsPage() {
         {guidedSetupEnabled ? (
           <div style={{ marginBottom: 12 }}>
             <button className="button secondary settings-premium-button" type="button" onClick={runGuidedSetup}>
-              Run guided setup again
+              {settings?.guidedSetupCompletedAt ? 'Review guided setup' : 'Resume guided setup'}
             </button>
           </div>
         ) : null}

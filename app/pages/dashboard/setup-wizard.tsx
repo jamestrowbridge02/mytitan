@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { DashboardShell } from "../../components/dashboard-shell";
@@ -21,13 +21,25 @@ const steps = [
   { key: "trade", title: "Confirm trade" },
   { key: "branding", title: "Business branding" },
   { key: "services", title: "Services" },
-  { key: "charging", title: "Charging defaults" },
-  { key: "payments", title: "Payments" },
+  { key: "operations", title: "Charging and calendar" },
+  { key: "payments", title: "Billing and payments" },
   { key: "ready", title: "Ready" },
 ] as const;
 
 const normalizeList = (value: unknown) =>
   Array.from(new Set((Array.isArray(value) ? value : []).map((entry) => String(entry || "").trim()).filter(Boolean)));
+
+const formatMinuteOfDay = (value: number) => {
+  const hour = Math.max(0, Math.min(23, Math.floor(value / 60)));
+  const minute = Math.max(0, Math.min(59, value % 60));
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+};
+
+const minuteOfDay = (value: string) => {
+  const [hour, minute] = String(value || "").split(":").map(Number);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return NaN;
+  return hour * 60 + minute;
+};
 
 export default function SetupWizard() {
   const router = useRouter();
@@ -48,6 +60,15 @@ export default function SetupWizard() {
     supportEmail: "",
     supportPhone: "",
   });
+  const brandingRef = useRef<any>({
+    companyName: "",
+    logoUrl: "",
+    brandPrimaryColor: "#4fd1c5",
+    brandSecondaryColor: "#1a1f36",
+    brandAccentColor: "#4fd1c5",
+    supportEmail: "",
+    supportPhone: "",
+  });
 
   const [services, setServices] = useState<any[]>([]);
   const [charging, setCharging] = useState<any>({
@@ -57,14 +78,22 @@ export default function SetupWizard() {
     defaultTorqueSetting: "",
     defaultTyrePressure: "",
   });
+  const [bookingPublicEnabled, setBookingPublicEnabled] = useState(false);
+  const [startHour, setStartHour] = useState("09:00");
+  const [endHour, setEndHour] = useState("17:00");
   const [enablePayments, setEnablePayments] = useState(false);
+
+  const updateBranding = (next: any) => {
+    brandingRef.current = next;
+    setBranding(next);
+  };
 
   const loadStatus = useCallback(async () => {
     const data = await apiFetch("/guided-setup/status");
     setStatus(data);
     setCompletedSteps(normalizeList(data?.completedSteps));
     setSkippedSteps(normalizeList(data?.skippedSteps));
-    setBranding({
+    const nextBranding = {
       companyName: data?.branding?.companyName || "",
       logoUrl: data?.branding?.logoUrl || "",
       brandPrimaryColor: data?.branding?.brandPrimaryColor || "#4fd1c5",
@@ -72,7 +101,9 @@ export default function SetupWizard() {
       brandAccentColor: data?.branding?.brandAccentColor || data?.branding?.brandPrimaryColor || "#4fd1c5",
       supportEmail: data?.supportEmail || "",
       supportPhone: data?.supportPhone || "",
-    });
+    };
+    brandingRef.current = nextBranding;
+    setBranding(nextBranding);
     setServices(
       Array.isArray(data?.services) && data.services.length > 0
         ? data.services.map((svc: any) => ({
@@ -91,7 +122,21 @@ export default function SetupWizard() {
       defaultTorqueSetting: data?.chargingDefaults?.defaultTorqueSetting || "",
       defaultTyrePressure: data?.chargingDefaults?.defaultTyrePressure || "",
     });
-    setEnablePayments(Boolean(data?.stripeConfigured));
+    const weekdayHours = Array.isArray(data?.calendar?.businessHours)
+      ? data.calendar.businessHours.find((entry: any) => Number(entry?.dayOfWeek) === 1) || data.calendar.businessHours[0]
+      : null;
+    setBookingPublicEnabled(Boolean(data?.calendar?.bookingPublicEnabled));
+    setStartHour(
+      weekdayHours && Number.isFinite(Number(weekdayHours.startMinute))
+        ? formatMinuteOfDay(Number(weekdayHours.startMinute))
+        : "09:00",
+    );
+    setEndHour(
+      weekdayHours && Number.isFinite(Number(weekdayHours.endMinute))
+        ? formatMinuteOfDay(Number(weekdayHours.endMinute))
+        : "17:00",
+    );
+    setEnablePayments(Boolean(data?.paymentsEnabled));
 
     const currentStep = Number(data?.currentStep ?? 0);
     const maxStep = steps.length - 1;
@@ -118,7 +163,7 @@ export default function SetupWizard() {
     if (!res.ok) {
       throw new Error(data?.message || "Logo upload failed");
     }
-    setBranding((prev: any) => ({ ...prev, logoUrl: data?.logoUrl || prev.logoUrl }));
+    updateBranding({ ...brandingRef.current, logoUrl: data?.logoUrl || brandingRef.current.logoUrl });
   };
 
   const persistStep = async (
@@ -182,12 +227,13 @@ export default function SetupWizard() {
 
   const renderControls = (stepNumber: number, payload: Record<string, any>) => {
     const isLast = stepNumber === steps.length - 1;
+    const nextDisabled = saving || (stepNumber === 3 && !businessHoursPayload);
     return (
       <div style={{ display: "grid", gap: 12, marginTop: 16 }}>
         <button
           className="button"
           onClick={() => (isLast ? completeSetup() : persistStep(stepNumber, payload))}
-          disabled={saving}
+          disabled={nextDisabled}
         >
           {isLast ? "Finish setup" : "Next"}
         </button>
@@ -202,18 +248,54 @@ export default function SetupWizard() {
           Skip for now
         </button>
         <button className="button secondary" onClick={() => persistStep(stepNumber, payload, { saveAndExit: true })} disabled={saving}>
-          Save & Exit
+          Save & exit for now
         </button>
       </div>
     );
   };
 
+  const businessHoursPayload = useMemo(() => {
+    const startMinute = minuteOfDay(startHour);
+    const endMinute = minuteOfDay(endHour);
+    if (!Number.isFinite(startMinute) || !Number.isFinite(endMinute) || endMinute <= startMinute) {
+      return null;
+    }
+    return [1, 2, 3, 4, 5].map((dayOfWeek) => ({ dayOfWeek, startMinute, endMinute }));
+  }, [startHour, endHour]);
+
+  const getCurrentPayload = () => {
+    if (step === 0) return { trade: "WHEELS" };
+    if (step === 1) return brandingRef.current;
+    if (step === 2) return { services };
+    if (step === 3) return { ...charging, bookingPublicEnabled, businessHours: businessHoursPayload || [] };
+    if (step === 4) return { enablePayments };
+    return {};
+  };
+
   return (
     <DashboardShell>
       <div className="card" style={{ marginBottom: 16 }}>
-        <h1>Guided setup</h1>
-        <p className="muted">Step {step + 1} of {steps.length}: {steps[step].title}</p>
-        <p className="muted">Status: {stepState === "done" ? "Done" : stepState === "skipped" ? "Skipped" : "In progress"}</p>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
+          <div>
+            <h1>Guided setup</h1>
+            <p className="muted">Step {step + 1} of {steps.length}: {steps[step].title}</p>
+            <p className="muted">Status: {stepState === "done" ? "Done" : stepState === "skipped" ? "Skipped" : "In progress"}</p>
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <Link className="button secondary" href="/dashboard/settings" data-testid="guided-setup-rerun-settings">
+              Review in settings
+            </Link>
+            <button
+              className="button secondary"
+              type="button"
+              onClick={() => persistStep(step, getCurrentPayload(), { saveAndExit: true })}
+              disabled={saving || (step === 3 && !businessHoursPayload)}
+              data-testid="guided-setup-save-exit-header"
+            >
+              Save and exit
+            </button>
+          </div>
+        </div>
         {error ? <p style={{ color: "#ff8a8a" }}>{error}</p> : null}
       </div>
 
@@ -230,7 +312,7 @@ export default function SetupWizard() {
           <h2>Business branding</h2>
           <p className="muted">Add your name, logo, and support details so customers recognize you.</p>
           <label>Business name</label>
-          <input className="input" value={branding.companyName} onChange={(e) => setBranding({ ...branding, companyName: e.target.value })} />
+          <input className="input" value={branding.companyName} onChange={(e) => updateBranding({ ...brandingRef.current, companyName: e.target.value })} data-testid="guided-setup-company-name" />
 
           <label style={{ marginTop: 12 }}>Logo (upload)</label>
           <input
@@ -242,16 +324,16 @@ export default function SetupWizard() {
           />
 
           <label style={{ marginTop: 12 }}>Logo URL (optional)</label>
-          <input className="input" value={branding.logoUrl} onChange={(e) => setBranding({ ...branding, logoUrl: e.target.value })} />
+          <input className="input" value={branding.logoUrl} onChange={(e) => updateBranding({ ...brandingRef.current, logoUrl: e.target.value })} />
 
           <label style={{ marginTop: 12 }}>Primary color</label>
-          <input className="input" value={branding.brandPrimaryColor} onChange={(e) => setBranding({ ...branding, brandPrimaryColor: e.target.value })} />
+          <input className="input" value={branding.brandPrimaryColor} onChange={(e) => updateBranding({ ...brandingRef.current, brandPrimaryColor: e.target.value })} />
 
           <label style={{ marginTop: 12 }}>Support email</label>
-          <input className="input" value={branding.supportEmail} onChange={(e) => setBranding({ ...branding, supportEmail: e.target.value })} />
+          <input className="input" value={branding.supportEmail} onChange={(e) => updateBranding({ ...brandingRef.current, supportEmail: e.target.value })} />
 
           <label style={{ marginTop: 12 }}>Support phone (WhatsApp)</label>
-          <input className="input" value={branding.supportPhone} onChange={(e) => setBranding({ ...branding, supportPhone: e.target.value })} />
+          <input className="input" value={branding.supportPhone} onChange={(e) => updateBranding({ ...brandingRef.current, supportPhone: e.target.value })} />
 
           {renderControls(1, branding)}
         </div>
@@ -317,8 +399,8 @@ export default function SetupWizard() {
 
       {step === 3 ? (
         <div className="card">
-          <h2>Charging defaults</h2>
-          <p className="muted">Set your default pricing and VAT preferences.</p>
+          <h2>Charging and calendar</h2>
+          <p className="muted">Set your default pricing and the weekday hours customers can book against.</p>
           <label style={{ marginBottom: 8 }}>
             <input type="checkbox" checked={charging.pricePerWheel} onChange={(e) => setCharging({ ...charging, pricePerWheel: e.target.checked })} />
             Price per wheel by default
@@ -333,22 +415,54 @@ export default function SetupWizard() {
           <input className="input" value={charging.defaultTorqueSetting} onChange={(e) => setCharging({ ...charging, defaultTorqueSetting: e.target.value })} />
           <label style={{ marginTop: 12 }}>Default tyre pressure (optional)</label>
           <input className="input" value={charging.defaultTyrePressure} onChange={(e) => setCharging({ ...charging, defaultTyrePressure: e.target.value })} />
-          {renderControls(3, charging)}
+          <div className="integration-card" style={{ marginTop: 16, padding: 16 }} data-testid="guided-setup-calendar-step">
+            <h3 style={{ marginTop: 0 }}>Calendar availability</h3>
+            <p className="muted">These weekday hours seed the booking calendar and can be refined later in Scheduling.</p>
+            <label style={{ marginBottom: 8 }}>
+              <input type="checkbox" checked={bookingPublicEnabled} onChange={(e) => setBookingPublicEnabled(e.target.checked)} />
+              Accept booking requests during these hours
+            </label>
+            <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
+              <div>
+                <label>Start time</label>
+                <input className="input" type="time" value={startHour} onChange={(e) => setStartHour(e.target.value)} data-testid="guided-setup-start-time" />
+              </div>
+              <div>
+                <label>End time</label>
+                <input className="input" type="time" value={endHour} onChange={(e) => setEndHour(e.target.value)} data-testid="guided-setup-end-time" />
+              </div>
+            </div>
+            {!businessHoursPayload ? <p style={{ color: "#ff8a8a", marginBottom: 0 }}>End time must be later than start time.</p> : null}
+          </div>
+          {renderControls(3, { ...charging, bookingPublicEnabled, businessHours: businessHoursPayload || [] })}
         </div>
       ) : null}
 
       {step === 4 ? (
         <div className="card">
-          <h2>Payments</h2>
+          <h2>Billing and payments</h2>
           {status?.stripeConfigured ? (
-            <p className="muted">Stripe is connected. Enable payments to allow customers to pay online.</p>
+            <p className="muted">Stripe is configured. Enable customer payments here, then manage plans and billing rules from the billing workspace.</p>
           ) : (
-            <p className="muted">Stripe is not configured yet. You can skip for now and continue using MyTitan.</p>
+            <p className="muted">Stripe is not configured for this environment yet. Online payments remain unavailable until a valid Stripe secret key and prices are configured on the server.</p>
           )}
+          <div className="integration-card" style={{ padding: 16, marginBottom: 12 }} data-testid="guided-setup-billing-step">
+            <strong>{status?.stripeConfigured ? "Stripe ready" : "Stripe unavailable"}</strong>
+            <p className="muted" style={{ marginBottom: 12 }}>
+              {status?.stripeConfigured
+                ? "Customers can be routed into Stripe once payments are enabled for this workspace."
+                : "Connect Stripe in deployment configuration first. MyTitan will not claim payment readiness before that is true."}
+            </p>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <Link className="button secondary" href="/dashboard/billing">Open billing workspace</Link>
+              <Link className="button secondary" href="/dashboard/billing/readiness">Review billing readiness</Link>
+            </div>
+          </div>
           <label style={{ marginBottom: 12 }}>
-            <input type="checkbox" checked={enablePayments} onChange={(e) => setEnablePayments(e.target.checked)} />
+            <input type="checkbox" checked={enablePayments} onChange={(e) => setEnablePayments(e.target.checked)} disabled={!status?.stripeConfigured} data-testid="guided-setup-enable-payments" />
             Enable online payments
           </label>
+          {!status?.stripeConfigured ? <p className="muted">This control stays disabled until Stripe is configured correctly.</p> : null}
           {renderControls(4, { enablePayments })}
         </div>
       ) : null}

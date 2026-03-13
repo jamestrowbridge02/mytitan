@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { apiFetch, setToken } from '../lib/api';
-import { isAuthPolishV1Enabled, isStartHereEnabled } from '../lib/feature-flags';
+import { isAuthPolishV1Enabled, isGuidedSetupV2Enabled, isStartHereEnabled } from '../lib/feature-flags';
 import MyTitanLogo from '../components/brand/mytitan-logo';
 
 export default function Login() {
@@ -12,6 +12,7 @@ export default function Login() {
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const authPolish = isAuthPolishV1Enabled();
+  const guidedSetupV2Enabled = isGuidedSetupV2Enabled();
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -40,6 +41,10 @@ export default function Login() {
       if (isStartHereEnabled()) {
         try {
           const status = await apiFetch('/onboarding/status');
+          if (guidedSetupV2Enabled && !status?.onboardingCompleted) {
+            router.replace('/dashboard/setup-wizard');
+            return;
+          }
           router.replace(status?.onboardingCompleted ? '/start' : '/onboarding');
           return;
         } catch {

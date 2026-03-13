@@ -8,7 +8,7 @@ import { TradePacksService } from "../trade-packs/trade-packs.service";
 
 const DEFAULT_PRIMARY_COLOR = "#4fd1c5";
 const DEFAULT_SECONDARY_COLOR = "#1a1f36";
-const GUIDED_SETUP_STEPS = ["trade", "branding", "services", "charging", "payments", "ready"] as const;
+const GUIDED_SETUP_STEPS = ["trade", "branding", "services", "operations", "payments", "ready"] as const;
 
 const WHEELS_DEFAULT_SERVICES = [
   { key: "diamond_cut", name: "Diamond Cut", unitPrice: 140, vatEligible: true },
@@ -45,10 +45,16 @@ export class GuidedSetupService {
   async getStatus(tenantId: string) {
     const db = this.prisma as any;
     const settings = await this.tenantService.getSettings(tenantId);
-    const services = await db.serviceCatalogItem.findMany({
-      where: { tenantId },
-      orderBy: [{ active: "desc" }, { name: "asc" }],
-    });
+    const [services, bookingBusinessHours] = await Promise.all([
+      db.serviceCatalogItem.findMany({
+        where: { tenantId },
+        orderBy: [{ active: "desc" }, { name: "asc" }],
+      }),
+      db.bookingBusinessHour.findMany({
+        where: { tenantId },
+        orderBy: [{ dayOfWeek: "asc" }, { startMinute: "asc" }],
+      }),
+    ]);
 
     const completedSteps = normalizeStepList(settings.guidedSetupCompletedSteps);
     const skippedSteps = normalizeStepList(settings.guidedSetupSkippedSteps);
@@ -79,6 +85,14 @@ export class GuidedSetupService {
         defaultTorqueSetting: settings.defaultTorqueSetting ?? null,
         defaultTyrePressure: settings.defaultTyrePressure ?? null,
       },
+      calendar: {
+        bookingPublicEnabled: Boolean(settings.bookingPublicEnabled),
+        businessHours: bookingBusinessHours.map((entry: any) => ({
+          dayOfWeek: Number(entry.dayOfWeek),
+          startMinute: Number(entry.startMinute),
+          endMinute: Number(entry.endMinute),
+        })),
+      },
       services: services.map((service: any) => ({
         id: service.id,
         key: service.key,
@@ -88,6 +102,7 @@ export class GuidedSetupService {
         enabled: Boolean(service.active),
       })),
       stripeConfigured: this.billingService.isStripeConfigured(),
+      paymentsEnabled: Boolean(settings.paymentsEnabled || settings.featurePayments),
     };
   }
 
@@ -267,6 +282,7 @@ export class GuidedSetupService {
       const vatRateBps = skipped ? 2000 : Math.round(Number(data.vatRate ?? 20) * 100);
       const defaultTorqueSetting = skipped ? null : (data.defaultTorqueSetting ?? null);
       const defaultTyrePressure = skipped ? null : (data.defaultTyrePressure ?? null);
+      const bookingPublicEnabled = skipped ? false : Boolean(data.bookingPublicEnabled);
 
       await db.tenantSetting.upsert({
         where: { tenantId },
@@ -276,6 +292,7 @@ export class GuidedSetupService {
           vatRateBpsDefault: vatRateBps,
           defaultTorqueSetting,
           defaultTyrePressure,
+          bookingPublicEnabled,
         },
         create: {
           tenantId,
@@ -284,8 +301,34 @@ export class GuidedSetupService {
           vatRateBpsDefault: vatRateBps,
           defaultTorqueSetting,
           defaultTyrePressure,
+          bookingPublicEnabled,
         },
       });
+
+      if (Array.isArray(data.businessHours)) {
+        const hours = data.businessHours
+          .map((entry: any) => ({
+            tenantId,
+            dayOfWeek: Number(entry.dayOfWeek),
+            startMinute: Number(entry.startMinute),
+            endMinute: Number(entry.endMinute),
+          }))
+          .filter((entry: any) =>
+            Number.isFinite(entry.dayOfWeek) &&
+            Number.isFinite(entry.startMinute) &&
+            Number.isFinite(entry.endMinute) &&
+            entry.dayOfWeek >= 0 &&
+            entry.dayOfWeek <= 6 &&
+            entry.startMinute >= 0 &&
+            entry.endMinute > entry.startMinute &&
+            entry.endMinute <= 1440,
+          );
+
+        await db.bookingBusinessHour.deleteMany({ where: { tenantId } });
+        if (hours.length > 0) {
+          await db.bookingBusinessHour.createMany({ data: hours });
+        }
+      }
     }
 
     if (step === 4) {

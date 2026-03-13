@@ -62,24 +62,17 @@ export function GuidedSetupProgress({ enabled, incomplete, compact = false }: Pr
       <div className="card" style={{ marginBottom: 16 }}>
         <h2 style={{ marginTop: 0 }}>Setup in progress</h2>
         <p className="muted">{progress.percent}% complete • {progress.remaining} step(s) left</p>
-        <Link className="button secondary" href="/dashboard/setup-wizard">Continue setup</Link>
+        <Link className="button secondary" href="/dashboard/setup-wizard" data-testid="guided-setup-continue">Continue setup</Link>
       </div>
     );
   }
 
   return (
-    <>
-      <div className="card" style={{ marginBottom: 16 }}>
-        <h2 style={{ marginTop: 0 }}>Finish setup</h2>
-        <p className="muted">You can keep using MyTitan now. Finish the setup when ready.</p>
-        <Link className="button secondary" href="/dashboard/setup-wizard">Continue setup</Link>
-      </div>
-      <div className="card" style={{ marginBottom: 16 }}>
-        <h2 style={{ marginTop: 0 }}>Setup Progress</h2>
-        <p className="muted">{progress.percent}% complete</p>
-        <p className="muted">{progress.remaining} step(s) remaining</p>
-        <Link className="button" href="/dashboard/setup-wizard">Continue Setup</Link>
-      </div>
-    </>
+    <div className="card" style={{ marginBottom: 16 }} data-testid="guided-setup-progress-card">
+      <h2 style={{ marginTop: 0 }}>Finish setup</h2>
+      <p className="muted">You can keep using MyTitan now. Resume the guided setup whenever you are ready.</p>
+      <p className="muted">{progress.percent}% complete • {progress.remaining} step(s) remaining</p>
+      <Link className="button" href="/dashboard/setup-wizard" data-testid="guided-setup-continue">Continue setup</Link>
+    </div>
   );
 }

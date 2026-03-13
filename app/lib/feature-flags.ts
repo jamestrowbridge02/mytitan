@@ -15,7 +15,7 @@ export const isPortalPolishV1Enabled = () =>
   isEnabled(process.env.NEXT_PUBLIC_MYTITAN_FEATURE_PORTAL_POLISH_V1);
 
 export const isGuidedSetupV2Enabled = () =>
-  isEnabled(process.env.NEXT_PUBLIC_MYTITAN_FEATURE_GUIDED_SETUP_V2);
+  isEnabled(process.env.NEXT_PUBLIC_MYTITAN_FEATURE_GUIDED_SETUP_V2) || isStartHereEnabled();
 
 export const isCommandCentreEnabled = () =>
   isEnabled(process.env.NEXT_PUBLIC_MYTITAN_FEATURE_COMMAND_CENTRE);
