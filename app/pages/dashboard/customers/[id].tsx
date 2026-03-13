@@ -84,15 +84,20 @@ export default function CustomerTimelinePage() {
       setApprovalRequests([]);
       return;
     }
-    try {
-      const [account, approvals] = await Promise.all([
-        apiFetch(`/customer-accounts/${encodeURIComponent(customerId)}/status`),
-        apiFetch(`/customer-approvals?customerId=${encodeURIComponent(customerId)}`),
-      ]);
-      setAccountStatus(account || null);
-      setApprovalRequests(Array.isArray(approvals) ? approvals : []);
-    } catch {
+    const [accountResult, approvalsResult] = await Promise.allSettled([
+      apiFetch(`/customer-accounts/${encodeURIComponent(customerId)}/status`),
+      apiFetch(`/customer-approvals?customerId=${encodeURIComponent(customerId)}`),
+    ]);
+
+    if (accountResult.status === "fulfilled") {
+      setAccountStatus(accountResult.value || null);
+    } else {
       setAccountStatus(null);
+    }
+
+    if (approvalsResult.status === "fulfilled") {
+      setApprovalRequests(Array.isArray(approvalsResult.value) ? approvalsResult.value : []);
+    } else {
       setApprovalRequests([]);
     }
   }

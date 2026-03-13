@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { DashboardShell } from "../../components/dashboard-shell";
 import { OperatorNotice } from "../../components/feedback/OperatorNotice";
 import { useOperatorNotice } from "../../components/feedback/useOperatorNotice";
@@ -149,6 +149,9 @@ export default function AnalyticsPage() {
   const [windowDays, setWindowDays] = useState(30);
   const [widgetOrder, setWidgetOrder] = useState<string[]>(DEFAULT_WIDGET_ORDER);
   const [hiddenWidgets, setHiddenWidgets] = useState<string[]>([]);
+  const widgetOrderRef = useRef<string[]>(DEFAULT_WIDGET_ORDER);
+  const hiddenWidgetsRef = useRef<string[]>([]);
+  const windowDaysRef = useRef(30);
   const [activeLocationId, setActiveLocationId] = useState('all');
   const [loading, setLoading] = useState(true);
   const [savingLayout, setSavingLayout] = useState(false);
@@ -157,6 +160,27 @@ export default function AnalyticsPage() {
   const canView = hasWorkspacePermission(permissions, "dashboard.view_intelligence");
   const canManageRevenue = hasWorkspacePermission(permissions, "billing.manage");
   const canManageLayout = hasWorkspacePermission(permissions, "settings.manage");
+
+  function updateWidgetOrder(next: string[] | ((current: string[]) => string[])) {
+    setWidgetOrder((current) => {
+      const resolved = typeof next === "function" ? next(current) : next;
+      widgetOrderRef.current = resolved;
+      return resolved;
+    });
+  }
+
+  function updateHiddenWidgets(next: string[] | ((current: string[]) => string[])) {
+    setHiddenWidgets((current) => {
+      const resolved = typeof next === "function" ? next(current) : next;
+      hiddenWidgetsRef.current = resolved;
+      return resolved;
+    });
+  }
+
+  function updateWindowDays(next: number) {
+    windowDaysRef.current = next;
+    setWindowDays(next);
+  }
 
   async function load(activeWindowDays?: number) {
     const selectedWindowDays = activeWindowDays || windowDays;
@@ -193,10 +217,10 @@ export default function AnalyticsPage() {
       const benchmarksResponse = (results[4] || null) as BenchmarksResponse | null;
       setBenchmarks(benchmarksResponse);
       if (benchmarksResponse?.widgetLayout) {
-        setWidgetOrder(benchmarksResponse.widgetLayout.widgetOrder || DEFAULT_WIDGET_ORDER);
-        setHiddenWidgets(benchmarksResponse.widgetLayout.hiddenWidgets || []);
+        updateWidgetOrder(benchmarksResponse.widgetLayout.widgetOrder || DEFAULT_WIDGET_ORDER);
+        updateHiddenWidgets(benchmarksResponse.widgetLayout.hiddenWidgets || []);
         if (!activeWindowDays) {
-          setWindowDays(benchmarksResponse.widgetLayout.defaultWindowDays || selectedWindowDays);
+          updateWindowDays(benchmarksResponse.widgetLayout.defaultWindowDays || selectedWindowDays);
         }
       }
       setRevenue(normalizedPermissions["billing.manage"] ? ((results[5] || null) as RevenueResponse | null) : null);
@@ -220,7 +244,11 @@ export default function AnalyticsPage() {
     void load();
   }, [activeLocationId, enabled]);
 
-  async function saveLayout(nextOrder = widgetOrder, nextHidden = hiddenWidgets, nextWindowDays = windowDays) {
+  async function saveLayout(
+    nextOrder = widgetOrderRef.current,
+    nextHidden = hiddenWidgetsRef.current,
+    nextWindowDays = windowDaysRef.current,
+  ) {
     if (!canManageLayout) return;
     setSavingLayout(true);
     try {
@@ -356,7 +384,7 @@ export default function AnalyticsPage() {
                 value={windowDays}
                 onChange={(event) => {
                   const nextWindowDays = Number(event.target.value);
-                  setWindowDays(nextWindowDays);
+                  updateWindowDays(nextWindowDays);
                   void load(nextWindowDays);
                 }}
               >
@@ -383,17 +411,17 @@ export default function AnalyticsPage() {
                       <p className="muted" style={{ margin: "4px 0 0 0" }}>{hidden ? "Hidden from default layout" : "Visible in default layout"}</p>
                     </div>
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                      <button className="button secondary" type="button" onClick={() => setWidgetOrder((current) => moveItem(current, widgetKey, "up"))}>
+                      <button className="button secondary" type="button" onClick={() => updateWidgetOrder((current) => moveItem(current, widgetKey, "up"))}>
                         Move up
                       </button>
-                      <button className="button secondary" type="button" onClick={() => setWidgetOrder((current) => moveItem(current, widgetKey, "down"))}>
+                      <button className="button secondary" type="button" onClick={() => updateWidgetOrder((current) => moveItem(current, widgetKey, "down"))}>
                         Move down
                       </button>
                       <button
                         className="button secondary"
                         type="button"
                         onClick={() => {
-                          setHiddenWidgets((current) => current.includes(widgetKey)
+                          updateHiddenWidgets((current) => current.includes(widgetKey)
                             ? current.filter((item) => item !== widgetKey)
                             : [...current, widgetKey]);
                         }}
