@@ -11,7 +11,7 @@ const PLANS = [
 ];
 
 export default function BillingPage() {
-  const { plan, subscription, usage, features, interval: billingInterval, refresh } = useBilling();
+  const { plan, subscription, usage, features, interval: billingInterval, stripeConfigured, refresh } = useBilling();
   const { settings } = useTenantSettings();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState('');
@@ -33,6 +33,10 @@ export default function BillingPage() {
   const usedJobs = usage?.jobsCreatedCount ?? 0;
 
   async function startCheckout(planCode: string) {
+    if (!stripeConfigured) {
+      setError('Stripe checkout is not configured for this environment. Configure a valid secret key and price IDs before taking payments.');
+      return;
+    }
     setError('');
     setLoading(planCode);
     try {
@@ -54,6 +58,10 @@ export default function BillingPage() {
   }
 
   async function openPortal() {
+    if (!stripeConfigured) {
+      setError('Stripe billing portal is not configured for this environment. Configure Stripe before handing operators into billing management.');
+      return;
+    }
     setError('');
     try {
       const res = await apiFetch('/billing/portal');
@@ -72,6 +80,14 @@ export default function BillingPage() {
       <div className="card">
         <h1>Billing</h1>
         {error && <p style={{ color: '#ff8a8a' }}>{error}</p>}
+        {!stripeConfigured ? (
+          <div className="card" style={{ marginTop: 12, padding: 16, borderColor: '#7a4a20' }}>
+            <strong>Stripe checkout unavailable</strong>
+            <p className="muted" style={{ marginBottom: 0 }}>
+              This workspace can still review billing state, but hosted checkout and the Stripe portal are disabled until a valid Stripe secret key and plan price IDs are configured on the server.
+            </p>
+          </div>
+        ) : null}
 
         <p className="muted">
           Current plan: <strong>{plan?.name || currentPlanCode}</strong> ({status})
@@ -130,18 +146,18 @@ export default function BillingPage() {
               <button
                 className="button"
                 type="button"
-                disabled={loading === p.code}
+                disabled={loading === p.code || !stripeConfigured}
                 onClick={() => startCheckout(p.code)}
                 style={{ marginRight: 10 }}
               >
-                {loading === p.code ? 'Redirecting...' : currentPlanCode === p.code ? 'Manage Plan' : 'Choose Plan'}
+                {loading === p.code ? 'Redirecting...' : !stripeConfigured ? 'Stripe unavailable' : currentPlanCode === p.code ? 'Manage Plan' : 'Choose Plan'}
               </button>
             </div>
           ))}
         </div>
 
-        <button className="button" type="button" style={{ marginTop: 16 }} onClick={openPortal}>
-          Manage billing in Stripe
+        <button className="button" type="button" style={{ marginTop: 16 }} onClick={openPortal} disabled={!stripeConfigured}>
+          {stripeConfigured ? 'Manage billing in Stripe' : 'Stripe portal unavailable'}
         </button>
       </div>
     </DashboardShell>

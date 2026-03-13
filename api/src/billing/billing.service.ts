@@ -405,6 +405,7 @@ export class BillingService {
       usage: usage ?? { aiRequestsUsed: 0, aiTokensUsed: 0, periodStart },
       features: effective,
       interval: settings?.planBillingInterval ?? DEFAULT_INTERVAL,
+      stripeConfigured: this.isStripeConfigured(),
     };
   }
 

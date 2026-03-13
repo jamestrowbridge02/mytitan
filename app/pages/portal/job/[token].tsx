@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/router';
 import { getApiBase } from '../../../lib/api';
 import { isMarketplaceEnabled, isPortalPolishV1Enabled } from '../../../lib/feature-flags';
+import { humanizeUnderscoreLabel } from '../../../lib/text-format';
 import MyTitanLogo from '../../../components/brand/mytitan-logo';
 
 const API_BASE = getApiBase();
@@ -678,7 +679,7 @@ export default function PublicJobPortal() {
           <h3 style={{ marginTop: 0 }}>Billing progress</h3>
           <div style={{ display: 'grid', gap: 8 }}>
             <p style={{ margin: 0 }}>
-              <strong>Billing state:</strong> {String(portal?.summary?.billingState || (paid ? 'paid' : job?.invoiceIssuedAt ? 'invoice_issued' : 'pre_invoice')).replaceAll('_', ' ')}
+              <strong>Billing state:</strong> {humanizeUnderscoreLabel(portal?.summary?.billingState || (paid ? 'paid' : job?.invoiceIssuedAt ? 'invoice_issued' : 'pre_invoice'))}
             </p>
             {dueTime ? (
               <p style={{ margin: 0 }}>
@@ -707,7 +708,7 @@ export default function PublicJobPortal() {
                   <div>
                     <div style={{ fontWeight: 600 }}>{item.label}</div>
                     <div className="muted" style={{ marginTop: 4 }}>
-                      {[item.kind.replaceAll("_", " "), formatDateTime(item.createdAt)].filter(Boolean).join(" • ")}
+                      {[humanizeUnderscoreLabel(item.kind), formatDateTime(item.createdAt)].filter(Boolean).join(" • ")}
                     </div>
                   </div>
                   {item.downloadUrl ? (
@@ -745,7 +746,7 @@ export default function PublicJobPortal() {
                   <div key={item.id} style={{ display: "flex", justifyContent: "space-between", gap: 12, border: "1px solid #2a3042", borderRadius: 12, padding: "12px 14px" }}>
                     <div>
                       <div style={{ fontWeight: 600 }}>{item.label}</div>
-                      <div className="muted" style={{ marginTop: 4 }}>{String(item.kind || "").replaceAll("_", " ")}</div>
+                      <div className="muted" style={{ marginTop: 4 }}>{humanizeUnderscoreLabel(item.kind)}</div>
                     </div>
                     {item.artifact ? (
                       <div className="muted">{item.artifact.label}</div>
@@ -914,7 +915,7 @@ export default function PublicJobPortal() {
             <div style={{ display: 'grid', gap: 10 }}>
               {portal?.summary?.billingState ? (
                 <p className="muted" style={{ margin: 0 }}>
-                  Billing state: {String(portal.summary.billingState).replaceAll('_', ' ')}
+                  Billing state: {humanizeUnderscoreLabel(portal.summary.billingState)}
                 </p>
               ) : null}
               <button className="button" data-testid="public-portal-pay" type="button" onClick={pay} disabled={!step4Enabled || pendingAction !== ''} style={{ width: '100%', minHeight: 46 }}>

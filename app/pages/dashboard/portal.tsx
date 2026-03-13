@@ -12,6 +12,7 @@ import {
   OperatorRowActions,
 } from "../../components/ui/operator-page";
 import { apiFetch } from "../../lib/api";
+import { humanizeUnderscoreLabel } from "../../lib/text-format";
 import { emptyPermissionSnapshot, hasWorkspacePermission, normalizePermissionSnapshot } from "../../lib/workspace-permissions";
 
 type PortalOverview = {
@@ -225,7 +226,7 @@ export default function PortalOpsPage() {
                   <div className="operator-table__cell">
                     <div className="operator-cellMeta">
                       <span><strong>{job.invoicePaidAt ? "Paid" : job.invoiceIssuedAt ? "Invoice issued" : "Pre-invoice"}</strong></span>
-                      {job.commercialState ? <span>Lifecycle {job.commercialState.replaceAll("_", " ")}</span> : null}
+                      {job.commercialState ? <span>Lifecycle {humanizeUnderscoreLabel(job.commercialState)}</span> : null}
                       {job.invoiceDueAt ? <span>{job.invoiceOverdue ? `Payment overdue since ${new Date(job.invoiceDueAt).toLocaleDateString()}` : `Payment due ${new Date(job.invoiceDueAt).toLocaleDateString()}`}</span> : null}
                       <span>{job.paymentReady ? "Payment-capable portal" : "Portal-only / payment disabled"}</span>
                       {job.nextCustomerStep ? <span>{job.nextCustomerStep}</span> : null}

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ApiError } from "../../lib/api";
 import { OperatorStatusBadge } from "../../components/ui/operator-page";
 import { clearCustomerToken, customerApiFetch, getCustomerToken, setCustomerToken } from "../../lib/customer-auth";
+import { humanizeUnderscoreLabel } from "../../lib/text-format";
 import MyTitanLogo from "../../components/brand/mytitan-logo";
 
 function money(cents: number, currency = "GBP") {
@@ -286,7 +287,7 @@ export default function CustomerWorkspacePage() {
                       <OperatorStatusBadge label={approval.status} />
                     </div>
                     <p className="muted" style={{ margin: "6px 0 0 0" }}>
-                      {approval.kind.replaceAll("_", " ")} • Requested {formatDateTime(approval.requestedAt)}
+                      {humanizeUnderscoreLabel(approval.kind)} • Requested {formatDateTime(approval.requestedAt)}
                     </p>
                   </div>
                   {approval.status === "PENDING" ? (
@@ -372,7 +373,7 @@ export default function CustomerWorkspacePage() {
                   <div>
                     <strong>{document.label}</strong>
                     <p className="muted" style={{ margin: "6px 0 0 0" }}>
-                      {document.kind.replaceAll("_", " ")} {document.jobRef ? `• ${document.jobRef}` : ""}
+                      {humanizeUnderscoreLabel(document.kind)} {document.jobRef ? `• ${document.jobRef}` : ""}
                     </p>
                   </div>
                   <a className="button secondary" href={document.downloadPath || document.downloadUrl} target="_blank" rel="noreferrer noopener">
@@ -468,7 +469,7 @@ export default function CustomerWorkspacePage() {
                     <div data-testid="customer-plan-request-list" style={{ display: "grid", gap: 6 }}>
                       {(plan.changeRequests || []).slice(0, 4).map((request: any) => (
                         <div key={request.id} className="muted" style={{ fontSize: 13 }}>
-                          {String(request.kind || "").replaceAll("_", " ")} • {request.status} • {formatDateTime(request.requestedAt)}
+                          {humanizeUnderscoreLabel(request.kind)} • {request.status} • {formatDateTime(request.requestedAt)}
                           {request.responseNote ? ` • ${request.responseNote}` : ""}
                         </div>
                       ))}

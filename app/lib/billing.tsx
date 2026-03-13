@@ -33,6 +33,7 @@ type BillingState = {
   features: Record<string, any>;
   usage: Usage | null;
   interval: 'MONTHLY' | 'ANNUAL';
+  stripeConfigured: boolean;
   loading: boolean;
   error: string;
   refresh: () => Promise<void>;
@@ -55,6 +56,7 @@ export function BillingProvider({ children }: { children: React.ReactNode }) {
   const [features, setFeatures] = useState<Record<string, any>>(defaultFeatures);
   const [usage, setUsage] = useState<Usage | null>(null);
   const [interval, setInterval] = useState<'MONTHLY' | 'ANNUAL'>('MONTHLY');
+  const [stripeConfigured, setStripeConfigured] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -65,6 +67,7 @@ export function BillingProvider({ children }: { children: React.ReactNode }) {
       setFeatures(defaultFeatures);
       setUsage(null);
       setInterval('MONTHLY');
+      setStripeConfigured(false);
       setError('');
       return;
     }
@@ -78,6 +81,7 @@ export function BillingProvider({ children }: { children: React.ReactNode }) {
       setFeatures(data?.features ?? nextPlan?.featuresJson ?? defaultFeatures);
       setUsage(data?.usage ?? null);
       setInterval(data?.interval || 'MONTHLY');
+      setStripeConfigured(Boolean(data?.stripeConfigured));
     } catch (err: any) {
       setError(err.message || 'Failed to load billing');
       setPlan(null);
@@ -85,6 +89,7 @@ export function BillingProvider({ children }: { children: React.ReactNode }) {
       setFeatures(defaultFeatures);
       setUsage(null);
       setInterval('MONTHLY');
+      setStripeConfigured(false);
     } finally {
       setLoading(false);
     }
@@ -101,11 +106,12 @@ export function BillingProvider({ children }: { children: React.ReactNode }) {
       features,
       usage,
       interval,
+      stripeConfigured,
       loading,
       error,
       refresh,
     }),
-    [plan, subscription, features, usage, interval, loading, error],
+    [plan, subscription, features, usage, interval, stripeConfigured, loading, error],
   );
 
   return <BillingContext.Provider value={value}>{children}</BillingContext.Provider>;

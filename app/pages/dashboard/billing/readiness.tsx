@@ -12,6 +12,7 @@ import {
   OperatorRowActions,
 } from "../../../components/ui/operator-page";
 import { apiFetch } from "../../../lib/api";
+import { humanizeUnderscoreLabel } from "../../../lib/text-format";
 import { emptyPermissionSnapshot, hasWorkspacePermission, normalizePermissionSnapshot } from "../../../lib/workspace-permissions";
 
 type BillingReadiness = {
@@ -218,7 +219,7 @@ export default function BillingReadinessPage() {
                     <div className="operator-cellMeta">
                       <span><strong>{job.invoiceIssuedAt ? "Invoice issued" : job.invoiceReady ? "Invoice ready" : "Not ready"}</strong></span>
                       <span>{job.invoicePaidAt ? "Paid" : job.paymentReady ? "Payment-capable" : "Payment not ready"}</span>
-                      {job.lifecycleState ? <span>Lifecycle {job.lifecycleState.replaceAll("_", " ")}</span> : null}
+                      {job.lifecycleState ? <span>Lifecycle {humanizeUnderscoreLabel(job.lifecycleState)}</span> : null}
                       {job.invoiceDueAt ? (
                         <span>{job.invoiceOverdue ? `Payment overdue since ${new Date(job.invoiceDueAt).toLocaleDateString()}` : `Payment due ${new Date(job.invoiceDueAt).toLocaleDateString()}`}</span>
                       ) : null}
