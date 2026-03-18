@@ -192,7 +192,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="dashboard-shell-content">
+    <div className="dashboard-shell-content w-full min-w-0">
       {isDemoUser ? (
         <div className="card" style={{ marginBottom: 8, borderColor: '#8cc8ff' }}>
           <strong>Demo mode</strong>

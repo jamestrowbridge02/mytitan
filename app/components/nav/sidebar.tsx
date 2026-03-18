@@ -37,7 +37,7 @@ function cx(...xs: Array<string | false | null | undefined>) {
   return xs.filter(Boolean).join(" ");
 }
 
-export default function Sidebar() {
+export default function Sidebar({ desktopWidth = 292 }: { desktopWidth?: number }) {
   const router = useRouter();
   const { settings } = useTenantSettings();
   const [permissions, setPermissions] = React.useState(() => emptyPermissionSnapshot());
@@ -87,7 +87,10 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="mt-sidebar relative z-0 hidden md:block h-screen shrink-0" style={{ width: 292, flex: "0 0 292px" }}>
+    <aside
+      className="mt-sidebar fixed inset-y-0 left-0 z-20 hidden h-screen shrink-0 md:block"
+      style={{ width: desktopWidth, flex: `0 0 ${desktopWidth}px` }}
+    >
       <div className="flex h-full flex-col px-3 py-3">
         <div className="mt-sidebar__brand rounded-2xl px-3 py-3">
           <Link href="/dashboard" className="mt-sidebar__brandLink flex items-center justify-between gap-3">

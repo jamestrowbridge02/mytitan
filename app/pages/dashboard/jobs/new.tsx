@@ -1205,6 +1205,140 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
     );
   }
 
+  function renderEvidenceMediaFields() {
+    return (
+      <>
+        <label className="jobs-new-label">Torque evidence (image/video)</label>
+        <input
+          ref={torqueFileInputRef}
+          data-testid="jobs-torque-upload"
+          className="input jobs-new-input"
+          type="file"
+          accept="image/*,video/*"
+          capture="environment"
+          onChange={(e) => setTorqueMedia(e.target.files?.[0] || null)}
+        />
+        {torqueFile ? (
+          <div className="card" style={{ padding: 12, marginTop: 8 }}>
+            <p style={{ marginTop: 0, marginBottom: 8 }}>{torqueFile.file.name}</p>
+            {torqueFile.file.type.startsWith("image/") && torqueFile.previewUrl ? (
+              <img src={torqueFile.previewUrl} alt={torqueFile.file.name} style={{ width: 140, height: 100, objectFit: "cover", borderRadius: 8 }} />
+            ) : null}
+            {torqueFile.file.type.startsWith("video/") && torqueFile.previewUrl ? (
+              <video src={torqueFile.previewUrl} controls style={{ width: 180, maxWidth: "100%" }} />
+            ) : null}
+            {!torqueFile.file.type.startsWith("image/") && !torqueFile.file.type.startsWith("video/") ? (
+              <span className="muted">Video selected</span>
+            ) : null}
+            <div>
+              <button
+                type="button"
+                className="button secondary"
+                style={{ marginTop: 8 }}
+                onClick={() => {
+                  setTorqueMedia(null);
+                  if (torqueFileInputRef.current) torqueFileInputRef.current.value = "";
+                }}
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        <label style={{ marginTop: 12 }}>Before photos (up to 6)</label>
+        <input
+          ref={beforeFileInputRef}
+          data-testid="jobs-before-upload"
+          className="input jobs-new-input"
+          type="file"
+          accept="image/*"
+          capture="environment"
+          multiple
+          onChange={(e) => {
+            appendMediaFiles(e.target.files, setBeforeFiles);
+            e.currentTarget.value = "";
+          }}
+        />
+        <button type="button" className="button secondary" style={{ marginTop: 8 }} onClick={() => beforeFileInputRef.current?.click()}>
+          Add More Before Photos
+        </button>
+        <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", marginTop: 10 }}>
+          {beforeFiles.map((item) => (
+            <div key={item.id} className="card" style={{ padding: 10 }}>
+              {item.previewUrl ? (
+                <img src={item.previewUrl} alt={item.file.name} style={{ width: "100%", height: 90, objectFit: "cover", borderRadius: 6 }} />
+              ) : null}
+              <p className="muted" style={{ margin: "8px 0" }}>{item.file.name}</p>
+              <button type="button" className="button secondary" onClick={() => removeBeforeFile(item.id)}>Remove</button>
+            </div>
+          ))}
+        </div>
+
+        <label style={{ marginTop: 12 }}>After photos (up to 6)</label>
+        <input
+          ref={afterFileInputRef}
+          data-testid="jobs-after-upload"
+          className="input jobs-new-input"
+          type="file"
+          accept="image/*"
+          capture="environment"
+          multiple
+          onChange={(e) => {
+            appendMediaFiles(e.target.files, setAfterFiles);
+            e.currentTarget.value = "";
+          }}
+        />
+        <button type="button" className="button secondary" style={{ marginTop: 8 }} onClick={() => afterFileInputRef.current?.click()}>
+          Add More After Photos
+        </button>
+        <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", marginTop: 10 }}>
+          {afterFiles.map((item) => (
+            <div key={item.id} className="card" style={{ padding: 10 }}>
+              {item.previewUrl ? (
+                <img src={item.previewUrl} alt={item.file.name} style={{ width: "100%", height: 90, objectFit: "cover", borderRadius: 6 }} />
+              ) : null}
+              <p className="muted" style={{ margin: "8px 0" }}>{item.file.name}</p>
+              <button type="button" className="button secondary" onClick={() => removeAfterFile(item.id)}>Remove</button>
+            </div>
+          ))}
+        </div>
+
+        {resumeMediaMessages.length ? (
+          <div style={{ marginTop: 12 }}>
+            {resumeMediaMessages.map((message, idx) => (
+              <p key={`${message}-${idx}`} className="muted" style={{ margin: 0 }}>{message}</p>
+            ))}
+          </div>
+        ) : null}
+      </>
+    );
+  }
+
+  function renderSignatureFields() {
+    return (
+      <>
+        <label className="jobs-new-label">Technician signature name</label>
+        <input className="input jobs-new-input" value={formData.technicianSignatureName || ""} onChange={(e) => setField("technicianSignatureName", e.target.value)} />
+
+        <SignaturePad
+          label="Technician signature (required)"
+          value={formData.technicianSignature || ""}
+          onChange={(next) => setField("technicianSignature", next)}
+        />
+
+        <label className="jobs-new-label">Customer signature name (optional)</label>
+        <input className="input jobs-new-input" value={formData.customerSignatureName || ""} onChange={(e) => setField("customerSignatureName", e.target.value)} />
+
+        <SignaturePad
+          label="Customer signature (optional)"
+          value={formData.customerSignature || ""}
+          onChange={(next) => setField("customerSignature", next)}
+        />
+      </>
+    );
+  }
+
   function renderGuidedStep() {
     const step = activeSectionIndex;
 
@@ -1345,111 +1479,7 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
 
     if (step === 4) {
       return sectionCard("Step 5: Evidence & Photos", (
-        <>
-          <label className="jobs-new-label">Torque evidence (image/video)</label>
-          <input
-            ref={torqueFileInputRef}
-            data-testid="jobs-torque-upload"
-            className="input jobs-new-input"
-            type="file"
-            accept="image/*,video/*"
-            capture="environment"
-            onChange={(e) => setTorqueMedia(e.target.files?.[0] || null)}
-          />
-          {torqueFile ? (
-            <div className="card" style={{ padding: 12, marginTop: 8 }}>
-              <p style={{ marginTop: 0, marginBottom: 8 }}>{torqueFile.file.name}</p>
-              {torqueFile.file.type.startsWith("image/") && torqueFile.previewUrl ? (
-                <img src={torqueFile.previewUrl} alt={torqueFile.file.name} style={{ width: 140, height: 100, objectFit: "cover", borderRadius: 8 }} />
-              ) : null}
-              {torqueFile.file.type.startsWith("video/") && torqueFile.previewUrl ? (
-                <video src={torqueFile.previewUrl} controls style={{ width: 180, maxWidth: "100%" }} />
-              ) : null}
-              {!torqueFile.file.type.startsWith("image/") && !torqueFile.file.type.startsWith("video/") ? (
-                <span className="muted">Video selected</span>
-              ) : null}
-              <div>
-                <button
-                  type="button"
-                  className="button secondary"
-                  style={{ marginTop: 8 }}
-                  onClick={() => {
-                    setTorqueMedia(null);
-                    if (torqueFileInputRef.current) torqueFileInputRef.current.value = "";
-                  }}
-                >
-                  Remove
-                </button>
-              </div>
-            </div>
-          ) : null}
-
-          <label style={{ marginTop: 12 }}>Before photos (up to 6)</label>
-          <input
-            ref={beforeFileInputRef}
-            data-testid="jobs-before-upload"
-            className="input jobs-new-input"
-            type="file"
-            accept="image/*"
-            capture="environment"
-            multiple
-            onChange={(e) => {
-              appendMediaFiles(e.target.files, setBeforeFiles);
-              e.currentTarget.value = "";
-            }}
-          />
-          <button type="button" className="button secondary" style={{ marginTop: 8 }} onClick={() => beforeFileInputRef.current?.click()}>
-            Add More Before Photos
-          </button>
-          <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", marginTop: 10 }}>
-            {beforeFiles.map((item) => (
-              <div key={item.id} className="card" style={{ padding: 10 }}>
-                {item.previewUrl ? (
-                  <img src={item.previewUrl} alt={item.file.name} style={{ width: "100%", height: 90, objectFit: "cover", borderRadius: 6 }} />
-                ) : null}
-                <p className="muted" style={{ margin: "8px 0" }}>{item.file.name}</p>
-                <button type="button" className="button secondary" onClick={() => removeBeforeFile(item.id)}>Remove</button>
-              </div>
-            ))}
-          </div>
-
-          <label style={{ marginTop: 12 }}>After photos (up to 6)</label>
-          <input
-            ref={afterFileInputRef}
-            data-testid="jobs-after-upload"
-            className="input jobs-new-input"
-            type="file"
-            accept="image/*"
-            capture="environment"
-            multiple
-            onChange={(e) => {
-              appendMediaFiles(e.target.files, setAfterFiles);
-              e.currentTarget.value = "";
-            }}
-          />
-          <button type="button" className="button secondary" style={{ marginTop: 8 }} onClick={() => afterFileInputRef.current?.click()}>
-            Add More After Photos
-          </button>
-          <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", marginTop: 10 }}>
-            {afterFiles.map((item) => (
-              <div key={item.id} className="card" style={{ padding: 10 }}>
-                {item.previewUrl ? (
-                  <img src={item.previewUrl} alt={item.file.name} style={{ width: "100%", height: 90, objectFit: "cover", borderRadius: 6 }} />
-                ) : null}
-                <p className="muted" style={{ margin: "8px 0" }}>{item.file.name}</p>
-                <button type="button" className="button secondary" onClick={() => removeAfterFile(item.id)}>Remove</button>
-              </div>
-            ))}
-          </div>
-
-          {resumeMediaMessages.length ? (
-            <div style={{ marginTop: 12 }}>
-              {resumeMediaMessages.map((message, idx) => (
-                <p key={`${message}-${idx}`} className="muted" style={{ margin: 0 }}>{message}</p>
-              ))}
-            </div>
-          ) : null}
-        </>
+        <>{renderEvidenceMediaFields()}</>
       ));
     }
 
@@ -1517,23 +1547,7 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
         </div>
         {whatsAppNotice ? <p className="muted">{whatsAppNotice}</p> : null}
 
-        <label className="jobs-new-label">Technician signature name</label>
-        <input className="input jobs-new-input" value={formData.technicianSignatureName || ""} onChange={(e) => setField("technicianSignatureName", e.target.value)} />
-
-        <SignaturePad
-          label="Technician signature (required)"
-          value={formData.technicianSignature || ""}
-          onChange={(next) => setField("technicianSignature", next)}
-        />
-
-        <label className="jobs-new-label">Customer signature name (optional)</label>
-        <input className="input jobs-new-input" value={formData.customerSignatureName || ""} onChange={(e) => setField("customerSignatureName", e.target.value)} />
-
-        <SignaturePad
-          label="Customer signature (optional)"
-          value={formData.customerSignature || ""}
-          onChange={(next) => setField("customerSignature", next)}
-        />
+        {renderSignatureFields()}
       </>
     ));
   }
@@ -1657,15 +1671,27 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
           {guidedExperienceEnabled ? (
             renderGuidedStep()
           ) : (
-            sections.map(([group, fields]) => (
-              <div key={group} className="card jobs-new-section-card" style={{ marginBottom: 16, padding: 16 }}>
-                <h3 style={{ marginTop: 0 }}>{group}</h3>
-                {fields.map(renderField)}
-                {group === "Pricing" ? (
-                  <p className="muted">Preview total: £{totalsPreview.total.toFixed(2)}</p>
-                ) : null}
+            <>
+              {sections.map(([group, fields]) => (
+                <div key={group} className="card jobs-new-section-card" style={{ marginBottom: 16, padding: 16 }}>
+                  <h3 style={{ marginTop: 0 }}>{group}</h3>
+                  {fields.map(renderField)}
+                  {group === "Pricing" ? (
+                    <p className="muted">Preview total: £{totalsPreview.total.toFixed(2)}</p>
+                  ) : null}
+                </div>
+              ))}
+              <div className="card jobs-new-section-card" style={{ marginBottom: 16, padding: 16 }}>
+                <h3 style={{ marginTop: 0 }}>Evidence & Photos</h3>
+                <p className="muted">Upload before/after media and torque proof as part of the standard Wheels workflow.</p>
+                {renderEvidenceMediaFields()}
               </div>
-            ))
+              <div className="card jobs-new-section-card" style={{ marginBottom: 16, padding: 16 }}>
+                <h3 style={{ marginTop: 0 }}>Sign-off</h3>
+                <p className="muted">Technician sign-off is required before the Wheels job can be submitted.</p>
+                {renderSignatureFields()}
+              </div>
+            </>
           )}
 
           {automationCard()}

@@ -4,6 +4,8 @@ import CommandPalette from "../command/command-palette";
 import Sidebar from "../nav/sidebar";
 import { NAV_GROUPS } from "../nav/nav-config";
 
+const DESKTOP_SIDEBAR_WIDTH = 292;
+
 function resolveTitleFromNav(pathname: string): string | undefined {
   for (const group of NAV_GROUPS as any[]) {
     for (const item of (group.items || [])) {
@@ -26,13 +28,28 @@ export function PageShell(props: {
   const navTitle = resolveTitleFromNav(router.pathname);
   const title = props.title ?? navTitle;
   const showHeader = Boolean(title || props.subtitle || props.actions);
+  const showSidebar = router.pathname === "/dashboard" || router.pathname.startsWith("/dashboard");
+  const [showDesktopSidebar, setShowDesktopSidebar] = React.useState(false);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mediaQuery = window.matchMedia("(min-width: 768px)");
+    const syncDesktopSidebar = () => setShowDesktopSidebar(showSidebar && mediaQuery.matches);
+
+    syncDesktopSidebar();
+    mediaQuery.addEventListener("change", syncDesktopSidebar);
+    return () => mediaQuery.removeEventListener("change", syncDesktopSidebar);
+  }, [showSidebar]);
 
   return (
     <div data-shell="app" className="min-h-screen bg-[var(--bg)] text-[var(--fg)]">
       <CommandPalette />
-      <div className="min-h-screen md:grid md:grid-cols-[292px_minmax(0,1fr)]">
-        <Sidebar />
-        <div className="relative z-10 min-w-0 flex-1">
+      <div className="min-h-screen">
+        <Sidebar desktopWidth={DESKTOP_SIDEBAR_WIDTH} />
+        <div
+          className="relative z-10 min-w-0"
+          style={showDesktopSidebar ? { marginLeft: DESKTOP_SIDEBAR_WIDTH, width: `calc(100% - ${DESKTOP_SIDEBAR_WIDTH}px)` } : undefined}
+        >
           <div className="sticky top-0 z-20 hidden border-b border-border/60 bg-[color:var(--surface-0)]/90 backdrop-blur md:block">
             <div className="mx-auto w-full max-w-[1400px] px-6 py-3 md:px-10 lg:px-12">
               {showHeader ? (
