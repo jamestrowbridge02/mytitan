@@ -66,6 +66,16 @@ export default function Dashboard() {
   const guidedSetupEnabled = isGuidedSetupV2Enabled();
   const demoTourEnabled = isDemoTourV1Enabled();
   const guidedEverywhereEnabled = isGuidedEverywhereV1Enabled();
+  const dashboardRedirect = useMemo(() => {
+    if (!router.isReady) return null;
+    if (commandCentreHref === '/dashboard/command-centre-v2' && commandCentreV2Enabled) {
+      return '/dashboard/command-centre-v2';
+    }
+    if (commandCentreV1Enabled && settings?.guidedSetupCompletedAt) {
+      return commandCentreHref;
+    }
+    return null;
+  }, [router.isReady, commandCentreHref, commandCentreV1Enabled, commandCentreV2Enabled, settings?.guidedSetupCompletedAt]);
 
   useEffect(() => {
     if (!router.isReady) return;
@@ -100,15 +110,9 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    if (!router.isReady) return;
-    if (commandCentreHref === '/dashboard/command-centre-v2' && commandCentreV2Enabled) {
-      router.replace('/dashboard/command-centre-v2');
-      return;
-    }
-    if (!commandCentreV1Enabled) return;
-    if (!settings?.guidedSetupCompletedAt) return;
-    router.replace(commandCentreHref);
-  }, [router, router.isReady, settings?.guidedSetupCompletedAt, commandCentreV1Enabled, commandCentreV2Enabled, commandCentreHref]);
+    if (!dashboardRedirect) return;
+    void router.replace(dashboardRedirect);
+  }, [dashboardRedirect, router]);
 
   const drafts = useMemo(() => {
     const jobs = summary?.drafts?.jobs || [];
@@ -166,27 +170,17 @@ export default function Dashboard() {
     },
   ];
 
-  if (!commandCentreEnabled) {
-  
-  const dashboardSummaryMetrics = [
-    {
-      label: "Jobs today",
-      value: String(Number((summary as any)?.jobsToday ?? (summary as any)?.todayJobs ?? (summary as any)?.counts?.jobsToday ?? 0)),
-    },
-    {
-      label: "Revenue today",
-      value: `£${Number((summary as any)?.revenueToday ?? (summary as any)?.todayRevenue ?? (summary as any)?.counts?.revenueToday ?? 0).toLocaleString()}`,
-    },
-    {
-      label: "Technicians active",
-      value: String(Number((summary as any)?.techniciansActive ?? (summary as any)?.activeTechnicians ?? (summary as any)?.counts?.techniciansActive ?? 0)),
-    },
-    {
-      label: "Pending approvals",
-      value: String(Number((summary as any)?.pendingApprovals ?? (summary as any)?.approvalsPending ?? (summary as any)?.counts?.pendingApprovals ?? 0)),
-    },
-  ];
+  if (dashboardRedirect) {
+    return (
+      <DashboardShell>
+        <div className="dashboard-home-premium">
+          <LoadingState title="Opening workspace" description="Preparing your operator dashboard." />
+        </div>
+      </DashboardShell>
+    );
+  }
 
+  if (!commandCentreEnabled) {
   return (
       <DashboardShell>
   <div className="dashboard-home-premium">
@@ -268,7 +262,7 @@ export default function Dashboard() {
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <h1 style={{ marginTop: 0 }}>Command Centre</h1>
+        <h2 style={{ marginTop: 0 }}>Command Centre</h2>
         <p className="muted">Simple daily control for jobs, bookings, CRM, and billing.</p>
         {error ? (
           <ErrorState

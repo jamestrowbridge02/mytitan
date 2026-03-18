@@ -2,7 +2,6 @@ export const APP_URL = "https://app.mytitan.co.uk";
 export const SIGN_IN_URL = `${APP_URL}/login`;
 export const SIGN_UP_URL = `${APP_URL}/signup`;
 export const BILLING_URL = `${APP_URL}/dashboard/billing`;
-export const SALES_EMAIL = "sales@mytitan.co.uk";
 
 export const platformPillars = [
   {
@@ -114,7 +113,7 @@ export const pricingTiers = [
     priceMonthly: "GBP 49 per month",
     priceAnnual: "GBP 39 per month, billed annually",
     summary: "Core workflow, jobs, CRM, and customer-visible foundations for a smaller operating footprint.",
-    cta: "Get started",
+    cta: "Start free",
     href: SIGN_UP_URL,
   },
   {
@@ -122,8 +121,8 @@ export const pricingTiers = [
     priceMonthly: "GBP 119 per month",
     priceAnnual: "GBP 95 per month, billed annually",
     summary: "Team workflows, customer approvals, service plans, command-centre control, and governed operating surfaces.",
-    cta: "See platform",
-    href: "/platform",
+    cta: "Start free",
+    href: SIGN_UP_URL,
     featured: true,
   },
   {

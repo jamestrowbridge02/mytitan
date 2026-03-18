@@ -2,7 +2,7 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import React from "react";
 
-import { SALES_EMAIL, SIGN_IN_URL, SIGN_UP_URL } from "../../lib/site-content";
+import { SIGN_IN_URL, SIGN_UP_URL } from "../../lib/site-content";
 
 function flagOn(name: string) {
   const value = (process.env[name] || "").trim().toLowerCase();
@@ -55,15 +55,15 @@ export default function MarketingShell(props: { children: React.ReactNode }) {
           </nav>
 
           <div className="mkt-actions mkt-actions--header">
-            <Link className="mkt-btn mkt-btn--primary" href="/demo">
-              Request demo
+            <Link className="mkt-btn mkt-btn--primary" href={SIGN_UP_URL}>
+              Start free
             </Link>
             <Link className="mkt-btn" href="/platform">
               See platform
             </Link>
-            <a className="mkt-btn mkt-btn--ghost" href={SIGN_UP_URL}>
-              Get started
-            </a>
+            <Link className="mkt-btn mkt-btn--ghost" href="/demo">
+              Book demo
+            </Link>
           </div>
         </div>
       </header>
@@ -75,8 +75,7 @@ export default function MarketingShell(props: { children: React.ReactNode }) {
           <div className="mkt-siteFooter__brand">
             <img src="/brand/mytitan-logo-light.svg" alt="MyTitan" className="mkt-siteFooter__logo" />
             <p>
-              MyTitan is the operating system for service businesses that need one controlled model for operations,
-              revenue, customer experience, and governance.
+              MyTitan helps service businesses run the day clearly, from bookings and jobs to customer updates and billing.
             </p>
           </div>
           <div className="mkt-siteFooter__links">
@@ -87,18 +86,18 @@ export default function MarketingShell(props: { children: React.ReactNode }) {
               <Link href="/security">Security</Link>
             </div>
             <div>
-              <h3>Evaluate</h3>
-              <Link href="/demo">Request demo</Link>
+              <h3>Start</h3>
+              <a href={SIGN_UP_URL}>Start free</a>
               <Link href="/pricing">Pricing</Link>
+              <Link href="/demo">Book demo</Link>
               <a href={SIGN_IN_URL}>Sign in</a>
             </div>
             <div>
-              <h3>Contact</h3>
-              <p>Review the platform in context, then open the workspace when the fit is clear.</p>
-              <a className="mkt-siteFooter__mail" href={`mailto:${SALES_EMAIL}`}>{SALES_EMAIL}</a>
+              <h3>Get going</h3>
+              <p>Start in the live product first. Use a demo when you need a guided walkthrough for your team.</p>
               <div className="mkt-actions" style={{ justifyContent: "flex-start" }}>
                 <a className="mkt-btn mkt-btn--primary" href={SIGN_UP_URL}>
-                  Get started
+                  Start free
                 </a>
               </div>
             </div>

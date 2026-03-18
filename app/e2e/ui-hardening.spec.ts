@@ -4,6 +4,27 @@ import { fixtureRefs, hasDashboardAuth, installApiProxy, loginAs } from "./utils
 test.describe("ui hardening regressions", () => {
   test.skip(!hasDashboardAuth(), "Seed the E2E fixtures or provide dashboard credentials before running authenticated workflow tests.");
 
+  test("login lands in the operator workspace without a first-load client exception and exposes logout", async ({ page, request }) => {
+    await installApiProxy(page, request);
+    const pageErrors: string[] = [];
+    page.on("pageerror", (error) => {
+      pageErrors.push(error.message);
+    });
+
+    await page.goto("/login");
+    await page.getByLabel("Email").fill("e2e.operator@mytitan.local");
+    await page.getByLabel("Password").fill("MyTitanE2E!2026");
+    await page.getByRole("button", { name: "Log in" }).click();
+
+    await expect(page).toHaveURL(/\/dashboard(\/|$)|\/dashboard\/command-centre-v2|\/start$/);
+    await expect(pageErrors).toEqual([]);
+    const logoutButton = page.getByTestId("sidebar-logout").or(page.getByTestId("start-logout"));
+    await expect(logoutButton).toBeVisible();
+
+    await logoutButton.click();
+    await expect(page).toHaveURL(/\/login$/);
+  });
+
   test("settings tabs remain responsive in the light shell", async ({ page, request }) => {
     await installApiProxy(page, request);
     await loginAs(page, request, "e2e.operator@mytitan.local", "MyTitanE2E!2026");

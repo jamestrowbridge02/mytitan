@@ -138,13 +138,19 @@ export class OnboardingController {
       }
       for (const entry of data.integrations) {
         if (!entry || typeof entry.key !== 'string') continue;
-        await this.onboardingService.toggleIntegration(
-          user.companyId,
-          user.sub,
-          user.role,
-          entry.key,
-          Boolean(entry.enabled),
-        );
+        try {
+          await this.onboardingService.toggleIntegration(
+            user.companyId,
+            user.sub,
+            user.role,
+            entry.key,
+            Boolean(entry.enabled),
+          );
+        } catch (error: any) {
+          if (error?.message !== 'Unknown integration key') {
+            throw error;
+          }
+        }
       }
     }
 

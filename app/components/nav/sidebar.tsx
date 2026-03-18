@@ -2,8 +2,9 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import React from "react";
 import { NAV_GROUPS, NavItem } from "./nav-config";
-import { apiFetch } from "../../lib/api";
+import { apiFetch, clearToken } from "../../lib/api";
 import { getBusinessTerms, getCommandCentreHref, getOptionalModuleVisibility } from "../../lib/business-config";
+import { isLogoutV1Enabled } from "../../lib/feature-flags";
 import { useTenantSettings } from "../../lib/tenant-settings";
 import { emptyPermissionSnapshot, normalizePermissionSnapshot } from "../../lib/workspace-permissions";
 import MyTitanLogo from "../brand/mytitan-logo";
@@ -37,9 +38,44 @@ function cx(...xs: Array<string | false | null | undefined>) {
   return xs.filter(Boolean).join(" ");
 }
 
+function SidebarIcon({ icon }: { icon?: string }) {
+  const common = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  switch (icon) {
+    case "command":
+      return <svg {...common}><path d="M8 8h8v8H8z" /><path d="M4 12h4M16 12h4M12 4v4M12 16v4" /></svg>;
+    case "analytics":
+      return <svg {...common}><path d="M5 19V9" /><path d="M12 19V5" /><path d="M19 19v-7" /></svg>;
+    case "shield":
+      return <svg {...common}><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" /></svg>;
+    case "jobs":
+      return <svg {...common}><path d="M8 7h8" /><path d="M8 12h8" /><path d="M8 17h5" /><path d="M5 7h.01M5 12h.01M5 17h.01" /></svg>;
+    case "calendar":
+      return <svg {...common}><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M8 3v4M16 3v4M3 10h18" /></svg>;
+    case "bookings":
+      return <svg {...common}><path d="M6 4h10a2 2 0 0 1 2 2v14l-7-4-7 4V6a2 2 0 0 1 2-2z" /></svg>;
+    case "customers":
+      return <svg {...common}><path d="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2" /><circle cx="9.5" cy="7" r="4" /><path d="M20 8v6M23 11h-6" /></svg>;
+    case "plans":
+      return <svg {...common}><path d="M4 6h16" /><path d="M4 12h10" /><path d="M4 18h7" /></svg>;
+    case "quotes":
+      return <svg {...common}><path d="M7 7h10" /><path d="M7 12h10" /><path d="M7 17h6" /><rect x="4" y="4" width="16" height="16" rx="2" /></svg>;
+    case "revenue":
+      return <svg {...common}><path d="M12 3v18" /><path d="M17 7c0-2-2.2-3-5-3s-5 1-5 3 2.2 3 5 3 5 1 5 3-2.2 3-5 3-5-1-5-3" /></svg>;
+    case "integrations":
+      return <svg {...common}><path d="M8 8l-4 4 4 4" /><path d="M16 8l4 4-4 4" /><path d="M10 19l4-14" /></svg>;
+    case "automations":
+      return <svg {...common}><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.64 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.64a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.36 9c.17.53.69.9 1.24.91H21a2 2 0 1 1 0 4h-.09c-.55.01-1.07.38-1.24.91Z" /></svg>;
+    case "settings":
+      return <svg {...common}><path d="M12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8Z" /><path d="M3 12h2M19 12h2M12 3v2M12 19v2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4" /></svg>;
+    default:
+      return <svg {...common}><circle cx="12" cy="12" r="8" /></svg>;
+  }
+}
+
 export default function Sidebar({ desktopWidth = 292 }: { desktopWidth?: number }) {
   const router = useRouter();
   const { settings } = useTenantSettings();
+  const logoutEnabled = isLogoutV1Enabled();
   const [permissions, setPermissions] = React.useState(() => emptyPermissionSnapshot());
   const terms = getBusinessTerms(settings);
   const commandCentreHref = getCommandCentreHref(settings);
@@ -86,23 +122,41 @@ export default function Sidebar({ desktopWidth = 292 }: { desktopWidth?: number 
     return true;
   }
 
+  async function signOut() {
+    try {
+      if (logoutEnabled) {
+        await apiFetch("/auth/logout", { method: "POST" });
+      }
+    } catch {
+      // fall back to local sign-out
+    }
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem("mytitan_token");
+      window.localStorage.removeItem("mytitan_wheels_draft_v1");
+      window.localStorage.removeItem("mytitan_demo_tour_seen_v1");
+      window.localStorage.removeItem("mytitan_theme_mode");
+    }
+    clearToken();
+    void router.replace("/login");
+  }
+
   return (
     <aside
       className="mt-sidebar fixed inset-y-0 left-0 z-20 hidden h-screen shrink-0 md:block"
       style={{ width: desktopWidth, flex: `0 0 ${desktopWidth}px` }}
     >
-      <div className="flex h-full flex-col px-3 py-3">
-        <div className="mt-sidebar__brand rounded-2xl px-3 py-3">
+      <div className="flex h-full flex-col px-2 py-2.5">
+        <div className="mt-sidebar__brand rounded-2xl px-2.5 py-2.5">
           <Link href="/dashboard" className="mt-sidebar__brandLink flex items-center justify-between gap-3">
             <div>
-              <MyTitanLogo size="sm" className="mt-sidebar__brandLogo" />
-              <div className="mt-sidebar__kicker mt-2 text-[11px]">Business OS</div>
+              <MyTitanLogo size="md" className="mt-sidebar__brandLogo" />
+              <div className="mt-sidebar__kicker mt-1.5 text-[10px]">Business OS</div>
             </div>
             <span className="mt-sidebar__brandBadge">Operator</span>
           </Link>
         </div>
 
-        <nav className="mt-3 flex-1 overflow-y-auto px-1 pb-2">
+        <nav className="mt-2 flex-1 overflow-y-auto px-1 pb-2">
           {NAV_GROUPS.map((g) => {
             const visibleItems = g.items
               .filter(canShow)
@@ -143,12 +197,17 @@ export default function Sidebar({ desktopWidth = 292 }: { desktopWidth?: number 
                         href={href}
                         aria-current={active ? "page" : undefined}
                         className={cx(
-                          "mt-sidebar__item flex items-center justify-between rounded-xl px-3 py-2 text-[13px]",
+                          "mt-sidebar__item flex items-center justify-between gap-3 rounded-xl px-2.5 py-2 text-[12px]",
                           active && "shadow-sm"
                         )}
                       >
-                        <span className="truncate">{it.title}</span>
-                        <span className="mt-sidebar__dot h-2 w-2 rounded-full bg-[color:var(--brand-600)]" />
+                        <span className="flex min-w-0 items-center gap-2.5">
+                          <span className="mt-sidebar__icon" aria-hidden="true">
+                            <SidebarIcon icon={it.icon} />
+                          </span>
+                          <span className="truncate">{it.title}</span>
+                        </span>
+                        <span className="mt-sidebar__dot h-1.5 w-1.5 rounded-full bg-[color:var(--brand-600)]" />
                       </Link>
                     );
                   })}
@@ -157,6 +216,18 @@ export default function Sidebar({ desktopWidth = 292 }: { desktopWidth?: number 
             );
           })}
         </nav>
+        <div className="px-1 pb-1 pt-2">
+          <button type="button" className="mt-sidebar__logout w-full" onClick={signOut} data-testid="sidebar-logout">
+            <span className="mt-sidebar__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <path d="M16 17l5-5-5-5" />
+                <path d="M21 12H9" />
+              </svg>
+            </span>
+            Sign out
+          </button>
+        </div>
       </div>
     </aside>
   );

@@ -25,7 +25,8 @@ export function PageShell(props: {
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const navTitle = resolveTitleFromNav(router.pathname);
+  const isDashboardRoute = router.pathname === "/dashboard" || router.pathname.startsWith("/dashboard/");
+  const navTitle = isDashboardRoute ? undefined : resolveTitleFromNav(router.pathname);
   const title = props.title ?? navTitle;
   const showHeader = Boolean(title || props.subtitle || props.actions);
   const showSidebar = router.pathname === "/dashboard" || router.pathname.startsWith("/dashboard");
@@ -76,7 +77,7 @@ export function PageShell(props: {
             ) : null}
           </div>
 
-          <div className="mx-auto w-full max-w-[1400px] px-6 pb-8 pt-0 md:px-10 md:pt-1 lg:px-12">{props.children}</div>
+          <div className="mx-auto w-full max-w-[1400px] px-5 pb-8 pt-0 md:px-8 md:pt-1 lg:px-10">{props.children}</div>
         </div>
       </div>
     </div>

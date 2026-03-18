@@ -118,7 +118,7 @@ export const requireAnalyticsV1Enabled = () => {
 
 export const requireCalendarV1Enabled = () => {
   if (!isCalendarV1Enabled()) {
-    throw new ServiceUnavailableException('Calendar v1 is not enabled.');
+    throw new ServiceUnavailableException('Scheduling calendar is not available in this environment.');
   }
 };
 

@@ -30,8 +30,19 @@ test.describe("analytics and benchmarking", () => {
     await page.goto("/dashboard/analytics");
     const controls = page.locator(".operator-section").filter({ hasText: "Analytics controls" }).first();
     const revenueWidgetRow = controls.locator(".integration-card").filter({ hasText: "revenue-panel" }).first();
+    const normalizeButton = revenueWidgetRow.getByRole("button", { name: /Hide widget|Show widget/ });
+    await normalizeButton.scrollIntoViewIfNeeded();
+    const normalizeLabel = await normalizeButton.textContent();
+    if ((normalizeLabel || "").includes("Show")) {
+      await normalizeButton.evaluate((element: HTMLButtonElement) => element.click());
+      await page.getByRole("button", { name: "Save layout" }).evaluate((element: HTMLButtonElement) => element.click());
+      await expect(page.getByTestId("operator-notice-success")).toContainText(/layout saved/i);
+      await page.reload();
+    }
 
-    const hideButton = revenueWidgetRow.getByRole("button", { name: "Hide widget" });
+    const refreshedControls = page.locator(".operator-section").filter({ hasText: "Analytics controls" }).first();
+    const refreshedRevenueRow = refreshedControls.locator(".integration-card").filter({ hasText: "revenue-panel" }).first();
+    const hideButton = refreshedRevenueRow.getByRole("button", { name: "Hide widget" });
     await hideButton.scrollIntoViewIfNeeded();
     await hideButton.evaluate((element: HTMLButtonElement) => element.click());
     await page.getByRole("button", { name: "Save layout" }).evaluate((element: HTMLButtonElement) => element.click());
@@ -39,10 +50,10 @@ test.describe("analytics and benchmarking", () => {
     await page.reload();
     await expect(page.getByTestId("analytics-revenue-panel")).toHaveCount(0);
 
-    const refreshedControls = page.locator(".operator-section").filter({ hasText: "Analytics controls" }).first();
-    const refreshedRevenueRow = refreshedControls.locator(".integration-card").filter({ hasText: "revenue-panel" }).first();
-    const showButton = refreshedRevenueRow.getByRole("button", { name: "Show widget" });
-    await refreshedRevenueRow.scrollIntoViewIfNeeded();
+    const restoredControls = page.locator(".operator-section").filter({ hasText: "Analytics controls" }).first();
+    const restoredRevenueRow = restoredControls.locator(".integration-card").filter({ hasText: "revenue-panel" }).first();
+    const showButton = restoredRevenueRow.getByRole("button", { name: "Show widget" });
+    await restoredRevenueRow.scrollIntoViewIfNeeded();
     await showButton.evaluate((element: HTMLButtonElement) => element.click());
     await page.getByRole("button", { name: "Save layout" }).evaluate((element: HTMLButtonElement) => element.click());
     await expect(page.getByTestId("operator-notice-success")).toContainText(/layout saved/i);

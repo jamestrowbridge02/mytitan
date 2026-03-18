@@ -68,10 +68,10 @@ export default function Login() {
             <div className="auth-shell__brandRow">
               <MyTitanLogo size="lg" glimmer className="auth-shell__brand" />
             </div>
-            <div className="auth-shell__eyebrow">MyTitan operations workspace</div>
-            <h1 className="auth-shell__title">Control the day without losing the detail.</h1>
+            <div className="auth-shell__eyebrow">Service business software</div>
+            <h1 className="auth-shell__title">Run bookings, jobs, customers, and billing in one place.</h1>
             <p className="auth-shell__lead">
-              Run bookings, jobs, customer approvals, service plans, documents, and billing from one operational system built for service teams.
+              MyTitan keeps the day clear for service teams without splitting work across disconnected tools.
             </p>
           </div>
           <ul className="auth-shell__featureList">
@@ -97,11 +97,11 @@ export default function Login() {
           <h1>Welcome back</h1>
           {error ? <p className="auth-shell__status auth-shell__status--error">{error}</p> : null}
           <form className="auth-shell__form" onSubmit={handleSubmit}>
-            <label>Email</label>
-            <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-            <label>Password</label>
+            <label htmlFor="login-email">Email</label>
+            <input id="login-email" className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+            <label htmlFor="login-password">Password</label>
             <div className="auth-shell__actions">
-              <input className="input" style={{ marginBottom: 0, flex: 1 }} type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} />
+              <input id="login-password" className="input" style={{ marginBottom: 0, flex: 1 }} type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} />
               <button type="button" className="button secondary" onClick={() => setShowPassword((v) => !v)}>
                 {showPassword ? 'Hide' : 'Show'}
               </button>

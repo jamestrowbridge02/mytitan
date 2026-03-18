@@ -4,6 +4,7 @@ export type NavItem = {
   children?: NavItem[];
   devOnly?: boolean;
   featureFlag?: string;
+  icon?: string;
 };
 
 export type NavGroup = {
@@ -16,34 +17,34 @@ export const NAV_GROUPS: NavGroup[] = [
     title: "",
     items: [
       { title: "Dashboard", href: "/dashboard" },
-      { title: "Command Centre", href: "/dashboard/command-centre-v2" },
-      { title: "Analytics", href: "/dashboard/analytics" },
-      { title: "Compliance", href: "/dashboard/compliance" },
+      { title: "Command Centre", href: "/dashboard/command-centre-v2", icon: "command" },
+      { title: "Analytics", href: "/dashboard/analytics", icon: "analytics" },
+      { title: "Compliance", href: "/dashboard/compliance", icon: "shield" },
     ],
   },
   {
     title: "Operations",
     items: [
-      { title: "Jobs", href: "/dashboard/jobs" },
-      { title: "Scheduling", href: "/dashboard/scheduling" },
-      { title: "Bookings", href: "/dashboard/bookings" },
-      { title: "Customers", href: "/dashboard/customers" },
-      { title: "Service Plans", href: "/dashboard/service-plans" },
+      { title: "Jobs", href: "/dashboard/jobs", icon: "jobs" },
+      { title: "Scheduling", href: "/dashboard/scheduling", icon: "calendar" },
+      { title: "Bookings", href: "/dashboard/bookings", icon: "bookings" },
+      { title: "Customers", href: "/dashboard/customers", icon: "customers" },
+      { title: "Service Plans", href: "/dashboard/service-plans", icon: "plans" },
     ],
   },
   {
     title: "Commercial",
     items: [
-      { title: "Quotes", href: "/dashboard/quotes" },
-      { title: "Revenue", href: "/dashboard/revenue" },
+      { title: "Quotes", href: "/dashboard/quotes", icon: "quotes" },
+      { title: "Revenue", href: "/dashboard/revenue", icon: "revenue" },
     ],
   },
   {
     title: "Platform",
     items: [
-      { title: "Integrations", href: "/dashboard/integrations" },
-      { title: "Automations", href: "/dashboard/settings/automations" },
-      { title: "Settings", href: "/dashboard/settings" },
+      { title: "Integrations", href: "/dashboard/integrations", icon: "integrations" },
+      { title: "Automations", href: "/dashboard/settings/automations", icon: "automations" },
+      { title: "Settings", href: "/dashboard/settings", icon: "settings" },
     ],
   },
   {

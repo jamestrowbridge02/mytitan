@@ -97,4 +97,41 @@ test.describe("guided setup continuity", () => {
     await expect(billingStep).toContainText(/Stripe unavailable|Stripe ready/i);
     await expect(page.getByTestId("guided-setup-enable-payments")).toBeDisabled();
   });
+
+  test("calendar setup lets operators choose operating days", async ({ page, request }) => {
+    await installApiProxy(page, request);
+    await loginAs(page, request, "e2e.operator@mytitan.local", "MyTitanE2E!2026");
+
+    await page.goto("/dashboard/setup-wizard");
+    await page.getByRole("button", { name: "Next" }).evaluate((element: HTMLButtonElement) => element.click());
+    await expect(page.getByRole("heading", { name: "Business branding" })).toBeVisible();
+    await page.getByRole("button", { name: "Next" }).evaluate((element: HTMLButtonElement) => element.click());
+    await expect(page.getByRole("heading", { name: "Services" })).toBeVisible();
+    await page.getByRole("button", { name: "Next" }).evaluate((element: HTMLButtonElement) => element.click());
+    await expect(page.getByRole("heading", { name: "Charging and calendar" })).toBeVisible();
+
+    const operatingDays = page.getByTestId("guided-setup-operating-days");
+    await expect(operatingDays).toBeVisible();
+    const saturdayButton = operatingDays.getByRole("button", { name: "Sat" });
+    await saturdayButton.evaluate((element: HTMLButtonElement) => element.click());
+    await expect(saturdayButton).toHaveAttribute("aria-pressed", "true");
+    await page.getByTestId("guided-setup-start-time").fill("08:00");
+    await page.getByTestId("guided-setup-end-time").fill("16:00");
+    await page.getByRole("button", { name: "Next" }).evaluate((element: HTMLButtonElement) => element.click());
+    await expect(page.getByRole("heading", { name: "Billing and payments" })).toBeVisible();
+
+    const token = await operatorToken();
+    const statusResponse = await request.get("http://127.0.0.1:3000/guided-setup/status", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+    expect(statusResponse.ok()).toBeTruthy();
+    const status = await statusResponse.json();
+    const dayValues = Array.isArray(status?.calendar?.businessHours)
+      ? status.calendar.businessHours.map((entry: any) => Number(entry?.dayOfWeek))
+      : [];
+    expect(dayValues).toContain(6);
+  });
 });

@@ -50,6 +50,10 @@ test.describe("parts and inventory", () => {
   test("purchase order create flow works", async ({ page, request }) => {
     await installApiProxy(page, request);
     await page.goto("/dashboard/purchase-orders");
+    const scopeSwitcher = page.getByTestId("location-scope-switcher");
+    if (await scopeSwitcher.count()) {
+      await scopeSwitcher.getByRole("combobox").selectOption({ label: "All locations" });
+    }
     await page.getByTestId("purchase-order-supplier").fill("Playwright Supplier");
     await page.getByTestId("purchase-order-location").selectOption({ label: fixtureRefs.inventoryWarehouseName });
     await page.getByTestId("purchase-order-part").selectOption({ label: `${fixtureRefs.lowStockPartSku} · ${fixtureRefs.lowStockPartName}` });
@@ -61,6 +65,10 @@ test.describe("parts and inventory", () => {
   test("purchase order receive flow works", async ({ page, request }) => {
     await installApiProxy(page, request);
     await page.goto("/dashboard/purchase-orders");
+    const scopeSwitcher = page.getByTestId("location-scope-switcher");
+    if (await scopeSwitcher.count()) {
+      await scopeSwitcher.getByRole("combobox").selectOption({ label: "All locations" });
+    }
     const row = page.getByTestId("purchase-order-list").locator(".integration-card", { hasText: "Seeded Supplies Ltd" }).first();
     await expect(row).toBeVisible();
     await row.getByRole("button", { name: "Receive" }).evaluate((element: HTMLButtonElement) => element.click());

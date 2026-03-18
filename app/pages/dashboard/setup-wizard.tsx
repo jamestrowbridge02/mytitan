@@ -26,6 +26,16 @@ const steps = [
   { key: "ready", title: "Ready" },
 ] as const;
 
+const OPERATING_DAYS = [
+  { dayOfWeek: 1, shortLabel: "Mon" },
+  { dayOfWeek: 2, shortLabel: "Tue" },
+  { dayOfWeek: 3, shortLabel: "Wed" },
+  { dayOfWeek: 4, shortLabel: "Thu" },
+  { dayOfWeek: 5, shortLabel: "Fri" },
+  { dayOfWeek: 6, shortLabel: "Sat" },
+  { dayOfWeek: 0, shortLabel: "Sun" },
+] as const;
+
 const normalizeList = (value: unknown) =>
   Array.from(new Set((Array.isArray(value) ? value : []).map((entry) => String(entry || "").trim()).filter(Boolean)));
 
@@ -79,6 +89,7 @@ export default function SetupWizard() {
     defaultTyrePressure: "",
   });
   const [bookingPublicEnabled, setBookingPublicEnabled] = useState(false);
+  const [operatingDays, setOperatingDays] = useState<number[]>([1, 2, 3, 4, 5]);
   const [startHour, setStartHour] = useState("09:00");
   const [endHour, setEndHour] = useState("17:00");
   const [enablePayments, setEnablePayments] = useState(false);
@@ -122,10 +133,13 @@ export default function SetupWizard() {
       defaultTorqueSetting: data?.chargingDefaults?.defaultTorqueSetting || "",
       defaultTyrePressure: data?.chargingDefaults?.defaultTyrePressure || "",
     });
-    const weekdayHours = Array.isArray(data?.calendar?.businessHours)
-      ? data.calendar.businessHours.find((entry: any) => Number(entry?.dayOfWeek) === 1) || data.calendar.businessHours[0]
-      : null;
+    const businessHours = Array.isArray(data?.calendar?.businessHours) ? data.calendar.businessHours : [];
+    const normalizedDays = normalizeList(businessHours.map((entry: any) => Number(entry?.dayOfWeek)))
+      .map((entry) => Number(entry))
+      .filter((entry) => Number.isInteger(entry) && entry >= 0 && entry <= 6);
+    const weekdayHours = businessHours.find((entry: any) => Number(entry?.dayOfWeek) === 1) || businessHours[0] || null;
     setBookingPublicEnabled(Boolean(data?.calendar?.bookingPublicEnabled));
+    setOperatingDays(normalizedDays.length ? normalizedDays : [1, 2, 3, 4, 5]);
     setStartHour(
       weekdayHours && Number.isFinite(Number(weekdayHours.startMinute))
         ? formatMinuteOfDay(Number(weekdayHours.startMinute))
@@ -257,11 +271,14 @@ export default function SetupWizard() {
   const businessHoursPayload = useMemo(() => {
     const startMinute = minuteOfDay(startHour);
     const endMinute = minuteOfDay(endHour);
-    if (!Number.isFinite(startMinute) || !Number.isFinite(endMinute) || endMinute <= startMinute) {
+    if (!Number.isFinite(startMinute) || !Number.isFinite(endMinute) || endMinute <= startMinute || operatingDays.length === 0) {
       return null;
     }
-    return [1, 2, 3, 4, 5].map((dayOfWeek) => ({ dayOfWeek, startMinute, endMinute }));
-  }, [startHour, endHour]);
+    return operatingDays
+      .slice()
+      .sort((left, right) => left - right)
+      .map((dayOfWeek) => ({ dayOfWeek, startMinute, endMinute }));
+  }, [operatingDays, startHour, endHour]);
 
   const getCurrentPayload = () => {
     if (step === 0) return { trade: "WHEELS" };
@@ -432,7 +449,32 @@ export default function SetupWizard() {
                 <input className="input" type="time" value={endHour} onChange={(e) => setEndHour(e.target.value)} data-testid="guided-setup-end-time" />
               </div>
             </div>
-            {!businessHoursPayload ? <p style={{ color: "#ff8a8a", marginBottom: 0 }}>End time must be later than start time.</p> : null}
+            <div style={{ marginTop: 12 }}>
+              <label style={{ display: "block", marginBottom: 8 }}>Operating days</label>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }} data-testid="guided-setup-operating-days">
+                {OPERATING_DAYS.map((day) => {
+                  const active = operatingDays.includes(day.dayOfWeek);
+                  return (
+                    <button
+                      key={day.dayOfWeek}
+                      type="button"
+                      className={`tab-button ${active ? "active" : ""}`}
+                      onClick={() =>
+                        setOperatingDays((prev) =>
+                          prev.includes(day.dayOfWeek)
+                            ? prev.filter((entry) => entry !== day.dayOfWeek)
+                            : [...prev, day.dayOfWeek],
+                        )
+                      }
+                      aria-pressed={active}
+                    >
+                      {day.shortLabel}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            {!businessHoursPayload ? <p style={{ color: "#ff8a8a", marginBottom: 0 }}>Choose at least one operating day, and make sure end time is later than start time.</p> : null}
           </div>
           {renderControls(3, { ...charging, bookingPublicEnabled, businessHours: businessHoursPayload || [] })}
         </div>

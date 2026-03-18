@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { DashboardShell } from '../components/dashboard-shell';
-import { apiFetch, getToken } from '../lib/api';
+import { apiFetch, clearToken, getToken } from '../lib/api';
 import { isGuidedSetupV2Enabled, isStartHereEnabled } from '../lib/feature-flags';
 
 type ChecklistSummary = {
@@ -16,6 +16,22 @@ export default function StartHerePage() {
   const [error, setError] = useState('');
   const enabled = isStartHereEnabled();
   const guidedSetupV2Enabled = isGuidedSetupV2Enabled();
+
+  async function signOut() {
+    try {
+      await apiFetch('/auth/logout', { method: 'POST' });
+    } catch {
+      // keep local sign-out deterministic
+    }
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem('mytitan_token');
+      window.localStorage.removeItem('mytitan_wheels_draft_v1');
+      window.localStorage.removeItem('mytitan_demo_tour_seen_v1');
+      window.localStorage.removeItem('mytitan_theme_mode');
+    }
+    clearToken();
+    await router.replace('/login');
+  }
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -51,8 +67,15 @@ export default function StartHerePage() {
   return (
     <DashboardShell>
       <div className="card" style={{ marginBottom: 16 }}>
-        <h1>Start Here</h1>
-        <p className="muted">Use these simple actions to get moving quickly.</p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <div>
+            <h1>Start Here</h1>
+            <p className="muted">Use these simple actions to get moving quickly.</p>
+          </div>
+          <button type="button" className="button secondary" onClick={() => void signOut()} data-testid="start-logout">
+            Sign out
+          </button>
+        </div>
         {error ? <p style={{ color: '#ff8a8a' }}>{error}</p> : null}
       </div>
 
