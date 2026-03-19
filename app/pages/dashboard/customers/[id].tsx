@@ -137,17 +137,20 @@ export default function CustomerTimelinePage() {
   }, [router.isReady, id, name]);
 
   async function inviteCustomerAccount() {
-    if (!customer?.id) return;
+    const customerKey =
+      String(customer?.id || "")
+      || (typeof id === "string" ? id : "");
+    if (!customerKey) return;
     setActionBusy(true);
     setNotice("");
     try {
       const response = await apiFetch("/customer-accounts/invite", {
         method: "POST",
-        body: JSON.stringify({ customerId: customer.id }),
+        body: JSON.stringify({ customerId: customerKey }),
       });
       setInviteLink(String(response?.activationUrl || ""));
       setNotice("Customer account invite prepared");
-      await loadWorkspaceGovernance(customer);
+      await loadWorkspaceGovernance({ id: customerKey });
     } catch {
       setNotice("Could not invite customer account");
     } finally {
