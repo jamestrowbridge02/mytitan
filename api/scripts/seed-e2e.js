@@ -252,6 +252,23 @@ function setUtcTime(date, hours, minutes) {
   return value;
 }
 
+async function ensureBookingBusinessHours(companyId) {
+  const weekdayHours = [1, 2, 3, 4, 5].map((dayOfWeek) => ({
+    tenantId: companyId,
+    dayOfWeek,
+    startMinute: 9 * 60,
+    endMinute: 17 * 60,
+  }));
+
+  await prisma.bookingBusinessHour.deleteMany({
+    where: { tenantId: companyId },
+  });
+
+  await prisma.bookingBusinessHour.createMany({
+    data: weekdayHours,
+  });
+}
+
 function deriveIntegrationKey() {
   const secret =
     String(process.env.INTEGRATIONS_ENCRYPTION_KEY || "").trim() ||
@@ -446,6 +463,10 @@ async function ensureTenantSettings(companyId, defaultLocationId, planId) {
       bookingPublicEnabled: true,
       bookingPublicToken: token,
       bookingIcsToken: icsToken,
+      guidedSetupCurrentStep: 0,
+      guidedSetupCompletedSteps: [],
+      guidedSetupSkippedSteps: [],
+      guidedSetupCompletedAt: null,
       onboardingCompleted: true,
       onboardingStep: 5,
       brandPrimaryColor: "#4fd1c5",
@@ -501,6 +522,10 @@ async function ensureTenantSettings(companyId, defaultLocationId, planId) {
       bookingPublicEnabled: true,
       bookingPublicToken: token,
       bookingIcsToken: icsToken,
+      guidedSetupCurrentStep: 0,
+      guidedSetupCompletedSteps: [],
+      guidedSetupSkippedSteps: [],
+      guidedSetupCompletedAt: null,
       onboardingCompleted: true,
       onboardingStep: 5,
       brandPrimaryColor: "#4fd1c5",
@@ -1307,6 +1332,7 @@ async function main() {
 
   await ensureInvoiceCounter(company.id);
   await ensureTenantSettings(company.id, location.id, planId);
+  await ensureBookingBusinessHours(company.id);
   await ensureAutomations(company.id);
   await resetCustomFields(company.id);
   const service = await ensureService(company.id);
