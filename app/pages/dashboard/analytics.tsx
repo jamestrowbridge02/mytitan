@@ -162,19 +162,17 @@ export default function AnalyticsPage() {
   const canManageLayout = hasWorkspacePermission(permissions, "settings.manage");
 
   function updateWidgetOrder(next: string[] | ((current: string[]) => string[])) {
-    setWidgetOrder((current) => {
-      const resolved = typeof next === "function" ? next(current) : next;
-      widgetOrderRef.current = resolved;
-      return resolved;
-    });
+    const current = widgetOrderRef.current;
+    const resolved = typeof next === "function" ? next(current) : next;
+    widgetOrderRef.current = resolved;
+    setWidgetOrder(resolved);
   }
 
   function updateHiddenWidgets(next: string[] | ((current: string[]) => string[])) {
-    setHiddenWidgets((current) => {
-      const resolved = typeof next === "function" ? next(current) : next;
-      hiddenWidgetsRef.current = resolved;
-      return resolved;
-    });
+    const current = hiddenWidgetsRef.current;
+    const resolved = typeof next === "function" ? next(current) : next;
+    hiddenWidgetsRef.current = resolved;
+    setHiddenWidgets(resolved);
   }
 
   function updateWindowDays(next: number) {
