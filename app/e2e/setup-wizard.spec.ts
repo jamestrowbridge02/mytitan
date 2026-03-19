@@ -113,7 +113,7 @@ test.describe("guided setup continuity", () => {
     const operatingDays = page.getByTestId("guided-setup-operating-days");
     await expect(operatingDays).toBeVisible();
     const saturdayButton = operatingDays.getByRole("button", { name: "Sat" });
-    await saturdayButton.evaluate((element: HTMLButtonElement) => element.click());
+    await saturdayButton.click();
     await expect(saturdayButton).toHaveAttribute("aria-pressed", "true");
     await page.getByTestId("guided-setup-start-time").fill("08:00");
     await page.getByTestId("guided-setup-end-time").fill("16:00");
