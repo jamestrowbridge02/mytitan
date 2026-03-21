@@ -71,21 +71,21 @@ export default function Login() {
             <div className="auth-shell__eyebrow">Service business software</div>
             <h1 className="auth-shell__title">Run bookings, jobs, customers, and billing in one place.</h1>
             <p className="auth-shell__lead">
-              MyTitan keeps the day clear for service teams without splitting work across disconnected tools.
+              MyTitan keeps daily work clear without making your team jump between tools.
             </p>
           </div>
           <ul className="auth-shell__featureList">
             <li className="auth-shell__feature">
-              <strong>Readable under pressure</strong>
-              Clear workflow, scheduling, and billing surfaces for high-volume operators.
+              <strong>Clear during busy days</strong>
+              Keep jobs, schedules, and payments easy to follow when the pace picks up.
             </li>
             <li className="auth-shell__feature">
-              <strong>Governed by default</strong>
-              Workspace permissions, audit-friendly automation, and tenant-scoped controls stay intact.
+              <strong>Safe by default</strong>
+              Roles, approvals, and workspace controls stay in place as the team grows.
             </li>
             <li className="auth-shell__feature">
-              <strong>Built for real service work</strong>
-              Capacity planning, recurring work, approvals, artifacts, and customer visibility are part of the core system.
+              <strong>Built for service teams</strong>
+              Plan work, manage repeats, track approvals, and keep customers informed in one system.
             </li>
           </ul>
         </section>
@@ -117,7 +117,7 @@ export default function Login() {
             </div>
           </form>
           <p className="muted" style={{ marginTop: 16, marginBottom: 0 }}>
-            Secure operator access with role-based governance and tenant-scoped data boundaries.
+            Secure sign-in with the right access for each team member.
           </p>
         </section>
       </div>

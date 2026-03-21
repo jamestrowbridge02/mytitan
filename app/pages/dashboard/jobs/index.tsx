@@ -277,12 +277,12 @@ export default function Jobs() {
         <OperatorPageHeader
           eyebrow="Workflow"
           title={terms.jobs}
-          subtitle="Dense queue controls, local filtering, and safe bulk actions for daily operator throughput."
+          subtitle="See work quickly, filter fast, and update jobs safely."
           actions={[
             { label: "Open Command Centre", href: commandCentreHref, variant: "secondary" },
             { label: `Create ${terms.jobs.slice(0, -1) || "Job"}`, href: "/dashboard/jobs/new" },
           ]}
-          shortcuts={["Ctrl K for route search", "Bulk status actions use the existing jobs mutation flow"]}
+          shortcuts={["Ctrl K opens quick navigation", "Bulk updates use the same live job actions"]}
           stats={stats}
         />
 
@@ -290,7 +290,7 @@ export default function Jobs() {
           <div className="operator-section__header">
             <div>
               <h2 className="operator-section__title">{terms.jobs} queue</h2>
-              <p className="operator-section__subtitle">Tighter rows, clearer status parsing, and filters that match how operators triage work.</p>
+              <p className="operator-section__subtitle">Keep the queue tight so status, timing, and ownership are easy to scan.</p>
             </div>
           </div>
 

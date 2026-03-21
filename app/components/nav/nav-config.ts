@@ -1,5 +1,6 @@
 export type NavItem = {
   title: string;
+  description?: string;
   href?: string;
   children?: NavItem[];
   devOnly?: boolean;
@@ -16,41 +17,41 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     title: "",
     items: [
-      { title: "Dashboard", href: "/dashboard" },
-      { title: "Command Centre", href: "/dashboard/command-centre-v2", icon: "command" },
-      { title: "Analytics", href: "/dashboard/analytics", icon: "analytics" },
-      { title: "Compliance", href: "/dashboard/compliance", icon: "shield" },
+      { title: "Dashboard", description: "Your main overview", href: "/dashboard", icon: "dashboard" },
+      { title: "Command Centre", description: "Live workboard", href: "/dashboard/command-centre-v2", icon: "command" },
+      { title: "Analytics", description: "Performance and trends", href: "/dashboard/analytics", icon: "analytics" },
+      { title: "Compliance", description: "Checks and controls", href: "/dashboard/compliance", icon: "shield" },
     ],
   },
   {
     title: "Operations",
     items: [
-      { title: "Jobs", href: "/dashboard/jobs", icon: "jobs" },
-      { title: "Scheduling", href: "/dashboard/scheduling", icon: "calendar" },
-      { title: "Bookings", href: "/dashboard/bookings", icon: "bookings" },
-      { title: "Customers", href: "/dashboard/customers", icon: "customers" },
-      { title: "Service Plans", href: "/dashboard/service-plans", icon: "plans" },
+      { title: "Jobs", description: "Track and update work", href: "/dashboard/jobs", icon: "jobs" },
+      { title: "Scheduling", description: "Plan team capacity", href: "/dashboard/scheduling", icon: "calendar" },
+      { title: "Bookings", description: "Manage incoming bookings", href: "/dashboard/bookings", icon: "bookings" },
+      { title: "Customers", description: "Customer records and contact", href: "/dashboard/customers", icon: "customers" },
+      { title: "Service Plans", description: "Recurring service plans", href: "/dashboard/service-plans", icon: "plans" },
     ],
   },
   {
     title: "Commercial",
     items: [
-      { title: "Quotes", href: "/dashboard/quotes", icon: "quotes" },
-      { title: "Revenue", href: "/dashboard/revenue", icon: "revenue" },
+      { title: "Quotes", description: "Pricing and approvals", href: "/dashboard/quotes", icon: "quotes" },
+      { title: "Revenue", description: "Sales and cash view", href: "/dashboard/revenue", icon: "revenue" },
     ],
   },
   {
     title: "Platform",
     items: [
-      { title: "Integrations", href: "/dashboard/integrations", icon: "integrations" },
-      { title: "Automations", href: "/dashboard/settings/automations", icon: "automations" },
-      { title: "Settings", href: "/dashboard/settings", icon: "settings" },
+      { title: "Integrations", description: "Connected tools", href: "/dashboard/integrations", icon: "integrations" },
+      { title: "Automations", description: "Rules and follow-ups", href: "/dashboard/settings/automations", icon: "automations" },
+      { title: "Settings", description: "Workspace setup", href: "/dashboard/settings", icon: "settings" },
     ],
   },
   {
     title: "Admin",
     items: [
-      { title: "Developer Admin", href: "/dev-admin", devOnly: true },
+      { title: "Developer Admin", description: "Internal tools", href: "/dev-admin", devOnly: true, icon: "settings" },
     ],
   },
 ];

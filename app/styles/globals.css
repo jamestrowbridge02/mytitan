@@ -1705,11 +1705,11 @@ main {
 }
 
 .mt-sidebar__brand {
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .mt-sidebar__brandLink {
-  border-radius: 16px;
+  border-radius: 18px;
 }
 
 .mt-sidebar__brandLogo {
@@ -1737,7 +1737,7 @@ main {
 }
 
 .mt-sidebar__item {
-  min-height: 32px;
+  min-height: 44px;
   color: rgba(226, 232, 240, 0.9);
 }
 
@@ -1745,28 +1745,26 @@ main {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   color: rgba(191, 219, 254, 0.88);
 }
 
 .mt-sidebar__icon svg {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
 }
 
 .mt-sidebar__logout {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  min-height: 34px;
-  border-radius: 12px;
+  gap: 0;
+  min-height: 44px;
+  border-radius: 18px;
   border: 1px solid rgba(148, 163, 184, 0.16);
   background: rgba(255, 255, 255, 0.03);
   color: rgba(226, 232, 240, 0.92);
-  font-size: 12px;
-  font-weight: 600;
 }
 
 .mt-sidebar__logout:hover {
@@ -1830,10 +1828,6 @@ body:has(input[type="password"]) .mt-sidebar {
 
 .mt-sidebar__groupTitle {
   color: rgba(255,255,255,0.50);
-}
-
-.mt-sidebar__item {
-  color: rgba(255,255,255,0.72);
 }
 
 .mt-sidebar__item[aria-current="page"] {
@@ -2611,14 +2605,14 @@ body {
 }
 
 [data-shell="app"] .operator-page {
-  padding: 16px 20px;
+  padding: 12px 18px;
 }
 
 [data-shell="app"] .operator-page__hero {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 14px;
+  gap: 10px;
   flex-wrap: wrap;
 }
 
@@ -2685,7 +2679,7 @@ body {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   gap: 10px;
-  margin-top: 16px;
+  margin-top: 14px;
 }
 
 [data-shell="app"] .operator-page__stat {
@@ -2718,7 +2712,7 @@ body {
 }
 
 [data-shell="app"] .operator-section {
-  padding: 18px 20px;
+  padding: 16px 18px;
 }
 
 [data-shell="app"] .operator-section__header {
@@ -3748,35 +3742,15 @@ table th,
   box-shadow: 0 14px 28px rgba(15, 23, 42, 0.06);
 }
 
-[data-shell="app"] .mt-sidebar__kicker,
-[data-shell="app"] .mt-sidebar__groupTitle,
-[data-shell="app"] .mt-sidebar__subhead {
-  color: #64748b;
-}
-
-[data-shell="app"] .mt-sidebar__search {
-  background: rgba(255, 255, 255, 0.88);
-  border: 1px solid rgba(148, 163, 184, 0.24);
-  color: #0f172a;
-}
-
-[data-shell="app"] .mt-sidebar__search::placeholder {
-  color: rgba(100, 116, 139, 0.75);
-}
-
-[data-shell="app"] .mt-sidebar__quickItem,
 [data-shell="app"] .mt-sidebar__item {
   color: #334155;
 }
 
-[data-shell="app"] .mt-sidebar__quickItem:hover,
 [data-shell="app"] .mt-sidebar__item:hover {
   background: rgba(29, 78, 216, 0.06);
   color: #0f172a;
 }
 
-[data-shell="app"] .mt-sidebar__quickItem.is-active,
-[data-shell="app"] .mt-sidebar__quickItem[aria-current="page"],
 [data-shell="app"] .mt-sidebar__item[aria-current="page"] {
   background: linear-gradient(135deg, rgba(17, 122, 120, 0.12), rgba(29, 78, 216, 0.08));
   color: #0f172a;
@@ -3784,11 +3758,11 @@ table th,
 }
 
 [data-shell="app"] .operator-page {
-  padding: 18px 20px;
+  padding: 14px 18px;
 }
 
 [data-shell="app"] .operator-page__hero {
-  gap: 14px;
+  gap: 10px;
 }
 
 [data-shell="app"] .operator-page__eyebrow {
@@ -3802,6 +3776,89 @@ table th,
 }
 
 [data-shell="app"] .operator-page__subtitle {
+  color: #526071;
+}
+
+[data-shell="app"] .mt-sidebar__group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+[data-shell="app"] .mt-sidebar__groupDivider {
+  width: 26px;
+  height: 1px;
+  margin: 0 auto;
+  background: rgba(148, 163, 184, 0.28);
+}
+
+[data-shell="app"] .mt-sidebar__iconList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+[data-shell="app"] .mt-sidebar__item,
+[data-shell="app"] .mt-sidebar__logout {
+  position: relative;
+  width: 100%;
+  min-height: 46px;
+  padding: 0;
+  justify-content: center;
+}
+
+[data-shell="app"] .mt-sidebar__dot {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  opacity: 0;
+  transform: scale(0.7);
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+[data-shell="app"] .mt-sidebar__item[aria-current="page"] .mt-sidebar__dot {
+  opacity: 1;
+  transform: scale(1);
+}
+
+[data-shell="app"] .mt-sidebar__tooltip {
+  position: absolute;
+  left: calc(100% + 12px);
+  top: 50%;
+  width: 188px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.12);
+  color: #0f172a;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(-50%) translateX(-6px);
+  transition: opacity 140ms ease, transform 140ms ease, visibility 140ms ease;
+}
+
+[data-shell="app"] .mt-sidebar__item:hover .mt-sidebar__tooltip,
+[data-shell="app"] .mt-sidebar__item:focus-visible .mt-sidebar__tooltip,
+[data-shell="app"] .mt-sidebar__logout:hover .mt-sidebar__tooltip,
+[data-shell="app"] .mt-sidebar__logout:focus-visible .mt-sidebar__tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(-50%) translateX(0);
+}
+
+[data-shell="app"] .mt-sidebar__tooltipTitle {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+[data-shell="app"] .mt-sidebar__tooltipMeta {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  line-height: 1.4;
   color: #526071;
 }
 

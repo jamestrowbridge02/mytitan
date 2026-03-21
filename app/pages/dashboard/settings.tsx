@@ -844,7 +844,7 @@ export default function SettingsPage() {
           <OperatorPageHeader
             eyebrow="Configuration"
             title="Settings"
-            subtitle="Workspace settings are limited to owners and admins."
+            subtitle="Only owners and admins can change workspace settings."
             stats={[]}
           />
           <div className="card settings-premium-card" data-testid="settings-governance-blocked">
@@ -865,20 +865,20 @@ export default function SettingsPage() {
       <OperatorPageHeader
         eyebrow="Configuration"
         title="Settings"
-        subtitle="Keep appearance, defaults, and tenant capability controls in one consistent workspace."
+        subtitle="Manage your brand, defaults, automations, and workspace controls in one place."
         actions={[
           { label: 'Integrations', href: '/dashboard/integrations', variant: 'secondary' },
           { label: settings?.guidedSetupCompletedAt ? 'Review guided setup' : 'Resume guided setup', onClick: () => void runGuidedSetup() },
         ]}
-        shortcuts={['Tabs keep configuration areas compact', 'Save once after grouped edits']}
+        shortcuts={['Use tabs to move between setup areas', 'Save after grouped edits']}
         stats={stats}
       />
       <GuidedSetupProgress enabled={guidedSetupEnabled} incomplete={!settings?.guidedSetupCompletedAt} compact />
       <div className="card settings-premium-card">
-        <h1 className="settings-premium-title">Tenant Settings</h1>
+        <h1 className="settings-premium-title">Workspace settings</h1>
         <div style={{ marginBottom: 16 }}>
           <h2 style={{ marginTop: 0 }}>Appearance</h2>
-          <p className="muted settings-premium-muted">Theme mode and guided setup controls stay live in this workspace.</p>
+          <p className="muted settings-premium-muted">Set the look and key setup controls for this workspace.</p>
           <div style={{ display: 'flex', gap: 10 }}>
             <button
               type="button"

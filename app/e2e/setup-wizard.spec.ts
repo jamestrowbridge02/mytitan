@@ -45,7 +45,7 @@ test.describe("guided setup continuity", () => {
     await loginAs(page, request, "e2e.operator@mytitan.local", "MyTitanE2E!2026");
 
     await page.goto("/dashboard/setup-wizard");
-    await expect(page.getByRole("heading", { name: "Guided setup" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Setup" })).toBeVisible();
     await page.getByRole("button", { name: "Next" }).evaluate((element: HTMLButtonElement) => element.click());
     await page.getByTestId("guided-setup-company-name").fill("E2E Guided Setup Resume");
     await page.getByTestId("guided-setup-save-exit-header").evaluate((element: HTMLButtonElement) => element.click());
@@ -71,7 +71,7 @@ test.describe("guided setup continuity", () => {
     await page.getByRole("button", { name: /Resume guided setup|Review guided setup/i }).first().evaluate((element: HTMLButtonElement) => element.click());
 
     await expect(page).toHaveURL(/\/dashboard\/setup-wizard$/);
-    await expect(page.getByRole("heading", { name: "Guided setup" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Setup" })).toBeVisible();
   });
 
   test("billing and calendar setup stay truthful when Stripe is unavailable", async ({ page, request }) => {
@@ -80,12 +80,10 @@ test.describe("guided setup continuity", () => {
 
     await page.goto("/dashboard/setup-wizard");
     await page.getByRole("button", { name: "Next" }).evaluate((element: HTMLButtonElement) => element.click());
-    await expect(page.getByRole("heading", { name: "Business branding" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Business details" })).toBeVisible();
     await page.getByRole("button", { name: "Next" }).evaluate((element: HTMLButtonElement) => element.click());
     await expect(page.getByText(/^Services$/i)).toBeVisible();
     await page.getByRole("button", { name: "Next" }).evaluate((element: HTMLButtonElement) => element.click());
-    await expect(page.getByRole("heading", { name: "Charging and calendar" })).toBeVisible();
-
     const calendarStep = page.getByTestId("guided-setup-calendar-step");
     await expect(calendarStep).toBeVisible();
     await calendarStep.getByRole("checkbox").check();
@@ -94,7 +92,7 @@ test.describe("guided setup continuity", () => {
     await page.getByRole("button", { name: "Next" }).evaluate((element: HTMLButtonElement) => element.click());
 
     const billingStep = page.getByTestId("guided-setup-billing-step");
-    await expect(billingStep).toContainText(/Stripe unavailable|Stripe ready/i);
+    await expect(billingStep).toContainText(/Stripe not ready|Stripe ready/i);
     await expect(page.getByTestId("guided-setup-enable-payments")).toBeDisabled();
   });
 
@@ -104,12 +102,10 @@ test.describe("guided setup continuity", () => {
 
     await page.goto("/dashboard/setup-wizard");
     await page.getByRole("button", { name: "Next" }).evaluate((element: HTMLButtonElement) => element.click());
-    await expect(page.getByRole("heading", { name: "Business branding" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Business details" })).toBeVisible();
     await page.getByRole("button", { name: "Next" }).evaluate((element: HTMLButtonElement) => element.click());
     await expect(page.getByRole("heading", { name: "Services" })).toBeVisible();
     await page.getByRole("button", { name: "Next" }).evaluate((element: HTMLButtonElement) => element.click());
-    await expect(page.getByRole("heading", { name: "Charging and calendar" })).toBeVisible();
-
     const operatingDays = page.getByTestId("guided-setup-operating-days");
     await expect(operatingDays).toBeVisible();
     const saturdayButton = operatingDays.getByRole("button", { name: "Sat" });

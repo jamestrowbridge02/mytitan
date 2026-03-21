@@ -230,21 +230,21 @@ export default function CustomersPage() {
       <div className="operator-stack">
         <OperatorPageHeader
           eyebrow={terms.customers}
-          title={`${terms.customers} CRM`}
-          subtitle={`Searchable ${terms.customers.toLowerCase()} records with timeline access, comms shortcuts, and lighter-weight selection tools for operator follow-up.`}
+          title={terms.customers}
+          subtitle={`Find ${terms.customers.toLowerCase()} quickly, open their history, and follow up without extra clicks.`}
           actions={[
             { label: "Command Centre", href: commandCentreHref, variant: "secondary" },
             { label: `New ${terms.jobs.slice(0, -1) || "Job"}`, href: "/dashboard/jobs/new" },
           ]}
-          shortcuts={["Search by customer name or contact detail", "Timeline and comms actions stay in-row"]}
+          shortcuts={["Search by name, phone, or email", "Open history and contact actions from each row"]}
           stats={stats}
         />
 
         <section className="card operator-section">
           <div className="operator-section__header">
             <div>
-              <h2 className="operator-section__title">{terms.customers} roster</h2>
-              <p className="operator-section__subtitle">Table-style rows replace oversized cards so contact state and workload are visible at a glance.</p>
+              <h2 className="operator-section__title">{terms.customers}</h2>
+              <p className="operator-section__subtitle">See contact details, recent activity, and workload at a glance.</p>
             </div>
           </div>
 
@@ -288,11 +288,11 @@ export default function CustomersPage() {
           <OperatorActiveFilters chips={activeFilters} onClearAll={activeFilters.length ? clearFilters : undefined} />
 
           <OperatorGuidance
-            title="CRM workflow tips"
+            title="Follow-up tips"
             items={[
-              "Sticky views keep follow-up and recent-activity slices available between visits on this device.",
-              "Use row selection to copy customer names or contact details before outreach.",
-              "Open a row menu for send, log, and copy actions while keeping the roster compact.",
+              "Saved views keep your key customer lists ready on this device.",
+              "Use row selection to copy names or contact details before you reach out.",
+              "Open each row menu to message, log, or copy details without leaving the list.",
             ]}
           />
 

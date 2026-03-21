@@ -170,9 +170,9 @@ export default function CustomerWorkspacePage() {
                 <MyTitanLogo size="sm" glimmer />
               </div>
               <p className="customer-workspace__eyebrow">Customer workspace</p>
-              <h1 style={{ marginTop: 8, marginBottom: 8 }}>Track your service records</h1>
+              <h1 style={{ marginTop: 8, marginBottom: 8 }}>Track your service work</h1>
               <p className="muted" style={{ margin: 0 }}>
-                Review jobs, documents, plans, and approvals linked to your account. Existing tokenized portal links still work.
+                Review jobs, documents, plans, and approvals linked to your account in one place.
               </p>
             </div>
             <Link href="/portal/job/e2e-public-portal-token" className="button secondary">Portal example</Link>

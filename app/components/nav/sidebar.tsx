@@ -41,6 +41,8 @@ function cx(...xs: Array<string | false | null | undefined>) {
 function SidebarIcon({ icon }: { icon?: string }) {
   const common = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
   switch (icon) {
+    case "dashboard":
+      return <svg {...common}><path d="M3 11.5 12 4l9 7.5" /><path d="M5 10.5V20h14v-9.5" /><path d="M10 20v-5h4v5" /></svg>;
     case "command":
       return <svg {...common}><path d="M8 8h8v8H8z" /><path d="M4 12h4M16 12h4M12 4v4M12 16v4" /></svg>;
     case "analytics":
@@ -72,7 +74,7 @@ function SidebarIcon({ icon }: { icon?: string }) {
   }
 }
 
-export default function Sidebar({ desktopWidth = 292 }: { desktopWidth?: number }) {
+export default function Sidebar({ desktopWidth = 96 }: { desktopWidth?: number }) {
   const router = useRouter();
   const { settings } = useTenantSettings();
   const logoutEnabled = isLogoutV1Enabled();
@@ -140,84 +142,80 @@ export default function Sidebar({ desktopWidth = 292 }: { desktopWidth?: number 
     void router.replace("/login");
   }
 
+  const navGroups = NAV_GROUPS.map((g) => {
+    const visibleItems = g.items
+      .filter(canShow)
+      .filter((item) => {
+        if (!canAccessHref(item.href)) return false;
+        if (item.href === "/dashboard/intelligence") return moduleVisibility.showIntelligence;
+        if (item.href === "/dashboard/compliance") return moduleVisibility.showIntelligence;
+        if (item.href === "/dashboard/executive") return moduleVisibility.showIntelligence;
+        if (item.href === "/dashboard/portal") return moduleVisibility.showPortalOps;
+        if (item.href === "/dashboard/technician") return moduleVisibility.showTechnicianQueue;
+        return true;
+      })
+      .map((item) => {
+        if (item.title === "Command Centre") return { ...item, href: commandCentreHref };
+        if (item.title === "Jobs") return { ...item, title: terms.jobs };
+        if (item.title === "Customers") return { ...item, title: terms.customers };
+        if (item.title === "Bookings") return { ...item, title: terms.bookings };
+        return item;
+      });
+
+    return { ...g, items: visibleItems };
+  }).filter((group) => group.items.length > 0);
+
   return (
     <aside
       className="mt-sidebar fixed inset-y-0 left-0 z-20 hidden h-screen shrink-0 md:block"
       style={{ width: desktopWidth, flex: `0 0 ${desktopWidth}px` }}
     >
-      <div className="flex h-full flex-col px-2 py-2.5">
-        <div className="mt-sidebar__brand rounded-2xl px-2.5 py-2.5">
-          <Link href="/dashboard" className="mt-sidebar__brandLink flex items-center justify-between gap-3">
-            <div>
-              <MyTitanLogo size="md" className="mt-sidebar__brandLogo" />
-              <div className="mt-sidebar__kicker mt-1.5 text-[10px]">Business OS</div>
-            </div>
-            <span className="mt-sidebar__brandBadge">Operator</span>
+      <div className="flex h-full flex-col px-3 py-3">
+        <div className="mt-sidebar__brand rounded-[24px] px-2 py-2">
+          <Link href="/dashboard" className="mt-sidebar__brandLink flex items-center justify-center" aria-label="Dashboard home" title="Dashboard home">
+            <MyTitanLogo size="sm" className="mt-sidebar__brandLogo" />
           </Link>
         </div>
 
-        <nav className="mt-2 flex-1 overflow-y-auto px-1 pb-2">
-          {NAV_GROUPS.map((g) => {
-            const visibleItems = g.items
-              .filter(canShow)
-              .filter((item) => {
-                if (!canAccessHref(item.href)) return false;
-                if (item.href === "/dashboard/intelligence") return moduleVisibility.showIntelligence;
-                if (item.href === "/dashboard/compliance") return moduleVisibility.showIntelligence;
-                if (item.href === "/dashboard/executive") return moduleVisibility.showIntelligence;
-                if (item.href === "/dashboard/portal") return moduleVisibility.showPortalOps;
-                if (item.href === "/dashboard/technician") return moduleVisibility.showTechnicianQueue;
-                return true;
-              })
-              .map((item) => {
-                if (item.title === "Command Centre") return { ...item, href: commandCentreHref };
-                if (item.title === "Jobs") return { ...item, title: terms.jobs };
-                if (item.title === "Customers") return { ...item, title: terms.customers };
-                if (item.title === "Bookings") return { ...item, title: terms.bookings };
-                return item;
-              });
-            if (!visibleItems.length) return null;
+        <nav className="mt-3 flex-1 overflow-y-auto px-0 pb-2" aria-label="Operator navigation">
+          {navGroups.map((group, groupIndex) => (
+            <div key={group.title || `group-${groupIndex}`} className="mt-sidebar__group">
+              {groupIndex > 0 ? <div className="mt-sidebar__groupDivider" aria-hidden="true" /> : null}
+              <div className="mt-sidebar__iconList">
+                {group.items.map((it) => {
+                  const href = it.href || "#";
+                  const active = isActive(path, href);
+                  const tooltip = it.description ? `${it.title}: ${it.description}` : it.title;
 
-            return (
-              <div key={g.title} className="mb-4">
-                {g.title ? (
-                  <div className="mt-sidebar__groupTitle w-full px-2 pb-2 text-left text-[11px] font-semibold uppercase">
-                    {g.title}
-                  </div>
-                ) : null}
-
-                <div className="space-y-1">
-                  {visibleItems.map((it) => {
-                    const href = it.href || "#";
-                    const active = isActive(path, href);
-
-                    return (
-                      <Link
-                        key={it.title}
-                        href={href}
-                        aria-current={active ? "page" : undefined}
-                        className={cx(
-                          "mt-sidebar__item flex items-center justify-between gap-3 rounded-xl px-2.5 py-2 text-[12px]",
-                          active && "shadow-sm"
-                        )}
-                      >
-                        <span className="flex min-w-0 items-center gap-2.5">
-                          <span className="mt-sidebar__icon" aria-hidden="true">
-                            <SidebarIcon icon={it.icon} />
-                          </span>
-                          <span className="truncate">{it.title}</span>
-                        </span>
-                        <span className="mt-sidebar__dot h-1.5 w-1.5 rounded-full bg-[color:var(--brand-600)]" />
-                      </Link>
-                    );
-                  })}
-                </div>
+                  return (
+                    <Link
+                      key={it.title}
+                      href={href}
+                      aria-current={active ? "page" : undefined}
+                      aria-label={it.title}
+                      title={tooltip}
+                      className={cx(
+                        "mt-sidebar__item group relative flex items-center justify-center rounded-2xl",
+                        active && "shadow-sm"
+                      )}
+                    >
+                      <span className="mt-sidebar__icon" aria-hidden="true">
+                        <SidebarIcon icon={it.icon} />
+                      </span>
+                      <span className="mt-sidebar__tooltip" role="tooltip">
+                        <span className="mt-sidebar__tooltipTitle">{it.title}</span>
+                        {it.description ? <span className="mt-sidebar__tooltipMeta">{it.description}</span> : null}
+                      </span>
+                      <span className="mt-sidebar__dot h-1.5 w-1.5 rounded-full bg-[color:var(--brand-600)]" />
+                    </Link>
+                  );
+                })}
               </div>
-            );
-          })}
+            </div>
+          ))}
         </nav>
-        <div className="px-1 pb-1 pt-2">
-          <button type="button" className="mt-sidebar__logout w-full" onClick={signOut} data-testid="sidebar-logout">
+        <div className="px-0 pb-1 pt-2">
+          <button type="button" className="mt-sidebar__logout w-full" onClick={signOut} data-testid="sidebar-logout" aria-label="Sign out" title="Sign out">
             <span className="mt-sidebar__icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
@@ -225,7 +223,10 @@ export default function Sidebar({ desktopWidth = 292 }: { desktopWidth?: number 
                 <path d="M21 12H9" />
               </svg>
             </span>
-            Sign out
+            <span className="mt-sidebar__tooltip" role="tooltip">
+              <span className="mt-sidebar__tooltipTitle">Sign out</span>
+              <span className="mt-sidebar__tooltipMeta">Leave this workspace</span>
+            </span>
           </button>
         </div>
       </div>

@@ -18,10 +18,10 @@ const DEFAULT_SERVICES = [
 ];
 
 const steps = [
-  { key: "trade", title: "Confirm trade" },
-  { key: "branding", title: "Business branding" },
+  { key: "trade", title: "Confirm your trade" },
+  { key: "branding", title: "Business details" },
   { key: "services", title: "Services" },
-  { key: "operations", title: "Charging and calendar" },
+  { key: "operations", title: "Hours and pricing" },
   { key: "payments", title: "Billing and payments" },
   { key: "ready", title: "Ready" },
 ] as const;
@@ -232,8 +232,8 @@ export default function SetupWizard() {
     return (
       <DashboardShell>
         <div className="card">
-          <h1>Guided setup</h1>
-          <p className="muted">Guided Setup V2 is not enabled for this environment.</p>
+          <h1>Setup</h1>
+          <p className="muted">The guided setup flow is not turned on in this environment.</p>
         </div>
       </DashboardShell>
     );
@@ -294,7 +294,7 @@ export default function SetupWizard() {
       <div className="card" style={{ marginBottom: 16 }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
           <div>
-            <h1>Guided setup</h1>
+            <h1>Setup</h1>
             <p className="muted">Step {step + 1} of {steps.length}: {steps[step].title}</p>
             <p className="muted">Status: {stepState === "done" ? "Done" : stepState === "skipped" ? "Skipped" : "In progress"}</p>
           </div>
@@ -318,16 +318,16 @@ export default function SetupWizard() {
 
       {step === 0 ? (
         <div className="card">
-          <h2>Confirm trade</h2>
-          <p className="muted">We will set your primary trade to Wheels and install the Wheels trade pack automatically.</p>
+          <h2>Confirm your trade</h2>
+          <p className="muted">We will set your main trade to Wheels and load the matching setup for you.</p>
           {renderControls(0, { trade: "WHEELS" })}
         </div>
       ) : null}
 
       {step === 1 ? (
         <div className="card">
-          <h2>Business branding</h2>
-          <p className="muted">Add your name, logo, and support details so customers recognize you.</p>
+          <h2>Business details</h2>
+          <p className="muted">Add your business name, logo, and contact details so customers recognise you.</p>
           <label>Business name</label>
           <input className="input" value={branding.companyName} onChange={(e) => updateBranding({ ...brandingRef.current, companyName: e.target.value })} data-testid="guided-setup-company-name" />
 
@@ -484,27 +484,27 @@ export default function SetupWizard() {
         <div className="card">
           <h2>Billing and payments</h2>
           {status?.stripeConfigured ? (
-            <p className="muted">Stripe is configured. Enable customer payments here, then manage plans and billing rules from the billing workspace.</p>
+            <p className="muted">Stripe is connected. Turn on customer payments here, then finish anything else in billing.</p>
           ) : (
-            <p className="muted">Stripe is not configured for this environment yet. Online payments remain unavailable until a valid Stripe secret key and prices are configured on the server.</p>
+            <p className="muted">Stripe is not connected yet, so online payments are still unavailable.</p>
           )}
           <div className="integration-card" style={{ padding: 16, marginBottom: 12 }} data-testid="guided-setup-billing-step">
-            <strong>{status?.stripeConfigured ? "Stripe ready" : "Stripe unavailable"}</strong>
+            <strong>{status?.stripeConfigured ? "Stripe ready" : "Stripe not ready"}</strong>
             <p className="muted" style={{ marginBottom: 12 }}>
               {status?.stripeConfigured
-                ? "Customers can be routed into Stripe once payments are enabled for this workspace."
-                : "Connect Stripe in deployment configuration first. MyTitan will not claim payment readiness before that is true."}
+                ? "Customers can pay through Stripe as soon as payments are enabled for this workspace."
+                : "Connect Stripe first. MyTitan will not show payments as ready until that is done."}
             </p>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <Link className="button secondary" href="/dashboard/billing">Open billing workspace</Link>
-              <Link className="button secondary" href="/dashboard/billing/readiness">Review billing readiness</Link>
+              <Link className="button secondary" href="/dashboard/billing">Open billing</Link>
+              <Link className="button secondary" href="/dashboard/billing/readiness">Check payment readiness</Link>
             </div>
           </div>
           <label style={{ marginBottom: 12 }}>
             <input type="checkbox" checked={enablePayments} onChange={(e) => setEnablePayments(e.target.checked)} disabled={!status?.stripeConfigured} data-testid="guided-setup-enable-payments" />
             Enable online payments
           </label>
-          {!status?.stripeConfigured ? <p className="muted">This control stays disabled until Stripe is configured correctly.</p> : null}
+          {!status?.stripeConfigured ? <p className="muted">This stays disabled until Stripe is connected correctly.</p> : null}
           {renderControls(4, { enablePayments })}
         </div>
       ) : null}
@@ -512,9 +512,9 @@ export default function SetupWizard() {
       {step === 5 ? (
         <div className="card">
           <h2>Ready</h2>
-          <p className="muted">You can start creating Wheels jobs now.</p>
+          <p className="muted">You are ready to start taking work.</p>
           <div style={{ display: "grid", gap: 12 }}>
-            <Link className="button" href="/dashboard/jobs/new?guided=1">Create first job (Guided Mode ON)</Link>
+            <Link className="button" href="/dashboard/jobs/new?guided=1">Create your first job</Link>
             <Link className="button secondary" href="/dashboard">Go to dashboard</Link>
           </div>
           {renderControls(5, {})}
