@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { apiFetch, getToken } from './api';
 
 export type TenantSettings = {
@@ -153,9 +153,10 @@ export function TenantSettingsProvider({ children }: { children: React.ReactNode
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     if (!getToken()) {
       setSettings(null);
+      setLoading(false);
       setError('');
       applyTheme(defaultSettings);
       return;
@@ -177,11 +178,29 @@ const merged = { ...defaultSettings, ...(data || {}) } as TenantSettings;
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    refresh();
-  }, []);
+    void refresh();
+
+    if (typeof window === 'undefined') return;
+
+    const handleTokenChanged = () => {
+      void refresh();
+    };
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === 'mytitan_token') {
+        void refresh();
+      }
+    };
+
+    window.addEventListener('mytitan:token-changed', handleTokenChanged);
+    window.addEventListener('storage', handleStorage);
+    return () => {
+      window.removeEventListener('mytitan:token-changed', handleTokenChanged);
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, [refresh]);
 
   const value = useMemo(
     () => ({

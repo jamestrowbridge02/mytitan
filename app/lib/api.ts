@@ -26,14 +26,21 @@ export function getToken() {
   return window.localStorage.getItem('mytitan_token');
 }
 
+function notifyTokenChanged() {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new Event('mytitan:token-changed'));
+}
+
 export function setToken(token: string) {
   if (typeof window === 'undefined') return;
   window.localStorage.setItem('mytitan_token', token);
+  notifyTokenChanged();
 }
 
 export function clearToken() {
   if (typeof window === 'undefined') return;
   window.localStorage.removeItem('mytitan_token');
+  notifyTokenChanged();
 }
 
 export async function apiFetch(path: string, init: RequestInit = {}) {

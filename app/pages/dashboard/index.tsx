@@ -53,21 +53,27 @@ function formatMoneyGBP(value: number) {
 
 export default function Dashboard() {
   const router = useRouter();
-  const { settings } = useTenantSettings();
+  const { settings, loading: settingsLoading } = useTenantSettings();
   const commandCentreHref = getCommandCentreHref(settings);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [me, setMe] = useState<any>(null);
   const [error, setError] = useState('');
   const [requestId, setRequestId] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(true);
+  const [hydrated, setHydrated] = useState(false);
   const commandCentreEnabled = isCommandCentreEnabled() || isCommandCentreV1Enabled();
   const commandCentreV1Enabled = isCommandCentreV1Enabled();
   const commandCentreV2Enabled = isCommandCentreV2Enabled();
   const guidedSetupEnabled = isGuidedSetupV2Enabled();
   const demoTourEnabled = isDemoTourV1Enabled();
   const guidedEverywhereEnabled = isGuidedEverywhereV1Enabled();
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
+
   const dashboardRedirect = useMemo(() => {
-    if (!router.isReady) return null;
+    if (!hydrated) return null;
+    if (settingsLoading) return null;
     if (commandCentreHref === '/dashboard/command-centre-v2' && commandCentreV2Enabled) {
       return '/dashboard/command-centre-v2';
     }
@@ -75,7 +81,7 @@ export default function Dashboard() {
       return commandCentreHref;
     }
     return null;
-  }, [router.isReady, commandCentreHref, commandCentreV1Enabled, commandCentreV2Enabled, settings?.guidedSetupCompletedAt]);
+  }, [hydrated, settingsLoading, commandCentreHref, commandCentreV1Enabled, commandCentreV2Enabled, settings?.guidedSetupCompletedAt]);
 
   useEffect(() => {
     if (!router.isReady) return;
@@ -174,7 +180,7 @@ export default function Dashboard() {
     return (
       <DashboardShell>
         <div className="dashboard-home-premium">
-          <LoadingState title="Opening workspace" description="Preparing your operator dashboard." />
+          <LoadingState title="Opening your workspace" description="Loading the right view for this account." />
         </div>
       </DashboardShell>
     );
@@ -185,7 +191,7 @@ export default function Dashboard() {
       <DashboardShell>
   <div className="dashboard-home-premium">
 <div className="dashboard-premium-shell">
-        <EmptyState title="Dashboard" description="Command Centre feature is disabled." />
+        <EmptyState title="Dashboard" description="The main workboard is turned off for this workspace." />
       </div>
   </div>
 </DashboardShell>
@@ -221,7 +227,7 @@ export default function Dashboard() {
             </div>
 
             <div className="dashboard-home-loading">
-              <LoadingState title="Loading command centre" description="Fetching today's activity and quick actions." />
+              <LoadingState title="Loading your dashboard" description="Bringing in today's work, bookings, and shortcuts." />
             </div>
           </>
         )}
@@ -262,8 +268,8 @@ export default function Dashboard() {
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <h2 style={{ marginTop: 0 }}>Command Centre</h2>
-        <p className="muted">Simple daily control for jobs, bookings, CRM, and billing.</p>
+        <h2 style={{ marginTop: 0 }}>Today at a glance</h2>
+        <p className="muted">See the work, bookings, customers, and payments that need attention first.</p>
         {error ? (
           <ErrorState
             title="Some data may be out of date"
@@ -275,12 +281,12 @@ export default function Dashboard() {
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <h2 style={{ marginTop: 0 }}>Quick Actions</h2>
+        <h2 style={{ marginTop: 0 }}>Quick actions</h2>
         <div style={{ display: 'grid', gap: 10 }}>
           {(summary?.quickActions || [
-            { key: 'new_job', label: 'New Job', href: '/dashboard/jobs/new' },
-            { key: 'new_booking', label: 'New Booking', href: '/dashboard/bookings' },
-            { key: 'new_customer', label: 'New Customer / Trade Account', href: '/dashboard/trade-accounts' },
+            { key: 'new_job', label: 'New job', href: '/dashboard/jobs/new' },
+            { key: 'new_booking', label: 'New booking', href: '/dashboard/bookings' },
+            { key: 'new_customer', label: 'New customer', href: '/dashboard/trade-accounts' },
           ]).map((action) => (
             <Link key={action.key} className="button" href={action.href} style={{ textAlign: 'center' }}>{action.label}</Link>
           ))}
@@ -289,7 +295,7 @@ export default function Dashboard() {
 
       {guidedEverywhereEnabled ? (
         <div className="card" style={{ marginBottom: 16 }}>
-          <h2 style={{ marginTop: 0 }}>What do you want to do?</h2>
+          <h2 style={{ marginTop: 0 }}>Start something quickly</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 10 }}>
             <Link className="button secondary" href="/dashboard/guided?action=create_job">Create job</Link>
             <Link className="button secondary" href="/dashboard/guided?action=book_appointment">Book appointment</Link>
@@ -303,7 +309,7 @@ export default function Dashboard() {
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="two-col">
           <div>
-            <h3 style={{ marginTop: 0, marginBottom: 6 }}>Cash at Risk</h3>
+            <h3 style={{ marginTop: 0, marginBottom: 6 }}>Money waiting to be collected</h3>
             <p className="muted" style={{ marginTop: 0 }}>
               Review unpaid jobs ready for collection.
             </p>
@@ -313,7 +319,7 @@ export default function Dashboard() {
             </div>
           </div>
           <div>
-            <h3 style={{ marginTop: 0, marginBottom: 6 }}>Stuck Jobs</h3>
+            <h3 style={{ marginTop: 0, marginBottom: 6 }}>Work that is getting stuck</h3>
             <p className="muted" style={{ marginTop: 0 }}>
               See blocked and at-risk work in one place.
             </p>
@@ -353,8 +359,8 @@ export default function Dashboard() {
       <div className="card" style={{ marginBottom: 16 }}>
         <h2 style={{ marginTop: 0 }}>Money</h2>
         <p className="muted">Unpaid: {summary?.money?.unpaidCount || 0} • {money(summary?.money?.unpaidTotalCents || 0)}</p>
-        <p className="muted">Subscription: {summary?.money?.subscriptionStatus || 'none'}</p>
-        <Link className="button secondary" href="/dashboard/billing">Open Billing</Link>
+        <p className="muted">Plan: {summary?.money?.subscriptionStatus || 'none'}</p>
+        <Link className="button secondary" href="/dashboard/billing">Open billing</Link>
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
@@ -381,9 +387,9 @@ export default function Dashboard() {
       </div>
 
       <div className="card">
-        <h2 style={{ marginTop: 0 }}>Setup Progress</h2>
-        <p className="muted">Setup is non-blocking. Continue when ready.</p>
-        <Link className="button secondary" href="/dashboard/setup">Open Setup</Link>
+        <h2 style={{ marginTop: 0 }}>Setup</h2>
+        <p className="muted">You can finish the remaining setup whenever you are ready.</p>
+        <Link className="button secondary" href="/dashboard/setup">Open setup</Link>
       </div>
       </div>
     </DashboardShell>
