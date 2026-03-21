@@ -30,7 +30,7 @@ test.describe("ui hardening regressions", () => {
     await loginAs(page, request, "e2e.operator@mytitan.local", "MyTitanE2E!2026");
 
     await page.goto("/dashboard/settings");
-    await expect(page.getByRole("heading", { name: "Tenant Settings" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Workspace settings" })).toBeVisible();
 
     await page.getByTestId("settings-tab-workflow").click();
     await expect(page.getByTestId("settings-workflow-panel")).toBeVisible();
