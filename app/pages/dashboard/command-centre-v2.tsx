@@ -631,8 +631,9 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
           <div className="ccv2-inline-actions-marker" data-inline-actions="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>
             INLINE_ACTIONS_ENABLED
           </div>
+        <p className="ccv2-eyebrow">Live operations</p>
         <h1 className="ccv2-title" style={{ marginTop: 0 }}>Command Centre</h1>
-        <p className="muted ccv2-subtitle">Operations brain for {terms.jobs.toLowerCase()}, bulk actions, reminders, and inline updates.</p>
+        <p className="muted ccv2-subtitle">Use the live board to move {terms.jobs.toLowerCase()}, assign work, and clear blockers as they happen.</p>
                   <div className="ccv2-count-strip">
           {visibleJobStages.map((row) => (
             <div key={row.id} className="ccv2-count-pill">

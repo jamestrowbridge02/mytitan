@@ -172,7 +172,7 @@ export default function CustomerWorkspacePage() {
               <p className="customer-workspace__eyebrow">Customer workspace</p>
               <h1 style={{ marginTop: 8, marginBottom: 8 }}>Track your service work</h1>
               <p className="muted" style={{ margin: 0 }}>
-                Review jobs, documents, plans, and approvals linked to your account in one place.
+                Review your jobs, quotes, plans, and approvals in one place.
               </p>
             </div>
             <Link href="/portal/job/e2e-public-portal-token" className="button secondary">Portal example</Link>

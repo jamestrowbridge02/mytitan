@@ -275,14 +275,14 @@ export default function Jobs() {
     <DashboardShell>
       <div className="operator-stack">
         <OperatorPageHeader
-          eyebrow="Workflow"
+          eyebrow="Work queue"
           title={terms.jobs}
-          subtitle="See work quickly, filter fast, and update jobs safely."
+          subtitle="See today&apos;s work, keep ownership clear, and update jobs without opening every record."
           actions={[
-            { label: "Open Command Centre", href: commandCentreHref, variant: "secondary" },
+            { label: "Open live board", href: commandCentreHref, variant: "secondary" },
             { label: `Create ${terms.jobs.slice(0, -1) || "Job"}`, href: "/dashboard/jobs/new" },
           ]}
-          shortcuts={["Ctrl K opens quick navigation", "Bulk updates use the same live job actions"]}
+          shortcuts={["Ctrl K opens quick navigation", "Bulk changes use the same live job actions"]}
           stats={stats}
         />
 
@@ -290,7 +290,7 @@ export default function Jobs() {
           <div className="operator-section__header">
             <div>
               <h2 className="operator-section__title">{terms.jobs} queue</h2>
-              <p className="operator-section__subtitle">Keep the queue tight so status, timing, and ownership are easy to scan.</p>
+              <p className="operator-section__subtitle">Keep the queue easy to scan so timing, owner, and next step stay clear.</p>
             </div>
           </div>
 

@@ -15,9 +15,9 @@ test.describe("sidebar navigation cleanup", () => {
     await expect(sidebar.getByRole("link", { name: "Command Centre" })).toBeVisible();
     await expect(sidebar.getByRole("link", { name: "Analytics" })).toBeVisible();
     await expect(sidebar.getByRole("link", { name: "Compliance" })).toBeVisible();
-    await expect(sidebar.getByText("Your main overview")).toBeHidden();
+    await expect(sidebar.getByText("Today at a glance")).toBeHidden();
     await dashboardLink.hover();
-    await expect(sidebar.getByText("Your main overview")).toBeVisible();
+    await expect(sidebar.getByText("Today at a glance")).toBeVisible();
 
     await expect(page.getByText("Search routes")).toHaveCount(0);
     await expect(page.getByText("Ctrl K opens global command search.")).toHaveCount(0);

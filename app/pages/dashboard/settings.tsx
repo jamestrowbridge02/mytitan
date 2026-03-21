@@ -863,14 +863,14 @@ export default function SettingsPage() {
   <div className="settings-premium-shell">
       <OperatorNotice notice={notice} onDismiss={clearNotice} />
       <OperatorPageHeader
-        eyebrow="Configuration"
+        eyebrow="Workspace setup"
         title="Settings"
-        subtitle="Manage your brand, defaults, automations, and workspace controls in one place."
+        subtitle="Update your logo, defaults, team tools, and customer-facing basics in one place."
         actions={[
           { label: 'Integrations', href: '/dashboard/integrations', variant: 'secondary' },
           { label: settings?.guidedSetupCompletedAt ? 'Review guided setup' : 'Resume guided setup', onClick: () => void runGuidedSetup() },
         ]}
-        shortcuts={['Use tabs to move between setup areas', 'Save after grouped edits']}
+        shortcuts={['Tabs keep related setup together', 'Save after each section']}
         stats={stats}
       />
       <GuidedSetupProgress enabled={guidedSetupEnabled} incomplete={!settings?.guidedSetupCompletedAt} compact />
@@ -878,7 +878,7 @@ export default function SettingsPage() {
         <h1 className="settings-premium-title">Workspace settings</h1>
         <div style={{ marginBottom: 16 }}>
           <h2 style={{ marginTop: 0 }}>Appearance</h2>
-          <p className="muted settings-premium-muted">Set the look and key setup controls for this workspace.</p>
+          <p className="muted settings-premium-muted">Set the look, starting points, and key controls for this workspace.</p>
           <div style={{ display: 'flex', gap: 10 }}>
             <button
               type="button"
@@ -1141,9 +1141,9 @@ export default function SettingsPage() {
 
             <div className="card settings-premium-card" style={{ marginBottom: 12 }}>
               <h3 style={{ marginTop: 0 }}>Operational defaults</h3>
-              <p className="muted settings-premium-muted">Choose how operators land in Command Centre and which optional destinations stay visible in navigation.</p>
+              <p className="muted settings-premium-muted">Choose which live board operators open and which optional areas stay visible in the menu.</p>
 
-              <label className="settings-premium-label">Default Command Centre experience</label>
+              <label className="settings-premium-label">Default live board</label>
               <select
                 className="input settings-premium-input"
                 data-testid="settings-command-centre-default"

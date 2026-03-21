@@ -11,7 +11,6 @@ import { ApiError, apiFetch, setToken } from '../../lib/api';
 import {
   isCommandCentreEnabled,
   isCommandCentreV1Enabled,
-  isCommandCentreV2Enabled,
   isDemoTourV1Enabled,
   isGuidedEverywhereV1Enabled,
   isGuidedSetupV2Enabled,
@@ -53,35 +52,17 @@ function formatMoneyGBP(value: number) {
 
 export default function Dashboard() {
   const router = useRouter();
-  const { settings, loading: settingsLoading } = useTenantSettings();
+  const { settings } = useTenantSettings();
   const commandCentreHref = getCommandCentreHref(settings);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [me, setMe] = useState<any>(null);
   const [error, setError] = useState('');
   const [requestId, setRequestId] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(true);
-  const [hydrated, setHydrated] = useState(false);
   const commandCentreEnabled = isCommandCentreEnabled() || isCommandCentreV1Enabled();
-  const commandCentreV1Enabled = isCommandCentreV1Enabled();
-  const commandCentreV2Enabled = isCommandCentreV2Enabled();
   const guidedSetupEnabled = isGuidedSetupV2Enabled();
   const demoTourEnabled = isDemoTourV1Enabled();
   const guidedEverywhereEnabled = isGuidedEverywhereV1Enabled();
-  useEffect(() => {
-    setHydrated(true);
-  }, []);
-
-  const dashboardRedirect = useMemo(() => {
-    if (!hydrated) return null;
-    if (settingsLoading) return null;
-    if (commandCentreHref === '/dashboard/command-centre-v2' && commandCentreV2Enabled) {
-      return '/dashboard/command-centre-v2';
-    }
-    if (commandCentreV1Enabled && settings?.guidedSetupCompletedAt) {
-      return commandCentreHref;
-    }
-    return null;
-  }, [hydrated, settingsLoading, commandCentreHref, commandCentreV1Enabled, commandCentreV2Enabled, settings?.guidedSetupCompletedAt]);
 
   useEffect(() => {
     if (!router.isReady) return;
@@ -104,7 +85,7 @@ export default function Dashboard() {
       setSummary(s as Summary);
       setMe(m);
     } catch (err: any) {
-      setError(err?.message || 'Failed to load command centre');
+      setError(err?.message || 'Failed to load dashboard');
       setRequestId(err instanceof ApiError ? err.requestId : undefined);
     } finally {
       setLoading(false);
@@ -115,11 +96,6 @@ export default function Dashboard() {
     load();
   }, []);
 
-  useEffect(() => {
-    if (!dashboardRedirect) return;
-    void router.replace(dashboardRedirect);
-  }, [dashboardRedirect, router]);
-
   const drafts = useMemo(() => {
     const jobs = summary?.drafts?.jobs || [];
     const crm = summary?.drafts?.crm || [];
@@ -128,6 +104,8 @@ export default function Dashboard() {
       ...crm.map((d) => ({ ...d, kind: 'CRM draft', href: d.tradeAccountId ? `/dashboard/trade-accounts/${d.tradeAccountId}` : '/dashboard/trade-accounts' })),
     ];
   }, [summary]);
+
+  const canManageBilling = Boolean(me?.permissions?.["billing.manage"]);
 
   const dashboardMetrics = [
     {
@@ -176,22 +154,12 @@ export default function Dashboard() {
     },
   ];
 
-  if (dashboardRedirect) {
-    return (
-      <DashboardShell>
-        <div className="dashboard-home-premium">
-          <LoadingState title="Opening your workspace" description="Loading the right view for this account." />
-        </div>
-      </DashboardShell>
-    );
-  }
-
   if (!commandCentreEnabled) {
   return (
       <DashboardShell>
   <div className="dashboard-home-premium">
 <div className="dashboard-premium-shell">
-        <EmptyState title="Dashboard" description="The main workboard is turned off for this workspace." />
+        <EmptyState title="Dashboard" description="This overview is turned off for this workspace." />
       </div>
   </div>
 </DashboardShell>
@@ -227,7 +195,7 @@ export default function Dashboard() {
             </div>
 
             <div className="dashboard-home-loading">
-              <LoadingState title="Loading your dashboard" description="Bringing in today's work, bookings, and shortcuts." />
+              <LoadingState title="Loading your dashboard" description="Bringing in today's work, priorities, and quick actions." />
             </div>
           </>
         )}
@@ -256,6 +224,18 @@ export default function Dashboard() {
     <DashboardShell>
       <div className="dashboard-home-premium">
       <GuidedTourOverlay enabled={demoTourEnabled} isDemoUser={Boolean(me?.demoUser || me?.email === '@mytitan.co.uk')} />
+      <div className="card dashboard-home-hero">
+        <p className="operator-kicker" style={{ margin: 0 }}>Business overview</p>
+        <h1 className="dashboard-home-title" style={{ marginTop: 10 }}>Dashboard</h1>
+        <p className="dashboard-home-subtitle" style={{ marginTop: 8, marginBottom: 0 }}>
+          See what needs attention today, then jump into the live board only when you need to move work.
+        </p>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 16 }}>
+          <Link className="button" href={commandCentreHref}>Open live board</Link>
+          <Link className="button secondary" href="/dashboard/jobs">Open jobs</Link>
+          <Link className="button secondary" href="/dashboard/customers">Open customers</Link>
+        </div>
+      </div>
       <GuidedSetupProgress enabled={guidedSetupEnabled} incomplete={!settings?.guidedSetupCompletedAt} />
 
       <div className="dashboard-metrics-grid">
@@ -268,8 +248,8 @@ export default function Dashboard() {
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <h2 style={{ marginTop: 0 }}>Today at a glance</h2>
-        <p className="muted">See the work, bookings, customers, and payments that need attention first.</p>
+        <h2 style={{ marginTop: 0 }}>Needs attention today</h2>
+        <p className="muted">Start with the work, bookings, and payments that need a decision today.</p>
         {error ? (
           <ErrorState
             title="Some data may be out of date"
@@ -281,7 +261,7 @@ export default function Dashboard() {
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <h2 style={{ marginTop: 0 }}>Quick actions</h2>
+        <h2 style={{ marginTop: 0 }}>Start something</h2>
         <div style={{ display: 'grid', gap: 10 }}>
           {(summary?.quickActions || [
             { key: 'new_job', label: 'New job', href: '/dashboard/jobs/new' },
@@ -295,7 +275,7 @@ export default function Dashboard() {
 
       {guidedEverywhereEnabled ? (
         <div className="card" style={{ marginBottom: 16 }}>
-          <h2 style={{ marginTop: 0 }}>Start something quickly</h2>
+          <h2 style={{ marginTop: 0 }}>Guided actions</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 10 }}>
             <Link className="button secondary" href="/dashboard/guided?action=create_job">Create job</Link>
             <Link className="button secondary" href="/dashboard/guided?action=book_appointment">Book appointment</Link>
@@ -309,22 +289,22 @@ export default function Dashboard() {
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="two-col">
           <div>
-            <h3 style={{ marginTop: 0, marginBottom: 6 }}>Money waiting to be collected</h3>
+            <h3 style={{ marginTop: 0, marginBottom: 6 }}>Cash to follow up</h3>
             <p className="muted" style={{ marginTop: 0 }}>
-              Review unpaid jobs ready for collection.
+              See unpaid work that needs a call, reminder, or invoice follow-up.
             </p>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <Link className="button secondary" href="/dashboard/command-centre">Open Command Centre</Link>
+              <Link className="button secondary" href={commandCentreHref}>Open live board</Link>
               <Link className="button secondary" href="/dashboard/jobs">View Jobs</Link>
             </div>
           </div>
           <div>
-            <h3 style={{ marginTop: 0, marginBottom: 6 }}>Work that is getting stuck</h3>
+            <h3 style={{ marginTop: 0, marginBottom: 6 }}>Work that needs help</h3>
             <p className="muted" style={{ marginTop: 0 }}>
-              See blocked and at-risk work in one place.
+              Spot blocked or slowing work before it slips further behind.
             </p>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <Link className="button secondary" href="/dashboard/command-centre">Open Command Centre</Link>
+              <Link className="button secondary" href={commandCentreHref}>Open live board</Link>
               <Link className="button secondary" href="/dashboard/jobs">View Jobs</Link>
             </div>
           </div>
@@ -332,8 +312,8 @@ export default function Dashboard() {
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <h2 style={{ marginTop: 0 }}>Today</h2>
-        <p className="muted">Bookings scheduled today</p>
+        <h2 style={{ marginTop: 0 }}>Today&apos;s schedule</h2>
+        <p className="muted">Bookings and due work for today.</p>
         <div className="list">
           {(summary?.todayBookings || []).slice(0, 5).map((b) => (
             <div key={b.id} className="integration-card">
@@ -344,7 +324,7 @@ export default function Dashboard() {
           {(!summary?.todayBookings || summary.todayBookings.length === 0) ? <p className="muted">No bookings for today.</p> : null}
         </div>
 
-        <p className="muted" style={{ marginTop: 14 }}>Jobs due / overdue</p>
+        <p className="muted" style={{ marginTop: 14 }}>Jobs due or overdue</p>
         <div className="list">
           {(summary?.dueAndOverdueJobs || []).slice(0, 5).map((j) => (
             <div key={j.id} className="integration-card">
@@ -357,18 +337,18 @@ export default function Dashboard() {
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <h2 style={{ marginTop: 0 }}>Money</h2>
+        <h2 style={{ marginTop: 0 }}>Billing snapshot</h2>
         <p className="muted">Unpaid: {summary?.money?.unpaidCount || 0} • {money(summary?.money?.unpaidTotalCents || 0)}</p>
         <p className="muted">Plan: {summary?.money?.subscriptionStatus || 'none'}</p>
-        <Link className="button secondary" href="/dashboard/billing">Open billing</Link>
+        {canManageBilling ? <Link className="button secondary" href="/dashboard/billing">Open billing</Link> : null}
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <h2 style={{ marginTop: 0 }}>Drafts</h2>
+        <h2 style={{ marginTop: 0 }}>Unfinished work</h2>
         {drafts.length === 0 ? (
           <EmptyState
-            title="No drafts yet"
-            description="Drafts will appear here when you start a job or CRM note and leave before finishing."
+            title="Nothing to resume"
+            description="Anything you start and leave unfinished will appear here so you can pick it up later."
             primaryAction={{ label: 'Create new job', href: '/dashboard/jobs/new?guided=1' }}
           />
         ) : (
@@ -387,8 +367,8 @@ export default function Dashboard() {
       </div>
 
       <div className="card">
-        <h2 style={{ marginTop: 0 }}>Setup</h2>
-        <p className="muted">You can finish the remaining setup whenever you are ready.</p>
+        <h2 style={{ marginTop: 0 }}>Setup progress</h2>
+        <p className="muted">Finish the remaining setup when you are ready.</p>
         <Link className="button secondary" href="/dashboard/setup">Open setup</Link>
       </div>
       </div>

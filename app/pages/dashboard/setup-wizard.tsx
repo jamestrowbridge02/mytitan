@@ -294,7 +294,7 @@ export default function SetupWizard() {
       <div className="card" style={{ marginBottom: 16 }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
           <div>
-            <h1>Setup</h1>
+            <h1>Guided setup</h1>
             <p className="muted">Step {step + 1} of {steps.length}: {steps[step].title}</p>
             <p className="muted">Status: {stepState === "done" ? "Done" : stepState === "skipped" ? "Skipped" : "In progress"}</p>
           </div>
@@ -327,7 +327,7 @@ export default function SetupWizard() {
       {step === 1 ? (
         <div className="card">
           <h2>Business details</h2>
-          <p className="muted">Add your business name, logo, and contact details so customers recognise you.</p>
+          <p className="muted">Add your business name, logo, and contact details so customers recognise you right away.</p>
           <label>Business name</label>
           <input className="input" value={branding.companyName} onChange={(e) => updateBranding({ ...brandingRef.current, companyName: e.target.value })} data-testid="guided-setup-company-name" />
 
@@ -359,7 +359,7 @@ export default function SetupWizard() {
       {step === 2 ? (
         <div className="card">
           <h2>Services</h2>
-          <p className="muted">Turn on the services you offer and set prices.</p>
+          <p className="muted">Choose the services you offer and set your starting prices.</p>
           <div style={{ marginBottom: 12 }}>
             <button className="button secondary" onClick={() => setServices(DEFAULT_SERVICES.map((svc) => ({ ...svc, enabled: true })))}>
               Use Wheels defaults
@@ -417,7 +417,7 @@ export default function SetupWizard() {
       {step === 3 ? (
         <div className="card">
           <h2>Charging and calendar</h2>
-          <p className="muted">Set your default pricing and the weekday hours customers can book against.</p>
+          <p className="muted">Set your default pricing and the hours customers can book against.</p>
           <label style={{ marginBottom: 8 }}>
             <input type="checkbox" checked={charging.pricePerWheel} onChange={(e) => setCharging({ ...charging, pricePerWheel: e.target.checked })} />
             Price per wheel by default
@@ -434,7 +434,7 @@ export default function SetupWizard() {
           <input className="input" value={charging.defaultTyrePressure} onChange={(e) => setCharging({ ...charging, defaultTyrePressure: e.target.value })} />
           <div className="integration-card" style={{ marginTop: 16, padding: 16 }} data-testid="guided-setup-calendar-step">
             <h3 style={{ marginTop: 0 }}>Calendar availability</h3>
-            <p className="muted">These weekday hours seed the booking calendar and can be refined later in Scheduling.</p>
+            <p className="muted">These hours set your first booking calendar and can be refined later in Scheduling.</p>
             <label style={{ marginBottom: 8 }}>
               <input type="checkbox" checked={bookingPublicEnabled} onChange={(e) => setBookingPublicEnabled(e.target.checked)} />
               Accept booking requests during these hours
@@ -484,9 +484,9 @@ export default function SetupWizard() {
         <div className="card">
           <h2>Billing and payments</h2>
           {status?.stripeConfigured ? (
-            <p className="muted">Stripe is connected. Turn on customer payments here, then finish anything else in billing.</p>
+            <p className="muted">Stripe is connected. Turn on customer payments here, then fine-tune anything else in billing.</p>
           ) : (
-            <p className="muted">Stripe is not connected yet, so online payments are still unavailable.</p>
+            <p className="muted">Stripe is not connected yet, so online payments are not ready.</p>
           )}
           <div className="integration-card" style={{ padding: 16, marginBottom: 12 }} data-testid="guided-setup-billing-step">
             <strong>{status?.stripeConfigured ? "Stripe ready" : "Stripe not ready"}</strong>
@@ -512,7 +512,7 @@ export default function SetupWizard() {
       {step === 5 ? (
         <div className="card">
           <h2>Ready</h2>
-          <p className="muted">You are ready to start taking work.</p>
+          <p className="muted">Your workspace is ready for day-to-day work.</p>
           <div style={{ display: "grid", gap: 12 }}>
             <Link className="button" href="/dashboard/jobs/new?guided=1">Create your first job</Link>
             <Link className="button secondary" href="/dashboard">Go to dashboard</Link>

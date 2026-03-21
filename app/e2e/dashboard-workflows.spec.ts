@@ -244,7 +244,7 @@ test.describe("dashboard workflows", () => {
     await expect(page.getByRole("heading", { name: "Requests", exact: true })).toBeVisible();
 
     await page.goto("/dashboard/command-centre-v2");
-    await expect(page.getByText(/Operations brain for work orders/i)).toBeVisible();
+    await expect(page.getByText(/Use the live board to move work orders/i)).toBeVisible();
   });
 
   test("configured workflow stages render across operator surfaces", async ({ page, request }) => {

@@ -35,7 +35,7 @@ test.describe("login post-auth stability", () => {
     expectNoPageErrors("/dashboard/settings");
 
     await page.goto("/dashboard/jobs");
-    await expect(page.getByRole("heading", { name: "Jobs", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^(Jobs|Work Orders)$/ })).toBeVisible();
     await expect(page.getByText("Application error: a client-side exception has occurred")).toHaveCount(0);
     expectNoPageErrors("/dashboard/jobs");
 
@@ -45,7 +45,7 @@ test.describe("login post-auth stability", () => {
     expectNoPageErrors("/dashboard/customers");
 
     await page.goto("/dashboard/setup-wizard");
-    await expect(page.getByRole("heading", { name: "Setup", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Guided setup", exact: true })).toBeVisible();
     await expect(page.getByText("Application error: a client-side exception has occurred")).toHaveCount(0);
     expectNoPageErrors("/dashboard/setup-wizard");
 
