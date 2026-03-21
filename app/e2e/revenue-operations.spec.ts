@@ -21,13 +21,14 @@ async function operatorAuthHeaders(request: any) {
 
 async function createQuote(request: any, headers: Record<string, string>, overrides: Record<string, any> = {}) {
   const stamp = Date.now();
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
   const payload = {
     customerId: fixtureRefs.convertibleCustomerId,
     title: `Playwright revenue quote ${stamp}`,
     summary: "API-created quote for deterministic revenue coverage",
     currency: "GBP",
     taxCents: 2400,
-    expiresAt: "2026-03-20T10:00:00.000Z",
+    expiresAt,
     lineItems: [
       { sortOrder: 0, type: "LABOUR", title: "Labour", quantity: 1, unitPriceCents: 12000 },
       { sortOrder: 1, type: "PART", title: "Parts", quantity: 1, unitPriceCents: 12000 },
