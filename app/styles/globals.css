@@ -41,7 +41,7 @@ a { color: var(--tenant-accent); text-decoration: none; }
 .container {
   max-width: 960px;
   margin: 0 auto;
-  padding: 32px 20px;
+  padding: 28px 20px;
 }
 
 .card {
@@ -138,30 +138,30 @@ a { color: var(--tenant-accent); text-decoration: none; }
 }
 
 .mt-brand-lockup--sm {
-  height: 28px;
-}
-
-.mt-brand-lockup--md {
-  height: 34px;
-}
-
-.mt-brand-lockup--lg {
-  height: 44px;
-}
-
-.mt-brand-lockup--mark.mt-brand-lockup--sm {
-  width: 32px;
   height: 32px;
 }
 
+.mt-brand-lockup--md {
+  height: 38px;
+}
+
+.mt-brand-lockup--lg {
+  height: 50px;
+}
+
+.mt-brand-lockup--mark.mt-brand-lockup--sm {
+  width: 36px;
+  height: 36px;
+}
+
 .mt-brand-lockup--mark.mt-brand-lockup--md {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
 }
 
 .mt-brand-lockup--mark.mt-brand-lockup--lg {
-  width: 52px;
-  height: 52px;
+  width: 58px;
+  height: 58px;
 }
 
 .mt-brand-glimmer::after {
@@ -1134,8 +1134,8 @@ input:focus, select:focus, textarea:focus {
 
 .dashboard-premium-hero,
 .dashboard-home-hero {
-  border-radius: 18px;
-  padding: 20px;
+  border-radius: 20px;
+  padding: 16px 18px;
   border: 1px solid rgba(255,255,255,0.08);
   background: linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.02));
   box-shadow: 0 14px 36px rgba(0,0,0,0.18);
@@ -1154,12 +1154,13 @@ input:focus, select:focus, textarea:focus {
 }
 
 .dashboard-home-subtitle {
-  max-width: 64ch;
-  color: rgba(255,255,255,0.68);
+  max-width: 60ch;
+  line-height: 1.55;
+  color: #526071;
 }
 
 .dashboard-home-premium > * + * {
-  margin-top: 16px;
+  margin-top: 12px;
 }
 
 .dashboard-premium-container .card,
@@ -1319,7 +1320,7 @@ input:focus, select:focus, textarea:focus {
 }
 
 .settings-premium-shell > * + * {
-  margin-top: 16px;
+  margin-top: 12px;
 }
 
 .settings-premium-title {
@@ -1705,11 +1706,12 @@ main {
 }
 
 .mt-sidebar__brand {
-  margin-bottom: 2px;
+  margin-bottom: 0;
 }
 
 .mt-sidebar__brandLink {
-  border-radius: 18px;
+  min-height: 68px;
+  border-radius: 20px;
 }
 
 .mt-sidebar__brandLogo {
@@ -1737,7 +1739,7 @@ main {
 }
 
 .mt-sidebar__item {
-  min-height: 44px;
+  min-height: 46px;
   color: rgba(226, 232, 240, 0.9);
 }
 
@@ -1745,14 +1747,14 @@ main {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   color: rgba(191, 219, 254, 0.88);
 }
 
 .mt-sidebar__icon svg {
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 22px;
 }
 
 .mt-sidebar__logout {
@@ -3472,7 +3474,7 @@ body {
 [data-shell="app"] .operator-stack {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 
 [data-shell="app"] .operator-split {
@@ -3739,7 +3741,7 @@ table th,
 [data-shell="app"] .mt-sidebar__brand {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(241, 246, 255, 0.92));
   border: 1px solid rgba(148, 163, 184, 0.2);
-  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.06);
 }
 
 [data-shell="app"] .mt-sidebar__item {
@@ -3758,7 +3760,7 @@ table th,
 }
 
 [data-shell="app"] .operator-page {
-  padding: 14px 18px;
+  padding: 12px 16px;
 }
 
 [data-shell="app"] .operator-page__hero {
@@ -3777,12 +3779,13 @@ table th,
 
 [data-shell="app"] .operator-page__subtitle {
   color: #526071;
+  margin-top: 6px;
 }
 
 [data-shell="app"] .mt-sidebar__group {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 [data-shell="app"] .mt-sidebar__groupDivider {
@@ -3795,16 +3798,40 @@ table th,
 [data-shell="app"] .mt-sidebar__iconList {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 [data-shell="app"] .mt-sidebar__item,
 [data-shell="app"] .mt-sidebar__logout {
   position: relative;
-  width: 100%;
-  min-height: 46px;
+  width: 56px;
+  min-height: 54px;
+  margin: 0 auto;
   padding: 0;
   justify-content: center;
+  border-radius: 18px;
+}
+
+[data-shell="app"] .mt-sidebar__icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(239, 245, 255, 0.96));
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.05);
+  color: #2563eb;
+}
+
+[data-shell="app"] .mt-sidebar__item:hover .mt-sidebar__icon,
+[data-shell="app"] .mt-sidebar__logout:hover .mt-sidebar__icon {
+  color: #0f172a;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(234, 243, 255, 1));
+}
+
+[data-shell="app"] .mt-sidebar__item[aria-current="page"] .mt-sidebar__icon {
+  background: linear-gradient(135deg, rgba(17, 122, 120, 0.16), rgba(29, 78, 216, 0.14));
+  border-color: rgba(17, 122, 120, 0.2);
+  color: #0f172a;
 }
 
 [data-shell="app"] .mt-sidebar__dot {
@@ -3825,8 +3852,8 @@ table th,
   position: absolute;
   left: calc(100% + 12px);
   top: 50%;
-  width: 188px;
-  padding: 10px 12px;
+  width: 204px;
+  padding: 11px 13px;
   border-radius: 16px;
   border: 1px solid rgba(148, 163, 184, 0.2);
   background: rgba(255, 255, 255, 0.96);
@@ -3929,7 +3956,7 @@ table th,
 }
 
 .auth-shell__brand {
-  transform: scale(1.14);
+  transform: scale(1.2);
   transform-origin: left center;
   filter: drop-shadow(0 18px 34px rgba(15, 43, 97, 0.16));
 }
@@ -3991,7 +4018,7 @@ table th,
 }
 
 .auth-shell__formBrand {
-  margin-bottom: 18px;
+  margin-bottom: 14px;
 }
 
 .auth-shell__actions {
@@ -4022,7 +4049,7 @@ table th,
 
 .customer-workspace {
   max-width: 1200px;
-  padding-top: 28px;
+  padding-top: 18px;
   padding-bottom: 36px;
 }
 
@@ -4055,7 +4082,23 @@ table th,
 }
 
 .customer-workspace__section {
-  padding: 24px;
+  padding: 20px;
+}
+
+.ccv2-eyebrow {
+  margin: 0 0 8px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(17, 122, 120, 0.1);
+  border: 1px solid rgba(17, 122, 120, 0.14);
+  color: #0f766e;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 @media (max-width: 900px) {

@@ -172,8 +172,8 @@ export default function Sidebar({ desktopWidth = 96 }: { desktopWidth?: number }
     >
       <div className="flex h-full flex-col px-3 py-3">
         <div className="mt-sidebar__brand rounded-[24px] px-2 py-2">
-          <Link href="/dashboard" className="mt-sidebar__brandLink flex items-center justify-center" aria-label="Dashboard home" title="Dashboard home">
-            <MyTitanLogo size="sm" className="mt-sidebar__brandLogo" />
+          <Link href="/dashboard" className="mt-sidebar__brandLink flex items-center justify-center" aria-label="MyTitan dashboard home" title="MyTitan dashboard home">
+            <MyTitanLogo variant="mark" size="lg" className="mt-sidebar__brandLogo" />
           </Link>
         </div>
 
