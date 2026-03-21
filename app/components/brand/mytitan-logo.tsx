@@ -49,7 +49,7 @@ export default function MyTitanLogo({
         className,
       )}
     >
-      <img src={srcByVariant[variant][surface]} alt={alt} className="mt-brand-lockup__image" />
+      <img src={srcByVariant[variant][surface]} alt={alt} className="mt-brand-lockup__image" draggable={false} />
     </span>
   );
 }
