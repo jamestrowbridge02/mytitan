@@ -225,10 +225,10 @@ export default function Dashboard() {
       <div className="dashboard-home-premium">
       <GuidedTourOverlay enabled={demoTourEnabled} isDemoUser={Boolean(me?.demoUser || me?.email === '@mytitan.co.uk')} />
       <div className="card dashboard-home-hero">
-        <p className="operator-kicker" style={{ margin: 0 }}>Business overview</p>
+        <p className="operator-kicker" style={{ margin: 0 }}>Today&apos;s overview</p>
         <h1 className="dashboard-home-title" style={{ marginTop: 10 }}>Dashboard</h1>
         <p className="dashboard-home-subtitle" style={{ marginTop: 8, marginBottom: 0 }}>
-          See what needs attention today, then jump into the live board only when you need to move work.
+          Start here for today&apos;s priorities, quick actions, and anything that needs a decision before work slips.
         </p>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 16 }}>
           <Link className="button" href={commandCentreHref}>Open live board</Link>

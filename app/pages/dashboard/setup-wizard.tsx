@@ -296,6 +296,7 @@ export default function SetupWizard() {
           <div>
             <h1>Guided setup</h1>
             <p className="muted">Step {step + 1} of {steps.length}: {steps[step].title}</p>
+            <p className="muted">Work through the basics once so your team can start from a clean, ready workspace.</p>
             <p className="muted">Status: {stepState === "done" ? "Done" : stepState === "skipped" ? "Skipped" : "In progress"}</p>
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -319,7 +320,7 @@ export default function SetupWizard() {
       {step === 0 ? (
         <div className="card">
           <h2>Confirm your trade</h2>
-          <p className="muted">We will set your main trade to Wheels and load the matching setup for you.</p>
+          <p className="muted">We&apos;ll set your main trade to Wheels and load the matching setup for you.</p>
           {renderControls(0, { trade: "WHEELS" })}
         </div>
       ) : null}

@@ -14,33 +14,33 @@ export default function SecurityPage() {
     <MarketingShell>
       <MarketingSeo
         title="Security and Governance"
-        description="Review MyTitan's tenant-scoped governance model, permissions, compliance controls, integrations, and audit-friendly platform seams."
+        description="Review MyTitan's tenant-scoped controls, permissions, compliance tools, integrations, and audit-friendly product seams."
         path="/security"
       />
 
       <MarketingPageHero
         eyebrow="Security and governance"
         title="Built for controlled operations."
-        lead="MyTitan keeps tenant boundaries, permissions, auditability, compliance visibility, and customer-safe access explicit across the platform."
+        lead="MyTitan keeps tenant boundaries, permissions, auditability, compliance visibility, and customer-safe access explicit across the product."
         actions={
           <>
             <Link className="mkt-btn mkt-btn--primary" href="/demo">
-              Request demo
+              Book demo
             </Link>
             <Link className="mkt-btn" href="/platform">
-              See platform
+              See product
             </Link>
           </>
         }
         aside={
           <>
             <div>
-              <div className="mkt-hero__asideLabel">What is already in the platform</div>
+              <div className="mkt-hero__asideLabel">What is already in the product</div>
               <h2 className="mkt-hero__asideTitle">Governance as an operating primitive.</h2>
             </div>
             <div className="mkt-card">
               <h3>Tenant-scoped by design</h3>
-              <p>Workflow, customer, finance, integration, document, and compliance layers all operate within the tenant model.</p>
+              <p>Workflow, customer, finance, integration, document, and compliance areas all operate inside the tenant model.</p>
             </div>
             <div className="mkt-card">
               <h3>Role-aware access</h3>
@@ -53,8 +53,8 @@ export default function SecurityPage() {
       <section className="mkt-section">
         <MarketingSectionHeading
           eyebrow="Control points"
-          title="A governance posture grounded in implemented platform seams."
-          lead="The site does not claim controls that are not represented in the product. It reflects the operating guardrails already in place."
+          title="Controls grounded in the real product."
+          lead="The site does not claim controls that are not represented in the product. It reflects the guardrails already in place."
         />
         <div className="mkt-securityList">
           {securityPoints.map((point) => (
@@ -66,11 +66,11 @@ export default function SecurityPage() {
       </section>
 
       <MarketingCtaBand
-        title="Review the platform with security, control, and auditability in scope."
+        title="Review the product with security and control in scope."
         copy="Walk through permissions, integrations, activity visibility, compliance queueing, and the customer-safe access model with the product team."
-        primaryLabel="Request demo"
+        primaryLabel="Book demo"
         primaryHref="/demo"
-        secondaryLabel="See platform"
+        secondaryLabel="See product"
         secondaryHref="/platform"
       />
     </MarketingShell>

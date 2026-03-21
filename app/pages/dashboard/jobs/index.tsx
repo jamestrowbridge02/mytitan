@@ -277,7 +277,7 @@ export default function Jobs() {
         <OperatorPageHeader
           eyebrow="Work queue"
           title={terms.jobs}
-          subtitle="See today&apos;s work, keep ownership clear, and update jobs without opening every record."
+          subtitle="See today&apos;s work, keep ownership clear, and move the queue forward without opening every record."
           actions={[
             { label: "Open live board", href: commandCentreHref, variant: "secondary" },
             { label: `Create ${terms.jobs.slice(0, -1) || "Job"}`, href: "/dashboard/jobs/new" },
@@ -290,7 +290,7 @@ export default function Jobs() {
           <div className="operator-section__header">
             <div>
               <h2 className="operator-section__title">{terms.jobs} queue</h2>
-              <p className="operator-section__subtitle">Keep the queue easy to scan so timing, owner, and next step stay clear.</p>
+              <p className="operator-section__subtitle">Keep timing, owner, and next step clear at a glance.</p>
             </div>
           </div>
 
@@ -347,9 +347,9 @@ export default function Jobs() {
           <OperatorGuidance
             title="Queue shortcuts"
             items={[
-              "Saved views stay sticky on this device so operators can reopen their working queue quickly.",
-              "Use the row checkboxes to build a selection, then apply bulk status updates from the bulk bar.",
-              "Open a row menu for copy and next-step actions without expanding the table width.",
+              "Saved views stay on this device so you can reopen the same working list quickly.",
+              "Select rows to update several jobs at once from the bulk bar.",
+              "Use each row menu for quick copy and next-step actions without leaving the list.",
             ]}
           />
 

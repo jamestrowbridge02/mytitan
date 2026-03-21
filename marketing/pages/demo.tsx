@@ -41,21 +41,21 @@ export default function DemoPage() {
     <MarketingShell>
       <MarketingSeo
         title="Request a Demo"
-        description="Request a MyTitan demo and walk through operations control, revenue continuity, customer workspace, governance, and multi-location scale."
+        description="Request a MyTitan demo and walk through day-to-day operations, billing follow-through, customer workspace, controls, and multi-location scale."
         path="/demo"
       />
 
       <MarketingPageHero
         eyebrow="Request a demo"
-        title="Walk the platform against your operating model."
-        lead="Use the demo path to review the workflows, commercial controls, customer experience, governance model, and rollout shape that matter to your team."
+        title="Walk the product against your day-to-day work."
+        lead="Use the demo path to review the workflows, billing controls, customer experience, team controls, and rollout shape that matter to your team."
         actions={
           <>
             <Link className="mkt-btn mkt-btn--primary" href="/demo">
-              Request demo
+              Book demo
             </Link>
             <Link className="mkt-btn" href="/platform">
-              See platform
+              See product
             </Link>
           </>
         }
@@ -67,8 +67,8 @@ export default function DemoPage() {
             <div className="mkt-eyebrow">What the demo covers</div>
             <h2 className="mkt-sectionTitle">A practical walkthrough, not a feature recital.</h2>
             <p>
-              We can focus the conversation around command-centre operations, multi-location scale, customer workspace,
-              revenue continuity, compliance controls, or leadership visibility depending on where the pressure is highest.
+              We can focus the conversation around live operations, multi-location scale, customer workspace,
+              billing follow-through, compliance controls, or reporting depending on where the pressure is highest.
             </p>
           </article>
           <article className="mkt-panel mkt-demoPanel">
@@ -98,11 +98,11 @@ export default function DemoPage() {
               <label>
                 Primary focus
                 <select value={focus} onChange={(event) => setFocus(event.target.value)}>
-                  <option>Command centre and workflow control</option>
+                  <option>Live operations and workflow control</option>
                   <option>Recurring service plans and customer workspace</option>
-                  <option>Revenue, approvals, and collections</option>
+                  <option>Quotes, approvals, and billing follow-up</option>
                   <option>Compliance, SLA, and audit controls</option>
-                  <option>Multi-location operations and executive visibility</option>
+                  <option>Multi-location operations and reporting</option>
                 </select>
               </label>
               <label>

@@ -17,21 +17,21 @@ export default function PricingPage() {
     <MarketingShell>
       <MarketingSeo
         title="Pricing"
-        description="Review MyTitan pricing across focused operators, growing teams, and enterprise multi-location deployments."
+        description="Review MyTitan pricing for focused operators, growing teams, and larger multi-location deployments."
         path="/pricing"
       />
 
       <MarketingPageHero
         eyebrow="Pricing"
-        title="Pricing aligned to operating complexity."
-        lead="MyTitan pricing is positioned around operational depth, team control, and platform scale."
+        title="Pricing that matches team size and complexity."
+        lead="MyTitan pricing is shaped around how much control, scale, and support your team needs."
         actions={
           <>
             <Link className="mkt-btn mkt-btn--primary" href="/demo">
-              Request demo
+              Book demo
             </Link>
             <Link className="mkt-btn" href="/platform">
-              See platform
+              See product
             </Link>
           </>
         }
@@ -41,8 +41,8 @@ export default function PricingPage() {
         <div className="mkt-pricingHeader">
           <MarketingSectionHeading
             eyebrow="Commercial model"
-            title="Choose the tier that matches the team and operating complexity."
-            lead="Enterprise buyers can use the demo path for rollout and governance planning. Smaller teams can start directly."
+            title="Choose the tier that matches your team."
+            lead="Larger buyers can use the demo path for rollout planning. Smaller teams can start directly."
           />
           <div className="mkt-actions">
             <button className={`mkt-btn${annual ? "" : " mkt-btn--primary"}`} type="button" onClick={() => setAnnual(false)}>
@@ -75,11 +75,11 @@ export default function PricingPage() {
       </section>
 
       <MarketingCtaBand
-        title="Use a commercial walkthrough if you need a broader rollout plan."
-        copy="The demo path is the right place to review deployment shape, multi-location scope, governance expectations, and how the platform maps to your operating pressure."
-        primaryLabel="Request demo"
+        title="Use a guided walkthrough if you need a broader rollout plan."
+        copy="The demo path is the right place to review deployment shape, multi-location scope, controls, and how the product maps to your operating pressure."
+        primaryLabel="Book demo"
         primaryHref="/demo"
-        secondaryLabel="See platform"
+        secondaryLabel="See product"
         secondaryHref="/platform"
       />
     </MarketingShell>

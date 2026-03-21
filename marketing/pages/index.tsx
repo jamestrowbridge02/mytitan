@@ -14,19 +14,19 @@ export default function MarketingHome() {
   const replacementGroups = [
     {
       title: "Fragmented tools",
-      description: "Replace separate booking, job, scheduling, portal, and reporting tools with one controlled operating model.",
+      description: "Replace separate booking, job, scheduling, portal, and reporting tools with one clear workspace.",
     },
     {
       title: "Disconnected handoffs",
-      description: "Keep quotes, approvals, collections, and billing readiness tied directly to live operational work.",
+      description: "Keep quotes, approvals, collections, and billing tied directly to live work.",
     },
     {
       title: "Operational blind spots",
-      description: "Surface workflow pressure, inventory constraints, SLA risk, and leadership visibility inside the same system.",
+      description: "Surface workflow pressure, inventory constraints, SLA risk, and leadership visibility in the same place.",
     },
     {
       title: "Duplicated systems of record",
-      description: "Run the business from one model across operations, revenue, customer workspace, and governance.",
+      description: "Run the business from one product across operations, billing, customer workspace, and controls.",
     },
   ];
 
@@ -36,39 +36,39 @@ export default function MarketingHome() {
 
       <MarketingPageHero
         brand
-        eyebrow="Enterprise operations system for service businesses"
-        title="One system to run the service business."
-        lead="MyTitan gives service operators one platform for command-centre work, revenue continuity, customer workspace, inventory, compliance, and executive visibility."
+        eyebrow="Service business software"
+        title="Run the day from one clear workspace."
+        lead="MyTitan brings jobs, scheduling, customers, approvals, billing, and live operations together so your team can run the business without jumping between systems."
         actions={
           <>
-            <Link className="mkt-btn mkt-btn--primary" href="/demo">
-              Request demo
+            <a className="mkt-btn mkt-btn--primary" href={SIGN_UP_URL}>
+              Start trial
+            </a>
+            <Link className="mkt-btn" href="/demo">
+              Book demo
             </Link>
             <Link className="mkt-btn" href="/platform">
-              See platform
+              See product
             </Link>
-            <a className="mkt-btn" href={SIGN_UP_URL}>
-              Get started
-            </a>
           </>
         }
         aside={
           <div className="mkt-stack-lg">
             <div>
-              <div className="mkt-hero__asideLabel">Platform snapshot</div>
-              <h2 className="mkt-hero__asideTitle">Built for operators who need the front line and leadership layer in one system.</h2>
+              <div className="mkt-hero__asideLabel">What teams see first</div>
+              <h2 className="mkt-hero__asideTitle">A calmer, clearer way to run jobs, people, customers, and cash.</h2>
             </div>
             <div className="mkt-card">
-              <h3>Command centre</h3>
-              <p>Live jobs, bookings, technician load, and workflow pressure stay visible without leaving the command surface.</p>
+              <h3>Live control</h3>
+              <p>Live jobs, bookings, technician load, and blockers stay visible without leaving the main work surface.</p>
             </div>
             <div className="mkt-card">
-              <h3>Revenue continuity</h3>
-              <p>Quotes, approvals, collections, and customer-facing records stay connected to the operational lifecycle.</p>
+              <h3>Billing follow-through</h3>
+              <p>Quotes, approvals, collections, and customer-facing records stay tied to the work that created them.</p>
             </div>
             <div className="mkt-card">
-              <h3>Governed scale</h3>
-              <p>Multi-location operations, compliance, integrations, and auditability are already part of the core platform.</p>
+              <h3>Scale with control</h3>
+              <p>Multi-location operations, permissions, integrations, and activity history are already part of the core product.</p>
             </div>
           </div>
         }
@@ -77,21 +77,21 @@ export default function MarketingHome() {
       <section className="mkt-section">
         <MarketingSectionHeading
           eyebrow="Platform snapshot"
-          title="Where the business runs."
-          lead="MyTitan is designed so operations, finance, and leadership work from the same source of truth, not parallel systems."
+          title="One place to run the business."
+          lead="MyTitan is designed so operations, finance, and leadership can work from the same live picture instead of parallel systems."
         />
         <div className="mkt-kpiGrid">
           <div className="mkt-stat">
-            <div className="mkt-stat__value">Control the day</div>
-            <div className="mkt-stat__label">Bookings, jobs, scheduling, and technician execution stay in one operating layer.</div>
+            <div className="mkt-stat__value">Run the day</div>
+            <div className="mkt-stat__label">Bookings, jobs, scheduling, and technician work stay in one place.</div>
           </div>
           <div className="mkt-stat">
-            <div className="mkt-stat__value">Protect the money flow</div>
-            <div className="mkt-stat__label">Quotes, approvals, collections, and billing readiness stay close to the work itself.</div>
+            <div className="mkt-stat__value">Protect the money</div>
+            <div className="mkt-stat__label">Quotes, approvals, collections, and billing stay close to the work itself.</div>
           </div>
           <div className="mkt-stat">
-            <div className="mkt-stat__value">Scale with control</div>
-            <div className="mkt-stat__label">Inventory, compliance, analytics, and location-aware governance are built into the platform core.</div>
+            <div className="mkt-stat__value">Grow without chaos</div>
+            <div className="mkt-stat__label">Inventory, compliance, analytics, and location-aware controls are built into the core product.</div>
           </div>
         </div>
       </section>
@@ -99,8 +99,8 @@ export default function MarketingHome() {
       <section className="mkt-section">
         <MarketingSectionHeading
           eyebrow="Platform screenshot"
-          title="A command surface for the whole operating model."
-          lead="This is where command centre work, revenue follow-through, customer workspace, and governance come together."
+          title="A work surface for the whole business."
+          lead="This is where live work, billing follow-through, customer workspace, and controls come together."
         />
         <div className="mkt-panel mkt-proofStage">
           <div className="mkt-stack-lg">
@@ -108,18 +108,18 @@ export default function MarketingHome() {
               <div>
                 <div className="mkt-eyebrow">Operator workspace</div>
                 <h3 className="mkt-proofStage__title">
-                  Command centre, revenue continuity, customer workspace, and governance in one shell.
+                  Live control, billing follow-through, customer workspace, and controls in one shell.
                 </h3>
                 <p className="mkt-proofStage__copy">
-                  The product organizes live work, operational pressure, customer-facing records, and leadership signals inside one consistent operating system.
+                  The product organizes live work, customer-facing records, billing actions, and leadership signals inside one consistent workspace.
                 </p>
               </div>
               <div className="mkt-actions" style={{ justifyContent: "flex-start" }}>
                 <Link className="mkt-btn mkt-btn--primary" href="/demo">
-                  Request demo
+                  Book demo
                 </Link>
                 <Link className="mkt-btn" href="/platform">
-                  See platform
+                  See product
                 </Link>
               </div>
             </div>
@@ -142,9 +142,9 @@ export default function MarketingHome() {
                   </div>
                   <div className="mkt-proofRail">
                     {[
-                      "Command centre pressure and workflow enforcement",
-                      "Revenue operations with approvals, collections, and billing readiness",
-                      "Customer workspace, inventory, and service-plan continuity",
+                      "Live work control and workflow checks",
+                      "Quotes, approvals, collections, and billing follow-through",
+                      "Customer workspace, inventory, and repeat work",
                     ].map((item) => (
                       <div key={item} className="mkt-proof mkt-proof--tight">
                         <strong>{item}</strong>
@@ -171,8 +171,8 @@ export default function MarketingHome() {
       <section className="mkt-section">
         <MarketingSectionHeading
           eyebrow="Platform pillars"
-          title="Four pillars, one operating model."
-          lead="The platform is structured around the real control points of the business, not a loose bundle of modules."
+          title="Four pillars, one product."
+          lead="The product is structured around the real control points of the business, not a loose bundle of modules."
         />
         <div className="mkt-grid--2">
           <MarketingCapabilityCard
@@ -185,8 +185,8 @@ export default function MarketingHome() {
             ]}
           />
           <MarketingCapabilityCard
-            title="Revenue continuity"
-            description="Keep approvals, billing readiness, collections, and recurring service delivery connected to live work."
+            title="Revenue follow-through"
+            description="Keep approvals, billing, collections, and repeat service delivery connected to live work."
             bullets={[
               "Quotes, approvals, and collections",
               "Billing readiness and recurring service plans",
@@ -217,8 +217,8 @@ export default function MarketingHome() {
       <section className="mkt-section">
         <MarketingSectionHeading
           eyebrow="What MyTitan replaces"
-          title="One model across the business."
-          lead="MyTitan replaces fragmented tools, disconnected handoffs, blind spots, and duplicated systems of record with one accountable platform."
+          title="One product across the business."
+          lead="MyTitan replaces fragmented tools, disconnected handoffs, blind spots, and duplicated systems with one accountable product."
         />
         <div className="mkt-grid--2">
           {replacementGroups.map((group) => (
@@ -234,7 +234,7 @@ export default function MarketingHome() {
         <MarketingSectionHeading
           eyebrow="Industries"
           title="Built for operators with real complexity."
-          lead="The strongest fit is where service delivery, customer experience, revenue discipline, and governance all matter at the same time."
+          lead="The strongest fit is where service delivery, customer experience, revenue discipline, and team controls all matter at the same time."
         />
         <div className="mkt-grid--2">
           {industries.map((industry) => (
@@ -249,8 +249,8 @@ export default function MarketingHome() {
       <section className="mkt-section">
         <MarketingSectionHeading
           eyebrow="Security"
-          title="Governance is native to the platform."
-          lead="MyTitan keeps tenant boundaries, operator roles, auditability, and customer-safe surfaces explicit across the operating model."
+          title="Controls are native to the product."
+          lead="MyTitan keeps tenant boundaries, operator roles, auditability, and customer-safe surfaces explicit across the product."
         />
         <div className="mkt-grid--2">
           <article className="mkt-proof">
@@ -260,10 +260,10 @@ export default function MarketingHome() {
             </p>
             <div className="mkt-actions" style={{ marginTop: 18 }}>
               <Link className="mkt-btn mkt-btn--primary" href="/demo">
-                Request demo
+                Book demo
               </Link>
               <Link className="mkt-btn" href="/platform">
-                See platform
+                See product
               </Link>
             </div>
           </article>
@@ -284,17 +284,17 @@ export default function MarketingHome() {
             See whether MyTitan fits the way your business actually runs.
           </h2>
           <p>
-            Walk through the platform against real workflow pressure, customer approvals, billing readiness, inventory control, and multi-location operations.
+            Walk through the product against real workflow pressure, customer approvals, billing follow-through, inventory control, and multi-location operations.
           </p>
           <div className="mkt-actions" style={{ marginTop: 18 }}>
             <Link className="mkt-btn mkt-btn--primary" href="/demo">
-              Request demo
+              Book demo
             </Link>
             <Link className="mkt-btn" href="/platform">
-              See platform
+              See product
             </Link>
             <a className="mkt-btn" href={SIGN_UP_URL}>
-              Get started
+              Start trial
             </a>
           </div>
         </div>

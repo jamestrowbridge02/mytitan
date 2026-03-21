@@ -170,9 +170,9 @@ export default function CustomerWorkspacePage() {
                 <MyTitanLogo size="sm" glimmer />
               </div>
               <p className="customer-workspace__eyebrow">Customer workspace</p>
-              <h1 style={{ marginTop: 8, marginBottom: 8 }}>Track your service work</h1>
+              <h1 style={{ marginTop: 8, marginBottom: 8 }}>Track your work in one place</h1>
               <p className="muted" style={{ margin: 0 }}>
-                Review your jobs, quotes, plans, and approvals in one place.
+                Review your jobs, quotes, plans, and approvals without calling the office for every update.
               </p>
             </div>
             <Link href="/portal/job/e2e-public-portal-token" className="button secondary">Portal example</Link>

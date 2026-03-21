@@ -1,9 +1,9 @@
 import Head from "next/head";
 
-const DEFAULT_TITLE = "MyTitan | Enterprise Operations System for Service Businesses";
+const DEFAULT_TITLE = "MyTitan | Service Business Software for Jobs, Customers, and Billing";
 const DEFAULT_DESCRIPTION =
-  "MyTitan helps service businesses run bookings, jobs, customers, approvals, scheduling, and billing from one controlled workspace.";
-const DEFAULT_OG = "https://www.mytitan.co.uk/brand/mytitan-logo-light.svg";
+  "MyTitan helps service businesses run jobs, bookings, customers, approvals, scheduling, and billing from one clear workspace.";
+const DEFAULT_OG = "https://www.mytitan.co.uk/brand/mytitan-social-card.svg";
 
 export default function MarketingSeo({
   title,

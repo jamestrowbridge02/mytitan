@@ -865,7 +865,7 @@ export default function SettingsPage() {
       <OperatorPageHeader
         eyebrow="Workspace setup"
         title="Settings"
-        subtitle="Update your logo, defaults, team tools, and customer-facing basics in one place."
+        subtitle="Update your brand, defaults, team tools, and customer basics in one place."
         actions={[
           { label: 'Integrations', href: '/dashboard/integrations', variant: 'secondary' },
           { label: settings?.guidedSetupCompletedAt ? 'Review guided setup' : 'Resume guided setup', onClick: () => void runGuidedSetup() },

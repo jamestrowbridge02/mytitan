@@ -231,7 +231,7 @@ export default function CustomersPage() {
         <OperatorPageHeader
           eyebrow={terms.customers}
           title={terms.customers}
-          subtitle={`Find ${terms.customers.toLowerCase()} quickly, see recent contact, and open the right record without digging.`}
+          subtitle={`Find ${terms.customers.toLowerCase()} quickly, see recent contact, and open the right record without digging around.`}
           actions={[
             { label: "Open live board", href: commandCentreHref, variant: "secondary" },
             { label: `New ${terms.jobs.slice(0, -1) || "Job"}`, href: "/dashboard/jobs/new" },
@@ -244,7 +244,7 @@ export default function CustomersPage() {
           <div className="operator-section__header">
             <div>
               <h2 className="operator-section__title">{terms.customers}</h2>
-              <p className="operator-section__subtitle">See contact details, recent activity, and current workload at a glance.</p>
+              <p className="operator-section__subtitle">See contact details, recent activity, and current workload in one view.</p>
             </div>
           </div>
 
@@ -291,8 +291,8 @@ export default function CustomersPage() {
             title="Follow-up tips"
             items={[
               "Saved views keep your key customer lists ready on this device.",
-              "Use row selection to copy names or contact details before you reach out.",
-              "Open each row menu to message, log, or copy details without leaving the list.",
+              "Select rows to copy names or contact details before you reach out.",
+              "Use each row menu to message, log, or copy details without leaving the list.",
             ]}
           />
 

@@ -41,9 +41,6 @@ export default function MarketingShell(props: { children: React.ReactNode }) {
           </Link>
 
           <nav className="mkt-topbar__nav" aria-label="Primary">
-            <a className="mkt-navLink mkt-navLink--utility" href={SIGN_IN_URL}>
-              Sign in
-            </a>
             {navItems.map((item) => {
               const active = router.pathname === item.href;
               return (
@@ -55,14 +52,17 @@ export default function MarketingShell(props: { children: React.ReactNode }) {
           </nav>
 
           <div className="mkt-actions mkt-actions--header">
+            <a className="mkt-navLink mkt-navLink--utility" href={SIGN_IN_URL}>
+              Sign in
+            </a>
             <Link className="mkt-btn mkt-btn--primary" href={SIGN_UP_URL}>
-              Start free
-            </Link>
-            <Link className="mkt-btn" href="/platform">
-              See platform
+              Start trial
             </Link>
             <Link className="mkt-btn mkt-btn--ghost" href="/demo">
               Book demo
+            </Link>
+            <Link className="mkt-btn" href="/platform">
+              See product
             </Link>
           </div>
         </div>
@@ -75,7 +75,7 @@ export default function MarketingShell(props: { children: React.ReactNode }) {
           <div className="mkt-siteFooter__brand">
             <img src="/brand/mytitan-logo-light.svg" alt="MyTitan" className="mkt-siteFooter__logo" />
             <p>
-              MyTitan helps service businesses run the day clearly, from bookings and jobs to customer updates and billing.
+              MyTitan helps service businesses run the day clearly, from new work and scheduling to customer updates and billing.
             </p>
           </div>
           <div className="mkt-siteFooter__links">
@@ -87,17 +87,17 @@ export default function MarketingShell(props: { children: React.ReactNode }) {
             </div>
             <div>
               <h3>Start</h3>
-              <a href={SIGN_UP_URL}>Start free</a>
+              <a href={SIGN_UP_URL}>Start trial</a>
               <Link href="/pricing">Pricing</Link>
               <Link href="/demo">Book demo</Link>
               <a href={SIGN_IN_URL}>Sign in</a>
             </div>
             <div>
-              <h3>Get going</h3>
-              <p>Start in the live product first. Use a demo when you need a guided walkthrough for your team.</p>
+              <h3>Best next step</h3>
+              <p>Start a trial if you are ready to explore on your own. Use a demo if you want a guided walkthrough for your team.</p>
               <div className="mkt-actions" style={{ justifyContent: "flex-start" }}>
                 <a className="mkt-btn mkt-btn--primary" href={SIGN_UP_URL}>
-                  Start free
+                  Start trial
                 </a>
               </div>
             </div>
