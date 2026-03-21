@@ -31,5 +31,8 @@ api/prisma/migrations/**/.DS_Store
 
 .env.local
 app/playwright-report/
+playwright-report/
 app/test-results/
+app/.next/
 app/.playwright/
+.codex-backups/
