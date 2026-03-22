@@ -41,14 +41,14 @@ export default function DemoPage() {
     <MarketingShell>
       <MarketingSeo
         title="Request a Demo"
-        description="Request a MyTitan demo and walk through day-to-day operations, billing follow-through, customer workspace, controls, and multi-location scale."
+        description="Request a MyTitan demo and walk through jobs, customers, billing, team control, and rollout fit."
         path="/demo"
       />
 
       <MarketingPageHero
         eyebrow="Request a demo"
-        title="Walk the product against your day-to-day work."
-        lead="Use the demo path to review the workflows, billing controls, customer experience, team controls, and rollout shape that matter to your team."
+        title="Walk the product against your real workflow."
+        lead="Use the demo path to review the jobs, customer journeys, billing steps, team controls, and rollout shape that matter to your business."
         actions={
           <>
             <Link className="mkt-btn mkt-btn--primary" href="/demo">
@@ -67,15 +67,15 @@ export default function DemoPage() {
             <div className="mkt-eyebrow">What the demo covers</div>
             <h2 className="mkt-sectionTitle">A practical walkthrough, not a feature recital.</h2>
             <p>
-              We can focus the conversation around live operations, multi-location scale, customer workspace,
-              billing follow-through, compliance controls, or reporting depending on where the pressure is highest.
+              We can focus the conversation around daily operations, repeat work, customer updates,
+              billing follow-through, controls, or rollout shape depending on where the pressure is highest.
             </p>
           </article>
           <article className="mkt-panel mkt-demoPanel">
             <MarketingSectionHeading
               eyebrow="Demo request"
               title="Tell us what you need to see."
-              lead="This route opens a structured email to the MyTitan team. No fake form backend is used here."
+              lead="This opens a structured email to the MyTitan team. We keep it simple instead of pretending there is a live marketing form backend."
             />
             <form className="mkt-demoForm" onSubmit={handleSubmit}>
               <label>
@@ -116,7 +116,7 @@ export default function DemoPage() {
               </label>
               <div className="mkt-actions">
                 <button className="mkt-btn mkt-btn--primary" type="submit">
-                  Email request
+                  Send request
                 </button>
                 <a className="mkt-btn" href={`mailto:${SALES_EMAIL}`}>
                   {SALES_EMAIL}

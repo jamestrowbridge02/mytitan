@@ -14,14 +14,14 @@ export default function SolutionsPage() {
     <MarketingShell>
       <MarketingSeo
         title="Solutions"
-        description="See how MyTitan supports operations leaders, finance teams, and owners with one clear product."
+        description="See how MyTitan helps owners, service managers, and admin teams run the business from one shared system."
         path="/solutions"
       />
 
       <MarketingPageHero
         eyebrow="Solutions"
-        title="One product for the teams that run the business."
-        lead="MyTitan is designed so operations, finance, and owners do not need separate systems to understand what is happening."
+        title="Made for the people who keep the day moving."
+        lead="MyTitan helps owners, service managers, dispatch teams, and admin staff work from the same clear picture."
         actions={
           <>
             <Link className="mkt-btn mkt-btn--primary" href="/demo">
@@ -36,9 +36,9 @@ export default function SolutionsPage() {
 
       <section className="mkt-section">
         <MarketingSectionHeading
-          eyebrow="Buyer framing"
+          eyebrow="Who it helps"
           title="Built around real responsibilities."
-          lead="Each group below maps to product depth already implemented in MyTitan."
+          lead="Each group below reflects a real part of the service workflow already supported in the product."
         />
         <div className="mkt-solutionGrid">
           {solutionGroups.map((group) => (
@@ -59,20 +59,20 @@ export default function SolutionsPage() {
         <div className="mkt-grid--2">
           <article className="mkt-card">
             <div className="mkt-eyebrow">Replace extra tools</div>
-            <h2 className="mkt-sectionTitle">Stop buying separate tools for workflow, customer updates, finance, and reporting.</h2>
-            <p>MyTitan keeps the work and money layers connected so every team sees the same picture.</p>
+            <h2 className="mkt-sectionTitle">Stop switching between separate systems to run one job.</h2>
+            <p>MyTitan keeps the work, the customer communication, and the money tied together so every team sees the same picture.</p>
           </article>
           <article className="mkt-card">
             <div className="mkt-eyebrow">Scale safely</div>
-            <h2 className="mkt-sectionTitle">Move from one team to multiple locations without rebuilding your controls from scratch.</h2>
-            <p>Location-aware filtering, compliance, analytics, permissions, and performance reporting are already part of the product.</p>
+            <h2 className="mkt-sectionTitle">Grow from one team to multiple sites without losing control.</h2>
+            <p>Location-aware filtering, permissions, compliance, and reporting are already part of the product.</p>
           </article>
         </div>
       </section>
 
       <MarketingCtaBand
-        title="See the path that fits your team."
-        copy="Start with your highest-pressure workflow, then evaluate how MyTitan closes the rest of the gaps without creating more software sprawl."
+        title="See the setup that fits your team."
+        copy="Start with the workflow under the most pressure, then see how MyTitan closes the rest of the gaps without adding more software sprawl."
         primaryLabel="Book demo"
         primaryHref="/demo"
         secondaryLabel="See product"

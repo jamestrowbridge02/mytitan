@@ -15,14 +15,14 @@ export default function PlatformPage() {
     <MarketingShell>
       <MarketingSeo
         title="Platform"
-        description="Explore the MyTitan product across day-to-day operations, billing follow-through, customer workspace, controls, and reporting."
+        description="See how MyTitan brings jobs, customers, billing, and team control into one connected product."
         path="/platform"
       />
 
       <MarketingPageHero
-        eyebrow="Platform overview"
-        title="The product that keeps the service business in sync."
-        lead="MyTitan brings live work, customer records, billing follow-through, and team controls into one product."
+        eyebrow="Platform"
+        title="One product for the whole service workflow."
+        lead="MyTitan keeps jobs, customer records, approvals, billing, and team controls connected from start to finish."
         actions={
           <>
             <Link className="mkt-btn mkt-btn--primary" href="/demo">
@@ -36,12 +36,12 @@ export default function PlatformPage() {
         aside={
           <>
             <div>
-              <div className="mkt-hero__asideLabel">Product footprint</div>
-              <h2 className="mkt-hero__asideTitle">One product across the full service cycle.</h2>
+              <div className="mkt-hero__asideLabel">What teams get</div>
+              <h2 className="mkt-hero__asideTitle">One shared view of the work, the customer, and the money.</h2>
             </div>
             <div className="mkt-card">
               <h3>Day-to-day control</h3>
-              <p>Bookings, jobs, scheduling pressure, technician work, and proof of completion stay aligned.</p>
+              <p>Bookings, jobs, schedules, technician work, and proof of completion stay aligned.</p>
             </div>
             <div className="mkt-card">
               <h3>Billing follow-through</h3>
@@ -53,9 +53,9 @@ export default function PlatformPage() {
 
       <section className="mkt-section">
         <MarketingSectionHeading
-          eyebrow="Core pillars"
-          title="Four pillars, one product."
-          lead="Each pillar maps to product depth already implemented in MyTitan."
+          eyebrow="Core areas"
+          title="Built around real operating needs."
+          lead="Each area below already maps to working product depth inside MyTitan."
         />
         <div className="mkt-grid--2">
           {platformPillars.map((pillar) => (
@@ -71,28 +71,28 @@ export default function PlatformPage() {
 
       <section className="mkt-section">
         <MarketingSectionHeading
-          eyebrow="One model"
+          eyebrow="Why it matters"
           title="Stop stitching the business together."
-          lead="MyTitan keeps workflow, customer-facing records, billing signals, and team controls in one place."
+          lead="MyTitan keeps work, customer records, billing signals, and team controls in one place."
         />
         <div className="mkt-grid--2">
           <article className="mkt-proof">
-            <h3>For day-to-day operators</h3>
-            <p>Dispatch, capacity pressure, service-plan runs, missing information, and overdue work remain visible in the same live layer.</p>
+            <h3>For day-to-day teams</h3>
+            <p>Dispatch, capacity pressure, repeat work, missing information, and overdue jobs stay visible in the same live workspace.</p>
           </article>
           <article className="mkt-proof">
             <h3>For owners and managers</h3>
-            <p>Permissions, custom fields, integrations, delivery logs, activity history, and compliance controls are built in instead of bolted on later.</p>
+            <p>Permissions, integrations, delivery logs, activity history, and compliance controls are built in instead of bolted on later.</p>
           </article>
         </div>
       </section>
 
       <MarketingCtaBand
         title="Take a guided walkthrough of the product."
-        copy="Review live work, customer workspace, billing follow-through, inventory, compliance, and reporting in one pass."
+        copy="Review live work, customer experience, billing follow-through, inventory, compliance, and reporting in one pass."
         primaryLabel="Book demo"
         primaryHref="/demo"
-        secondaryLabel="Start trial"
+        secondaryLabel="Get started"
         secondaryHref={SIGN_UP_URL}
       />
     </MarketingShell>

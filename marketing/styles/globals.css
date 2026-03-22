@@ -54,7 +54,7 @@ select {
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  padding: 14px 0;
+  padding: 12px 0;
 }
 
 .mkt-brand {
@@ -72,7 +72,7 @@ select {
 
 .mkt-brand__logo {
   display: block;
-  height: 44px;
+  height: 40px;
   width: auto;
 }
 
@@ -114,7 +114,7 @@ select {
   display: flex;
   align-items: center;
   gap: 14px;
-  color: var(--muted);
+  color: #475569;
   font-size: 14px;
 }
 
@@ -164,7 +164,7 @@ select {
   justify-content: center;
   gap: 8px;
   min-height: 44px;
-  padding: 0 16px;
+  padding: 0 15px;
   border-radius: 16px;
   border: 1px solid rgba(148, 163, 184, 0.24);
   background: rgba(255, 255, 255, 0.82);
@@ -190,11 +190,11 @@ select {
 }
 
 .mkt-page {
-  padding: 30px 0 80px;
+  padding: 24px 0 80px;
 }
 
 .mkt-section {
-  margin-top: 48px;
+  margin-top: 44px;
 }
 
 .mkt-eyebrow {
@@ -241,7 +241,7 @@ select {
 }
 
 .mkt-hero__copy {
-  padding: 34px;
+  padding: 30px;
 }
 
 .mkt-hero__brand {
@@ -271,7 +271,7 @@ select {
 .mkt-hero__lead {
   max-width: 44rem;
   margin: 0;
-  color: var(--muted);
+  color: #475569;
   font-size: 1.03rem;
   line-height: 1.65;
 }
@@ -304,7 +304,7 @@ select {
 }
 
 .mkt-hero__aside {
-  padding: 26px;
+  padding: 24px;
   display: grid;
   gap: 16px;
   background:
@@ -383,7 +383,7 @@ select {
 .mkt-card,
 .mkt-pricingCard,
 .mkt-proof {
-  padding: 20px;
+  padding: 22px;
 }
 
 .mkt-proof--tight {
@@ -403,7 +403,7 @@ select {
 .mkt-faqItem p,
 .mkt-final p,
 .mkt-sectionLead {
-  color: var(--muted);
+  color: #526071;
   line-height: 1.65;
 }
 
@@ -437,7 +437,7 @@ select {
 }
 
 .mkt-proofStage {
-  padding: 26px;
+  padding: 24px;
 }
 
 .mkt-proofStage__header {

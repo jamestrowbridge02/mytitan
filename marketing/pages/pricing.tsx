@@ -17,14 +17,14 @@ export default function PricingPage() {
     <MarketingShell>
       <MarketingSeo
         title="Pricing"
-        description="Review MyTitan pricing for focused operators, growing teams, and larger multi-location deployments."
+        description="Review MyTitan pricing for smaller operators, growing service teams, and larger multi-location businesses."
         path="/pricing"
       />
 
       <MarketingPageHero
         eyebrow="Pricing"
-        title="Pricing that matches team size and complexity."
-        lead="MyTitan pricing is shaped around how much control, scale, and support your team needs."
+        title="Pricing that matches your team and workload."
+        lead="Choose the setup that matches how much control, support, and operational depth your business needs."
         actions={
           <>
             <Link className="mkt-btn mkt-btn--primary" href="/demo">
@@ -40,9 +40,9 @@ export default function PricingPage() {
       <section className="mkt-section">
         <div className="mkt-pricingHeader">
           <MarketingSectionHeading
-            eyebrow="Commercial model"
+            eyebrow="Plans"
             title="Choose the tier that matches your team."
-            lead="Larger buyers can use the demo path for rollout planning. Smaller teams can start directly."
+            lead="Smaller teams can get started directly. Larger rollouts are better handled through a demo."
           />
           <div className="mkt-actions">
             <button className={`mkt-btn${annual ? "" : " mkt-btn--primary"}`} type="button" onClick={() => setAnnual(false)}>
@@ -76,7 +76,7 @@ export default function PricingPage() {
 
       <MarketingCtaBand
         title="Use a guided walkthrough if you need a broader rollout plan."
-        copy="The demo path is the right place to review deployment shape, multi-location scope, controls, and how the product maps to your operating pressure."
+        copy="The demo path is the right place to review rollout shape, multi-location scope, controls, and how the product maps to your operating pressure."
         primaryLabel="Book demo"
         primaryHref="/demo"
         secondaryLabel="See product"

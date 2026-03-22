@@ -2,109 +2,110 @@ export const APP_URL = "https://app.mytitan.co.uk";
 export const SIGN_IN_URL = `${APP_URL}/login`;
 export const SIGN_UP_URL = `${APP_URL}/signup`;
 export const BILLING_URL = `${APP_URL}/dashboard/billing`;
+export const SALES_EMAIL = "support@mytitan.co.uk";
 
 export const platformPillars = [
   {
-    title: "Operations control",
+    title: "Run the day in one place",
     description:
-      "Run bookings, jobs, dispatch pressure, required information checks, and technician coordination from one place.",
+      "Keep bookings, jobs, dispatch, schedules, and technician work in one shared workspace.",
     bullets: [
-      "Command centre, workflow control, and booking intake",
-      "Scheduling pressure, technician execution, and completion records",
-      "Required-field enforcement with visible operational pressure",
+      "Live board for open work, blockers, and handoffs",
+      "Scheduling and capacity views that stay tied to real work",
+      "Completion records, evidence, and required checks built into the flow",
     ],
   },
   {
-    title: "Revenue follow-through",
+    title: "Keep work and money connected",
     description:
-      "Move from quote to payment, approvals, billing, and repeat work without losing the thread.",
+      "Move from quote to approval, billing, payment, and repeat work without losing context.",
     bullets: [
-      "Quotes, approvals, collections, and billing readiness",
-      "Recurring service plans that create real operational work",
-      "Revenue visibility tied directly to live operational context",
+      "Quotes, approvals, collections, and billing follow-up",
+      "Recurring service plans that create real work, not reminders",
+      "Financial follow-through that stays linked to the customer and the job",
     ],
   },
   {
-    title: "Customer workspace",
+    title: "Give customers a clear path",
     description:
-      "Give customers one clear place for approvals, records, status, and completed work.",
+      "Give customers one place for approvals, documents, updates, and completed work.",
     bullets: [
-      "Customer accounts, approvals, and portal-safe records",
-      "Completion acknowledgement, documents, and workspace access",
-      "Visibility that stays separate from internal operator controls",
+      "Customer accounts with customer-safe records and actions",
+      "Approvals, proof of work, and completion acknowledgement",
+      "Clear separation between customer views and internal operator controls",
     ],
   },
   {
-    title: "Governance at scale",
+    title: "Add control as you grow",
     description:
-      "Keep growth manageable with permissions, location context, integrations, compliance, and clear activity history built in.",
+      "Use permissions, locations, integrations, and audit trails without bolting on extra systems later.",
     bullets: [
-      "Workspace governance, RBAC, and audit-friendly automation",
+      "Role-based access and workspace controls",
       "API tokens, webhooks, and delivery logs",
-      "Compliance exceptions, analytics, and multi-location visibility",
+      "Compliance queues, analytics, and multi-location visibility",
     ],
   },
 ];
 
 export const solutionGroups = [
   {
-    title: "Operations leadership",
+    title: "Owners and operators",
     description:
-      "For teams running daily service delivery across bookings, jobs, dispatch, scheduling, and repeat work.",
+      "For teams that need to see the full day clearly without switching between five different tools.",
     points: [
-      "Keep missing required data visible before work advances",
-      "Surface unassigned, overdue, and breached work in one command layer",
-      "Hold together field execution, service plans, and inventory pressure",
+      "See new work, overdue work, and blocked work in one view",
+      "Keep dispatch, field execution, and repeat work connected",
+      "Reduce handoff mistakes and missed follow-up",
     ],
   },
   {
-    title: "Revenue and finance teams",
+    title: "Service managers",
     description:
-      "For teams that need quotes, approvals, collections, and billing to stay close to the job lifecycle.",
+      "For teams coordinating people, schedules, service plans, and customer updates every day.",
     points: [
-      "Track quote conversion and collections in the same system as operations",
-      "Keep billing actions governed by permissions and activity visibility",
-      "Use commercial signals in analytics, performance, and accountability reviews",
+      "Track technician load and job status without guesswork",
+      "Keep customer communication tied to the work itself",
+      "Use one system for live control and follow-through",
     ],
   },
   {
-    title: "Platform and branch owners",
+    title: "Finance and admin teams",
     description:
-      "For businesses standardizing across locations and teams without creating more software sprawl.",
+      "For teams that need approvals, billing, collections, and records to stay close to service delivery.",
     points: [
-      "Tenant-scoped custom fields, automations, and integrations",
-      "Multi-location operating context without fake org-chart theater",
-      "Executive analytics, SLA pressure, and compliance visibility built into the platform",
+      "Quotes, approvals, and billing follow-up linked to the real work",
+      "Permission-aware actions for sensitive financial steps",
+      "Clear records for customer, operator, and audit review",
     ],
   },
 ];
 
 export const industries = [
   {
+    title: "Tyres and workshops",
+    description: "For teams handling bookings, jobs, approvals, customer updates, and billing in one busy daily workflow.",
+  },
+  {
     title: "Field service and mobile teams",
-    description: "Businesses coordinating dispatch, technician execution, completion records, and customer follow-through without splitting the operating model.",
+    description: "For businesses coordinating dispatch, technician work, proof of completion, and customer follow-through on the move.",
+  },
+  {
+    title: "Fleet and recurring service businesses",
+    description: "For teams managing repeat work, service plans, renewal decisions, and a steady flow of customer requests.",
   },
   {
     title: "Multi-location service operators",
-    description: "Operators coordinating branches, warehouses, service regions, or franchise-style footprints with shared governance and explicit location context.",
-  },
-  {
-    title: "Recurring maintenance businesses",
-    description: "Teams managing service plans, renewals, change requests, recurring run history, and proof of completed work.",
-  },
-  {
-    title: "Commercial service providers",
-    description: "Operators where approvals, documents, quotes, collections, and auditability matter as much as day-of-work execution.",
+    description: "For businesses standardising process across sites, branches, or regions without losing local visibility.",
   },
 ];
 
 export const securityPoints = [
-  "Tenant-scoped data across workflow, customer, finance, integration, and governance areas",
-  "Workspace permissions and role-aware access to settings, finance, technician, portal, and compliance actions",
-  "Automation history, activity records, and clear evidence trails",
-  "Compliance queueing, SLA breach visibility, and operator-managed exception resolution",
-  "API tokens, webhook subscriptions, and delivery logs as platform primitives",
-  "Customer-facing surfaces kept separate from internal compliance and governance controls",
+  "Tenant-scoped data across jobs, customers, billing, and integrations",
+  "Role-based access for settings, finance actions, technician views, and customer-facing areas",
+  "Activity history and evidence trails across important actions",
+  "Compliance queues and exception handling built into the product",
+  "API tokens, webhooks, and delivery logs for controlled integrations",
+  "Customer-facing surfaces kept separate from internal operator workflows",
 ];
 
 export const pricingTiers = [
@@ -112,16 +113,16 @@ export const pricingTiers = [
     name: "Sole Trader",
     priceMonthly: "GBP 49 per month",
     priceAnnual: "GBP 39 per month, billed annually",
-    summary: "Core workflow, jobs, customer records, and customer-facing basics for a smaller team.",
-    cta: "Start trial",
+    summary: "For smaller teams that need jobs, customers, updates, and billing in one place.",
+    cta: "Get started",
     href: SIGN_UP_URL,
   },
   {
     name: "Business",
     priceMonthly: "GBP 119 per month",
     priceAnnual: "GBP 95 per month, billed annually",
-    summary: "Team workflows, customer approvals, service plans, live control, and stronger permissions.",
-    cta: "Start trial",
+    summary: "For growing service teams that need stronger control, repeat work, and better team visibility.",
+    cta: "Get started",
     href: SIGN_UP_URL,
     featured: true,
   },
@@ -129,23 +130,23 @@ export const pricingTiers = [
     name: "Enterprise",
     priceMonthly: "From GBP 299 per month",
     priceAnnual: "From GBP 239 per month, billed annually",
-    summary: "Multi-location rollout, broader controls, integrations, and support for more complex service operations.",
+    summary: "For larger or multi-location businesses that need rollout planning, integrations, and broader controls.",
     cta: "Book demo",
     href: "/demo",
   },
 ];
 
 export const homepageModules = [
-  "Command centre and live work control",
-  "Configurable workflows with required information checks",
+  "Live board for jobs and bookings",
+  "Scheduling and team capacity",
   "Recurring service plans and repeat work",
-  "Customer accounts, approvals, and portal-safe records",
+  "Customer accounts and approvals",
   "Quotes, collections, and billing follow-up",
   "Scheduling and capacity visibility",
   "Inventory, parts, and procurement controls",
-  "Execution evidence and completion records",
-  "Multi-location operations and location-aware filtering",
-  "SLA, compliance, and audit controls",
-  "Executive analytics, benchmarking, and performance views",
-  "API tokens, webhooks, and document foundations",
+  "Completion records and proof of work",
+  "Multi-location operations",
+  "Compliance and audit controls",
+  "Analytics and performance views",
+  "API tokens, webhooks, and documents",
 ];

@@ -56,13 +56,10 @@ export default function MarketingShell(props: { children: React.ReactNode }) {
               Sign in
             </a>
             <Link className="mkt-btn mkt-btn--primary" href={SIGN_UP_URL}>
-              Start trial
+              Get started
             </Link>
             <Link className="mkt-btn mkt-btn--ghost" href="/demo">
               Book demo
-            </Link>
-            <Link className="mkt-btn" href="/platform">
-              See product
             </Link>
           </div>
         </div>
@@ -87,17 +84,17 @@ export default function MarketingShell(props: { children: React.ReactNode }) {
             </div>
             <div>
               <h3>Start</h3>
-              <a href={SIGN_UP_URL}>Start trial</a>
+              <a href={SIGN_UP_URL}>Get started</a>
               <Link href="/pricing">Pricing</Link>
               <Link href="/demo">Book demo</Link>
               <a href={SIGN_IN_URL}>Sign in</a>
             </div>
             <div>
               <h3>Best next step</h3>
-              <p>Start a trial if you are ready to explore on your own. Use a demo if you want a guided walkthrough for your team.</p>
+              <p>Start with a live account if you want to explore on your own. Book a demo if you want to walk through your workflow with us.</p>
               <div className="mkt-actions" style={{ justifyContent: "flex-start" }}>
                 <a className="mkt-btn mkt-btn--primary" href={SIGN_UP_URL}>
-                  Start trial
+                  Get started
                 </a>
               </div>
             </div>

@@ -13,15 +13,15 @@ export default function SecurityPage() {
   return (
     <MarketingShell>
       <MarketingSeo
-        title="Security and Governance"
-        description="Review MyTitan's tenant-scoped controls, permissions, compliance tools, integrations, and audit-friendly product seams."
+        title="Security"
+        description="Review MyTitan's tenant-scoped controls, permissions, audit history, integrations, and customer-safe access model."
         path="/security"
       />
 
       <MarketingPageHero
-        eyebrow="Security and governance"
-        title="Built for controlled operations."
-        lead="MyTitan keeps tenant boundaries, permissions, auditability, compliance visibility, and customer-safe access explicit across the product."
+        eyebrow="Security"
+        title="Built with clear boundaries and controls."
+        lead="MyTitan keeps tenant boundaries, permissions, audit history, compliance visibility, and customer-safe access explicit across the product."
         actions={
           <>
             <Link className="mkt-btn mkt-btn--primary" href="/demo">
@@ -36,7 +36,7 @@ export default function SecurityPage() {
           <>
             <div>
               <div className="mkt-hero__asideLabel">What is already in the product</div>
-              <h2 className="mkt-hero__asideTitle">Governance as an operating primitive.</h2>
+              <h2 className="mkt-hero__asideTitle">Control is part of the day-to-day system, not an afterthought.</h2>
             </div>
             <div className="mkt-card">
               <h3>Tenant-scoped by design</h3>
@@ -53,7 +53,7 @@ export default function SecurityPage() {
       <section className="mkt-section">
         <MarketingSectionHeading
           eyebrow="Control points"
-          title="Controls grounded in the real product."
+          title="Controls grounded in the live product."
           lead="The site does not claim controls that are not represented in the product. It reflects the guardrails already in place."
         />
         <div className="mkt-securityList">
@@ -66,8 +66,8 @@ export default function SecurityPage() {
       </section>
 
       <MarketingCtaBand
-        title="Review the product with security and control in scope."
-        copy="Walk through permissions, integrations, activity visibility, compliance queueing, and the customer-safe access model with the product team."
+        title="Review the product with security in scope."
+        copy="Walk through permissions, integrations, activity visibility, compliance queueing, and customer-safe access with the product team."
         primaryLabel="Book demo"
         primaryHref="/demo"
         secondaryLabel="See product"
