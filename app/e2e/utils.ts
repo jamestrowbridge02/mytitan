@@ -75,6 +75,7 @@ export const fixtureRefs = {
   customerWorkspacePassword: "MyTitanCustomer!2026",
   customerWorkspaceInviteToken: "custinvite_e2e_customer_invited",
   blockedCustomerSlug: "e2e-blocked",
+  portalActiveCustomerId: "e2e-customer-portal-active",
   lowStockPartSku: "E2E-LACQUER",
   lowStockPartName: "Protective Lacquer",
   reservedPartSku: "E2E-ALLOY-KIT",

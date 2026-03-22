@@ -37,6 +37,35 @@ async function operatorAuthHeaders(request: any) {
   };
 }
 
+async function createOperatorServicePlan(request: any, options?: {
+  customerId?: string;
+  name?: string;
+  status?: "ACTIVE" | "PAUSED";
+  portalVisible?: boolean;
+}) {
+  const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const response = await request.post("http://127.0.0.1:3000/service-plans", {
+    data: {
+      customerId: options?.customerId || fixtureRefs.convertibleCustomerId,
+      name: options?.name || `Playwright service plan ${suffix}`,
+      description: `Deterministic Playwright plan ${suffix}`,
+      status: options?.status || "ACTIVE",
+      cadenceUnit: "MONTH",
+      cadenceInterval: 1,
+      nextRunAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      autoCreateBooking: true,
+      autoCreateJob: false,
+      portalVisible: Boolean(options?.portalVisible),
+      tasks: [{ title: "Playwright verification task" }],
+    },
+    headers: await operatorAuthHeaders(request),
+  });
+  if (!response.ok()) {
+    throw new Error(`Unable to create service plan fixture (${response.status()})`);
+  }
+  return response.json();
+}
+
 test.describe("service plans", () => {
   test.skip(!hasDashboardAuth(), "Seed the E2E fixtures or provide dashboard credentials before running authenticated workflow tests.");
 
@@ -70,19 +99,28 @@ test.describe("service plans", () => {
   });
 
   test("pause and resume actions work", async ({ page, request }) => {
+    const activePlan = await createOperatorServicePlan(request, {
+      name: `Playwright active pause target ${Date.now()}`,
+      status: "ACTIVE",
+    });
+    const pausedPlan = await createOperatorServicePlan(request, {
+      name: `Playwright paused resume target ${Date.now()}`,
+      status: "PAUSED",
+    });
+
     await installApiProxy(page, request);
     await loginAs(page, request, "e2e.operator@mytitan.local", "MyTitanE2E!2026");
 
     await page.goto("/dashboard/service-plans");
-    const activeRow = page.getByTestId(`service-plan-row-${fixtureRefs.activeServicePlanId}`);
-    await expect(activeRow).toContainText(fixtureRefs.activeServicePlanName);
+    const activeRow = page.getByTestId(`service-plan-row-${activePlan.id}`);
+    await expect(activeRow).toContainText(activePlan.name);
     await expect(activeRow.getByRole("button", { name: "Pause" })).toBeVisible();
     await activeRow.getByRole("button", { name: "Pause" }).evaluate((element: HTMLButtonElement) => element.click());
     await expect(page.getByText(/Service plan paused/i)).toBeVisible();
-    await expect(activeRow).toContainText(fixtureRefs.activeServicePlanName);
+    await expect(activeRow).toContainText(activePlan.name);
 
-    const pausedRow = page.getByTestId(`service-plan-row-${fixtureRefs.pausedServicePlanId}`);
-    await expect(pausedRow).toContainText(fixtureRefs.pausedServicePlanName);
+    const pausedRow = page.getByTestId(`service-plan-row-${pausedPlan.id}`);
+    await expect(pausedRow).toContainText(pausedPlan.name);
     await expect(pausedRow.getByRole("button", { name: "Resume" })).toBeVisible();
     await pausedRow.getByRole("button", { name: "Resume" }).evaluate((element: HTMLButtonElement) => element.click());
     await expect(page.getByText(/Service plan resumed/i)).toBeVisible();
@@ -117,9 +155,15 @@ test.describe("service plans", () => {
   });
 
   test("operator can approve and complete a customer plan request", async ({ page, request }) => {
+    const requestPlan = await createOperatorServicePlan(request, {
+      customerId: fixtureRefs.portalActiveCustomerId,
+      name: `Playwright customer request plan ${Date.now()}`,
+      status: "ACTIVE",
+      portalVisible: true,
+    });
     const headers = await customerAuthHeaders(request);
     const uniqueNote = `Please stop this plan at the next renewal point. [pw-${Date.now()}]`;
-    const createResponse = await request.post(`http://127.0.0.1:3000/customer/service-plans/${fixtureRefs.portalRenewalPlanId}/change-request`, {
+    const createResponse = await request.post(`http://127.0.0.1:3000/customer/service-plans/${requestPlan.id}/change-request`, {
       data: {
         kind: "CANCEL_REQUEST",
         note: uniqueNote,
@@ -166,11 +210,18 @@ test.describe("service plans", () => {
   });
 
   test("operator can decline a customer plan request", async ({ page, request }) => {
+    const requestPlan = await createOperatorServicePlan(request, {
+      customerId: fixtureRefs.portalActiveCustomerId,
+      name: `Playwright customer decline plan ${Date.now()}`,
+      status: "PAUSED",
+      portalVisible: true,
+    });
     const headers = await customerAuthHeaders(request);
-    const createResponse = await request.post(`http://127.0.0.1:3000/customer/service-plans/${fixtureRefs.pausedServicePlanId}/change-request`, {
+    const uniqueNote = `Please add photo proof to this plan. [pw-${Date.now()}]`;
+    const createResponse = await request.post(`http://127.0.0.1:3000/customer/service-plans/${requestPlan.id}/change-request`, {
       data: {
         kind: "SCOPE_CHANGE_REQUEST",
-        note: "Please add photo proof to this plan.",
+        note: uniqueNote,
       },
       headers,
     });
@@ -182,7 +233,7 @@ test.describe("service plans", () => {
     await loginAs(page, request, "e2e.operator@mytitan.local", "MyTitanE2E!2026");
     await page.goto("/dashboard/service-plans");
 
-    const requestRow = page.getByTestId("service-plan-change-request-list").locator(".operator-table__row").filter({ hasText: "SCOPE CHANGE REQUEST" }).first();
+    const requestRow = page.getByTestId("service-plan-change-request-list").locator(".operator-table__row").filter({ hasText: uniqueNote }).first();
     await expect(requestRow).toBeVisible();
     await requestRow.getByTestId("service-plan-request-decline").evaluate((element: HTMLButtonElement) => element.click());
     await expect(page.getByText(/Request declined/i)).toBeVisible();
