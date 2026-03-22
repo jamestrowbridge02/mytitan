@@ -6,9 +6,15 @@
   "scope": "/",
   "icons": [
     {
-      "src": "/brand/mytitan-mark.svg",
-      "sizes": "64x64",
+      "src": "/favicon.svg",
+      "sizes": "any",
       "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
       "purpose": "any"
     },
     {

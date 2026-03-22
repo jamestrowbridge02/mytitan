@@ -160,8 +160,8 @@ a { color: var(--tenant-accent); text-decoration: none; }
 }
 
 .mt-brand-lockup--mark.mt-brand-lockup--lg {
-  width: 58px;
-  height: 58px;
+  width: 62px;
+  height: 62px;
 }
 
 .mt-brand-glimmer::after {
@@ -1710,8 +1710,8 @@ main {
 }
 
 .mt-sidebar__brandLink {
-  min-height: 68px;
-  border-radius: 20px;
+  min-height: 76px;
+  border-radius: 22px;
 }
 
 .mt-sidebar__brandLogo {
@@ -3756,7 +3756,7 @@ table th,
 }
 
 [data-shell="app"] .mt-sidebar__brandLogo {
-  transform: scale(1.04);
+  transform: scale(1.16);
 }
 
 [data-shell="app"] .mt-sidebar__item {

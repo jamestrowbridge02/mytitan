@@ -36,11 +36,11 @@ export default function Document() {
         <meta itemProp="description" content="MyTitan keeps jobs, bookings, customers, approvals, scheduling, and billing clear for service teams." />
         <meta itemProp="image" content="/brand/mytitan-mark.svg" />
         <link rel="icon" href="/favicon.ico" sizes="any" />
-        <link rel="icon" type="image/svg+xml" href="/brand/mytitan-mark.svg" />
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
         <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
         <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
         <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-        <link rel="mask-icon" href="/brand/mytitan-mark.svg" color="#2563EB" />
+        <link rel="mask-icon" href="/favicon.svg" color="#2563EB" />
         <link rel="shortcut icon" href="/favicon.ico" />
         <link rel="manifest" href="/site.webmanifest" />
         <script
