@@ -3766,11 +3766,11 @@ table th,
 }
 
 [data-shell="app"] .operator-page {
-  padding: 6px 12px;
+  padding: 4px 10px;
 }
 
 [data-shell="app"] .operator-page__hero {
-  gap: 6px;
+  gap: 4px;
 }
 
 [data-shell="app"] .operator-page__eyebrow {
@@ -3792,7 +3792,7 @@ table th,
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
 }
 
 [data-shell="app"] .mt-sidebar__groupDivider {
@@ -3806,39 +3806,42 @@ table th,
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
 }
 
 [data-shell="app"] .mt-sidebar__item,
 [data-shell="app"] .mt-sidebar__logout {
   position: relative;
-  width: 46px;
-  min-height: 44px;
+  width: 44px;
+  min-height: 42px;
   margin: 0 auto;
   padding: 0;
   justify-content: center;
-  border-radius: 15px;
+  border-radius: 14px;
 }
 
 [data-shell="app"] .mt-sidebar__icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 15px;
+  width: 41px;
+  height: 41px;
+  border-radius: 14px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(239, 245, 255, 0.96));
   border: 1px solid rgba(148, 163, 184, 0.2);
   box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
   color: #1d4ed8;
+  transition: transform 140ms ease, box-shadow 140ms ease, background 140ms ease, color 140ms ease;
 }
 
 [data-shell="app"] .mt-sidebar__icon svg {
-  width: 24px;
-  height: 24px;
+  width: 25px;
+  height: 25px;
 }
 
 [data-shell="app"] .mt-sidebar__item:hover .mt-sidebar__icon,
 [data-shell="app"] .mt-sidebar__logout:hover .mt-sidebar__icon {
   color: #0f172a;
   background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(234, 243, 255, 1));
+  transform: translateY(-1px);
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
 }
 
 [data-shell="app"] .mt-sidebar__item[aria-current="page"] .mt-sidebar__icon {
@@ -3937,7 +3940,7 @@ table th,
 }
 
 [data-shell="app"] .operator-stack {
-  gap: 10px;
+  gap: 8px;
 }
 
 [data-shell="app"] .operator-page__actions {
@@ -3946,7 +3949,7 @@ table th,
 
 [data-shell="app"] .operator-page__stats {
   gap: 10px;
-  margin-top: 10px;
+  margin-top: 8px;
 }
 
 [data-shell="app"] .operator-page__shortcut,
@@ -3955,11 +3958,11 @@ table th,
 }
 
 [data-shell="app"] .operator-section {
-  padding: 14px 16px;
+  padding: 12px 14px;
 }
 
 [data-shell="app"] .operator-section__header {
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 [data-shell="app"] .operator-section__title,

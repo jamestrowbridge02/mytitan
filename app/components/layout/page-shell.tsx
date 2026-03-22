@@ -4,7 +4,7 @@ import CommandPalette from "../command/command-palette";
 import Sidebar from "../nav/sidebar";
 import { NAV_GROUPS } from "../nav/nav-config";
 
-const DESKTOP_SIDEBAR_WIDTH = 78;
+const DESKTOP_SIDEBAR_WIDTH = 74;
 
 function resolveTitleFromNav(pathname: string): string | undefined {
   for (const group of NAV_GROUPS as any[]) {
@@ -63,7 +63,7 @@ export function PageShell(props: {
         >
           {showHeader ? (
             <div className="sticky top-0 z-20 hidden border-b border-border/60 bg-[color:var(--surface-0)]/90 backdrop-blur md:block">
-              <div className="mx-auto w-full max-w-[1380px] px-5 py-1 md:px-7 lg:px-8">
+              <div className="mx-auto w-full max-w-[1380px] px-5 py-0.5 md:px-7 lg:px-8">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     {title ? <h1 className="text-xl font-semibold tracking-tight">{title}</h1> : null}
@@ -75,9 +75,9 @@ export function PageShell(props: {
             </div>
           ) : null}
 
-          <div className="mx-auto w-full max-w-[1380px] px-4 pt-0.5 md:hidden">
+          <div className="mx-auto w-full max-w-[1380px] px-4 pt-0 md:hidden">
             {showHeader ? (
-              <div className="mb-1 flex items-start justify-between gap-4">
+              <div className="mb-0.5 flex items-start justify-between gap-4">
                 <div>
                   {title ? <h1 className="text-xl font-semibold tracking-tight">{title}</h1> : null}
                   {props.subtitle ? <p className="mt-1 text-sm text-muted-foreground">{props.subtitle}</p> : null}
@@ -87,7 +87,7 @@ export function PageShell(props: {
             ) : null}
           </div>
 
-          <div className="mx-auto w-full max-w-[1380px] px-4 pb-5 pt-0 md:px-6 md:pb-6 md:pt-0 lg:px-8">{props.children}</div>
+          <div className="mx-auto w-full max-w-[1380px] px-4 pb-5 pt-0 md:px-6 md:pb-5 md:pt-0 lg:px-8">{props.children}</div>
         </div>
       </div>
     </div>

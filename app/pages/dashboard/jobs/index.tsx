@@ -276,13 +276,13 @@ export default function Jobs() {
       <div className="operator-stack">
         <OperatorPageHeader
           eyebrow="Today&apos;s work"
-          title={terms.jobs}
-          subtitle="See what needs doing, who owns it, and what should happen next without opening every job."
+          title={`Your ${terms.jobs.toLowerCase()}`}
+          subtitle="See what needs doing now, who owns it, and what to do next."
           actions={[
             { label: "Open live board", href: commandCentreHref, variant: "secondary" },
             { label: `Create ${terms.jobs.slice(0, -1) || "Job"}`, href: "/dashboard/jobs/new" },
           ]}
-          shortcuts={["Search by job, customer, reg, or owner", "Use bulk actions when several jobs need the same next step"]}
+          shortcuts={["Search by job, customer, reg, or owner", "Start with anything unassigned or overdue"]}
           stats={stats}
         />
 
@@ -290,7 +290,7 @@ export default function Jobs() {
           <div className="operator-section__header">
             <div>
               <h2 className="operator-section__title">Job list</h2>
-              <p className="operator-section__subtitle">Keep timing, owner, and next step clear at a glance.</p>
+              <p className="operator-section__subtitle">Keep timing, owner, and next step clear in one list.</p>
             </div>
           </div>
 
@@ -345,11 +345,11 @@ export default function Jobs() {
           <OperatorActiveFilters chips={activeFilters} onClearAll={activeFilters.length ? clearFilters : undefined} />
 
           <OperatorGuidance
-            title="Queue shortcuts"
+            title="Get started fast"
             items={[
-              "Saved views help you reopen the same working list quickly.",
-              "Select rows when several jobs need the same update.",
-              "Use each row menu for quick copy and next-step actions without leaving the list.",
+              "Open Unassigned to find work that still needs an owner.",
+              "Use bulk actions when several jobs need the same update.",
+              "Open any row to check details, evidence, and sign-off.",
             ]}
           />
 
@@ -498,11 +498,12 @@ export default function Jobs() {
             </OperatorDataTable>
           ) : !error ? (
             <OperatorEmptyStateCard
-              title={`No ${terms.jobs.toLowerCase()} match these filters`}
-              description="Try clearing the filters, opening the live board, or creating a new job."
+              title={`No ${terms.jobs.toLowerCase()} match this view`}
+              description="Change the filters, open the live board, or create a job to get work back on screen."
               actions={[
                 { label: "Reset filters", variant: "secondary", onClick: clearFilters },
                 { label: "Create job", href: "/dashboard/jobs/new" },
+                { label: "Open live board", href: commandCentreHref, variant: "secondary" },
               ]}
             />
           ) : null}

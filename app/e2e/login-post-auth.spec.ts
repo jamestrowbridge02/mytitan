@@ -35,12 +35,12 @@ test.describe("login post-auth stability", () => {
     expectNoPageErrors("/dashboard/settings");
 
     await page.goto("/dashboard/jobs");
-    await expect(page.getByRole("heading", { name: /^(Jobs|Work Orders)$/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^(Your jobs|Jobs|Work Orders)$/i })).toBeVisible();
     await expect(page.getByText("Application error: a client-side exception has occurred")).toHaveCount(0);
     expectNoPageErrors("/dashboard/jobs");
 
     await page.goto("/dashboard/customers");
-    await expect(page.getByRole("heading", { name: "Customers", exact: true }).first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^(Your customers|Customers)$/i }).first()).toBeVisible();
     await expect(page.getByText("Application error: a client-side exception has occurred")).toHaveCount(0);
     expectNoPageErrors("/dashboard/customers");
 

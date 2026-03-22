@@ -230,13 +230,13 @@ export default function CustomersPage() {
       <div className="operator-stack">
         <OperatorPageHeader
           eyebrow={terms.customers}
-          title={terms.customers}
-          subtitle={`Find the right ${terms.customers.toLowerCase()} quickly, see recent contact, and open the right record without digging around.`}
+          title={`Your ${terms.customers.toLowerCase()}`}
+          subtitle={`Find the right ${terms.customers.toLowerCase()} fast, see the latest contact, and open the right record without digging around.`}
           actions={[
             { label: "Open live board", href: commandCentreHref, variant: "secondary" },
             { label: `New ${terms.jobs.slice(0, -1) || "Job"}`, href: "/dashboard/jobs/new" },
           ]}
-          shortcuts={["Search by name, phone, or email", "Use each row for contact, follow-up, and history"]}
+          shortcuts={["Search by name, phone, or email", "Start with anyone missing contact details or follow-up"]}
           stats={stats}
         />
 
@@ -244,7 +244,7 @@ export default function CustomersPage() {
           <div className="operator-section__header">
             <div>
               <h2 className="operator-section__title">Customer list</h2>
-              <p className="operator-section__subtitle">See contact details, recent activity, and current workload in one place.</p>
+              <p className="operator-section__subtitle">See contact details, recent activity, and current work in one place.</p>
             </div>
           </div>
 
@@ -288,11 +288,11 @@ export default function CustomersPage() {
           <OperatorActiveFilters chips={activeFilters} onClearAll={activeFilters.length ? clearFilters : undefined} />
 
           <OperatorGuidance
-            title="Follow-up tips"
+            title="Get started fast"
             items={[
-              "Saved views keep your key customer lists ready on this device.",
-              "Select rows to copy names or contact details before you reach out.",
-              "Use each row menu to message, log, or copy details without leaving the list.",
+              "Open Missing contact to find records that still need the basics.",
+              "Use each row to message, log an update, or copy the best contact detail.",
+              "Open the timeline when you need the full history before you reply.",
             ]}
           />
 
@@ -471,10 +471,11 @@ export default function CustomersPage() {
           ) : (
             <OperatorEmptyStateCard
               title={`No ${terms.customers.toLowerCase()} match this view`}
-              description="Clear the filters, create a job, or log a customer update to start building history here."
+              description="Clear the filters, create a job, or open the live board if you need a different customer list."
               actions={[
                 { label: "Reset filters", variant: "secondary", onClick: clearFilters },
                 { label: "Create job", href: "/dashboard/jobs/new" },
+                { label: "Open live board", href: commandCentreHref, variant: "secondary" },
               ]}
             />
           )}

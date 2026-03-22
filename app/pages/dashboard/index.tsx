@@ -225,10 +225,10 @@ export default function Dashboard() {
       <div className="dashboard-home-premium">
       <GuidedTourOverlay enabled={demoTourEnabled} isDemoUser={Boolean(me?.demoUser || me?.email === '@mytitan.co.uk')} />
       <div className="card dashboard-home-hero">
-        <p className="operator-kicker" style={{ margin: 0 }}>Today&apos;s overview</p>
-        <h1 className="dashboard-home-title" style={{ marginTop: 10 }}>Dashboard</h1>
+        <p className="operator-kicker" style={{ margin: 0 }}>Start here</p>
+        <h1 className="dashboard-home-title" style={{ marginTop: 8 }}>Today</h1>
         <p className="dashboard-home-subtitle" style={{ marginTop: 8, marginBottom: 0 }}>
-          Start here for today&apos;s priorities, quick actions, and anything that needs attention before it slips.
+          See what needs attention today, jump into the right job, and keep work moving.
         </p>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 16 }}>
           <Link className="button" href={commandCentreHref}>Open live board</Link>
@@ -249,7 +249,7 @@ export default function Dashboard() {
 
       <div className="card" style={{ marginBottom: 16 }}>
         <h2 style={{ marginTop: 0 }}>Needs attention today</h2>
-        <p className="muted">Start with the work, bookings, and payments that need a decision today.</p>
+        <p className="muted">Start with the jobs, bookings, and payments that need a decision next.</p>
         {error ? (
           <ErrorState
             title="Some data may be out of date"
@@ -261,7 +261,8 @@ export default function Dashboard() {
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <h2 style={{ marginTop: 0 }}>Start something</h2>
+        <h2 style={{ marginTop: 0 }}>Take the next step</h2>
+        <p className="muted" style={{ marginTop: 0 }}>Choose the action you want to start right now.</p>
         <div style={{ display: 'grid', gap: 10 }}>
           {(summary?.quickActions || [
             { key: 'new_job', label: 'New job', href: '/dashboard/jobs/new' },
@@ -313,7 +314,7 @@ export default function Dashboard() {
 
       <div className="card" style={{ marginBottom: 16 }}>
         <h2 style={{ marginTop: 0 }}>Today&apos;s schedule</h2>
-        <p className="muted">Bookings and due work for today.</p>
+        <p className="muted">Open the next booking or check the jobs that still need to be done today.</p>
         <div className="list">
           {(summary?.todayBookings || []).slice(0, 5).map((b) => (
             <div key={b.id} className="integration-card">
@@ -321,7 +322,14 @@ export default function Dashboard() {
               <Link className="button secondary" href="/dashboard/bookings">Open</Link>
             </div>
           ))}
-          {(!summary?.todayBookings || summary.todayBookings.length === 0) ? <p className="muted">No bookings for today.</p> : null}
+          {(!summary?.todayBookings || summary.todayBookings.length === 0) ? (
+            <EmptyState
+              title="Nothing booked for today"
+              description="Create a booking or head to the live board if work is being added another way."
+              primaryAction={{ label: "Open bookings", href: "/dashboard/bookings" }}
+              secondaryAction={{ label: "Open live board", href: commandCentreHref }}
+            />
+          ) : null}
         </div>
 
         <p className="muted" style={{ marginTop: 14 }}>Jobs due or overdue</p>
@@ -332,7 +340,14 @@ export default function Dashboard() {
               <Link className="button secondary" href="/dashboard/jobs">Open</Link>
             </div>
           ))}
-          {(!summary?.dueAndOverdueJobs || summary.dueAndOverdueJobs.length === 0) ? <p className="muted">No due jobs.</p> : null}
+          {(!summary?.dueAndOverdueJobs || summary.dueAndOverdueJobs.length === 0) ? (
+            <EmptyState
+              title="No jobs need action yet"
+              description="When a job is due or slipping behind, it will show up here first."
+              primaryAction={{ label: "See jobs", href: "/dashboard/jobs" }}
+              secondaryAction={{ label: "Create job", href: "/dashboard/jobs/new" }}
+            />
+          ) : null}
         </div>
       </div>
 
@@ -347,7 +362,7 @@ export default function Dashboard() {
         <h2 style={{ marginTop: 0 }}>Unfinished work</h2>
         {drafts.length === 0 ? (
           <EmptyState
-            title="Nothing to resume"
+            title="No saved work yet"
             description="Anything you start and leave unfinished will appear here so you can pick it up later."
             primaryAction={{ label: 'Create new job', href: '/dashboard/jobs/new?guided=1' }}
           />
