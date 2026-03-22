@@ -4,41 +4,66 @@ export const SIGN_UP_URL = `${APP_URL}/signup`;
 export const BILLING_URL = `${APP_URL}/dashboard/billing`;
 export const SALES_EMAIL = "support@mytitan.co.uk";
 
+export const homepageProblems = [
+  {
+    title: "Too many handoffs",
+    description: "Teams lose time when bookings, jobs, customer updates, and billing live in different tools.",
+    outcome: "Keep the whole job journey in one place so work keeps moving.",
+  },
+  {
+    title: "No clear live view",
+    description: "Owners and managers struggle to see what is booked, blocked, overdue, or waiting for approval.",
+    outcome: "See the day clearly without asking three people for status updates.",
+  },
+  {
+    title: "Missed follow-through",
+    description: "Quotes, approvals, repeat work, and billing often break away from the job that created them.",
+    outcome: "Keep revenue follow-through tied to the actual work and customer record.",
+  },
+];
+
+export const homepageOutcomes = [
+  "Less chasing between dispatch, workshop, field, and office teams",
+  "Faster approvals and clearer customer communication",
+  "Better billing follow-through after work is complete",
+  "Cleaner growth into repeat work, multiple teams, and multiple sites",
+];
+
 export const platformPillars = [
   {
-    title: "Run the day in one place",
+    title: "Before the job starts",
     description:
-      "Keep bookings, jobs, dispatch, schedules, and technician work in one shared workspace.",
+      "Capture the booking, assign the work, and keep the schedule tied to the real customer and job.",
     bullets: [
-      "Live board for open work, blockers, and handoffs",
-      "Scheduling and capacity views that stay tied to real work",
-      "Completion records, evidence, and required checks built into the flow",
+      "Bookings and jobs created in the same system",
+      "Scheduling and capacity views tied to live work",
+      "Customer context visible before work begins",
     ],
   },
   {
-    title: "Keep work and money connected",
+    title: "While the job is live",
     description:
-      "Move from quote to approval, billing, payment, and repeat work without losing context.",
+      "Keep the team aligned while the job is in progress, with updates, evidence, and blockers in one view.",
+    bullets: [
+      "Live board for open work, blockers, and handoffs",
+      "Completion records and required checks built into the flow",
+      "Customer updates tied to the live job",
+    ],
+  },
+  {
+    title: "After the work is done",
+    description:
+      "Move into approvals, billing, payment follow-through, and repeat service without switching systems.",
     bullets: [
       "Quotes, approvals, collections, and billing follow-up",
       "Recurring service plans that create real work, not reminders",
-      "Financial follow-through that stays linked to the customer and the job",
+      "Customer records and completed work history in one place",
     ],
   },
   {
-    title: "Give customers a clear path",
+    title: "As the business grows",
     description:
-      "Give customers one place for approvals, documents, updates, and completed work.",
-    bullets: [
-      "Customer accounts with customer-safe records and actions",
-      "Approvals, proof of work, and completion acknowledgement",
-      "Clear separation between customer views and internal operator controls",
-    ],
-  },
-  {
-    title: "Add control as you grow",
-    description:
-      "Use permissions, locations, integrations, and audit trails without bolting on extra systems later.",
+      "Add control, reporting, and integrations without rebuilding the way the team already works.",
     bullets: [
       "Role-based access and workspace controls",
       "API tokens, webhooks, and delivery logs",
@@ -49,27 +74,27 @@ export const platformPillars = [
 
 export const solutionGroups = [
   {
-    title: "Owners and operators",
+    title: "Owners and general managers",
     description:
-      "For teams that need to see the full day clearly without switching between five different tools.",
+      "For leaders who need one clear view of work, team load, customer follow-through, and revenue.",
     points: [
-      "See new work, overdue work, and blocked work in one view",
-      "Keep dispatch, field execution, and repeat work connected",
-      "Reduce handoff mistakes and missed follow-up",
+      "See what is booked, blocked, overdue, or waiting",
+      "Spot handoff issues before they turn into delays or missed billing",
+      "Grow without adding more disconnected admin tools",
     ],
   },
   {
-    title: "Service managers",
+    title: "Dispatch, workshop, and service managers",
     description:
-      "For teams coordinating people, schedules, service plans, and customer updates every day.",
+      "For teams coordinating people, schedules, repeat work, and customer updates every day.",
     points: [
       "Track technician load and job status without guesswork",
       "Keep customer communication tied to the work itself",
-      "Use one system for live control and follow-through",
+      "Use one system for live control, completion, and follow-through",
     ],
   },
   {
-    title: "Finance and admin teams",
+    title: "Office, finance, and admin teams",
     description:
       "For teams that need approvals, billing, collections, and records to stay close to service delivery.",
     points: [
@@ -83,19 +108,19 @@ export const solutionGroups = [
 export const industries = [
   {
     title: "Tyres and workshops",
-    description: "For teams handling bookings, jobs, approvals, customer updates, and billing in one busy daily workflow.",
+    description: "Best for teams handling a high daily volume of bookings, jobs, approvals, customer updates, and invoicing.",
   },
   {
     title: "Field service and mobile teams",
-    description: "For businesses coordinating dispatch, technician work, proof of completion, and customer follow-through on the move.",
+    description: "Best for businesses coordinating dispatch, technician work, proof of completion, and customer follow-through on the move.",
   },
   {
     title: "Fleet and recurring service businesses",
-    description: "For teams managing repeat work, service plans, renewal decisions, and a steady flow of customer requests.",
+    description: "Best for teams managing repeat work, service plans, renewal decisions, and a steady flow of customer requests.",
   },
   {
     title: "Multi-location service operators",
-    description: "For businesses standardising process across sites, branches, or regions without losing local visibility.",
+    description: "Best for businesses standardising process across sites, branches, or regions without losing local visibility.",
   },
 ];
 
@@ -114,16 +139,16 @@ export const pricingTiers = [
     priceMonthly: "GBP 49 per month",
     priceAnnual: "GBP 39 per month, billed annually",
     summary: "For smaller teams that need jobs, customers, updates, and billing in one place.",
-    cta: "Get started",
-    href: SIGN_UP_URL,
+    cta: "Book demo",
+    href: "/demo",
   },
   {
     name: "Business",
     priceMonthly: "GBP 119 per month",
     priceAnnual: "GBP 95 per month, billed annually",
     summary: "For growing service teams that need stronger control, repeat work, and better team visibility.",
-    cta: "Get started",
-    href: SIGN_UP_URL,
+    cta: "Book demo",
+    href: "/demo",
     featured: true,
   },
   {

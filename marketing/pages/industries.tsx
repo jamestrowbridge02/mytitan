@@ -20,25 +20,16 @@ export default function IndustriesPage() {
 
       <MarketingPageHero
         eyebrow="Industries"
-        title="Built for service businesses that run on detail and follow-through."
-        lead="MyTitan fits teams where workflow drift, dispatch pressure, customer follow-up, and billing delays have a real cost."
-        actions={
-          <>
-            <Link className="mkt-btn mkt-btn--primary" href="/demo">
-              Book demo
-            </Link>
-            <Link className="mkt-btn" href="/platform">
-              See product
-            </Link>
-          </>
-        }
+        title="See where MyTitan is the strongest fit."
+        lead="This page is for businesses deciding whether their service model matches the way MyTitan is built."
+        actions={<Link className="mkt-btn mkt-btn--primary" href="/demo">Book demo</Link>}
       />
 
       <section className="mkt-section">
         <MarketingSectionHeading
           eyebrow="Where it fits best"
-          title="A strong fit for busy, operationally heavy teams."
-          lead="The strongest fit is where operations, customer communication, and billing follow-through all matter every day."
+          title="A strong fit for busy, operationally heavy service businesses."
+          lead="MyTitan is strongest where daily workload, customer communication, and billing follow-through all matter at the same time."
         />
         <div className="mkt-grid--2">
           {industries.map((industry) => (
@@ -52,22 +43,21 @@ export default function IndustriesPage() {
 
       <section className="mkt-section">
         <div className="mkt-proof">
-          <div className="mkt-eyebrow">Growth path</div>
-          <h2 className="mkt-sectionTitle">Start with one team. Keep the same system as you grow.</h2>
+          <div className="mkt-eyebrow">What these industries have in common</div>
+          <h2 className="mkt-sectionTitle">They all need strong follow-through after the booking is made.</h2>
           <p>
-            MyTitan can support a focused operator today, then extend into broader oversight, recurring service delivery,
-            finance follow-through, compliance pressure, and location-based visibility as complexity increases.
+            If the job is only one part of the challenge and the real pressure is in updates, approvals, repeat work, and billing, MyTitan is usually a much better fit than a basic booking tool.
           </p>
         </div>
       </section>
 
       <MarketingCtaBand
         title="Map MyTitan to your service model."
-        copy="Use a demo to walk through the workflows that matter most for your business, then evaluate how the wider product closes the rest of the gaps."
+        copy="Use a demo to walk through the workflow that matters most in your industry, then review whether the rest of the product matches your business shape."
         primaryLabel="Book demo"
         primaryHref="/demo"
-        secondaryLabel="See product"
-        secondaryHref="/platform"
+        secondaryLabel="Sign in"
+        secondaryHref="https://app.mytitan.co.uk/login"
       />
     </MarketingShell>
   );
