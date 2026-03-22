@@ -1567,9 +1567,9 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
           </div>
           ) : null}
           <OperatorPageHeader
-            eyebrow="Operations"
+            eyebrow="Quick entry"
             title="New job"
-            subtitle="Create a service record with the core customer and vehicle details your team needs."
+            subtitle="Create a job with the basic customer and vehicle details your team needs."
             stats={[
               { label: "Mode", value: "Standard", hint: "Quick entry form" },
               { label: "Trade", value: settings?.primaryTrade || "General", hint: "Current workspace configuration" },
@@ -1579,7 +1579,7 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
             <h2 className="jobs-new-title">Quick job entry</h2>
             {error ? <p style={{ color: "#b42318" }}>{error}</p> : null}
             <p className="muted" style={{ marginBottom: 12 }}>
-              Wheels Form v1 is off or your primary trade is not WHEELS, so MyTitan is using the standard quick job form.
+              This workspace is using the simple job form, so you can enter the basics and keep moving.
             </p>
             <form className="jobs-new-form" onSubmit={submitLegacy}>
               <label className="jobs-new-label">Customer name</label>
@@ -1606,24 +1606,24 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
     <DashboardShell>
       <div className="jobs-new-shell">
         <OperatorPageHeader
-          eyebrow="Operations"
+          eyebrow="Create a job"
           title="New job"
-          subtitle="Create a complete service record with customer details, evidence, pricing, and sign-off in one operator-ready workflow."
-          shortcuts={guidedExperienceEnabled ? ["Guided mode saves your draft as you move", "Save and exit any time"] : ["Use guided mode for field capture", "PDF is generated after submit"]}
+          subtitle="Create the full job record with customer details, evidence, pricing, and sign-off in one place."
+          shortcuts={guidedExperienceEnabled ? ["Step-by-step mode saves your draft as you go", "You can save and come back later"] : ["Use step-by-step mode if you want guided entry", "A PDF is created after you submit"]}
           stats={[
-            { label: "Trade", value: "Wheels", hint: "Template-driven service workflow" },
-            { label: "Evidence", value: mediaSignatureEnabled ? "Media + signatures" : "Links + notes", hint: "Depends on current tenant flags" },
-            { label: "Billing", value: "Server checked", hint: "Totals are recalculated on submit" },
+            { label: "Trade", value: "Wheels", hint: "Wheel service workflow" },
+            { label: "Evidence", value: mediaSignatureEnabled ? "Photos + signatures" : "Links + notes", hint: "Depends on current workspace settings" },
+            { label: "Billing", value: "Checked on save", hint: "Totals are recalculated when you submit" },
           ]}
         />
         <div className="card jobs-new-card jobs-new-card--wheels">
-          <h2 className="jobs-new-title">Wheels service record</h2>
-          <p className="muted">Capture the job once, keep the workflow clear, and hand off a customer-safe record without duplicating the same details across separate tools.</p>
+          <h2 className="jobs-new-title">Wheel job details</h2>
+          <p className="muted">Add the job once, keep the steps clear, and finish with a customer-safe record.</p>
 
           {guidedExperienceEnabled ? (
             <div className="card" style={{ marginBottom: 16, padding: 12, border: "1px solid rgba(17, 122, 120, 0.22)" }}>
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
-                <strong>Guided mode is on</strong>
+                <strong>Step-by-step mode is on</strong>
                 <button className="button secondary" type="button" onClick={disableGuidedMode}>Switch to standard entry</button>
               </div>
             </div>
@@ -1631,7 +1631,7 @@ const automationEnabled = wheelsFeature && isWheelsAutomationV1Enabled();
 
         {resumePrompt && guidedExperienceEnabled ? (
           <div className="card" style={{ marginBottom: 16, padding: 12, border: "1px solid rgba(111, 175, 255, 0.55)" }}>
-            <p style={{ marginTop: 0, marginBottom: 12 }}><strong>Resume your last Wheels job draft?</strong></p>
+            <p style={{ marginTop: 0, marginBottom: 12 }}><strong>Resume your last saved job?</strong></p>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               <button className="button" type="button" onClick={resumeDraft}>Resume</button>
               <button className="button secondary" type="button" onClick={discardDraft}>Discard</button>

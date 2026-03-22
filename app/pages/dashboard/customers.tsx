@@ -231,20 +231,20 @@ export default function CustomersPage() {
         <OperatorPageHeader
           eyebrow={terms.customers}
           title={terms.customers}
-          subtitle={`Find ${terms.customers.toLowerCase()} quickly, see recent contact, and open the right record without digging around.`}
+          subtitle={`Find the right ${terms.customers.toLowerCase()} quickly, see recent contact, and open the right record without digging around.`}
           actions={[
             { label: "Open live board", href: commandCentreHref, variant: "secondary" },
             { label: `New ${terms.jobs.slice(0, -1) || "Job"}`, href: "/dashboard/jobs/new" },
           ]}
-          shortcuts={["Search by name, phone, or email", "Open history and contact actions from each row"]}
+          shortcuts={["Search by name, phone, or email", "Use each row for contact, follow-up, and history"]}
           stats={stats}
         />
 
         <section className="card operator-section">
           <div className="operator-section__header">
             <div>
-              <h2 className="operator-section__title">{terms.customers}</h2>
-              <p className="operator-section__subtitle">See contact details, recent activity, and current workload in one view.</p>
+              <h2 className="operator-section__title">Customer list</h2>
+              <p className="operator-section__subtitle">See contact details, recent activity, and current workload in one place.</p>
             </div>
           </div>
 
@@ -471,7 +471,7 @@ export default function CustomersPage() {
           ) : (
             <OperatorEmptyStateCard
               title={`No ${terms.customers.toLowerCase()} match this view`}
-              description="Clear the filters, create a job, or log a customer message event to seed the CRM workspace."
+              description="Clear the filters, create a job, or log a customer update to start building history here."
               actions={[
                 { label: "Reset filters", variant: "secondary", onClick: clearFilters },
                 { label: "Create job", href: "/dashboard/jobs/new" },

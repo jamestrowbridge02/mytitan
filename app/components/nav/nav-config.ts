@@ -18,7 +18,7 @@ export const NAV_GROUPS: NavGroup[] = [
     title: "",
     items: [
       { title: "Dashboard", description: "Today at a glance", href: "/dashboard", icon: "dashboard" },
-      { title: "Command Centre", description: "Move live work and clear blockers", href: "/dashboard/command-centre-v2", icon: "command" },
+      { title: "Command Centre", description: "Move live work, assign owners, and clear blockers", href: "/dashboard/command-centre-v2", icon: "command" },
       { title: "Analytics", description: "Performance and trends", href: "/dashboard/analytics", icon: "analytics" },
       { title: "Compliance", description: "Checks and controls", href: "/dashboard/compliance", icon: "shield" },
     ],
@@ -26,10 +26,10 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     title: "Operations",
     items: [
-      { title: "Jobs", description: "Every live and upcoming job", href: "/dashboard/jobs", icon: "jobs" },
-      { title: "Scheduling", description: "Team time, load, and gaps", href: "/dashboard/scheduling", icon: "calendar" },
+      { title: "Jobs", description: "All live, upcoming, and finished jobs", href: "/dashboard/jobs", icon: "jobs" },
+      { title: "Scheduling", description: "Who is free, busy, or overloaded", href: "/dashboard/scheduling", icon: "calendar" },
       { title: "Bookings", description: "New requests and appointments", href: "/dashboard/bookings", icon: "bookings" },
-      { title: "Customers", description: "Contacts, updates, and history", href: "/dashboard/customers", icon: "customers" },
+      { title: "Customers", description: "Contact details, updates, and job history", href: "/dashboard/customers", icon: "customers" },
       { title: "Service Plans", description: "Repeat work and renewals", href: "/dashboard/service-plans", icon: "plans" },
     ],
   },
@@ -43,9 +43,9 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     title: "Platform",
     items: [
-      { title: "Integrations", description: "Connected tools", href: "/dashboard/integrations", icon: "integrations" },
-      { title: "Automations", description: "Rules, nudges, and follow-up", href: "/dashboard/settings/automations", icon: "automations" },
-      { title: "Settings", description: "Brand, defaults, and workspace tools", href: "/dashboard/settings", icon: "settings" },
+      { title: "Integrations", description: "Connect the tools you already use", href: "/dashboard/integrations", icon: "integrations" },
+      { title: "Automations", description: "Set follow-up rules that run for you", href: "/dashboard/settings/automations", icon: "automations" },
+      { title: "Settings", description: "Branding, defaults, and team setup", href: "/dashboard/settings", icon: "settings" },
     ],
   },
   {

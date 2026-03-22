@@ -275,21 +275,21 @@ export default function Jobs() {
     <DashboardShell>
       <div className="operator-stack">
         <OperatorPageHeader
-          eyebrow="Work queue"
+          eyebrow="Today&apos;s work"
           title={terms.jobs}
-          subtitle="See today&apos;s work, keep ownership clear, and move the queue forward without opening every record."
+          subtitle="See what needs doing, who owns it, and what should happen next without opening every job."
           actions={[
             { label: "Open live board", href: commandCentreHref, variant: "secondary" },
             { label: `Create ${terms.jobs.slice(0, -1) || "Job"}`, href: "/dashboard/jobs/new" },
           ]}
-          shortcuts={["Ctrl K opens quick navigation", "Bulk changes use the same live job actions"]}
+          shortcuts={["Search by job, customer, reg, or owner", "Use bulk actions when several jobs need the same next step"]}
           stats={stats}
         />
 
         <section className="card operator-section">
           <div className="operator-section__header">
             <div>
-              <h2 className="operator-section__title">{terms.jobs} queue</h2>
+              <h2 className="operator-section__title">Job list</h2>
               <p className="operator-section__subtitle">Keep timing, owner, and next step clear at a glance.</p>
             </div>
           </div>
@@ -332,7 +332,7 @@ export default function Jobs() {
                 ))}
               </select>
             </OperatorFilterField>
-            <OperatorFilterField label="Date bucket">
+            <OperatorFilterField label="When">
               <select className="input" value={dateBucket} onChange={(event) => setDateBucket(event.target.value as DateBucket)}>
                 <option value="all">All timing</option>
                 <option value="upcoming">Upcoming</option>
@@ -347,8 +347,8 @@ export default function Jobs() {
           <OperatorGuidance
             title="Queue shortcuts"
             items={[
-              "Saved views stay on this device so you can reopen the same working list quickly.",
-              "Select rows to update several jobs at once from the bulk bar.",
+              "Saved views help you reopen the same working list quickly.",
+              "Select rows when several jobs need the same update.",
               "Use each row menu for quick copy and next-step actions without leaving the list.",
             ]}
           />
@@ -499,7 +499,7 @@ export default function Jobs() {
           ) : !error ? (
             <OperatorEmptyStateCard
               title={`No ${terms.jobs.toLowerCase()} match these filters`}
-              description="Try clearing the filters, open Command Centre for the live board, or create a new job."
+              description="Try clearing the filters, opening the live board, or creating a new job."
               actions={[
                 { label: "Reset filters", variant: "secondary", onClick: clearFilters },
                 { label: "Create job", href: "/dashboard/jobs/new" },

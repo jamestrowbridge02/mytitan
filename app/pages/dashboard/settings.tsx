@@ -18,13 +18,13 @@ import { emptyPermissionSnapshot, hasWorkspacePermission, normalizePermissionSna
 type TabKey = 'branding' | 'email' | 'pricing' | 'features' | 'workflow' | 'custom_fields' | 'automation_rules' | 'ai';
 
 const TABS: Array<{ key: TabKey; label: string }> = [
-  { key: 'branding', label: 'Branding' },
+  { key: 'branding', label: 'Brand' },
   { key: 'email', label: 'Email' },
-  { key: 'pricing', label: 'Pricing Defaults' },
-  { key: 'features', label: 'Feature Toggles' },
-  { key: 'workflow', label: 'Workflow' },
-  { key: 'custom_fields', label: 'Custom Fields' },
-  { key: 'automation_rules', label: 'Automation Rules' },
+  { key: 'pricing', label: 'Pricing' },
+  { key: 'features', label: 'Features' },
+  { key: 'workflow', label: 'Steps' },
+  { key: 'custom_fields', label: 'Extra fields' },
+  { key: 'automation_rules', label: 'Auto follow-up' },
   { key: 'ai', label: 'AI' },
 ];
 
@@ -850,7 +850,7 @@ export default function SettingsPage() {
           <div className="card settings-premium-card" data-testid="settings-governance-blocked">
             <h2 style={{ marginTop: 0 }}>Access restricted</h2>
             <p className="muted settings-premium-muted" style={{ marginBottom: 0 }}>
-              Your workspace role does not include settings management. Ask an owner or admin to update workspace configuration.
+              Your role does not include settings access. Ask an owner or admin to make changes here.
             </p>
           </div>
         </div>
@@ -865,20 +865,20 @@ export default function SettingsPage() {
       <OperatorPageHeader
         eyebrow="Workspace setup"
         title="Settings"
-        subtitle="Update your brand, defaults, team tools, and customer basics in one place."
+        subtitle="Change your brand, defaults, and team setup in one place."
         actions={[
           { label: 'Integrations', href: '/dashboard/integrations', variant: 'secondary' },
           { label: settings?.guidedSetupCompletedAt ? 'Review guided setup' : 'Resume guided setup', onClick: () => void runGuidedSetup() },
         ]}
-        shortcuts={['Tabs keep related setup together', 'Save after each section']}
+        shortcuts={['Open the tab you need, make the change, then save', 'Use guided setup if you want step-by-step help']}
         stats={stats}
       />
       <GuidedSetupProgress enabled={guidedSetupEnabled} incomplete={!settings?.guidedSetupCompletedAt} compact />
       <div className="card settings-premium-card">
         <h1 className="settings-premium-title">Workspace settings</h1>
         <div style={{ marginBottom: 16 }}>
-          <h2 style={{ marginTop: 0 }}>Appearance</h2>
-          <p className="muted settings-premium-muted">Set the look, starting points, and key controls for this workspace.</p>
+          <h2 style={{ marginTop: 0 }}>Workspace basics</h2>
+          <p className="muted settings-premium-muted">Set the look, defaults, and key controls for this workspace.</p>
           <div style={{ display: 'flex', gap: 10 }}>
             <button
               type="button"
@@ -1650,7 +1650,7 @@ export default function SettingsPage() {
                   </div>
 
                   <div>
-                    <label className="settings-premium-label">Condition: workflow stage ready</label>
+                    <label className="settings-premium-label">Only run when required fields are complete</label>
                     <select
                       className="input settings-premium-input"
                       data-testid="automation-rule-workflow-stage-ready"
@@ -1670,7 +1670,7 @@ export default function SettingsPage() {
                         </option>
                       ))}
                     </select>
-                    <p className="muted settings-premium-muted" style={{ marginTop: 6 }}>Only run when the selected job workflow stage has all required custom fields present.</p>
+                    <p className="muted settings-premium-muted" style={{ marginTop: 6 }}>Use this when a rule should wait until the job has everything filled in for that step.</p>
                   </div>
 
                   <div>

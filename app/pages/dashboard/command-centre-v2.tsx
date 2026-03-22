@@ -605,7 +605,7 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
     return (
       <DashboardShell>
         <div className="ccv2-board-premium">
-          <div className="card ccv2-card"><h1>Command Centre</h1><p className="muted">Feature is disabled.</p></div>
+          <div className="card ccv2-card"><h1>Live board unavailable</h1><p className="muted">This workspace does not use the live board right now.</p></div>
         </div>
       </DashboardShell>
     );
@@ -631,9 +631,9 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
           <div className="ccv2-inline-actions-marker" data-inline-actions="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>
             INLINE_ACTIONS_ENABLED
           </div>
-        <p className="ccv2-eyebrow">Live control</p>
+        <p className="ccv2-eyebrow">Live work</p>
         <h1 className="ccv2-title" style={{ marginTop: 0 }}>Command Centre</h1>
-        <p className="muted ccv2-subtitle">Use the live board to move work orders, assign owners, and clear blockers while the day is still moving.</p>
+        <p className="muted ccv2-subtitle">Use the live board to move work orders forward, assign the right person, and clear blockers while the day is still moving.</p>
                   <div className="ccv2-count-strip">
           {visibleJobStages.map((row) => (
             <div key={row.id} className="ccv2-count-pill">
@@ -647,11 +647,11 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
             <div className="ccv2-livebar__meta">
               <span className={`ccv2-live-dot${isRefreshing ? " is-live" : ""}`}></span>
               <span className="ccv2-live-text" data-testid="ccv2-realtime-state">
-                {realtimeMode === 'fallback' ? 'Realtime paused · deterministic fallback mode' : lastUpdated ? `Updated ${lastUpdated}` : "Live workspace"}
+                {realtimeMode === 'fallback' ? 'Live updates are paused in this test mode' : lastUpdated ? `Updated ${lastUpdated}` : "Live board ready"}
               </span>
             </div>
             <button className="button secondary ccv2-button" data-testid="ccv2-refresh-button" type="button" onClick={() => void loadBoard(true)} disabled={isRefreshing}>
-              {isRefreshing ? 'Refreshing...' : 'Refresh'}
+              {isRefreshing ? 'Refreshing...' : 'Refresh board'}
             </button>
           </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
@@ -670,7 +670,7 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
                 {Number(complianceSummary?.totals?.openExceptions || 0)} open compliance exception{Number(complianceSummary?.totals?.openExceptions || 0) === 1 ? '' : 's'}
               </div>
               <button className="button secondary ccv2-button" type="button" style={{ marginTop: 10 }} onClick={() => void router.push('/dashboard/compliance')}>
-                Open compliance
+                Open checks
               </button>
             </div>
           </div>
@@ -682,7 +682,7 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
       <div className="card ccv2-activity-stream" style={{ marginBottom: 14 }}>
         <div className="ccv2-activity-stream__head">
           <h3 style={{ margin: 0 }}>Live activity</h3>
-          <span className="muted">Latest events across the board</span>
+          <span className="muted">Latest changes across the live board</span>
         </div>
 
         <div className="ccv2-activity-stream__list">
@@ -701,7 +701,7 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
               </div>
             </div>
           )) : (
-            <div className="muted">No live activity yet.</div>
+            <div className="muted">No new movement yet.</div>
           )}
         </div>
       </div>
@@ -710,7 +710,7 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
         <div className="two-col ccv2-grid">
           <div>
             <label>Search</label>
-            <input ref={searchRef} className="input ccv2-input" data-testid="ccv2-search-input" placeholder="Search jobs, customer, reg..." value={searchInput} onChange={(e) => setSearchInput(e.target.value)} />
+            <input ref={searchRef} className="input ccv2-input" data-testid="ccv2-search-input" placeholder="Search by job, customer, or reg" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} />
           </div>
           <div>
             <label>Status</label>
@@ -735,7 +735,7 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
             </select>
           </div>
           <div>
-            <label>Mode</label>
+            <label>View</label>
             <div style={{ display: 'flex', gap: 8 }}>
               <button className={`button ${viewMode === 'kanban' ? '' : 'secondary'}`} type="button" onClick={() => setViewMode('kanban')}>Kanban</button>
               <button className={`button ${viewMode === 'list' ? '' : 'secondary'}`} type="button" onClick={() => setViewMode('list')}>List</button>
@@ -744,16 +744,16 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
         </div>
         <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <select className="input" data-testid="ccv2-saved-view-select" style={{ margin: 0, width: 260 }} value={activeViewId} onChange={(e) => applyView(e.target.value)}>
-            <option value="">Saved views</option>
+            <option value="">Saved view</option>
             {views.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
           </select>
-          <button className="button secondary ccv2-button" data-testid="ccv2-save-view-trigger" type="button" disabled={savingView} onClick={() => { setShowSaveView(true); setSaveViewName(''); }}>Save view</button>
+          <button className="button secondary ccv2-button" data-testid="ccv2-save-view-trigger" type="button" disabled={savingView} onClick={() => { setShowSaveView(true); setSaveViewName(''); }}>Save this view</button>
         </div>
       </div>
 
       {showSaveView ? (
         <div aria-label="Save board view" className="card ccv2-surface" data-testid="ccv2-save-view-panel" style={{ marginBottom: 14 }}>
-          <input aria-label="Saved board view name" className="input" data-testid="ccv2-save-view-input" value={saveViewName} onChange={(e) => setSaveViewName(e.target.value)} placeholder="View name" />
+          <input aria-label="Saved board view name" className="input" data-testid="ccv2-save-view-input" value={saveViewName} onChange={(e) => setSaveViewName(e.target.value)} placeholder="Name this view" />
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="button ccv2-button" data-testid="ccv2-save-view-submit" type="button" disabled={savingView || !saveViewName.trim()} onClick={saveView}>{savingView ? 'Saving...' : 'Save'}</button>
             <button className="button secondary ccv2-button" data-testid="ccv2-save-view-cancel" type="button" disabled={savingView} onClick={() => setShowSaveView(false)}>Cancel</button>

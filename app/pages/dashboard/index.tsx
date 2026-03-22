@@ -159,7 +159,7 @@ export default function Dashboard() {
       <DashboardShell>
   <div className="dashboard-home-premium">
 <div className="dashboard-premium-shell">
-        <EmptyState title="Dashboard" description="This overview is turned off for this workspace." />
+        <EmptyState title="Overview unavailable" description="This workspace does not use the dashboard overview right now." />
       </div>
   </div>
 </DashboardShell>
@@ -195,7 +195,7 @@ export default function Dashboard() {
             </div>
 
             <div className="dashboard-home-loading">
-              <LoadingState title="Loading your dashboard" description="Bringing in today's work, priorities, and quick actions." />
+              <LoadingState title="Loading your overview" description="Bringing in today&apos;s work, priorities, and quick actions." />
             </div>
           </>
         )}
@@ -209,7 +209,7 @@ export default function Dashboard() {
       <DashboardShell>
           <div className="dashboard-home-premium">
             <ErrorState
-          title="Could not load dashboard"
+          title="We couldn't open your overview"
           description={error}
           requestId={requestId}
           primaryAction={{ label: 'Try again', onClick: load }}
@@ -228,12 +228,12 @@ export default function Dashboard() {
         <p className="operator-kicker" style={{ margin: 0 }}>Today&apos;s overview</p>
         <h1 className="dashboard-home-title" style={{ marginTop: 10 }}>Dashboard</h1>
         <p className="dashboard-home-subtitle" style={{ marginTop: 8, marginBottom: 0 }}>
-          Start here for today&apos;s priorities, quick actions, and anything that needs a decision before work slips.
+          Start here for today&apos;s priorities, quick actions, and anything that needs attention before it slips.
         </p>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 16 }}>
           <Link className="button" href={commandCentreHref}>Open live board</Link>
-          <Link className="button secondary" href="/dashboard/jobs">Open jobs</Link>
-          <Link className="button secondary" href="/dashboard/customers">Open customers</Link>
+          <Link className="button secondary" href="/dashboard/jobs">See jobs</Link>
+          <Link className="button secondary" href="/dashboard/customers">See customers</Link>
         </div>
       </div>
       <GuidedSetupProgress enabled={guidedSetupEnabled} incomplete={!settings?.guidedSetupCompletedAt} />
