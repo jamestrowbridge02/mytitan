@@ -31,6 +31,16 @@ export function PageShell(props: {
   const showHeader = Boolean(title || props.subtitle || props.actions);
   const showSidebar = router.pathname === "/dashboard" || router.pathname.startsWith("/dashboard");
   const [showDesktopSidebar, setShowDesktopSidebar] = React.useState(false);
+  const desktopShellStyle = showDesktopSidebar ? { height: "100vh", overflow: "hidden" as const } : undefined;
+  const desktopMainStyle = showDesktopSidebar
+    ? {
+        marginLeft: DESKTOP_SIDEBAR_WIDTH,
+        width: `calc(100% - ${DESKTOP_SIDEBAR_WIDTH}px)`,
+        height: "100vh",
+        overflowY: "auto" as const,
+        overscrollBehavior: "contain" as const,
+      }
+    : undefined;
 
   React.useEffect(() => {
     if (typeof window === "undefined") return;
@@ -45,11 +55,11 @@ export function PageShell(props: {
   return (
     <div data-shell="app" className="min-h-screen bg-[var(--bg)] text-[var(--fg)]">
       <CommandPalette />
-      <div className="min-h-screen md:h-screen md:overflow-hidden">
+      <div className="min-h-screen md:h-screen md:overflow-hidden" style={desktopShellStyle}>
         <Sidebar desktopWidth={DESKTOP_SIDEBAR_WIDTH} />
         <div
           className="mt-shell__main relative z-10 min-w-0 md:h-screen md:overflow-y-auto md:overscroll-contain"
-          style={showDesktopSidebar ? { marginLeft: DESKTOP_SIDEBAR_WIDTH, width: `calc(100% - ${DESKTOP_SIDEBAR_WIDTH}px)` } : undefined}
+          style={desktopMainStyle}
         >
           {showHeader ? (
             <div className="sticky top-0 z-20 hidden border-b border-border/60 bg-[color:var(--surface-0)]/90 backdrop-blur md:block">

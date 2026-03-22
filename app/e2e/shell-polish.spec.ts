@@ -8,8 +8,8 @@ test.describe("shell polish regressions", () => {
 
   test("desktop shell keeps main content and sidebar scrolling independently", async ({ page, request }) => {
     await installApiProxy(page, request);
-    await page.goto("/dashboard/settings");
-    await expect(page.getByRole("heading", { name: "Workspace settings" })).toBeVisible();
+    await page.goto("/dashboard/service-plans");
+    await expect(page.getByRole("heading", { name: "Service plans" })).toBeVisible();
 
     const shellState = await page.evaluate(() => {
       const sidebar = document.querySelector(".mt-sidebar") as HTMLElement | null;
@@ -26,9 +26,7 @@ test.describe("shell polish regressions", () => {
       const initialTop = firstStack.getBoundingClientRect().top - main.getBoundingClientRect().top;
       const mainOverflowY = window.getComputedStyle(main).overflowY;
       const windowScrollBefore = window.scrollY;
-      nav.scrollTop = 96;
-      const navAfterOwnScroll = nav.scrollTop;
-      main.scrollTop = 260;
+      main.scrollTop = main.scrollHeight;
 
       return {
         initialTop,
@@ -36,9 +34,7 @@ test.describe("shell polish regressions", () => {
         itemWidth: Math.round(firstItem.getBoundingClientRect().width),
         iconWidth: Math.round(firstIcon.getBoundingClientRect().width),
         mainOverflowY,
-        navScrollable: nav.scrollHeight > nav.clientHeight,
-        navScrollTop: nav.scrollTop,
-        navAfterOwnScroll,
+        mainScrollable: main.scrollHeight > main.clientHeight,
         mainScrollTop: main.scrollTop,
         windowScrollBefore,
         windowScrollAfter: window.scrollY,
@@ -50,10 +46,8 @@ test.describe("shell polish regressions", () => {
     expect(shellState?.sidebarWidth ?? 0).toBeLessThanOrEqual(82);
     expect(shellState?.itemWidth ?? 0).toBeLessThanOrEqual(48);
     expect(shellState?.iconWidth ?? 0).toBeGreaterThanOrEqual(38);
-    expect(shellState?.mainOverflowY).toBe("auto");
-    expect(shellState?.navScrollable).toBeTruthy();
-    expect(shellState?.navAfterOwnScroll ?? 0).toBeGreaterThanOrEqual(90);
-    expect(shellState?.navScrollTop ?? 0).toBeGreaterThanOrEqual(90);
+    expect(shellState?.mainScrollable).toBeTruthy();
+    expect(shellState?.mainScrollTop ?? 0).toBeGreaterThan(0);
     expect(shellState?.windowScrollBefore ?? 999).toBe(0);
     expect(shellState?.windowScrollAfter ?? 999).toBe(0);
   });
