@@ -17,7 +17,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     title: "",
     items: [
-      { title: "Dashboard", description: "Today, priorities, and quick starts", href: "/dashboard", icon: "dashboard" },
+      { title: "Dashboard", description: "Today at a glance", href: "/dashboard", icon: "dashboard" },
       { title: "Command Centre", description: "Move live work and clear blockers", href: "/dashboard/command-centre-v2", icon: "command" },
       { title: "Analytics", description: "Performance and trends", href: "/dashboard/analytics", icon: "analytics" },
       { title: "Compliance", description: "Checks and controls", href: "/dashboard/compliance", icon: "shield" },

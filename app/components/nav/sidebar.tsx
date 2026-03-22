@@ -85,9 +85,12 @@ export default function Sidebar({ desktopWidth = 96 }: { desktopWidth?: number }
   const path = router.asPath || router.pathname || "";
 
   const showSidebar = path.startsWith("/dashboard") || path === "/dashboard";
-  if (!showSidebar) return null;
 
   React.useEffect(() => {
+    if (!showSidebar) {
+      setPermissions(emptyPermissionSnapshot());
+      return;
+    }
     let cancelled = false;
     const loadMe = async () => {
       try {
@@ -105,7 +108,9 @@ export default function Sidebar({ desktopWidth = 96 }: { desktopWidth?: number }
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [showSidebar]);
+
+  if (!showSidebar) return null;
 
   function canAccessHref(href?: string) {
     if (!href) return true;
@@ -167,17 +172,17 @@ export default function Sidebar({ desktopWidth = 96 }: { desktopWidth?: number }
 
   return (
     <aside
-      className="mt-sidebar fixed inset-y-0 left-0 z-20 hidden h-screen shrink-0 md:block"
+      className="mt-sidebar fixed inset-y-0 left-0 z-20 hidden h-screen shrink-0 overflow-hidden md:block"
       style={{ width: desktopWidth, flex: `0 0 ${desktopWidth}px` }}
     >
-      <div className="flex h-full flex-col px-3 py-3">
+      <div className="flex h-full min-h-0 flex-col px-2.5 py-2.5">
         <div className="mt-sidebar__brand rounded-[24px] px-2 py-2">
           <Link href="/dashboard" className="mt-sidebar__brandLink flex items-center justify-center" aria-label="MyTitan dashboard home" title="MyTitan dashboard home">
             <MyTitanLogo variant="mark" size="lg" className="mt-sidebar__brandLogo" />
           </Link>
         </div>
 
-        <nav className="mt-3 flex-1 overflow-y-auto px-0 pb-2" aria-label="Operator navigation">
+        <nav className="mt-sidebar__nav mt-3 flex-1 overflow-y-auto overflow-x-visible px-0 pb-2" aria-label="Operator navigation">
           {navGroups.map((group, groupIndex) => (
             <div key={group.title || `group-${groupIndex}`} className="mt-sidebar__group">
               {groupIndex > 0 ? <div className="mt-sidebar__groupDivider" aria-hidden="true" /> : null}

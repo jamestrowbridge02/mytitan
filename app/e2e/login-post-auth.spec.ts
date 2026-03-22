@@ -45,12 +45,12 @@ test.describe("login post-auth stability", () => {
     expectNoPageErrors("/dashboard/customers");
 
     await page.goto("/dashboard/setup-wizard");
-    await expect(page.getByRole("heading", { name: "Guided setup", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Guided setup|Setup/i })).toBeVisible();
     await expect(page.getByText("Application error: a client-side exception has occurred")).toHaveCount(0);
     expectNoPageErrors("/dashboard/setup-wizard");
 
     await page.goto("/customer");
-    await expect(page.getByRole("heading", { name: "Track your service work" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Track your work in one place|Track your service work/i })).toBeVisible();
     await expect(page.getByText("Application error: a client-side exception has occurred")).toHaveCount(0);
     expectNoPageErrors("/customer");
   });

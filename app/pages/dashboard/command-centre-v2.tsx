@@ -633,7 +633,7 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
           </div>
         <p className="ccv2-eyebrow">Live control</p>
         <h1 className="ccv2-title" style={{ marginTop: 0 }}>Command Centre</h1>
-        <p className="muted ccv2-subtitle">Run the live board here when you need to assign work, move jobs forward, and clear blockers in the moment.</p>
+        <p className="muted ccv2-subtitle">Use the live board to move work orders, assign owners, and clear blockers while the day is still moving.</p>
                   <div className="ccv2-count-strip">
           {visibleJobStages.map((row) => (
             <div key={row.id} className="ccv2-count-pill">

@@ -157,6 +157,36 @@ type SuggestionState = {
   supportCode?: string;
 };
 
+function resolveCalendarFallback(message: string) {
+  const normalized = message.trim().toLowerCase();
+
+  if (
+    normalized.includes('scheduling calendar is not available') ||
+    normalized.includes('calendar is not available in this environment') ||
+    normalized.includes('calendar is not available')
+  ) {
+    return {
+      title: 'Calendar is not ready in this workspace',
+      description:
+        'The planning calendar is unavailable right now. You can keep working from Bookings or Scheduling, then try the calendar again after calendar access is enabled for this workspace.',
+    };
+  }
+
+  if (normalized.includes('cannot reach server') || normalized.includes('failed to fetch')) {
+    return {
+      title: 'Calendar is temporarily unavailable',
+      description:
+        "We couldn't reach the calendar just now. Try again in a moment, or return to bookings while the connection settles.",
+    };
+  }
+
+  return {
+    title: "We couldn't open the calendar",
+    description:
+      'Try again in a moment. If this keeps happening, return to bookings or scheduling and ask a workspace admin to check the calendar setup.',
+  };
+}
+
 type UtilizationStatus = 'Under' | 'OK' | 'Over' | 'Off';
 
 const GRID_START_HOUR = 8;
@@ -1252,6 +1282,7 @@ export default function CalendarPage() {
     selectedTechId !== 'ALL' ? { id: 'tech', label: `Tech: ${technicianFilterOptions.find((tech) => tech.id === selectedTechId)?.name || selectedTechId}`, onClear: () => setSelectedTechId('ALL') } : null,
     selectedLocationId !== 'ALL' ? { id: 'location', label: `Location: ${locationOptions.find((loc) => loc.id === selectedLocationId)?.label || selectedLocationId}`, onClear: () => setSelectedLocationId('ALL') } : null,
   ].filter((chip): chip is { id: string; label: string; onClear: () => void } => Boolean(chip));
+  const calendarFallback = useMemo(() => resolveCalendarFallback(error), [error]);
 
   return (
     <>
@@ -1456,11 +1487,10 @@ export default function CalendarPage() {
           ) : null}
           {error && !data ? (
             <ErrorState
-              title="Could not load calendar"
-              description={error}
-              requestId={requestId}
+              title={calendarFallback.title}
+              description={calendarFallback.description}
               primaryAction={{ label: 'Retry', onClick: () => setWeekStart((prev) => new Date(prev)) }}
-              secondaryAction={{ label: 'Back to bookings', href: '/dashboard/bookings' }}
+              secondaryAction={{ label: 'Open bookings', href: '/dashboard/bookings' }}
             />
           ) : null}
 

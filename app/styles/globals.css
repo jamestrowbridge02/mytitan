@@ -1135,7 +1135,7 @@ input:focus, select:focus, textarea:focus {
 .dashboard-premium-hero,
 .dashboard-home-hero {
   border-radius: 20px;
-  padding: 16px 18px;
+  padding: 14px 16px;
   border: 1px solid rgba(255,255,255,0.08);
   background: linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.02));
   box-shadow: 0 14px 36px rgba(0,0,0,0.18);
@@ -1156,11 +1156,11 @@ input:focus, select:focus, textarea:focus {
 .dashboard-home-subtitle {
   max-width: 60ch;
   line-height: 1.55;
-  color: #526071;
+  color: #475569;
 }
 
 .dashboard-home-premium > * + * {
-  margin-top: 12px;
+  margin-top: 10px;
 }
 
 .dashboard-premium-container .card,
@@ -1331,7 +1331,7 @@ input:focus, select:focus, textarea:focus {
 }
 
 .settings-premium-muted {
-  color: #5f6b7d;
+  color: #475569;
   max-width: 68ch;
 }
 
@@ -1351,7 +1351,7 @@ input:focus, select:focus, textarea:focus {
   display: inline-block;
   font-size: 12px;
   letter-spacing: 0.02em;
-  color: #526071;
+  color: #475569;
   margin-bottom: 6px;
 }
 
@@ -3747,7 +3747,7 @@ table th,
 }
 
 [data-shell="app"] .mt-sidebar__brandLogo {
-  transform: scale(1.08);
+  transform: scale(1.04);
 }
 
 [data-shell="app"] .mt-sidebar__item {
@@ -3766,7 +3766,7 @@ table th,
 }
 
 [data-shell="app"] .operator-page {
-  padding: 10px 14px;
+  padding: 8px 14px;
 }
 
 [data-shell="app"] .operator-page__hero {
@@ -3784,13 +3784,14 @@ table th,
 }
 
 [data-shell="app"] .operator-page__subtitle {
-  color: #526071;
-  margin-top: 6px;
+  color: #475569;
+  margin-top: 4px;
 }
 
 [data-shell="app"] .mt-sidebar__group {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 8px;
 }
 
@@ -3804,28 +3805,34 @@ table th,
 [data-shell="app"] .mt-sidebar__iconList {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  align-items: center;
+  gap: 5px;
 }
 
 [data-shell="app"] .mt-sidebar__item,
 [data-shell="app"] .mt-sidebar__logout {
   position: relative;
-  width: 52px;
-  min-height: 50px;
+  width: 48px;
+  min-height: 46px;
   margin: 0 auto;
   padding: 0;
   justify-content: center;
-  border-radius: 17px;
+  border-radius: 16px;
 }
 
 [data-shell="app"] .mt-sidebar__icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 15px;
+  width: 38px;
+  height: 38px;
+  border-radius: 14px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(239, 245, 255, 0.96));
-  border: 1px solid rgba(148, 163, 184, 0.16);
-  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.05);
-  color: #2563eb;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
+  color: #1d4ed8;
+}
+
+[data-shell="app"] .mt-sidebar__icon svg {
+  width: 23px;
+  height: 23px;
 }
 
 [data-shell="app"] .mt-sidebar__item:hover .mt-sidebar__icon,
@@ -3895,20 +3902,30 @@ table th,
   color: #526071;
 }
 
+[data-shell="app"] .mt-sidebar {
+  overflow: hidden;
+}
+
+[data-shell="app"] .mt-sidebar__nav {
+  min-height: 0;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+}
+
 [data-shell="app"] .operator-page__shortcut,
 [data-shell="app"] .operator-page__stat,
 [data-shell="app"] .operator-filterbar,
 [data-shell="app"] .operator-guidance,
 [data-shell="app"] .operator-table {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(245, 249, 255, 0.92));
-  border-color: rgba(148, 163, 184, 0.2);
-  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.05);
+  border-color: rgba(148, 163, 184, 0.24);
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
 }
 
 [data-shell="app"] .operator-page__statLabel,
 [data-shell="app"] .operator-filterbar__label,
 [data-shell="app"] .operator-guidance__toggleMeta {
-  color: #64748b;
+  color: #526071;
 }
 
 [data-shell="app"] .operator-page__statValue {
@@ -3920,7 +3937,7 @@ table th,
 }
 
 [data-shell="app"] .operator-stack {
-  gap: 14px;
+  gap: 12px;
 }
 
 [data-shell="app"] .operator-page__actions {
@@ -3938,11 +3955,28 @@ table th,
 }
 
 [data-shell="app"] .operator-section {
-  padding: 18px 20px;
+  padding: 16px 18px;
 }
 
 [data-shell="app"] .operator-section__header {
-  margin-bottom: 14px;
+  margin-bottom: 12px;
+}
+
+[data-shell="app"] .operator-section__title,
+[data-shell="app"] .operator-empty h3 {
+  color: #0f172a;
+}
+
+[data-shell="app"] .operator-section__subtitle,
+[data-shell="app"] .operator-empty .muted,
+[data-shell="app"] .operator-table__cell,
+[data-shell="app"] .operator-filterbar__results {
+  color: #475569;
+}
+
+[data-shell="app"] .operator-table__header {
+  color: #526071;
+  background: rgba(255, 255, 255, 0.72);
 }
 
 [data-shell="app"] .operator-table__row:hover {
