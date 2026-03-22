@@ -3731,11 +3731,20 @@ table th,
 }
 
 [data-shell="app"] .mt-sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(244, 248, 255, 0.96)),
     #f6f9fe;
   border-right: 1px solid rgba(148, 163, 184, 0.18);
   box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.7);
+}
+
+[data-shell="app"] .mt-shell__main {
+  position: relative;
+  top: 0;
 }
 
 [data-shell="app"] .mt-sidebar__brand {
