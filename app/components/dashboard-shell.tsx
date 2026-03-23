@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import { useEffect, useMemo, useState } from 'react';
 import { apiFetch, clearToken } from '../lib/api';
 import { useBilling } from '../lib/billing';
-import { writeActiveLocationId } from '../lib/location-context';
+import { hasStoredActiveLocationId, readActiveLocationId, writeActiveLocationId } from '../lib/location-context';
 import {
   isBookingProV1Enabled,
   isCommandCentreV2Enabled,
@@ -64,6 +64,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [demoBannerDismissed, setDemoBannerDismissed] = useState(false);
+  const [showDesktopLocationScope, setShowDesktopLocationScope] = useState(false);
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -76,6 +77,15 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   }, [settings?.themeMode]);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mediaQuery = window.matchMedia('(min-width: 768px)');
+    const sync = () => setShowDesktopLocationScope(mediaQuery.matches);
+    sync();
+    mediaQuery.addEventListener('change', sync);
+    return () => mediaQuery.removeEventListener('change', sync);
+  }, []);
+
+  useEffect(() => {
     const load = async () => {
       try {
         const meRes = await apiFetch('/me');
@@ -86,11 +96,21 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       if (!locationsEnabled) return;
       try {
         const ctx = await apiFetch('/me/location');
-        const nextLocationId = writeActiveLocationId(ctx?.activeLocationId || 'all');
+        const serverLocationId = String(ctx?.activeLocationId || 'all');
+        const shouldPreferStoredLocation = hasStoredActiveLocationId();
+        const nextLocationId = shouldPreferStoredLocation
+          ? readActiveLocationId()
+          : writeActiveLocationId(serverLocationId);
         setLocationCtx({
           activeLocationId: nextLocationId,
           available: Array.isArray(ctx?.available) && ctx.available.length ? ctx.available : [{ id: 'all', name: 'All locations' }],
         });
+        if (shouldPreferStoredLocation && nextLocationId !== serverLocationId) {
+          void apiFetch('/me/location', {
+            method: 'PUT',
+            body: JSON.stringify({ locationId: nextLocationId }),
+          }).catch(() => undefined);
+        }
       } catch {
         // ignore
       }
@@ -191,6 +211,30 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     await signOut();
   }
 
+  const locationScopeCard = locationsEnabled && locationCtx.available.length > 1 ? (
+    <div className="card" data-testid="location-scope-switcher">
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div>
+          <strong>Location scope</strong>
+          <p className="muted" style={{ margin: '6px 0 0 0' }}>Filter location-aware dashboards without changing tenant boundaries.</p>
+        </div>
+        <select
+          className="input"
+          style={{ minWidth: 240, margin: 0 }}
+          value={locationCtx.activeLocationId}
+          onChange={(event) => updateLocationContext(event.target.value)}
+        >
+          {locationCtx.available.map((location) => (
+            <option key={location.id} value={location.id}>
+              {location.name}
+              {location.code ? ` (${location.code})` : ''}
+            </option>
+          ))}
+        </select>
+      </div>
+    </div>
+  ) : null;
+
   return (
     <div className="dashboard-shell-content w-full min-w-0">
       {isDemoUser ? (
@@ -219,31 +263,14 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         </div>
       ) : null}
 
-      {locationsEnabled && locationCtx.available.length > 1 ? (
-        <div className="card" style={{ marginBottom: 8 }} data-testid="location-scope-switcher">
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-            <div>
-              <strong>Location scope</strong>
-              <p className="muted" style={{ margin: '6px 0 0 0' }}>Filter location-aware dashboards without changing tenant boundaries.</p>
-            </div>
-            <select
-              className="input"
-              style={{ minWidth: 240, margin: 0 }}
-              value={locationCtx.activeLocationId}
-              onChange={(event) => updateLocationContext(event.target.value)}
-            >
-              {locationCtx.available.map((location) => (
-                <option key={location.id} value={location.id}>
-                  {location.name}
-                  {location.code ? ` (${location.code})` : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-      ) : null}
+      {locationScopeCard && !showDesktopLocationScope ? <div style={{ marginBottom: 8 }}>{locationScopeCard}</div> : null}
 
-      {children}
+      <div className="min-w-0 md:flex md:items-start md:gap-4">
+        <div className="min-w-0 flex-1">{children}</div>
+        {locationScopeCard && showDesktopLocationScope ? (
+          <div className="md:w-[320px] md:shrink-0">{locationScopeCard}</div>
+        ) : null}
+      </div>
 
       {marketplaceEnabled && aiAllowed ? <AiAssistant /> : null}
     </div>

@@ -670,7 +670,7 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
                 {Number(complianceSummary?.totals?.openExceptions || 0)} open compliance exception{Number(complianceSummary?.totals?.openExceptions || 0) === 1 ? '' : 's'}
               </div>
               <button className="button secondary ccv2-button" type="button" style={{ marginTop: 10 }} onClick={() => void router.push('/dashboard/compliance')}>
-                Open checks
+                Open compliance
               </button>
             </div>
           </div>

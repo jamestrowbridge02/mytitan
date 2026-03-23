@@ -1,6 +1,7 @@
 
 # --- generated / local ---
 api/node_modules/
+api/dist/
 **/node_modules/
 api/node_modules/.prisma/
 api/node_modules/@prisma/

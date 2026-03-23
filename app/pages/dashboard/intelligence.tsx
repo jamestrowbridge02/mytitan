@@ -143,13 +143,13 @@ export default function IntelligencePage() {
         <OperatorPageHeader
           eyebrow="Business OS"
           title="Intelligence"
-          subtitle="DB-backed operational intelligence built from real jobs, bookings, customer activity, billing readiness, and technician assignment data."
+          subtitle="See what needs attention today across bookings, billing, dispatch, stock, and customer access."
           actions={[
             { label: "Analytics", href: "/dashboard/analytics", variant: "secondary" },
             { label: "Portal Ops", href: "/dashboard/portal", variant: "secondary" },
             { label: "Billing readiness", href: "/dashboard/billing/readiness" },
           ]}
-          shortcuts={["This view is DB-backed", "Use it to spot load, follow-up debt, and conversion bottlenecks"]}
+          shortcuts={["Start with the attention queue", "Use this view to spot load, follow-up debt, and conversion bottlenecks"]}
           stats={stats}
         />
 

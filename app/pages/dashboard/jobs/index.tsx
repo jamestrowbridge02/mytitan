@@ -276,7 +276,7 @@ export default function Jobs() {
       <div className="operator-stack">
         <OperatorPageHeader
           eyebrow="Today&apos;s work"
-          title={`Your ${terms.jobs.toLowerCase()}`}
+          title={terms.jobs}
           subtitle="See what needs doing now, who owns it, and what to do next."
           actions={[
             { label: "Open live board", href: commandCentreHref, variant: "secondary" },

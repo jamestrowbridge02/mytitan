@@ -11,6 +11,11 @@ export function readActiveLocationId() {
   return normalizeLocationId(window.localStorage.getItem(ACTIVE_LOCATION_STORAGE_KEY));
 }
 
+export function hasStoredActiveLocationId() {
+  if (typeof window === "undefined") return false;
+  return window.localStorage.getItem(ACTIVE_LOCATION_STORAGE_KEY) !== null;
+}
+
 export function writeActiveLocationId(value?: string | null) {
   if (typeof window === "undefined") return "all";
   const next = normalizeLocationId(value);

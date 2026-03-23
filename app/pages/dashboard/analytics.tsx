@@ -108,6 +108,28 @@ type BenchmarksResponse = {
 
 const DEFAULT_WIDGET_ORDER = ["executive-summary", "pressure-panel", "revenue-panel", "capacity-panel", "benchmark-delta"];
 
+function arraysEqual(left: string[], right: string[]) {
+  if (left.length !== right.length) return false;
+  return left.every((value, index) => value === right[index]);
+}
+
+function normalizeAnalyticsLayout(raw: any) {
+  const analytics = raw && typeof raw === "object" ? raw : {};
+  return {
+    widgetOrder: Array.isArray(analytics.widgetOrder)
+      ? analytics.widgetOrder.map((item: any) => String(item || "")).filter(Boolean)
+      : [],
+    hiddenWidgets: Array.isArray(analytics.hiddenWidgets)
+      ? analytics.hiddenWidgets.map((item: any) => String(item || "")).filter(Boolean)
+      : [],
+    defaultWindowDays: Math.max(7, Math.min(90, Number(analytics.defaultWindowDays || 30))),
+  };
+}
+
+function wait(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
 function formatMetricValue(value: number | null | undefined, suffix = "") {
   if (value === null || value === undefined) return "-";
   return `${value}${suffix}`;
@@ -271,6 +293,19 @@ export default function AnalyticsPage() {
           },
         }),
       });
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        const refreshedSettings = await apiFetch("/tenant/settings");
+        const refreshedLayout = normalizeAnalyticsLayout(refreshedSettings?.businessConfigJson?.analytics);
+        if (
+          arraysEqual(refreshedLayout.widgetOrder, nextOrder) &&
+          arraysEqual(refreshedLayout.hiddenWidgets, nextHidden) &&
+          refreshedLayout.defaultWindowDays === nextWindowDays
+        ) {
+          showSuccess("Analytics layout saved");
+          return;
+        }
+        await wait(150);
+      }
       showSuccess("Analytics layout saved");
     } catch (error: any) {
       showError(error?.message || "Failed to save analytics layout");
