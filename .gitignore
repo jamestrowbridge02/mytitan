@@ -1,11 +1,15 @@
 
 # --- generated / local ---
+node_modules/
 api/node_modules/
 api/dist/
 **/node_modules/
+.next/
+**/.next/
 api/node_modules/.prisma/
 api/node_modules/@prisma/
 **/.prisma/
+*.tsbuildinfo
 *.zip
 
 # Prisma generated client (if your repo includes it somewhere unexpected)
@@ -16,6 +20,7 @@ api/src/**/generated/
 api/tmp/
 tmp/
 backups/
+nginx-backup-*/
 api/prisma/migrations/**/.DS_Store
 .DS_Store
 *.log
@@ -30,10 +35,19 @@ api/prisma/migrations/**/.DS_Store
 # Local editor/Codex backups
 *.localbak.*
 
+.env
 .env.local
+docker-compose.override.yml
 app/playwright-report/
+**/playwright-report/
 playwright-report/
 app/test-results/
+**/test-results/
+**/playwright/.cache/
+**/playwright-traces/
+**/traces/
+**/videos/
 app/.next/
 app/.playwright/
+app/tsconfig.tsbuildinfo
 .codex-backups/
