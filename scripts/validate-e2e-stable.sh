@@ -3,10 +3,12 @@
 set -uo pipefail
 
 TS="$(date +%Y%m%d-%H%M%S)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 LOG="${1:-/tmp/mytitan-validation/full-suite-stable-${TS}.log}"
 JSON_DIR="${PLAYWRIGHT_OUTPUT_DIR:-/tmp/pw-results}"
 AUTH_DIR="${PLAYWRIGHT_AUTH_DIR:-/tmp/mytitan-playwright}"
-APP_DIR="/opt/mytitan/app"
+APP_DIR="${REPO_ROOT}/app"
 LOCK_FILE="${MYTITAN_E2E_LOCK_FILE:-/tmp/mytitan-validation/full-suite.lock}"
 WORKERS="${PLAYWRIGHT_STABLE_WORKERS:-1}"
 TEST_TIMEOUT_MS="${PLAYWRIGHT_TEST_TIMEOUT_MS:-45000}"
@@ -30,8 +32,8 @@ cd "${APP_DIR}" || {
 JSON="${JSON_DIR}/final-proof.json"
 
 cleanup_after_validation() {
-  bash /opt/mytitan/scripts/cleanup-orphaned-playwright.sh --apply --min-age 60 >> "${LOG}" 2>&1 || true
-  bash /opt/mytitan/scripts/cleanup-validation-artifacts.sh --apply --days 7 >> "${LOG}" 2>&1 || true
+  bash "${REPO_ROOT}/scripts/cleanup-orphaned-playwright.sh" --apply --min-age 60 >> "${LOG}" 2>&1 || true
+  bash "${REPO_ROOT}/scripts/cleanup-validation-artifacts.sh" --apply --days 7 >> "${LOG}" 2>&1 || true
 }
 trap cleanup_after_validation EXIT
 
@@ -45,10 +47,10 @@ echo "SUITE_TIMEOUT_SECONDS=${SUITE_TIMEOUT_SECONDS}" | tee -a "${LOG}"
 find "${JSON_DIR:?}" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
 find "${AUTH_DIR:?}" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
 rm -rf "${APP_DIR}/test-results"
-bash /opt/mytitan/scripts/cleanup-orphaned-playwright.sh --apply --min-age 600 >> "${LOG}" 2>&1 || true
-bash /opt/mytitan/scripts/cleanup-validation-artifacts.sh --apply --days 7 >> "${LOG}" 2>&1 || true
+bash "${REPO_ROOT}/scripts/cleanup-orphaned-playwright.sh" --apply --min-age 600 >> "${LOG}" 2>&1 || true
+bash "${REPO_ROOT}/scripts/cleanup-validation-artifacts.sh" --apply --days 7 >> "${LOG}" 2>&1 || true
 
-if ! docker compose -f /opt/mytitan/docker-compose.yml up -d --force-recreate api >> "${LOG}" 2>&1; then
+if ! docker compose -p mytitan -f "${REPO_ROOT}/docker-compose.yml" up -d --force-recreate api >> "${LOG}" 2>&1; then
   echo "BOOTSTRAP_ERROR: api recreate failed" | tee -a "${LOG}"
   echo "EXIT_CODE:201" | tee -a "${LOG}"
   exit 201
