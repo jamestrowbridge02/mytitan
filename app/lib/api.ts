@@ -1,11 +1,13 @@
 export function getApiBase() {
+  if (typeof window !== 'undefined') {
+    return '/api';
+  }
   const envBase = process.env.NEXT_PUBLIC_API_BASE_URL;
   if (envBase) return envBase;
-  if (process.env.NODE_ENV !== 'production') return 'http://localhost:3000';
+  // Keep the localhost fallback limited to explicit local/server-side development.
+  if (process.env.NODE_ENV !== 'production') return 'http://127.0.0.1:3000';
   return '';
 }
-
-const API_BASE = getApiBase();
 
 export class ApiError extends Error {
   statusCode: number;
@@ -20,6 +22,8 @@ export class ApiError extends Error {
     this.payload = payload;
   }
 }
+
+const inFlightGets = new Map<string, Promise<any>>();
 
 export function getToken() {
   if (typeof window === 'undefined') return null;
@@ -44,6 +48,7 @@ export function clearToken() {
 }
 
 export async function apiFetch(path: string, init: RequestInit = {}) {
+  const apiBase = getApiBase();
   const token = getToken();
   const isFormData = typeof FormData !== 'undefined' && init.body instanceof FormData;
   const headers: Record<string, string> = {
@@ -55,9 +60,14 @@ export async function apiFetch(path: string, init: RequestInit = {}) {
     headers.Authorization = `Bearer ${token}`;
   }
 
+  const method = String(init.method || 'GET').toUpperCase();
+  const dedupeKey = method === 'GET' && typeof window !== 'undefined' ? `${token || 'anonymous'}:${path}` : '';
+  if (dedupeKey && inFlightGets.has(dedupeKey)) return inFlightGets.get(dedupeKey);
+
+  const execute = async () => {
   let response: Response;
   try {
-    response = await fetch(`${API_BASE}${path}`, {
+    response = await fetch(`${apiBase}${path}`, {
       credentials: 'include',
       ...init,
       headers,
@@ -79,6 +89,14 @@ export async function apiFetch(path: string, init: RequestInit = {}) {
     : null;
 
   if (!response.ok) {
+    if (response.status === 413) {
+      throw new ApiError(
+        asJson?.message || 'This file is too large. Choose a smaller file and try again.',
+        response.status,
+        requestId,
+        asJson ?? text,
+      );
+    }
     const message = asJson?.message || text || response.statusText || 'Request failed';
     throw new ApiError(
       Array.isArray(message) ? message.join(', ') : String(message),
@@ -88,5 +106,15 @@ export async function apiFetch(path: string, init: RequestInit = {}) {
     );
   }
 
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(method) && typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('mytitan:operational-data-changed', { detail: { path } }));
+  }
   return asJson;
+  };
+  if (!dedupeKey) return execute();
+  const pending = execute().finally(() => {
+    if (inFlightGets.get(dedupeKey) === pending) inFlightGets.delete(dedupeKey);
+  });
+  inFlightGets.set(dedupeKey, pending);
+  return pending;
 }

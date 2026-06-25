@@ -8,14 +8,16 @@ export const WORKSPACE_PERMISSIONS = [
   "technician.execute",
   "jobs.transition",
   "dashboard.view_intelligence",
+  "users.invite",
+  "users.role_assign",
 ] as const;
 
 export type WorkspacePermission = (typeof WORKSPACE_PERMISSIONS)[number];
 export type PermissionSnapshot = Record<WorkspacePermission, boolean>;
 
-export const MODERN_WORKSPACE_ROLES = ["OWNER", "ADMIN", "DISPATCHER", "FINANCE", "TECHNICIAN", "VIEWER"] as const;
+export const MODERN_WORKSPACE_ROLES = ["OWNER", "ADMIN", "DISPATCHER", "FINANCE", "TECHNICIAN", "EXTERNAL_OPERATOR", "VIEWER"] as const;
 
-export const ASSIGNABLE_WORKSPACE_ROLES = ["ADMIN", "DISPATCHER", "FINANCE", "TECHNICIAN", "VIEWER"] as const;
+export const ASSIGNABLE_WORKSPACE_ROLES = ["ADMIN", "DISPATCHER", "FINANCE", "TECHNICIAN", "EXTERNAL_OPERATOR", "VIEWER"] as const;
 
 export function emptyPermissionSnapshot(): PermissionSnapshot {
   return WORKSPACE_PERMISSIONS.reduce((snapshot, permission) => {

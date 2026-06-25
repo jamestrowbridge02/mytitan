@@ -4,7 +4,7 @@ import { OperatorNotice } from "../feedback/OperatorNotice";
 import { useOperatorNotice } from "../feedback/useOperatorNotice";
 import { OperatorEmptyStateCard, OperatorFilterBar, OperatorPageHeader, OperatorStatusBadge } from "../ui/operator-page";
 import { apiFetch } from "../../lib/api";
-import { isInventoryV1Enabled } from "../../lib/feature-flags";
+import { isTruckStockV1Enabled } from "../../lib/feature-flags";
 import { readActiveLocationId, subscribeActiveLocationId } from "../../lib/location-context";
 
 type InventoryWorkspaceTab = "parts" | "inventory" | "purchase-orders";
@@ -12,15 +12,15 @@ type InventoryWorkspaceTab = "parts" | "inventory" | "purchase-orders";
 const TAB_META: Record<InventoryWorkspaceTab, { title: string; subtitle: string }> = {
   parts: {
     title: "Parts",
-    subtitle: "Operator-safe catalog of parts, pricing, and availability across stock locations.",
+    subtitle: "Keep parts, pricing, and availability in one calm view.",
   },
   inventory: {
     title: "Inventory",
-    subtitle: "Track on-hand, reserved, and shortage pressure by location without introducing warehouse theater.",
+    subtitle: "Track on-hand, reserved, and shortage pressure by location without extra noise.",
   },
   "purchase-orders": {
     title: "Purchase Orders",
-    subtitle: "Basic procurement workflow for ordered and received stock against live inventory locations.",
+    subtitle: "Track ordered and received stock against live inventory locations.",
   },
 };
 
@@ -29,19 +29,22 @@ function money(cents: number) {
 }
 
 export function InventoryWorkspace({ initialTab }: { initialTab: InventoryWorkspaceTab }) {
-  const enabled = isInventoryV1Enabled();
+  const enabled = isTruckStockV1Enabled();
   const [tab, setTab] = useState<InventoryWorkspaceTab>(initialTab);
   const [parts, setParts] = useState<any[]>([]);
   const [locations, setLocations] = useState<any[]>([]);
   const [stock, setStock] = useState<any[]>([]);
   const [purchaseOrders, setPurchaseOrders] = useState<any[]>([]);
   const [alerts, setAlerts] = useState<any[]>([]);
+  const [dashboard, setDashboard] = useState<any>(null);
+  const [assignments, setAssignments] = useState<any[]>([]);
   const [activeLocationId, setActiveLocationId] = useState('all');
   const [query, setQuery] = useState("");
   const [partForm, setPartForm] = useState({ sku: "", name: "", category: "", unit: "pcs", minLevel: 0, avgUnitCost: 0, unitPriceCents: 0 });
   const [locationForm, setLocationForm] = useState({ name: "", kind: "WAREHOUSE" });
   const [adjustForm, setAdjustForm] = useState({ stockItemId: "", inventoryLocationId: "", quantityDelta: 0, reorderPoint: 0, reason: "" });
-  const [poForm, setPoForm] = useState({ supplierName: "", inventoryLocationId: "", stockItemId: "", qtyOrdered: 1, unitCost: 0, status: "ORDERED" });
+  const [transferForm, setTransferForm] = useState({ stockItemId: "", fromInventoryLocationId: "", toInventoryLocationId: "", quantity: 1, reason: "" });
+  const [poForm, setPoForm] = useState({ supplierName: "", inventoryLocationId: "", stockItemId: "", qtyOrdered: 1, unitCost: 0, status: "DRAFT" });
   const { notice, showError, showSuccess, clearNotice } = useOperatorNotice();
 
   useEffect(() => {
@@ -57,18 +60,22 @@ export function InventoryWorkspace({ initialTab }: { initialTab: InventoryWorksp
   async function loadAll() {
     if (!enabled) return;
     try {
-      const [partsRes, locationsRes, stockRes, poRes, alertsRes] = await Promise.all([
+      const [partsRes, locationsRes, stockRes, poRes, alertsRes, dashboardRes, assignmentsRes] = await Promise.all([
         apiFetch(`/parts?q=${encodeURIComponent(query)}`),
         apiFetch(`/inventory/locations?locationId=${encodeURIComponent(activeLocationId)}`),
         apiFetch(`/inventory/stock?inventoryLocationId=all&locationId=${encodeURIComponent(activeLocationId)}&q=${encodeURIComponent(query)}`),
         apiFetch(`/purchase-orders?locationId=${encodeURIComponent(activeLocationId)}`),
         apiFetch(`/inventory/alerts?locationId=${encodeURIComponent(activeLocationId)}`).catch(() => []),
+        apiFetch("/inventory/dashboard").catch(() => null),
+        apiFetch("/inventory/technician-assignments").catch(() => []),
       ]);
       setParts(Array.isArray(partsRes) ? partsRes : []);
       setLocations(Array.isArray(locationsRes) ? locationsRes : []);
       setStock(Array.isArray(stockRes) ? stockRes : []);
       setPurchaseOrders(Array.isArray(poRes) ? poRes : []);
       setAlerts(Array.isArray(alertsRes) ? alertsRes : []);
+      setDashboard(dashboardRes || null);
+      setAssignments(Array.isArray(assignmentsRes) ? assignmentsRes : []);
       if (notice?.kind === "error") clearNotice();
     } catch (err: any) {
       showError(err?.message || "Failed to load parts and inventory workspace");
@@ -142,6 +149,21 @@ export function InventoryWorkspace({ initialTab }: { initialTab: InventoryWorksp
     }
   }
 
+  async function transferStock(event: React.FormEvent) {
+    event.preventDefault();
+    try {
+      await apiFetch("/inventory/stock/transfer", {
+        method: "POST",
+        body: JSON.stringify(transferForm),
+      });
+      setTransferForm({ stockItemId: "", fromInventoryLocationId: "", toInventoryLocationId: "", quantity: 1, reason: "" });
+      showSuccess("Stock transferred");
+      await loadAll();
+    } catch (err: any) {
+      showError(err?.message || "Failed to transfer stock");
+    }
+  }
+
   async function savePurchaseOrder(event: React.FormEvent) {
     event.preventDefault();
     try {
@@ -160,7 +182,7 @@ export function InventoryWorkspace({ initialTab }: { initialTab: InventoryWorksp
           ],
         }),
       });
-      setPoForm({ supplierName: "", inventoryLocationId: "", stockItemId: "", qtyOrdered: 1, unitCost: 0, status: "ORDERED" });
+      setPoForm({ supplierName: "", inventoryLocationId: "", stockItemId: "", qtyOrdered: 1, unitCost: 0, status: "DRAFT" });
       showSuccess("Purchase order created");
       await loadAll();
     } catch (err: any) {
@@ -178,12 +200,42 @@ export function InventoryWorkspace({ initialTab }: { initialTab: InventoryWorksp
     }
   }
 
+  async function submitPurchaseOrder(id: string) {
+    try {
+      await apiFetch(`/purchase-orders/${id}/submit`, { method: "POST", body: JSON.stringify({}) });
+      showSuccess("Purchase order submitted");
+      await loadAll();
+    } catch (err: any) {
+      showError(err?.message || "Failed to submit purchase order");
+    }
+  }
+
+  async function approvePurchaseOrder(id: string) {
+    try {
+      await apiFetch(`/purchase-orders/${id}/approve`, { method: "POST", body: JSON.stringify({}) });
+      showSuccess("Purchase order approved");
+      await loadAll();
+    } catch (err: any) {
+      showError(err?.message || "Failed to approve purchase order");
+    }
+  }
+
+  async function cancelPurchaseOrder(id: string) {
+    try {
+      await apiFetch(`/purchase-orders/${id}/cancel`, { method: "POST", body: JSON.stringify({}) });
+      showSuccess("Purchase order cancelled");
+      await loadAll();
+    } catch (err: any) {
+      showError(err?.message || "Failed to cancel purchase order");
+    }
+  }
+
   const meta = TAB_META[tab];
 
   return (
     <div className="operator-stack">
       <OperatorPageHeader
-        eyebrow="Operations system of record"
+        eyebrow="Inventory"
         title={meta.title}
         subtitle={meta.subtitle}
         actions={[
@@ -198,7 +250,7 @@ export function InventoryWorkspace({ initialTab }: { initialTab: InventoryWorksp
           { label: "Open POs", value: String(openPurchaseOrders.length), hint: "Procurement still active" },
         ]}
       />
-      {!enabled ? <OperatorEmptyStateCard title="Inventory is disabled" description="Enable inventory features to work with parts, stock, and purchase orders." /> : null}
+      {!enabled ? <OperatorEmptyStateCard title="Truck stock is disabled" description="Enable truck_stock_v1 to work with parts, stock, job materials, and purchase preparation." /> : null}
       {notice ? <OperatorNotice notice={notice} onDismiss={clearNotice} /> : null}
       <section className="card" style={{ marginBottom: 16 }}>
         <div className="tab-row" style={{ marginTop: 14 }}>
@@ -219,7 +271,7 @@ export function InventoryWorkspace({ initialTab }: { initialTab: InventoryWorksp
         <div className="operator-section__header">
           <div>
             <h2 className="operator-section__title">Inventory posture</h2>
-            <p className="operator-section__subtitle">Live stock, procurement, and shortage pressure derived from durable inventory rows.</p>
+              <p className="operator-section__subtitle">Live stock, procurement, and shortage pressure in one readable view.</p>
           </div>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
@@ -246,6 +298,22 @@ export function InventoryWorkspace({ initialTab }: { initialTab: InventoryWorksp
           <div className="metric-card">
             <strong>Open purchase orders</strong>
             <p>{openPurchaseOrders.length}</p>
+          </div>
+          <div className="metric-card">
+            <strong>Awaiting approval</strong>
+            <p>{dashboard?.purchaseOrders?.pendingApproval?.length || purchaseOrders.filter((po) => po.status === "SUBMITTED_INTERNAL").length}</p>
+          </div>
+          <div className="metric-card">
+            <strong>Awaiting receipt</strong>
+            <p>{dashboard?.purchaseOrders?.approvedAwaitingReceipt?.length || purchaseOrders.filter((po) => ["APPROVED", "ORDERED"].includes(String(po.status || ""))).length}</p>
+          </div>
+          <div className="metric-card">
+            <strong>Truck rows</strong>
+            <p>{dashboard?.truckStock?.length || stock.filter((row) => row.locationKind === "VAN").length}</p>
+          </div>
+          <div className="metric-card">
+            <strong>Assigned to jobs</strong>
+            <p>{dashboard?.stockAssignedToJobs?.length || 0}</p>
           </div>
         </div>
       </section>
@@ -296,7 +364,7 @@ export function InventoryWorkspace({ initialTab }: { initialTab: InventoryWorksp
             <div className="operator-section__header">
               <div>
                 <h2 className="operator-section__title">Locations and stock controls</h2>
-                <p className="operator-section__subtitle">Adjust live stock, create locations, and monitor low-stock conditions by location.</p>
+              <p className="operator-section__subtitle">Adjust live stock, create locations, and watch low-stock pressure by location.</p>
               </div>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16 }}>
@@ -330,6 +398,30 @@ export function InventoryWorkspace({ initialTab }: { initialTab: InventoryWorksp
                 <input className="input" placeholder="Reason" value={adjustForm.reason} onChange={(event) => setAdjustForm((current) => ({ ...current, reason: event.target.value }))} />
                 <button className="button" type="submit">Apply adjustment</button>
               </form>
+              <form onSubmit={transferStock} style={{ display: "grid", gap: 10 }}>
+                <strong>Transfer stock</strong>
+                <select className="input" value={transferForm.stockItemId} onChange={(event) => setTransferForm((current) => ({ ...current, stockItemId: event.target.value }))} required>
+                  <option value="">Select part</option>
+                  {parts.map((part) => (
+                    <option key={part.id} value={part.id}>{part.sku} · {part.name}</option>
+                  ))}
+                </select>
+                <select className="input" value={transferForm.fromInventoryLocationId} onChange={(event) => setTransferForm((current) => ({ ...current, fromInventoryLocationId: event.target.value }))} required>
+                  <option value="">From location</option>
+                  {locations.map((location) => (
+                    <option key={location.id} value={location.id}>{location.name}</option>
+                  ))}
+                </select>
+                <select className="input" value={transferForm.toInventoryLocationId} onChange={(event) => setTransferForm((current) => ({ ...current, toInventoryLocationId: event.target.value }))} required>
+                  <option value="">To location</option>
+                  {locations.map((location) => (
+                    <option key={location.id} value={location.id}>{location.name}</option>
+                  ))}
+                </select>
+                <input className="input" type="number" min="0.01" step="0.01" placeholder="Quantity" value={transferForm.quantity} onChange={(event) => setTransferForm((current) => ({ ...current, quantity: Number(event.target.value || 0) }))} required />
+                <input className="input" placeholder="Reason" value={transferForm.reason} onChange={(event) => setTransferForm((current) => ({ ...current, reason: event.target.value }))} />
+                <button className="button secondary" type="submit">Transfer</button>
+              </form>
             </div>
           </section>
 
@@ -337,7 +429,7 @@ export function InventoryWorkspace({ initialTab }: { initialTab: InventoryWorksp
             <div className="operator-section__header">
               <div>
                 <h2 className="operator-section__title">Stock by location</h2>
-                <p className="operator-section__subtitle">Shortage pressure is explicit: no hidden reservations and no silent negative inventory.</p>
+              <p className="operator-section__subtitle">Shortage pressure stays explicit, with no hidden reservations and no silent negative inventory.</p>
               </div>
             </div>
             <div data-testid="inventory-stock-grid" style={{ display: "grid", gap: 10 }}>
@@ -367,6 +459,23 @@ export function InventoryWorkspace({ initialTab }: { initialTab: InventoryWorksp
                         <strong>{alert.item?.sku || alert.sku} · {alert.item?.name || alert.name}</strong>
                         <p className="muted" style={{ margin: "4px 0 0 0" }}>
                           {alert.inventoryLocationName || alert.locationName} • Current {alert.currentLevel ?? alert.quantityOnHand} • Threshold {alert.item?.minLevel ?? alert.reorderPoint}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            {assignments.length ? (
+              <div style={{ marginTop: 14 }}>
+                <strong>Technician stock assignments</strong>
+                <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
+                  {assignments.map((assignment) => (
+                    <div key={assignment.id} className="integration-card">
+                      <div>
+                        <strong>{assignment.inventoryLocation?.name || "Stock location"}</strong>
+                        <p className="muted" style={{ margin: "4px 0 0 0" }}>
+                          {assignment.technician?.email || "Technician"} • {assignment.active ? "Active" : "Released"}
                         </p>
                       </div>
                     </div>
@@ -404,25 +513,44 @@ export function InventoryWorkspace({ initialTab }: { initialTab: InventoryWorksp
             <input className="input" type="number" min="0" step="0.01" placeholder="Unit cost" value={poForm.unitCost} onChange={(event) => setPoForm((current) => ({ ...current, unitCost: Number(event.target.value || 0) }))} />
             <select className="input" value={poForm.status} onChange={(event) => setPoForm((current) => ({ ...current, status: event.target.value }))}>
               <option value="DRAFT">Draft</option>
-              <option value="ORDERED">Ordered</option>
+              <option value="SUBMITTED_INTERNAL">Submit internal</option>
+              <option value="APPROVED">Approved internal</option>
             </select>
             <div style={{ display: "flex", alignItems: "center" }}>
               <button className="button" data-testid="purchase-order-save" type="submit">Save purchase order</button>
             </div>
           </form>
           <div data-testid="purchase-order-list" style={{ display: "grid", gap: 10 }}>
+            <div className="integration-card">
+              <div>
+                <strong>Internal PO only</strong>
+                <p className="muted" style={{ margin: "4px 0 0 0" }}>
+                  Supplier bridge is dry-run prepared. No wholesaler API call or live supplier order is made from this workspace.
+                </p>
+              </div>
+              <OperatorStatusBadge label="Live ordering off" tone="warning" />
+            </div>
             {purchaseOrders.map((po) => (
               <div key={po.id} className="integration-card">
                 <div>
                   <strong>{po.supplierName || "Unassigned supplier"} · {po.status}</strong>
                   <p className="muted" style={{ margin: "4px 0 0 0" }}>
-                    {po.inventoryLocationName || "No receiving location"} • {(po.lines || []).map((line: any) => `${line.sku || line.partId} x${line.quantityOrdered}`).join(", ")}
+                    {po.inventoryLocationName || "No receiving location"} • {(po.lines || []).map((line: any) => `${line.sku || line.partId} x${line.quantityOrdered}${line.supplierSku ? ` · ${line.supplierSku}` : ""}`).join(", ")}
                   </p>
                 </div>
                 <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                   <span className="muted">Received {(po.lines || []).reduce((sum: number, line: any) => sum + Number(line.quantityReceived || 0), 0).toFixed(2)}</span>
-                  {!["RECEIVED", "CANCELLED"].includes(String(po.status || "")) ? (
+                  {po.status === "DRAFT" ? (
+                    <button className="button secondary" type="button" onClick={() => void submitPurchaseOrder(po.id)}>Submit</button>
+                  ) : null}
+                  {["DRAFT", "SUBMITTED_INTERNAL"].includes(String(po.status || "")) ? (
+                    <button className="button secondary" type="button" onClick={() => void approvePurchaseOrder(po.id)}>Approve</button>
+                  ) : null}
+                  {["APPROVED", "ORDERED", "PARTIALLY_RECEIVED"].includes(String(po.status || "")) ? (
                     <button className="button secondary" type="button" onClick={() => void receivePurchaseOrder(po.id)}>Receive</button>
+                  ) : null}
+                  {!["RECEIVED", "CANCELLED"].includes(String(po.status || "")) ? (
+                    <button className="button secondary" type="button" onClick={() => void cancelPurchaseOrder(po.id)}>Cancel</button>
                   ) : null}
                 </div>
               </div>

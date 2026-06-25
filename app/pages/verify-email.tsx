@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import { apiFetch } from '../lib/api';
+import { apiFetch, getToken } from '../lib/api';
+import { getResendVerificationMessage, getSafeVerificationError } from '../lib/verification-resend';
 
 export default function VerifyEmailPage() {
   const router = useRouter();
@@ -8,6 +9,7 @@ export default function VerifyEmailPage() {
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
+  const [actionHref, setActionHref] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -20,6 +22,7 @@ export default function VerifyEmailPage() {
     setLoading(true);
     setError('');
     setStatus('');
+    setActionHref('');
     try {
       await apiFetch('/auth/verify-email', {
         method: 'POST',
@@ -40,14 +43,17 @@ export default function VerifyEmailPage() {
   async function resend() {
     setError('');
     setStatus('');
+    setActionHref('');
     try {
-      await apiFetch('/auth/resend-verification', {
+      const path = getToken() ? '/auth/resend-verification' : '/auth/resend-verification/public';
+      const result = await apiFetch(path, {
         method: 'POST',
         body: JSON.stringify({ email }),
       });
-      setStatus('Verification email sent (or queued).');
+      setStatus(getResendVerificationMessage(result));
+      setActionHref(typeof result?.actionHref === 'string' ? result.actionHref : '');
     } catch (err: any) {
-      setError(err?.message || 'Could not resend verification');
+      setError(getSafeVerificationError(err));
     }
   }
 
@@ -59,6 +65,7 @@ export default function VerifyEmailPage() {
         {loading ? <p className="muted">Verifying...</p> : null}
         {status ? <p style={{ color: '#5eead4' }}>{status}</p> : null}
         {error ? <p style={{ color: '#ff8a8a' }}>{error}</p> : null}
+        {actionHref ? <p><a className="button secondary" href={actionHref}>Open email settings</a></p> : null}
         <form
           onSubmit={(e) => {
             e.preventDefault();

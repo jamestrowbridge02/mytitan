@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { apiFetch, setToken } from '../lib/api';
-import { isAuthPolishV1Enabled, isGuidedSetupV2Enabled, isStartHereEnabled } from '../lib/feature-flags';
+import { isAuthPolishV1Enabled, isPublicDemoEnabled, isStartHereEnabled } from '../lib/feature-flags';
+import { resolvePostAuthDestination } from '../lib/post-auth';
 import MyTitanLogo from '../components/brand/mytitan-logo';
 
 export default function Login() {
@@ -12,7 +13,6 @@ export default function Login() {
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const authPolish = isAuthPolishV1Enabled();
-  const guidedSetupV2Enabled = isGuidedSetupV2Enabled();
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -21,10 +21,13 @@ export default function Login() {
 
   useEffect(() => {
     if (!router.isReady) return;
+    if (!isPublicDemoEnabled()) return;
     const demoTokenParam = router.query.demo_token;
     if (typeof demoTokenParam === 'string' && demoTokenParam.trim()) {
       setToken(demoTokenParam.trim());
-      router.replace('/dashboard');
+      void resolvePostAuthDestination({ startHereEnabled: isStartHereEnabled() })
+        .then((nextPath) => router.replace(nextPath))
+        .catch(() => router.replace('/dashboard'));
     }
   }, [router.isReady, router.query.demo_token]);
 
@@ -38,14 +41,15 @@ export default function Login() {
       });
       setToken(res.token);
 
+      if (res?.user?.platformAdmin) {
+        router.replace('/platform');
+        return;
+      }
+
       if (isStartHereEnabled()) {
         try {
-          const status = await apiFetch('/onboarding/status');
-          if (guidedSetupV2Enabled && !status?.onboardingCompleted) {
-            router.replace('/dashboard/setup-wizard');
-            return;
-          }
-          router.replace(status?.onboardingCompleted ? '/start' : '/onboarding');
+          const nextPath = await resolvePostAuthDestination({ startHereEnabled: true });
+          router.replace(nextPath);
           return;
         } catch {
           router.replace('/dashboard');
@@ -68,7 +72,7 @@ export default function Login() {
             <div className="auth-shell__brandRow">
               <MyTitanLogo size="lg" glimmer className="auth-shell__brand" />
             </div>
-            <div className="auth-shell__eyebrow">Service business software</div>
+            <div className="auth-shell__eyebrow">Built for service teams</div>
             <h1 className="auth-shell__title">Run bookings, jobs, customers, and billing in one place.</h1>
             <p className="auth-shell__lead">
               MyTitan keeps daily work clear without making your team jump between tools.
@@ -76,16 +80,16 @@ export default function Login() {
           </div>
           <ul className="auth-shell__featureList">
             <li className="auth-shell__feature">
-              <strong>Clear during busy days</strong>
+              <strong>See the day clearly</strong>
               Keep jobs, schedules, and payments easy to follow when the pace picks up.
             </li>
             <li className="auth-shell__feature">
-              <strong>Safe by default</strong>
+              <strong>Keep control</strong>
               Roles, approvals, and workspace controls stay in place as the team grows.
             </li>
             <li className="auth-shell__feature">
-              <strong>Built for service teams</strong>
-              Plan work, manage repeats, track approvals, and keep customers informed in one system.
+              <strong>Keep work moving</strong>
+              Plan work, manage repeats, track approvals, and keep customers informed in one place.
             </li>
           </ul>
         </section>

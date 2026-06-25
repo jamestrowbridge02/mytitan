@@ -207,26 +207,39 @@ export default function BookingProCalendarPage() {
 
   return (
     <DashboardShell>
-      <div className="card" style={{ marginBottom: 14 }}>
-        <h1>Booking Pro Calendar</h1>
+      <div style={{ display: 'grid', gap: 16, maxWidth: 1180, margin: '0 auto', width: '100%' }} data-testid="booking-calendar-page">
+      <div className="card" style={{ marginBottom: 0, overflow: 'clip' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
+          <div>
+            <p className="muted" style={{ margin: 0, fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0 }}>Location scheduling</p>
+            <h1 style={{ margin: '4px 0 0' }}>Booking calendar</h1>
+          </div>
+          <span className="badge">Week/day ready</span>
+        </div>
         {error ? <p style={{ color: '#ff8a8a' }}>{error}</p> : null}
-        <label>Service</label>
-        <select className="input" value={serviceId} onChange={(e) => setServiceId(e.target.value)}>
-          <option value="">Select service</option>
-          {services.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}
-        </select>
-        <label>Location ID (optional)</label>
-        <input className="input" value={locationId} onChange={(e) => setLocationId(e.target.value)} />
-        <label>Staff user ID (optional)</label>
-        <input className="input" value={staffUserId} onChange={(e) => setStaffUserId(e.target.value)} />
-        <label>Date</label>
-        <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-
-        <label>Available slots</label>
-        <select className="input" value={selectedSlot} onChange={(e) => setSelectedSlot(e.target.value)}>
-          <option value="">Select slot</option>
-          {slots.map((slot: any) => <option key={slot.startsAt} value={slot.startsAt}>{new Date(slot.startsAt).toLocaleString()}</option>)}
-        </select>
+        <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', alignItems: 'end' }}>
+          <label style={{ minWidth: 0 }}>Service
+            <select className="input" value={serviceId} onChange={(e) => setServiceId(e.target.value)}>
+              <option value="">Select service</option>
+              {services.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}
+            </select>
+          </label>
+          <label style={{ minWidth: 0 }}>Location
+            <input className="input" placeholder="Any location" value={locationId} onChange={(e) => setLocationId(e.target.value)} />
+          </label>
+          <label style={{ minWidth: 0 }}>Team member
+            <input className="input" placeholder="Auto-assign or paste user ID" value={staffUserId} onChange={(e) => setStaffUserId(e.target.value)} />
+          </label>
+          <label style={{ minWidth: 0 }}>Date
+            <input className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </label>
+          <label style={{ minWidth: 0 }}>Available slots
+            <select className="input" value={selectedSlot} onChange={(e) => setSelectedSlot(e.target.value)}>
+              <option value="">Select slot</option>
+              {slots.map((slot: any) => <option key={slot.startsAt} value={slot.startsAt}>{new Date(slot.startsAt).toLocaleString()}</option>)}
+            </select>
+          </label>
+        </div>
 
         {schedulingEnabled ? (
           <div
@@ -340,27 +353,33 @@ export default function BookingProCalendarPage() {
           </div>
         ) : null}
 
-        <label>Customer name</label>
-        <input className="input" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
-        <label>Customer email</label>
-        <input className="input" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} type="email" />
-        <label>Customer phone</label>
-        <input className="input" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
+        <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', marginTop: 14 }}>
+          <label style={{ minWidth: 0 }}>Customer name
+            <input className="input" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
+          </label>
+          <label style={{ minWidth: 0 }}>Customer email
+            <input className="input" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} type="email" />
+          </label>
+          <label style={{ minWidth: 0 }}>Customer phone
+            <input className="input" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
+          </label>
+        </div>
 
-        <button className="button" type="button" onClick={createBooking}>Create booking</button>
+        <button className="button" type="button" onClick={createBooking} style={{ marginTop: 14 }}>Create booking</button>
       </div>
 
-      <div className="card">
-        <h3>Upcoming bookings</h3>
+      <div className="card" style={{ overflow: 'clip' }}>
+        <h3 style={{ marginTop: 0 }}>Upcoming bookings</h3>
         <div className="list">
           {bookings.map((booking) => (
-            <div key={booking.id} className="integration-card">
+            <div key={booking.id} className="integration-card" style={{ minWidth: 0, overflowWrap: 'anywhere' }}>
               <strong>{new Date(booking.startsAt).toLocaleString()}</strong>
               <span>{booking.customerName || booking.customerEmail || 'Customer'}</span>
             </div>
           ))}
           {bookings.length === 0 ? <p className="muted">No bookings yet.</p> : null}
         </div>
+      </div>
       </div>
     </DashboardShell>
   );

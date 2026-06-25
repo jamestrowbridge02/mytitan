@@ -1,0 +1,112 @@
+/* MyTitan design tokens shared across the product surfaces. */
+:root {
+  --font-sans: "IBM Plex Sans", "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.6rem;
+  --text-3xl: 2rem;
+
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 22px;
+  --r-xl: 28px;
+
+  --sh-sm: 0 14px 34px rgba(9, 16, 30, 0.07);
+  --sh-md: 0 24px 60px rgba(9, 16, 30, 0.12);
+  --sh-lg: 0 32px 84px rgba(9, 16, 30, 0.16);
+
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-7: 32px;
+  --s-8: 40px;
+  --s-9: 48px;
+
+  --bg: #edf2f9;
+  --fg: #0a1526;
+  --muted-fg: #58667a;
+  --text-primary: #0f172a;
+  --text-secondary: #344256;
+  --text-muted: #58667a;
+  --text-soft: #68778d;
+  --text-disabled: #7f8ca1;
+  --text-placeholder: #708096;
+  --text-inverse: #f8fbff;
+  --text-metadata: #4f5f74;
+  --card: #ffffff;
+  --card-border: rgba(88, 105, 138, 0.22);
+  --card-border-strong: rgba(52, 78, 122, 0.28);
+  --surface-soft: #f4f7fc;
+  --surface-strong: #dbe5f5;
+  --surface-titanium: #e4ebf6;
+  --surface-navy: #0d1b33;
+  --surface-graphite: #1a263b;
+
+  --accent: #0f8e74;
+  --accent-2: #2556f3;
+  --accent-cobalt: #2556f3;
+  --accent-cobalt-strong: #173ecb;
+  --accent-cobalt-soft: rgba(37, 86, 243, 0.12);
+  --accent-soft: rgba(15, 142, 116, 0.12);
+  --danger: #cf435a;
+  --danger-soft: rgba(207, 67, 90, 0.12);
+  --ok: #0f8e74;
+  --ok-soft: rgba(15, 142, 116, 0.12);
+  --warning: #b97a0e;
+  --warning-soft: rgba(185, 122, 14, 0.14);
+  --insight: #5950e8;
+  --insight-soft: rgba(89, 80, 232, 0.12);
+  --success-emerald: #16856d;
+  --warning-amber: #b97a0e;
+  --warning-amber-strong: #8f5c00;
+  --critical-red: #cf435a;
+  --critical-red-strong: #9f1f32;
+  --intelligence-indigo: #5950e8;
+  --intelligence-indigo-strong: #4338ca;
+  --graphite-authority: #1f2a3d;
+  --navy-authority: #142742;
+
+  --gradient-command: linear-gradient(135deg, #11233f 0%, #18315b 36%, #2556f3 100%);
+  --gradient-command-soft: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(239, 245, 255, 0.98) 100%);
+  --gradient-intelligence: linear-gradient(135deg, rgba(89, 80, 232, 0.18), rgba(37, 86, 243, 0.08));
+  --focus: rgba(37, 86, 243, 0.2);
+  --focus-strong: rgba(37, 86, 243, 0.34);
+
+  --mt-type-page: clamp(1.75rem, 1.6rem + 0.45vw, 2.25rem);
+  --mt-type-section: 1.08rem;
+  --mt-type-body: 0.95rem;
+  --mt-space-page: clamp(16px, 2vw, 28px);
+  --mt-space-section: clamp(14px, 1.6vw, 22px);
+  --mt-surface-card: #ffffff;
+  --mt-surface-card-muted: #f7f9fd;
+  --mt-surface-border: rgba(60, 76, 110, 0.18);
+  --mt-surface-border-strong: rgba(31, 42, 61, 0.28);
+  --mt-action-primary: #173ecb;
+  --mt-action-primary-hover: #102f9f;
+  --mt-action-secondary: #ffffff;
+  --mt-status-success-bg: rgba(15, 142, 116, 0.12);
+  --mt-status-success-fg: #0b6f5b;
+  --mt-status-warning-bg: rgba(185, 122, 14, 0.14);
+  --mt-status-warning-fg: #7a4d00;
+  --mt-status-critical-bg: rgba(207, 67, 90, 0.12);
+  --mt-status-critical-fg: #9f1f32;
+  --mt-focus-ring: 0 0 0 3px rgba(37, 86, 243, 0.24);
+}
+
+:root[data-theme="light"] {
+  --bg: #edf2f9;
+  --fg: #0a1526;
+  --muted-fg: #58667a;
+  --card: #ffffff;
+  --card-border: rgba(88, 105, 138, 0.22);
+  --card-border-strong: rgba(52, 78, 122, 0.28);
+  --surface-soft: #f4f7fc;
+  --surface-strong: #dbe5f5;
+  --focus: rgba(37, 86, 243, 0.2);
+}

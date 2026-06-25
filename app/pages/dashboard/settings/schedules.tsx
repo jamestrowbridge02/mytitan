@@ -9,6 +9,11 @@ import { isSchedulingIntelligenceV1Enabled } from '../../../lib/feature-flags';
 type WeeklyScheduleSlot = {
   start?: string | null;
   end?: string | null;
+  role?: string | null;
+  venue?: string | null;
+  breakMinutes?: number | null;
+  notes?: string | null;
+  absence?: boolean;
 };
 
 type WeeklyScheduleJson = Record<string, WeeklyScheduleSlot[]>;
@@ -33,6 +38,10 @@ type ScheduleResponse = {
   schedules: TechSchedule[];
   availabilityMinutesByDay: Record<string, Record<string, number>>;
   exceptions: ScheduleException[];
+  rota?: {
+    publishedAt?: string | null;
+    publishedWeekStart?: string | null;
+  };
 };
 
 type ScheduleUpdateResponse = {
@@ -83,6 +92,7 @@ export default function ScheduleSettingsPage() {
   const [error, setError] = useState('');
   const [requestId, setRequestId] = useState<string | undefined>(undefined);
   const [saving, setSaving] = useState(false);
+  const [publishing, setPublishing] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [saveRequestId, setSaveRequestId] = useState<string | undefined>(undefined);
   const [successMessage, setSuccessMessage] = useState('');
@@ -212,8 +222,8 @@ export default function ScheduleSettingsPage() {
     (
       day: (typeof WEEKDAY_KEYS)[number],
       index: number,
-      field: 'start' | 'end',
-      value: string,
+      field: keyof WeeklyScheduleSlot,
+      value: string | number | boolean,
     ) => {
       updateDaySlots(day, (current) =>
         current.map((slot, slotIndex) => (slotIndex === index ? { ...slot, [field]: value } : slot)),
@@ -384,6 +394,24 @@ export default function ScheduleSettingsPage() {
     }
   }, [selectedTechId, weeklyJsonByTech, showSuccess]);
 
+  const handlePublish = useCallback(async () => {
+    setPublishing(true);
+    setSaveError('');
+    try {
+      await handleSave();
+      await apiFetch('/calendar/rota/publish', {
+        method: 'POST',
+        body: JSON.stringify({ weekStart: weekStart.toISOString().slice(0, 10) }),
+      });
+      await loadSchedules();
+      showSuccess();
+    } catch (err: any) {
+      setSaveError(err?.message || 'Failed to publish rota');
+    } finally {
+      setPublishing(false);
+    }
+  }, [handleSave, loadSchedules, showSuccess, weekStart]);
+
   if (!enabled) {
     return (
       <DashboardShell>
@@ -442,10 +470,15 @@ function buildExceptionFormDefaults() {
       <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
           <div>
-            <h1>Technician schedules</h1>
+            <h1>Staff rota</h1>
             <p className="muted" style={{ margin: 0 }}>
-              Define working hours for each technician. Maximum of three slots per day.
+              Plan shifts, roles, venues, breaks, and absences. This does not calculate payroll.
             </p>
+            {scheduleData?.rota?.publishedAt ? (
+              <p className="muted" style={{ margin: '6px 0 0', fontSize: 12 }}>
+                Published {new Date(scheduleData.rota.publishedAt).toLocaleString()}
+              </p>
+            ) : null}
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button
@@ -456,6 +489,9 @@ function buildExceptionFormDefaults() {
               style={{ minWidth: 120 }}
             >
               {saving ? 'Saving…' : 'Save changes'}
+            </button>
+            <button className="button" data-testid="rota-publish" type="button" onClick={handlePublish} disabled={!selectedTechId || saving || publishing}>
+              {publishing ? 'Publishing…' : 'Publish rota'}
             </button>
           </div>
         </div>
@@ -603,6 +639,49 @@ function buildExceptionFormDefaults() {
                               className="input"
                               style={{ maxWidth: 120 }}
                             />
+                            <input
+                              className="input"
+                              aria-label={`${WEEKDAY_LABELS[day]} shift role`}
+                              placeholder="Role"
+                              value={slot.role || ''}
+                              onChange={(event) => handleSlotChange(day, index, 'role', event.target.value)}
+                              style={{ maxWidth: 130 }}
+                            />
+                            <input
+                              className="input"
+                              aria-label={`${WEEKDAY_LABELS[day]} shift venue`}
+                              placeholder="Location or venue"
+                              value={slot.venue || ''}
+                              onChange={(event) => handleSlotChange(day, index, 'venue', event.target.value)}
+                              style={{ maxWidth: 170 }}
+                            />
+                            <label style={{ fontSize: 12 }}>Break</label>
+                            <input
+                              className="input"
+                              aria-label={`${WEEKDAY_LABELS[day]} break minutes`}
+                              type="number"
+                              min={0}
+                              max={240}
+                              value={slot.breakMinutes || 0}
+                              onChange={(event) => handleSlotChange(day, index, 'breakMinutes', Number(event.target.value || 0))}
+                              style={{ maxWidth: 85 }}
+                            />
+                            <input
+                              className="input"
+                              aria-label={`${WEEKDAY_LABELS[day]} shift notes`}
+                              placeholder="Notes"
+                              value={slot.notes || ''}
+                              onChange={(event) => handleSlotChange(day, index, 'notes', event.target.value)}
+                              style={{ maxWidth: 180 }}
+                            />
+                            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+                              <input
+                                type="checkbox"
+                                checked={slot.absence === true}
+                                onChange={(event) => handleSlotChange(day, index, 'absence', event.target.checked)}
+                              />
+                              Absence
+                            </label>
                             <label style={{ fontSize: 12 }}>End</label>
                             <input
                               type="time"

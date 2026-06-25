@@ -5,6 +5,8 @@ export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
+  const emailInputId = 'forgot-password-email';
+  const fallbackStatus = 'If an account exists, a reset link has been sent.';
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -13,16 +15,18 @@ export default function ForgotPasswordPage() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setStatus('');
+    setStatus(`${fallbackStatus} Use the most recent MyTitan email if you request more than one link.`);
     setError('');
     try {
-      await apiFetch('/auth/forgot-password', {
+      const response = await apiFetch('/auth/forgot-password', {
         method: 'POST',
         body: JSON.stringify({ email }),
       });
-      setStatus('If an account exists, a reset link has been sent.');
+      const baseMessage = String(response?.message || fallbackStatus);
+      setStatus(`${baseMessage} Use the most recent MyTitan email if you request more than one link.`);
     } catch (err: any) {
       const msg = String(err?.message || '');
+      setStatus('');
       setError(msg.includes('Failed to fetch') ? 'Cannot reach server. Check your connection and try again.' : (msg || 'Request failed'));
     }
   }
@@ -35,8 +39,8 @@ export default function ForgotPasswordPage() {
         {status ? <p style={{ color: '#5eead4' }}>{status}</p> : null}
         {error ? <p style={{ color: '#ff8a8a' }}>{error}</p> : null}
         <form onSubmit={onSubmit}>
-          <label>Email</label>
-          <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <label htmlFor={emailInputId}>Email</label>
+          <input id={emailInputId} className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
           <button className="button" type="submit">Send reset link</button>
         </form>
       </div>

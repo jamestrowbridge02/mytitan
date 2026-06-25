@@ -123,6 +123,7 @@ export default function RevenuePage() {
           subtitle="Operator-driven quote, approval, invoice, and payment follow-up built on real platform state."
           actions={[
             { label: "Quotes", href: "/dashboard/quotes", variant: "secondary" },
+            { label: "Finance", href: "/dashboard/finance", variant: "secondary" },
             { label: "Billing readiness", href: "/dashboard/billing/readiness" },
           ]}
           shortcuts={["Tasks are derived from live quote and invoice state", "No fake outbound cadence is implied by this queue"]}

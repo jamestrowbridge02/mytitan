@@ -17,14 +17,16 @@ export function LoadingState(props: {
   ];
 
   return (
-    <div className="card loading-state-premium" role="status" aria-live="polite">
+    <div className="card loading-state-premium app-state app-state--loading" role="status" aria-live="polite">
       <div className="loading-state-premium__top">
-        <div className="loading-state-premium__eyebrow">Workspace</div>
+        <div className="loading-state-premium__eyebrow">Preparing your next view</div>
         <h2 className="loading-state-premium__title">
-          {props.title || "Loading"}
+          {props.title || "Bringing everything into place"}
         </h2>
-        {props.description ? (
-          <p className="loading-state-premium__description">{props.description}</p>
+        {(props.description || true) ? (
+          <p className="loading-state-premium__description">
+            {props.description || "Pulling together the latest operational truth so the next decision stays clear."}
+          </p>
         ) : null}
       </div>
 

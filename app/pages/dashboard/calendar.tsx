@@ -24,6 +24,7 @@ import {
 import { formatSuggestedSlotLabel, type SuggestedSlot } from '../../lib/suggested-slot';
 import { SuggestedSlotReasons } from '../../components/SuggestedSlotReasons';
 import { useStickyOperatorView } from '../../lib/operator-view-state';
+import { useOperationalRefresh } from '../../lib/operational-refresh';
 
 type BookingWarning =
   | { code: 'OVERLAP'; id: string; startsAt: string; endsAt: string }
@@ -35,6 +36,7 @@ type CalendarTechnician = {
   id: string;
   name: string;
   email: string;
+  color?: string | null;
 };
 
 type CalendarBlock = {
@@ -51,11 +53,19 @@ type CalendarBlock = {
     id: string;
     name: string;
     email: string;
+    color?: string | null;
   } | null;
   location?: {
     id: string;
     name?: string | null;
+    color?: string | null;
   } | null;
+  service?: {
+    id: string;
+    name?: string | null;
+    color?: string | null;
+  } | null;
+  displayColor?: string | null;
   jobSummary?: {
     id: string;
     jobRef?: string | null;
@@ -157,6 +167,8 @@ type SuggestionState = {
   supportCode?: string;
 };
 
+type CalendarViewMode = 'day' | 'week' | 'month';
+
 function resolveCalendarFallback(message: string) {
   const normalized = message.trim().toLowerCase();
 
@@ -198,6 +210,7 @@ const UNDO_DURATION_MS = 10_000;
 const REVERT_TOAST_DURATION_MS = 3_500;
 const CONFLICT_HIGHLIGHT_DURATION_MS = 3_000;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const MAX_RANGE_DAYS = 14;
 
 const STATUS_COLORS: Record<string, { bg: string; border: string; text: string }> = {
   PENDING: { bg: '#fef9c3', border: '#facc15', text: '#713f12' },
@@ -256,6 +269,23 @@ function startOfWeekMonday(input: Date) {
   date.setDate(date.getDate() + mondayOffset);
   date.setHours(0, 0, 0, 0);
   return date;
+}
+
+function startOfDay(input: Date) {
+  const date = new Date(input);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function startOfMonth(input: Date) {
+  const date = new Date(input.getFullYear(), input.getMonth(), 1);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function buildMonthDays(input: Date) {
+  const start = startOfWeekMonday(startOfMonth(input));
+  return Array.from({ length: 42 }, (_, index) => addDays(start, index));
 }
 
 function formatDateKey(date: Date) {
@@ -480,10 +510,75 @@ function formatHours(minutes: number) {
   return `${normalized}h`;
 }
 
+function getRangeForView(date: Date, viewMode: CalendarViewMode) {
+  if (viewMode === 'day') {
+    const start = startOfDay(date);
+    return { from: start, to: addDays(start, 1) };
+  }
+  if (viewMode === 'month') {
+    const days = buildMonthDays(date);
+    return { from: days[0], to: addDays(days[days.length - 1], 1) };
+  }
+  const start = startOfWeekMonday(date);
+  return { from: start, to: addDays(start, 7) };
+}
+
+function buildFetchWindows(from: Date, to: Date) {
+  const windows: Array<{ from: Date; to: Date }> = [];
+  let cursor = new Date(from);
+  while (cursor.getTime() < to.getTime()) {
+    const next = new Date(Math.min(cursor.getTime() + MAX_RANGE_DAYS * MS_PER_DAY, to.getTime()));
+    windows.push({ from: new Date(cursor), to: next });
+    cursor = next;
+  }
+  return windows;
+}
+
+function mergeCalendarResponses(responses: CalendarResponse[], from: Date, to: Date): CalendarResponse {
+  const technicianMap = new Map<string, CalendarTechnician>();
+  const blockMap = new Map<string, CalendarBlock>();
+  let clamped = false;
+  for (const response of responses) {
+    clamped = clamped || Boolean(response.clamped);
+    for (const technician of response.technicians || []) {
+      technicianMap.set(technician.id, technician);
+    }
+    for (const block of response.blocks || []) {
+      blockMap.set(block.id, block);
+    }
+  }
+  return {
+    from: from.toISOString(),
+    to: to.toISOString(),
+    effectiveTo: to.toISOString(),
+    clamped,
+    technicians: Array.from(technicianMap.values()).sort((a, b) => a.name.localeCompare(b.name)),
+    blocks: Array.from(blockMap.values()).sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()),
+  };
+}
+
+function formatViewRangeLabel(days: Date[], viewMode: CalendarViewMode) {
+  if (!days.length) return '';
+  if (viewMode === 'day') {
+    return days[0].toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+  }
+  if (viewMode === 'month') {
+    return days[Math.floor(days.length / 2)].toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  }
+  return `${days[0].toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} to ${days[days.length - 1].toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
+}
+
+function shiftFocusDate(date: Date, viewMode: CalendarViewMode, direction: -1 | 1) {
+  if (viewMode === 'day') return addDays(date, direction);
+  if (viewMode === 'month') return new Date(date.getFullYear(), date.getMonth() + direction, 1);
+  return addDays(date, direction * 7);
+}
+
 export default function CalendarPage() {
   const router = useRouter();
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [weekStart, setWeekStart] = useState(() => startOfWeekMonday(new Date()));
+  const [focusDate, setFocusDate] = useState(() => startOfDay(new Date()));
+  const [viewMode, setViewMode] = useStickyOperatorView<CalendarViewMode>('mytitan_calendar_mode_v1', 'week');
   const [data, setData] = useState<CalendarResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -492,6 +587,7 @@ export default function CalendarPage() {
   const [search, setSearch] = useState('');
   const [selectedTechId, setSelectedTechId] = useState('ALL');
   const [selectedLocationId, setSelectedLocationId] = useState('ALL');
+  const [showTechnicianOverlay, setShowTechnicianOverlay] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [nowMinutes, setNowMinutes] = useState(() => clampMinute(minutesFromGridStart(new Date())));
   const [draggingBookingId, setDraggingBookingId] = useState<string | null>(null);
@@ -513,6 +609,9 @@ export default function CalendarPage() {
   const deepLinkRef = useRef<string | null>(null);
   const [deepLinkTarget, setDeepLinkTarget] = useState<{ dayKey: string; techId: string } | null>(null);
   const [applyingBestBookingId, setApplyingBestBookingId] = useState<string | null>(null);
+  const [refreshVersion, setRefreshVersion] = useState(0);
+  useOperationalRefresh(() => setRefreshVersion((current) => current + 1));
+  const range = useMemo(() => getRangeForView(focusDate, viewMode), [focusDate, viewMode]);
 
   const clearToast = useCallback(() => {
     if (toastTimerRef.current) {
@@ -569,15 +668,24 @@ export default function CalendarPage() {
   const nowPosition = nowMinutes * PIXELS_PER_MINUTE;
   const showNowLine = nowMinutes >= 0 && nowMinutes <= GRID_TOTAL_MINUTES;
 
-  const days = useMemo(() => Array.from({ length: 7 }, (_, index) => addDays(weekStart, index)), [weekStart]);
+  const days = useMemo(() => {
+    if (viewMode === 'month') return buildMonthDays(focusDate);
+    if (viewMode === 'day') return [startOfDay(focusDate)];
+    return Array.from({ length: 7 }, (_, index) => addDays(startOfWeekMonday(focusDate), index));
+  }, [focusDate, viewMode]);
+  const plannerDays = useMemo(() => (viewMode === 'month' ? [] : days), [days, viewMode]);
+  const monthWeeks = useMemo(() => {
+    if (viewMode !== 'month') return [] as Date[][];
+    return Array.from({ length: 6 }, (_, index) => days.slice(index * 7, index * 7 + 7));
+  }, [days, viewMode]);
   const dayMeta = useMemo(
     () =>
-      days.map((day) => ({
+      plannerDays.map((day) => ({
         date: day,
         key: formatDateKey(day),
         weekday: WEEKDAY_KEYS[day.getDay()],
       })),
-    [days],
+    [plannerDays],
   );
   const scheduleSegments = useMemo(() => {
     const map = new Map<string, Array<{ top: number; height: number }>>();
@@ -731,11 +839,11 @@ export default function CalendarPage() {
     const warningCount = data?.blocks?.filter((block) => (block.warnings ?? []).length > 0).length || 0;
     const activeTechs = technicians.filter((tech) => tech.id !== '__unassigned__').length;
     return [
-      { label: 'Week range', value: `${days[0]?.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) || '-'} to ${days[6]?.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) || '-'}`, hint: 'Current planning window' },
+      { label: viewMode === 'month' ? 'Month' : viewMode === 'day' ? 'Day' : 'Week range', value: formatViewRangeLabel(days, viewMode) || '-', hint: 'Current planning window' },
       { label: 'Bookings', value: String(bookingCount), hint: warningCount ? `${warningCount} with warnings` : 'No schedule warnings' },
       { label: 'Technicians', value: String(activeTechs), hint: hasUnassigned ? 'Includes unassigned lane' : 'Assigned lanes only' },
     ];
-  }, [data?.blocks, days, hasUnassigned, technicians]);
+  }, [data?.blocks, days, hasUnassigned, technicians, viewMode]);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 900);
@@ -767,34 +875,52 @@ export default function CalendarPage() {
   }, []);
 
   useEffect(() => {
+    let isActive = true;
     const load = async () => {
-      setLoading(true);
-      setError('');
-      setRequestId(undefined);
-      setUndoState(null);
-      setSuggestionsByBooking({});
-      clearToast();
-      setRescheduleError('');
-      setRescheduleErrorRequestId(undefined);
-      setHighlightedConflictIds([]);
+      if (isActive) {
+        setLoading(true);
+        setError('');
+        setRequestId(undefined);
+        setUndoState(null);
+        setSuggestionsByBooking({});
+        clearToast();
+        setRescheduleError('');
+        setRescheduleErrorRequestId(undefined);
+        setHighlightedConflictIds([]);
+      }
       try {
-        const from = weekStart.toISOString();
-        const to = addDays(weekStart, 7).toISOString();
-        const query = new URLSearchParams({ from, to });
-        const result = await apiFetch(`/calendar/bookings?${query.toString()}`);
-        setData((result || null) as CalendarResponse | null);
+        const windows = buildFetchWindows(range.from, range.to);
+        const responses = (await Promise.all(
+          windows.map(async (windowRange) => {
+            const query = new URLSearchParams({
+              from: windowRange.from.toISOString(),
+              to: windowRange.to.toISOString(),
+            });
+            return (await apiFetch(`/calendar/bookings?${query.toString()}`)) as CalendarResponse;
+          }),
+        )) as CalendarResponse[];
+        if (isActive) {
+          setData(mergeCalendarResponses(responses, range.from, range.to));
+        }
       } catch (err: any) {
-        setError(err?.message || 'Failed to load calendar');
-        setRequestId(err instanceof ApiError ? err.requestId : undefined);
+        if (isActive) {
+          setError(err?.message || 'Failed to load calendar');
+          setRequestId(err instanceof ApiError ? err.requestId : undefined);
+        }
       } finally {
-        setLoading(false);
+        if (isActive) {
+          setLoading(false);
+        }
       }
     };
     load();
-  }, [weekStart, clearToast]);
+    return () => {
+      isActive = false;
+    };
+  }, [clearToast, range.from, range.to, refreshVersion]);
 
   useEffect(() => {
-    if (!schedulingEnabled) {
+    if (!schedulingEnabled || viewMode === 'month') {
       setScheduleData(null);
       setScheduleError('');
       setScheduleLoading(false);
@@ -805,8 +931,8 @@ export default function CalendarPage() {
       setScheduleLoading(true);
       setScheduleError('');
       try {
-        const from = weekStart.toISOString();
-        const to = addDays(weekStart, 7).toISOString();
+        const from = range.from.toISOString();
+        const to = range.to.toISOString();
         const query = new URLSearchParams({ from, to });
         const result = await apiFetch(`/calendar/schedules?${query.toString()}`);
         if (isActive) {
@@ -826,7 +952,7 @@ export default function CalendarPage() {
     return () => {
       isActive = false;
     };
-  }, [schedulingEnabled, weekStart]);
+  }, [range.from, range.to, refreshVersion, schedulingEnabled, viewMode]);
 
   useEffect(() => {
     if (!data || !scrollRef.current) return;
@@ -843,16 +969,14 @@ export default function CalendarPage() {
     deepLinkRef.current = key;
     const parsed = new Date(dayParam);
     if (Number.isNaN(parsed.getTime())) return;
-    const targetWeek = startOfWeekMonday(parsed);
-    setWeekStart((prev) =>
-      formatDateKey(prev) === formatDateKey(targetWeek) ? prev : targetWeek,
-    );
+    setFocusDate(startOfDay(parsed));
+    setViewMode('day');
     setSelectedTechId(techParam ?? 'ALL');
     setDeepLinkTarget({
       dayKey: formatDateKey(parsed),
       techId: techParam ?? 'ALL',
     });
-  }, [router.isReady, router.query.day, router.query.techId]);
+  }, [router.isReady, router.query.day, router.query.techId, setViewMode]);
 
   useEffect(() => {
     if (!deepLinkTarget || !scrollRef.current) return;
@@ -1069,6 +1193,7 @@ export default function CalendarPage() {
 
   const handleLaneDrop = (event: DragEvent<HTMLDivElement>, day: Date, techId: string) => {
     if (!dragEnabled) return;
+    if (techId === '__all__') return;
     event.preventDefault();
     const bookingId = event.dataTransfer?.getData('text/plain');
     if (!bookingId || !data) return;
@@ -1225,6 +1350,20 @@ export default function CalendarPage() {
     return Array.from(seen.entries()).map(([id, label]) => ({ id, label }));
   }, [data]);
 
+  const locationAuthorityRows = useMemo(() => {
+    const rows = new Map<string, { id: string; label: string; count: number; unassigned: number; warnings: number }>();
+    for (const block of data?.blocks || []) {
+      const id = block.location?.id || '__no_location__';
+      const label = block.location?.name || 'No location';
+      const current = rows.get(id) || { id, label, count: 0, unassigned: 0, warnings: 0 };
+      current.count += 1;
+      if (!block.technician?.id) current.unassigned += 1;
+      current.warnings += block.warnings?.length || 0;
+      rows.set(id, current);
+    }
+    return Array.from(rows.values()).sort((left, right) => right.count - left.count || left.label.localeCompare(right.label));
+  }, [data?.blocks]);
+
   const filteredBlocks = useMemo(() => {
     if (!data) return [] as CalendarBlock[];
     const normalizedSearch = search.trim().toLowerCase();
@@ -1259,14 +1398,29 @@ export default function CalendarPage() {
   }, [data, search, selectedTechId, selectedLocationId, statusFilter]);
 
   const visibleTechnicians = useMemo(() => {
+    if (viewMode === 'month') return [] as CalendarTechnician[];
+    if (!showTechnicianOverlay) return [{ id: '__all__', name: 'All scheduled work', email: 'Location-first lane' }];
     if (!isMobile) return technicians;
     const techId = selectedTechId === 'ALL' ? technicians[0]?.id ?? '__unassigned__' : selectedTechId;
     return technicians.filter((tech) => tech.id === techId);
-  }, [isMobile, selectedTechId, technicians]);
+  }, [isMobile, selectedTechId, showTechnicianOverlay, technicians, viewMode]);
   const visibleQueue = useMemo(() => {
     return [...filteredBlocks]
       .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime())
       .slice(0, 10);
+  }, [filteredBlocks]);
+  const monthBookingMap = useMemo(() => {
+    const map = new Map<string, CalendarBlock[]>();
+    for (const block of filteredBlocks) {
+      const dayKey = formatDateKey(new Date(block.startsAt));
+      const entries = map.get(dayKey) ?? [];
+      entries.push(block);
+      map.set(dayKey, entries);
+    }
+    for (const [key, entries] of map.entries()) {
+      map.set(key, entries.sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()));
+    }
+    return map;
   }, [filteredBlocks]);
 
   const clearFilters = () => {
@@ -1287,32 +1441,90 @@ export default function CalendarPage() {
   return (
     <>
       <DashboardShell>
-        <div className="operator-stack">
+        <div className="operator-stack" data-testid="calendar-v2-workspace" data-calendar-version="2">
           <OperatorPageHeader
             eyebrow="Scheduling"
             title="Calendar"
-            subtitle="Weekly technician lanes with drag rescheduling, schedule overlays, and conflict visibility kept in one operational view."
+            subtitle={
+              viewMode === 'month'
+                ? 'Month view for workload overview, quick reassignment, and clear empty days.'
+                : viewMode === 'day'
+                ? 'Day view for focused dispatching, schedule overlays, and precise timing changes.'
+                : 'Location-first week view with optional technician overlay, drag readiness, and conflict visibility.'
+            }
             actions={[
               { label: 'Bookings', href: '/dashboard/bookings', variant: 'secondary' },
-              { label: 'Current week', onClick: () => setWeekStart(startOfWeekMonday(new Date())) },
+              { label: 'Today', onClick: () => setFocusDate(startOfDay(new Date())) },
             ]}
-            shortcuts={['Drag bookings to reschedule', 'Filter by technician, location, or status']}
+            shortcuts={['Location first', 'Technician overlay optional', 'No route optimisation claims']}
             stats={calendarStats}
           />
+
+          <section className="operator-quickRail" data-testid="calendar-click-to-action-rail">
+            <Link className="operator-actionTile" href="/dashboard/bookings?view=today">
+              <div className="operator-actionTile__body">
+                <h3>Today&apos;s booking queue</h3>
+                <p>Open visits that need confirmation, conversion, or timing decisions before dispatch.</p>
+              </div>
+              <span className="button secondary">Open queue</span>
+            </Link>
+            <Link className="operator-actionTile" href="/dashboard/scheduling">
+              <div className="operator-actionTile__body">
+                <h3>Capacity and absence</h3>
+                <p>Check technician availability, time off, and location capacity before moving work.</p>
+              </div>
+              <span className="button secondary">Open scheduling</span>
+            </Link>
+            <Link className="operator-actionTile" href="/dashboard/booking/settings#workflow">
+              <div className="operator-actionTile__body">
+                <h3>Booking workflow rules</h3>
+                <p>Choose auto-confirm, manual review, job creation, and location-first scheduling settings.</p>
+              </div>
+              <span className="button secondary">Edit workflow</span>
+            </Link>
+          </section>
 
           <div className="card operator-section">
             <div className="operator-section__header">
               <div>
-                <h2 className="operator-section__title">Weekly planner</h2>
-                <p className="operator-section__subtitle">Week view with technician lanes from 08:00 to 18:00.</p>
+                <h2 className="operator-section__title">
+                  {viewMode === 'month' ? 'Monthly planner' : viewMode === 'day' ? 'Daily planner' : 'Weekly planner'}
+                </h2>
+                <p className="operator-section__subtitle">{formatViewRangeLabel(days, viewMode)}</p>
               </div>
-              <div className="operator-inline-actions">
-                <button className="button secondary operator-compact-button" type="button" onClick={() => setWeekStart((prev) => addDays(prev, -7))}>Prev week</button>
-                <button className="button secondary operator-compact-button" type="button" onClick={() => setWeekStart(startOfWeekMonday(new Date()))}>Current week</button>
-                <button className="button secondary operator-compact-button" type="button" onClick={() => setWeekStart((prev) => addDays(prev, 7))}>Next week</button>
+              <div className="operator-inline-actions" style={{ flexWrap: 'wrap' }}>
+                <div style={{ display: 'inline-flex', border: '1px solid rgba(148, 163, 184, 0.3)', borderRadius: 999, padding: 4, gap: 4 }}>
+                  {(['day', 'week', 'month'] as CalendarViewMode[]).map((mode) => (
+                    <button
+                      key={mode}
+                      className={viewMode === mode ? 'button primary operator-compact-button' : 'button secondary operator-compact-button'}
+                      type="button"
+                      data-testid={`calendar-view-toggle-${mode}`}
+                      onClick={() => setViewMode(mode)}
+                    >
+                      {mode[0].toUpperCase() + mode.slice(1)}
+                    </button>
+                  ))}
+                </div>
+                <button className="button secondary operator-compact-button" type="button" onClick={() => setFocusDate((prev) => shiftFocusDate(prev, viewMode, -1))}>
+                  {viewMode === 'month' ? 'Prev month' : viewMode === 'day' ? 'Prev day' : 'Prev week'}
+                </button>
+                <button className="button secondary operator-compact-button" type="button" onClick={() => setFocusDate(startOfDay(new Date()))}>Today</button>
+                <button className="button secondary operator-compact-button" type="button" onClick={() => setFocusDate((prev) => shiftFocusDate(prev, viewMode, 1))}>
+                  {viewMode === 'month' ? 'Next month' : viewMode === 'day' ? 'Next day' : 'Next week'}
+                </button>
                 <Link className="button secondary operator-compact-button" href="/dashboard/bookings">
                   Booking queue
                 </Link>
+                <label className="button secondary operator-compact-button" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <input
+                    type="checkbox"
+                    checked={showTechnicianOverlay}
+                    onChange={(event) => setShowTechnicianOverlay(event.target.checked)}
+                    data-testid="calendar-technician-overlay-toggle"
+                  />
+                  Technician overlay
+                </label>
               </div>
             </div>
 
@@ -1371,6 +1583,25 @@ export default function CalendarPage() {
           </OperatorFilterField>
         </OperatorFilterBar>
         <OperatorActiveFilters chips={activeFilters} onClearAll={activeFilters.length ? clearFilters : undefined} />
+        <section className="operator-grid operator-grid--three" style={{ marginTop: 12 }} data-testid="calendar-location-authority">
+          {locationAuthorityRows.length ? (
+            locationAuthorityRows.slice(0, 6).map((row) => (
+              <button
+                key={row.id}
+                className={selectedLocationId === row.id ? 'button primary' : 'button secondary'}
+                type="button"
+                onClick={() => setSelectedLocationId(row.id === '__no_location__' ? 'ALL' : row.id)}
+                data-testid={`calendar-location-card-${row.id}`}
+              >
+                {row.label} · {row.count} booking{row.count === 1 ? '' : 's'}
+                {row.unassigned ? ` · ${row.unassigned} unassigned` : ''}
+                {row.warnings ? ` · ${row.warnings} warning${row.warnings === 1 ? '' : 's'}` : ''}
+              </button>
+            ))
+          ) : (
+            <span className="muted">Location workload appears once bookings are scheduled.</span>
+          )}
+        </section>
         {schedulingEnabled && scheduleLoading ? (
           <p className="muted" style={{ marginTop: 6, fontSize: 12 }}>Loading schedules…</p>
         ) : null}
@@ -1419,6 +1650,14 @@ export default function CalendarPage() {
                 );
               })}
             </OperatorDataTable>
+          </div>
+        ) : null}
+        {data && filteredBlocks.length === 0 ? (
+          <div className="card" data-testid="calendar-empty-state" style={{ marginTop: 12, padding: 18 }}>
+            <strong>No bookings in this view</strong>
+            <p className="muted" style={{ marginTop: 6, marginBottom: 0 }}>
+              Try another date range or clear filters to see more scheduled work.
+            </p>
           </div>
         ) : null}
         {toastState ? (
@@ -1483,30 +1722,122 @@ export default function CalendarPage() {
           ) : null}
 
           {loading && !data ? (
-            <LoadingState title="Loading calendar" description="Fetching booking blocks for this week." />
+            <LoadingState
+              title="Loading calendar"
+              description={
+                viewMode === 'month'
+                  ? 'Fetching booking blocks for this month.'
+                  : viewMode === 'day'
+                  ? 'Fetching booking blocks for this day.'
+                  : 'Fetching booking blocks for this week.'
+              }
+            />
           ) : null}
           {error && !data ? (
             <ErrorState
               title={calendarFallback.title}
               description={calendarFallback.description}
-              primaryAction={{ label: 'Retry', onClick: () => setWeekStart((prev) => new Date(prev)) }}
+              primaryAction={{ label: 'Retry', onClick: () => setFocusDate((prev) => new Date(prev)) }}
               secondaryAction={{ label: 'Open bookings', href: '/dashboard/bookings' }}
             />
           ) : null}
 
           {data ? (
             <>
-              {data.clamped ? <p className="muted" style={{ marginTop: 12 }}>Requested range exceeded 14 days and was clamped.</p> : null}
-              <div style={{ marginTop: 12, maxHeight: ROW_HEIGHT + 80, overflow: 'auto' }} ref={scrollRef}>
+              {data.clamped ? <p className="muted" style={{ marginTop: 12 }}>Large calendar windows are loaded in chunks to keep month planning stable.</p> : null}
+              {viewMode === 'month' ? (
+                <div data-testid="calendar-month-grid" style={{ marginTop: 12, display: 'grid', gap: 10 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 10 }}>
+                    {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((label) => (
+                      <div key={label} style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        {label}
+                      </div>
+                    ))}
+                  </div>
+                  {monthWeeks.map((week, weekIndex) => (
+                    <div key={`month-week-${weekIndex}`} style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 10 }}>
+                      {week.map((day) => {
+                        const dayKey = formatDateKey(day);
+                        const dayBookings = monthBookingMap.get(dayKey) ?? [];
+                        const isCurrentMonth = day.getMonth() === focusDate.getMonth();
+                        return (
+                          <div
+                            key={dayKey}
+                            className="card"
+                            data-testid={`calendar-month-cell-${dayKey}`}
+                            onDragOver={handleLaneDragOver}
+                            onDrop={(event) => {
+                              if (!dragEnabled || !data) return;
+                              event.preventDefault();
+                              const bookingId = event.dataTransfer?.getData('text/plain');
+                              if (!bookingId) return;
+                              const booking = data.blocks.find((block) => block.id === bookingId);
+                              if (!booking) return;
+                              const originalStart = new Date(booking.startsAt);
+                              const originalEnd = new Date(booking.endsAt);
+                              const durationMs = Math.max(0, originalEnd.getTime() - originalStart.getTime());
+                              const nextStart = new Date(day);
+                              nextStart.setHours(originalStart.getHours(), originalStart.getMinutes(), 0, 0);
+                              handleReschedule(
+                                bookingId,
+                                booking.technician?.id ?? '__unassigned__',
+                                nextStart,
+                                new Date(nextStart.getTime() + durationMs),
+                                { showSavedToast: true, showErrorToast: true },
+                              );
+                            }}
+                            style={{ padding: 12, minHeight: 170, margin: 0, opacity: isCurrentMonth ? 1 : 0.7 }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                              <strong>{day.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</strong>
+                              <span className="muted" style={{ fontSize: 11 }}>{dayBookings.length ? `${dayBookings.length} booked` : 'Open'}</span>
+                            </div>
+                            <div style={{ display: 'grid', gap: 8 }}>
+                              {dayBookings.slice(0, 4).map((booking) => {
+                                const color = getStatusColor(booking.status);
+                                const accentColor = booking.displayColor || color.border;
+                                return (
+                                  <div
+                                    key={booking.id}
+                                    draggable={dragEnabled}
+                                    onDragStart={(event) => handleDragStart(event, booking.id)}
+                                    onDragEnd={handleDragEnd}
+                                    onClick={() => handleBookingClick(booking)}
+                                    data-calendar-booking={booking.id}
+                                    data-testid={`calendar-booking-${booking.id}`}
+                                    style={{ borderRadius: 10, border: `1px solid ${accentColor}`, borderLeftWidth: 6, background: color.bg, color: color.text, padding: 10, cursor: 'pointer', opacity: draggingBookingId === booking.id ? 0.6 : 1 }}
+                                  >
+                                    <div style={{ fontWeight: 700, fontSize: 12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                      {getBookingTitle(booking)}
+                                    </div>
+                                    <div style={{ fontSize: 11, marginTop: 3 }}>
+                                      {new Date(booking.startsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                      {' - '}
+                                      {new Date(booking.endsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                              {dayBookings.length > 4 ? <div className="muted" style={{ fontSize: 12 }}>+{dayBookings.length - 4} more bookings</div> : null}
+                              {!dayBookings.length ? <div className="muted" style={{ fontSize: 12 }}>No scheduled work</div> : null}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+              <div data-testid="calendar-time-grid" style={{ marginTop: 12, maxHeight: ROW_HEIGHT + 80, overflow: 'auto' }} ref={scrollRef}>
                 <div
                   style={{
-                    minWidth: isMobile ? 320 : 1960,
+                    minWidth: 0,
                     display: 'grid',
-                    gridTemplateColumns: `repeat(7, minmax(280px, 1fr))`,
+                    gridTemplateColumns: isMobile ? '1fr' : `repeat(${plannerDays.length}, minmax(0, 1fr))`,
                     gap: 10,
                   }}
                 >
-                  {days.map((day) => {
+                  {plannerDays.map((day) => {
                     const dayStart = new Date(day);
                     dayStart.setHours(GRID_START_HOUR, 0, 0, 0);
                     const dayEnd = new Date(day);
@@ -1526,7 +1857,7 @@ export default function CalendarPage() {
                           }}
                         >
                           <div />
-                          {!isMobile ? (
+                          {showTechnicianOverlay && !isMobile ? (
                             visibleTechnicians.map((tech) => (
                               <div
                                 key={`${dayKey}-${tech.id}-label`}
@@ -1579,6 +1910,8 @@ export default function CalendarPage() {
                             const blockEnd = new Date(block.endsAt);
                             const sameTech = tech.id === '__unassigned__'
                               ? !block.technician?.id
+                              : tech.id === '__all__'
+                              ? true
                               : block.technician?.id === tech.id;
                             return sameTech && blockEnd > dayStart && blockStart < dayEnd;
                           });
@@ -1591,6 +1924,7 @@ export default function CalendarPage() {
                             return (
                             <div
                               key={`${dayKey}-${tech.id}-lane`}
+                              data-testid={`calendar-lane-${dayKey}-${tech.id}`}
                               style={{
                                 position: 'relative',
                                 height: ROW_HEIGHT,
@@ -1601,7 +1935,7 @@ export default function CalendarPage() {
                               onDragOver={handleLaneDragOver}
                               onDrop={(event) => handleLaneDrop(event, day, tech.id)}
                             >
-                              {utilization ? (
+                              {showTechnicianOverlay && utilization ? (
                                 <div
                                   style={{
                                     position: 'absolute',
@@ -1641,7 +1975,7 @@ export default function CalendarPage() {
                                   );
                                 })}
 
-                              {workingSegments.map((segment, index) => (
+                              {showTechnicianOverlay && workingSegments.map((segment, index) => (
                                 <div
                                   key={`${tech.id}-${dayKey}-segment-${index}`}
                                   style={{
@@ -1657,7 +1991,7 @@ export default function CalendarPage() {
                                   }}
                                 />
                               ))}
-                              {getExceptionSegmentsFor(tech.id, dayKey).map((segment, index) => (
+                              {showTechnicianOverlay && getExceptionSegmentsFor(tech.id, dayKey).map((segment, index) => (
                                 <div
                                   key={`${tech.id}-${dayKey}-exception-${index}`}
                                   style={{
@@ -1689,6 +2023,7 @@ export default function CalendarPage() {
 
                               {positioned.map((entry) => {
                                 const color = getStatusColor(entry.booking.status);
+                                const accentColor = entry.booking.displayColor || color.border;
                                 const width = entry.laneCount > 1 ? `${Math.max(30, 100 / entry.laneCount - 2)}%` : '98%';
                                 const left = entry.laneCount > 1 ? `${(100 / entry.laneCount) * entry.lane}%` : '1%';
                                 const scheduleWarnings = entry.booking.warnings?.filter((warning) => warning.code !== 'OVERLAP') ?? [];
@@ -1720,6 +2055,7 @@ export default function CalendarPage() {
                                       }}
                                       title={`${getBookingTitle(entry.booking)} (${entry.booking.status})`}
                                       data-calendar-booking={entry.booking.id}
+                                      data-testid={`calendar-booking-${entry.booking.id}`}
                                       role="button"
                                       tabIndex={0}
                                       style={{
@@ -1729,7 +2065,8 @@ export default function CalendarPage() {
                                         width,
                                         height: entry.height,
                                         borderRadius: 8,
-                                        border: `1px solid ${entry.hasOverlap ? '#f97316' : color.border}`,
+                                        border: `1px solid ${entry.hasOverlap ? '#f97316' : accentColor}`,
+                                        borderLeftWidth: 6,
                                         boxShadow: entry.hasOverlap ? '0 0 0 1px rgba(249, 115, 22, 0.45)' : 'none',
                                         background: color.bg,
                                         ...conflictStyles,
@@ -1960,6 +2297,7 @@ export default function CalendarPage() {
                   })}
                 </div>
               </div>
+              )}
             </>
           ) : null}
           </div>

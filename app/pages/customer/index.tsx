@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ApiError } from "../../lib/api";
+import { LoadingState } from "../../components/states/LoadingState";
 import { OperatorStatusBadge } from "../../components/ui/operator-page";
 import { clearCustomerToken, customerApiFetch, getCustomerToken, setCustomerToken } from "../../lib/customer-auth";
 import { humanizeUnderscoreLabel } from "../../lib/text-format";
-import MyTitanLogo from "../../components/brand/mytitan-logo";
 
 function money(cents: number, currency = "GBP") {
   return new Intl.NumberFormat(undefined, { style: "currency", currency }).format((cents || 0) / 100);
@@ -160,27 +160,32 @@ export default function CustomerWorkspacePage() {
     setError("");
   }
 
+  if (loading && hasToken && !workspace) {
+    return (
+      <div className="container customer-workspace" style={{ maxWidth: 1120 }}>
+        <LoadingState title="Loading your workspace" description="Bringing together jobs, approvals, plans, and shared documents." />
+      </div>
+    );
+  }
+
   if (!workspace) {
     return (
       <div className="container customer-workspace" style={{ maxWidth: 1120 }}>
-        <div className="card customer-workspace__section" style={{ marginBottom: 16 }}>
+        <div className="card customer-workspace__section customer-workspace__section--hero" style={{ marginBottom: 16 }}>
           <div className="customer-workspace__hero">
             <div>
-              <div className="customer-workspace__brandRow">
-                <MyTitanLogo size="sm" glimmer />
-              </div>
               <p className="customer-workspace__eyebrow">Customer workspace</p>
-              <h1 style={{ marginTop: 8, marginBottom: 8 }}>Track your work in one place</h1>
+              <h1 style={{ marginTop: 8, marginBottom: 8 }}>Track your service work in one secure place</h1>
               <p className="muted" style={{ margin: 0 }}>
-                Review your jobs, quotes, plans, and approvals without calling the office for every update.
+                Review your jobs, quotes, plans, approvals, and shared documents without chasing updates.
               </p>
             </div>
-            <Link href="/portal/job/e2e-public-portal-token" className="button secondary">Portal example</Link>
+            <Link href="/portal/job/e2e-public-portal-token" className="button secondary">See a shared update</Link>
           </div>
         </div>
 
-        <div className="card customer-workspace__section">
-          <h2 style={{ marginTop: 0 }}>Sign in</h2>
+        <div className="card customer-workspace__section customer-workspace__section--auth">
+          <h2 style={{ marginTop: 0 }}>Continue securely</h2>
           {error ? <p className="auth-shell__status auth-shell__status--error">{error}</p> : null}
           <form className="auth-shell__form" onSubmit={login}>
             <label>Email</label>
@@ -191,7 +196,7 @@ export default function CustomerWorkspacePage() {
               <button className="button" type="submit" disabled={authLoading} data-testid="customer-login-submit">
                 {authLoading ? "Signing in..." : "Sign in"}
               </button>
-              <Link href="/customer/activate" className="button secondary">Activate invited account</Link>
+              <Link href="/customer/activate" className="button secondary">Activate account</Link>
             </div>
           </form>
         </div>
@@ -199,14 +204,26 @@ export default function CustomerWorkspacePage() {
     );
   }
 
+  const customerMoment = workspace.approvals?.some((item: any) => item.status === "PENDING")
+    ? {
+        title: "Something is waiting for your answer",
+        detail: "Review the approval request below when you are ready.",
+      }
+    : workspace.jobs?.some((job: any) => job.invoicePaidAt)
+      ? {
+          title: "Your latest paid work is recorded here",
+          detail: "You can come back to jobs, proofs, and updates in one place.",
+        }
+      : {
+          title: "Everything shared with you is in one secure place",
+          detail: "Jobs, approvals, plans, and documents stay together here without extra chasing.",
+        };
+
   return (
     <div className="container customer-workspace">
-      <div className="card customer-workspace__section" style={{ marginBottom: 16 }}>
+      <div className="card customer-workspace__section customer-workspace__section--hero" style={{ marginBottom: 16 }}>
         <div className="customer-workspace__hero">
           <div>
-            <div className="customer-workspace__brandRow">
-              <MyTitanLogo size="sm" />
-            </div>
             <p className="customer-workspace__eyebrow">Customer workspace</p>
             <h1 style={{ marginTop: 8, marginBottom: 6 }}>{workspace.customer?.name || "Customer"}</h1>
             <p className="muted" style={{ margin: 0 }}>
@@ -214,15 +231,19 @@ export default function CustomerWorkspacePage() {
             </p>
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <Link className="button secondary" href="/customer/activate">Activation</Link>
+            <Link className="button secondary" href="/customer/activate">Account access</Link>
             <button className="button secondary" type="button" onClick={signOut}>Sign out</button>
           </div>
+        </div>
+        <div className="customer-workspace__moment">
+          <strong>{customerMoment.title}</strong>
+          <p>{customerMoment.detail}</p>
         </div>
         {notice ? <p className="auth-shell__status auth-shell__status--success" style={{ marginTop: 12 }}>{notice}</p> : null}
         {error ? <p className="auth-shell__status auth-shell__status--error" style={{ marginTop: 12 }}>{error}</p> : null}
       </div>
 
-      <div className="customer-workspace__stats">
+      <div className="customer-workspace__stats customer-workspace__stats--hero">
         <div className="card customer-workspace__statCard">
           <h3 style={{ marginTop: 0 }}>Account</h3>
           <p className="muted" style={{ marginBottom: 4 }}>Status</p>
@@ -269,7 +290,7 @@ export default function CustomerWorkspacePage() {
               ))}
             </div>
           ) : (
-            <p className="muted">No customer-visible quotes yet.</p>
+            <p className="muted">No quotes are shared here yet.</p>
           )}
         </section>
 
@@ -304,7 +325,7 @@ export default function CustomerWorkspacePage() {
               ))}
             </div>
           ) : (
-            <p className="muted">No approvals are waiting for your response.</p>
+            <p className="muted">Nothing is waiting for your response right now.</p>
           )}
         </section>
 
@@ -358,7 +379,7 @@ export default function CustomerWorkspacePage() {
               ))}
             </div>
           ) : (
-            <p className="muted">No customer-visible jobs yet.</p>
+            <p className="muted">No jobs are shared here yet.</p>
           )}
         </section>
 
@@ -383,7 +404,7 @@ export default function CustomerWorkspacePage() {
               ))}
             </div>
           ) : (
-            <p className="muted">No documents shared yet.</p>
+            <p className="muted">No documents are shared here yet.</p>
           )}
         </section>
 
@@ -482,7 +503,7 @@ export default function CustomerWorkspacePage() {
               ))}
             </div>
           ) : (
-            <p className="muted">No plans are shared to this workspace yet.</p>
+            <p className="muted">No plans are shared here yet.</p>
           )}
         </section>
 
@@ -502,7 +523,7 @@ export default function CustomerWorkspacePage() {
               ))}
             </div>
           ) : (
-            <p className="muted">No recent customer-visible activity yet.</p>
+            <p className="muted">No recent activity is shared here yet.</p>
           )}
         </section>
       </div>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { apiFetch } from '../lib/api';
 
@@ -10,6 +11,8 @@ export default function ResetPasswordPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
+  const newPasswordInputId = 'reset-password-new';
+  const confirmPasswordInputId = 'reset-password-confirm';
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -33,10 +36,20 @@ export default function ResetPasswordPage() {
         method: 'POST',
         body: JSON.stringify({ token, newPassword }),
       });
-      setStatus('Password reset complete. You can now log in.');
+      setStatus('Your password has been updated. You can sign in with the new one now.');
+      setNewPassword('');
+      setConfirmPassword('');
     } catch (err: any) {
       const msg = String(err?.message || '');
-      setError(msg.includes('Failed to fetch') ? 'Cannot reach server. Check your connection and try again.' : (msg || 'Reset failed'));
+      if (msg.includes('Cannot reach server') || msg.includes('Failed to fetch')) {
+        setError('We could not reach MyTitan right now. Check your connection and try again.');
+        return;
+      }
+      if (msg.includes('no longer valid') || msg.includes('Invalid or expired token')) {
+        setError('This link has already been used, expired, or been replaced by a newer email. Request a fresh reset link to keep going.');
+        return;
+      }
+      setError(msg || 'We could not reset your password just now.');
     }
   }
 
@@ -44,13 +57,23 @@ export default function ResetPasswordPage() {
     <div className="container">
       <div className="card">
         <h1>Reset password</h1>
-        {status ? <p style={{ color: '#5eead4' }}>{status}</p> : null}
-        {error ? <p style={{ color: '#ff8a8a' }}>{error}</p> : null}
+        {status ? <p className="auth-shell__status auth-shell__status--success">{status}</p> : null}
+        {error ? <p className="auth-shell__status auth-shell__status--error">{error}</p> : null}
+        {status ? (
+          <p>
+            <Link href="/login">Return to login</Link>
+          </p>
+        ) : null}
+        {error && error.includes('Request a fresh reset link') ? (
+          <p>
+            <Link href="/forgot-password">Send a new reset email</Link>
+          </p>
+        ) : null}
         <form onSubmit={onSubmit}>
-          <label>New password</label>
-          <input className="input" type={showPassword ? 'text' : 'password'} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required />
-          <label>Confirm password</label>
-          <input className="input" type={showPassword ? 'text' : 'password'} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
+          <label htmlFor={newPasswordInputId}>New password</label>
+          <input id={newPasswordInputId} className="input" type={showPassword ? 'text' : 'password'} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required />
+          <label htmlFor={confirmPasswordInputId}>Confirm password</label>
+          <input id={confirmPasswordInputId} className="input" type={showPassword ? 'text' : 'password'} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
           <button type="button" className="button secondary" onClick={() => setShowPassword((v) => !v)} style={{ marginRight: 10 }}>
             {showPassword ? 'Hide' : 'Show'} password
           </button>

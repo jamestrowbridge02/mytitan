@@ -3,6 +3,7 @@ import { defineConfig } from "@playwright/test";
 const useExistingServer = process.env.PLAYWRIGHT_USE_EXISTING_SERVER === "1";
 const defaultBaseURL = useExistingServer ? "http://127.0.0.1:3001" : "http://127.0.0.1:3101";
 const baseURL = process.env.PLAYWRIGHT_BASE_URL || defaultBaseURL;
+const stableMode = process.env.PLAYWRIGHT_STABLE_MODE === "1";
 
 export default defineConfig({
   testDir: "./e2e",
@@ -16,9 +17,10 @@ export default defineConfig({
   },
   use: {
     baseURL,
-    trace: "retain-on-failure",
+    trace: stableMode ? "off" : "retain-on-failure",
     screenshot: "only-on-failure",
-    video: "retain-on-failure",
+    video: stableMode ? "off" : "retain-on-failure",
+    launchOptions: stableMode ? { args: ["--disable-gpu"] } : undefined,
   },
   webServer: useExistingServer
     ? undefined

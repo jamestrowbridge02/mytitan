@@ -1,14 +1,22 @@
+import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { OperatorNotice } from '../../components/feedback/OperatorNotice';
 import { useOperatorNotice } from '../../components/feedback/useOperatorNotice';
 import { DashboardShell } from '../../components/dashboard-shell';
 import { apiFetch } from '../../lib/api';
-import { getBusinessTerms } from '../../lib/business-config';
+import {
+  COMMAND_CENTRE_SECTION_KEYS,
+  getBusinessTerms,
+  getCommandCentreWorkspaceLayout,
+  type CommandCentreSectionKey,
+} from '../../lib/business-config';
 import { getCommandCentreRealtimeMode, getCommandCentreSseUrl, isCommandCentreRealtimeDisabled } from '../../lib/command-centre-realtime';
 import { getRequiredFieldWarningLabel } from '../../lib/custom-fields';
 import { isCommandCentreV2Enabled, isDemoPolishV1Enabled } from '../../lib/feature-flags';
+import { useOperationalRefresh } from '../../lib/operational-refresh';
 import { useTenantSettings } from '../../lib/tenant-settings';
+import { emptyPermissionSnapshot, hasWorkspacePermission, normalizePermissionSnapshot } from '../../lib/workspace-permissions';
 import { getJobStages, getStageStatus, getVisibleStages, mapStatusToStage } from '../../lib/workflow-config';
 
 const STATUS_FILTER_OPTIONS: Array<{ key: string; label: string }> = [
@@ -20,12 +28,56 @@ const STATUS_FILTER_OPTIONS: Array<{ key: string; label: string }> = [
   { key: 'CANCELLED', label: 'Cancelled' },
 ];
 
+const DEFAULT_SECTION_ORDER = [...COMMAND_CENTRE_SECTION_KEYS];
+const SECTION_META: Record<CommandCentreSectionKey, { title: string; description: string; hideable: boolean }> = {
+  filters: {
+    title: 'Filters and saved views',
+    description: 'Search, status, location, and saved team views.',
+    hideable: false,
+  },
+  'recent-updates': {
+    title: 'Recent updates',
+    description: 'Live changes across the workspace.',
+    hideable: true,
+  },
+  'bulk-actions': {
+    title: 'Bulk actions',
+    description: 'Batch updates for selected work.',
+    hideable: true,
+  },
+  'work-board': {
+    title: 'Live work board',
+    description: 'The active list or board for today’s work.',
+    hideable: false,
+  },
+};
+
+function arraysEqual(left: string[], right: string[]) {
+  if (left.length !== right.length) return false;
+  return left.every((value, index) => value === right[index]);
+}
+
+function moveItem(items: string[], key: string, direction: 'up' | 'down') {
+  const index = items.indexOf(key);
+  if (index === -1) return items;
+  const nextIndex = direction === 'up' ? index - 1 : index + 1;
+  if (nextIndex < 0 || nextIndex >= items.length) return items;
+  const next = [...items];
+  [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+  return next;
+}
+
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export default function CommandCentreV2Page() {
   const router = useRouter();
-  const { settings } = useTenantSettings();
+  const { settings, refresh } = useTenantSettings();
   const terms = getBusinessTerms(settings);
   const jobStages = getJobStages(settings);
   const visibleJobStages = getVisibleStages(jobStages);
+  const commandCentreLayout = getCommandCentreWorkspaceLayout(settings);
   const enabled = isCommandCentreV2Enabled();
   const demoPolishEnabled = isDemoPolishV1Enabled();
   const searchRef = useRef<HTMLInputElement | null>(null);
@@ -33,8 +85,12 @@ export default function CommandCentreV2Page() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [locationIds, setLocationIds] = useState<string[]>(['all']);
-  const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
+  const [viewMode, setViewMode] = useState<'kanban' | 'list'>(commandCentreLayout.defaultViewMode);
+  const [layoutDefaultViewMode, setLayoutDefaultViewMode] = useState<'kanban' | 'list'>(commandCentreLayout.defaultViewMode);
   const [board, setBoard] = useState<any>({ grouped: {}, counts: {} });
+  const [permissions, setPermissions] = useState(() => emptyPermissionSnapshot());
+  const [sectionOrder, setSectionOrder] = useState<CommandCentreSectionKey[]>(commandCentreLayout.sectionOrder);
+  const [hiddenSections, setHiddenSections] = useState<CommandCentreSectionKey[]>(commandCentreLayout.hiddenSections);
   const [selected, setSelected] = useState<string[]>([]);
   const [bulkStatus, setBulkStatus] = useState('IN_PROGRESS');
   const [bulkLocation, setBulkLocation] = useState('all');
@@ -55,6 +111,12 @@ export default function CommandCentreV2Page() {
     loadTechnicians();
   }, []);
 
+  useEffect(() => {
+    apiFetch('/me')
+      .then((me) => setPermissions(normalizePermissionSnapshot(me?.permissions)))
+      .catch(() => setPermissions(emptyPermissionSnapshot()));
+  }, []);
+
   const [activeViewId, setActiveViewId] = useState('');
   const [saveViewName, setSaveViewName] = useState('');
   const [showSaveView, setShowSaveView] = useState(false);
@@ -66,7 +128,7 @@ export default function CommandCentreV2Page() {
   const [dragStatusTarget, setDragStatusTarget] = useState<string>("");
   const [capacityPressure, setCapacityPressure] = useState<any>(null);
   const [assignmentRecommendations, setAssignmentRecommendations] = useState<any[]>([]);
-  const [complianceSummary, setComplianceSummary] = useState<any>(null);
+  const [complianceSummary, setComplianceSummary] = useState<any>({ totals: { breachedEvents: 0, openExceptions: 0 } });
   const [pendingBulk, setPendingBulk] = useState<{ op: string; payload: Record<string, any>; label: string } | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [pendingInlineJobId, setPendingInlineJobId] = useState<string>("");
@@ -77,8 +139,16 @@ export default function CommandCentreV2Page() {
     const [lastBoardHash, setLastBoardHash] = useState("");
     const [liveNotice, setLiveNotice] = useState("");
   const [activityItems, setActivityItems] = useState<any[]>([]);
+  const [savingLayout, setSavingLayout] = useState(false);
+  const [savedLayoutApplied, setSavedLayoutApplied] = useState(false);
   const { notice, showSuccess, showError, clearNotice } = useOperatorNotice();
   const realtimeMode = getCommandCentreRealtimeMode();
+  const initialLayoutRef = useRef(commandCentreLayout);
+  const sectionOrderRef = useRef<CommandCentreSectionKey[]>(commandCentreLayout.sectionOrder);
+  const hiddenSectionsRef = useRef<CommandCentreSectionKey[]>(commandCentreLayout.hiddenSections);
+  const layoutDefaultViewModeRef = useRef<'kanban' | 'list'>(commandCentreLayout.defaultViewMode);
+  const canManageLayout = hasWorkspacePermission(permissions, 'settings.manage');
+  const layoutControlsReady = Boolean(settings) && savedLayoutApplied;
 
   const defaultViews = [
     { name: 'All Open', filters: { status: 'OPEN', locationIds: ['all'], search: '', viewType: 'kanban' }, viewType: 'kanban' },
@@ -94,6 +164,7 @@ export default function CommandCentreV2Page() {
 
   async function loadBoard(background = false) {
     if (!enabled) return;
+    const refreshStartedAt = background ? Date.now() : 0;
     try {
       if (background) setIsRefreshing(true);
       const q = new URLSearchParams();
@@ -112,9 +183,16 @@ export default function CommandCentreV2Page() {
         setLastBoardHash(nextHash);
         setLastUpdated(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
     } catch (err: any) {
-      showError(err?.message || 'Failed to load board');
+      showError('We could not refresh live work right now.');
     } finally {
-      if (background) setIsRefreshing(false);
+      if (background) {
+        const minimumRefreshIndicatorMs = 500;
+        const remainingIndicatorMs = minimumRefreshIndicatorMs - (Date.now() - refreshStartedAt);
+        if (remainingIndicatorMs > 0) {
+          await new Promise((resolve) => window.setTimeout(resolve, remainingIndicatorMs));
+        }
+        setIsRefreshing(false);
+      }
     }
   }
 
@@ -151,9 +229,9 @@ export default function CommandCentreV2Page() {
       const selectedLocationIds = locationIds.filter((x) => x !== 'all');
       const scope = selectedLocationIds.length === 1 ? `?locationId=${encodeURIComponent(selectedLocationIds[0])}` : '';
       const data = await apiFetch(`/compliance/summary${scope}`);
-      setComplianceSummary(data || null);
+      setComplianceSummary(data || { totals: { breachedEvents: 0, openExceptions: 0 } });
     } catch {
-      setComplianceSummary(null);
+      setComplianceSummary({ totals: { breachedEvents: 0, openExceptions: 0 } });
     }
   }
 
@@ -173,6 +251,19 @@ export default function CommandCentreV2Page() {
     if (typeof router.query.search === 'string') setSearchInput(router.query.search);
     if (typeof router.query.status === 'string') setStatus(router.query.status);
   }, [router.isReady, router.query.search, router.query.status]);
+
+  useEffect(() => {
+    if (!settings || savedLayoutApplied) return;
+    setSectionOrder(commandCentreLayout.sectionOrder);
+    setHiddenSections(commandCentreLayout.hiddenSections);
+    setViewMode(commandCentreLayout.defaultViewMode);
+    setLayoutDefaultViewMode(commandCentreLayout.defaultViewMode);
+    sectionOrderRef.current = [...commandCentreLayout.sectionOrder];
+    hiddenSectionsRef.current = [...commandCentreLayout.hiddenSections];
+    layoutDefaultViewModeRef.current = commandCentreLayout.defaultViewMode;
+    initialLayoutRef.current = commandCentreLayout;
+    setSavedLayoutApplied(true);
+  }, [savedLayoutApplied, commandCentreLayout, settings]);
 
   useEffect(() => {
     loadBoard();
@@ -228,31 +319,10 @@ export default function CommandCentreV2Page() {
     });
   }, [openedJob, assignTime]);
 
-  useEffect(() => {
-    if (!enabled) return;
-
-    const tick = () => {
-      if (document.visibilityState === 'visible') {
-        void loadBoard(true);
-      }
-    };
-
-    const id = window.setInterval(tick, 12000);
-    const onFocus = () => { void loadBoard(true); };
-    const onVisible = () => { if (document.visibilityState === 'visible') void loadBoard(true); };
-    const onOnline = () => { void loadBoard(true); };
-
-    window.addEventListener('focus', onFocus);
-    document.addEventListener('visibilitychange', onVisible);
-    window.addEventListener('online', onOnline);
-
-    return () => {
-      window.clearInterval(id);
-      window.removeEventListener('focus', onFocus);
-      document.removeEventListener('visibilitychange', onVisible);
-      window.removeEventListener('online', onOnline);
-    };
-  }, [enabled, search, status, locationIds.join(',')]);
+  useOperationalRefresh(
+    () => Promise.all([loadBoard(true), loadActivity(), loadComplianceSummary()]),
+    { enabled },
+  );
 
   useEffect(() => {
     if (!enabled || typeof window === 'undefined') return;
@@ -308,7 +378,7 @@ export default function CommandCentreV2Page() {
     if (!enabled || defaultViewApplied || activeViewId || views.length === 0) return;
     const defaultView = views.find((view) => view?.isDefault);
     if (!defaultView?.id) return;
-    applyView(defaultView.id);
+    applyView(defaultView.id, { preserveViewMode: true });
     setSaveViewName(String(defaultView.name || ""));
     setDefaultViewApplied(true);
   }, [enabled, defaultViewApplied, activeViewId, views]);
@@ -332,6 +402,61 @@ export default function CommandCentreV2Page() {
       ]),
     );
   }, [allJobs, jobStages, visibleJobStages]);
+  const liveWorkRecommendation = useMemo(() => {
+    const breachedEvents = Number(complianceSummary?.totals?.breachedEvents || 0);
+    const openExceptions = Number(complianceSummary?.totals?.openExceptions || 0);
+    const inProgressJob = allJobs.find((job) => mapStatusToStage(job?.status, jobStages)?.id === 'IN_PROGRESS') || null;
+    const completedJob = allJobs.find((job) => mapStatusToStage(job?.status, jobStages)?.id === 'COMPLETED') || null;
+    const scheduledJob = allJobs.find((job) => mapStatusToStage(job?.status, jobStages)?.id === 'SCHEDULED') || null;
+
+    if (breachedEvents > 0 || openExceptions > 0) {
+      return {
+        eyebrow: "Recommended next action",
+        title: "Review compliance pressure first",
+        detail: `${breachedEvents} breached SLA item${breachedEvents === 1 ? '' : 's'} and ${openExceptions} open compliance check${openExceptions === 1 ? '' : 's'} need operator review before more work is moved.`,
+        href: "/dashboard/compliance",
+        action: "Review compliance",
+      };
+    }
+
+    if (inProgressJob) {
+      return {
+        eyebrow: "Recommended next action",
+        title: `${inProgressJob.jobRef || inProgressJob.id} is already live`,
+        detail: `${inProgressJob.customerName || "This customer"} has work in progress now. Resume the active job sheet before opening another queue item.`,
+        href: `/dashboard/jobs/${inProgressJob.id}`,
+        action: "Resume live job",
+      };
+    }
+
+    if (completedJob) {
+      return {
+        eyebrow: "Recommended next action",
+        title: "Close the handoff loop on completed work",
+        detail: `${completedJob.jobRef || completedJob.id} is ready for handoff, sending, or billing follow-up next.`,
+        href: `/dashboard/jobs/${completedJob.id}`,
+        action: "Review completed job",
+      };
+    }
+
+    if (scheduledJob) {
+      return {
+        eyebrow: "Recommended next action",
+        title: "Pull the next scheduled job into focus",
+        detail: `${scheduledJob.jobRef || scheduledJob.id} is scheduled and ready to be reviewed before the day slips forward.`,
+        href: `/dashboard/jobs/${scheduledJob.id}`,
+        action: "Open scheduled job",
+      };
+    }
+
+    return {
+      eyebrow: "Recommended next action",
+      title: "No live blockers right now",
+      detail: "Use filters, saved views, or the full jobs queue to pull the next item into view without overloading the board.",
+      href: "/dashboard/jobs",
+      action: "Open all jobs",
+    };
+  }, [allJobs, complianceSummary?.totals?.breachedEvents, complianceSummary?.totals?.openExceptions, jobStages]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -349,7 +474,7 @@ export default function CommandCentreV2Page() {
     return () => window.removeEventListener('keydown', onKey);
   }, [enabled]);
 
-  function applyView(id: string) {
+  function applyView(id: string, options?: { preserveViewMode?: boolean }) {
     setActiveViewId(id);
     const next = views.find((v) => v.id === id);
     if (!next) return;
@@ -357,7 +482,9 @@ export default function CommandCentreV2Page() {
     setSearchInput(String(f.search || ''));
     setStatus(String(f.status || ''));
     setLocationIds(Array.isArray(f.locationIds) && f.locationIds.length ? f.locationIds : ['all']);
-    setViewMode(f.viewType === 'list' ? 'list' : 'kanban');
+    if (!options?.preserveViewMode) {
+      setViewMode(f.viewType === 'list' ? 'list' : 'kanban');
+    }
   }
 
   async function saveView() {
@@ -425,6 +552,84 @@ export default function CommandCentreV2Page() {
       return;
     }
     setPendingBulk({ op, payload, label });
+  }
+
+  const orderedSections = Array.from(new Set([...sectionOrder, ...DEFAULT_SECTION_ORDER])) as CommandCentreSectionKey[];
+  const visibleSections = orderedSections.filter((sectionKey) => !hiddenSections.includes(sectionKey));
+  const layoutDirty =
+    !arraysEqual(sectionOrder, initialLayoutRef.current.sectionOrder) ||
+    !arraysEqual(hiddenSections, initialLayoutRef.current.hiddenSections) ||
+    layoutDefaultViewMode !== initialLayoutRef.current.defaultViewMode;
+  const layoutAtDefaults =
+    arraysEqual(sectionOrder, DEFAULT_SECTION_ORDER) &&
+    hiddenSections.length === 0 &&
+    layoutDefaultViewMode === 'kanban';
+
+  async function saveLayout() {
+    if (!canManageLayout || savingLayout) return;
+    clearNotice();
+    setSavingLayout(true);
+    const nextSectionOrder = [...sectionOrderRef.current];
+    const nextHiddenSections = [...hiddenSectionsRef.current];
+    const nextDefaultViewMode = layoutDefaultViewModeRef.current;
+    try {
+      const tenantSettings = await apiFetch('/tenant/settings');
+      const currentBusinessConfig = tenantSettings?.businessConfigJson && typeof tenantSettings.businessConfigJson === 'object'
+        ? tenantSettings.businessConfigJson
+        : {};
+      const currentCommandCentre = currentBusinessConfig.commandCentre && typeof currentBusinessConfig.commandCentre === 'object'
+        ? currentBusinessConfig.commandCentre
+        : {};
+      await apiFetch('/tenant/settings', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          businessConfigJson: {
+            ...currentBusinessConfig,
+            commandCentre: {
+              ...currentCommandCentre,
+              sectionOrder: nextSectionOrder,
+              hiddenSections: nextHiddenSections,
+              defaultViewMode: nextDefaultViewMode,
+            },
+          },
+        }),
+      });
+      for (let attempt = 0; attempt < 12; attempt += 1) {
+        const refreshedSettings = await apiFetch('/tenant/settings');
+        const refreshedLayout = getCommandCentreWorkspaceLayout(refreshedSettings as any);
+        if (
+          arraysEqual(refreshedLayout.sectionOrder, nextSectionOrder) &&
+          arraysEqual(refreshedLayout.hiddenSections, nextHiddenSections) &&
+          refreshedLayout.defaultViewMode === nextDefaultViewMode
+        ) {
+          initialLayoutRef.current = {
+            sectionOrder: [...refreshedLayout.sectionOrder],
+            hiddenSections: [...refreshedLayout.hiddenSections],
+            defaultViewMode: refreshedLayout.defaultViewMode,
+          };
+          await refresh();
+          showSuccess('Command Centre layout saved');
+          return;
+        }
+        await wait(250);
+      }
+      showError('Command Centre layout is still saving. Please try again.');
+    } catch (error: any) {
+      showError(error?.message || 'Failed to save Command Centre layout');
+    } finally {
+      setSavingLayout(false);
+    }
+  }
+
+  function resetLayout() {
+    clearNotice();
+    sectionOrderRef.current = [...DEFAULT_SECTION_ORDER];
+    hiddenSectionsRef.current = [];
+    layoutDefaultViewModeRef.current = 'kanban';
+    setSectionOrder(DEFAULT_SECTION_ORDER);
+    setHiddenSections([]);
+    setLayoutDefaultViewMode('kanban');
+    setViewMode('kanban');
   }
 
 
@@ -574,7 +779,7 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
 
     return rows.length
       ? rows
-      : [{ label: "No activity yet", at: null }];
+      : [{ label: "No updates yet", at: null }];
   }
 
   function InlineStatusActions({ job }: { job: any }) {
@@ -605,7 +810,7 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
     return (
       <DashboardShell>
         <div className="ccv2-board-premium">
-          <div className="card ccv2-card"><h1>Live board unavailable</h1><p className="muted">This workspace does not use the live board right now.</p></div>
+          <div className="card ccv2-card"><h1>Live work unavailable</h1><p className="muted">This workspace is not using live work right now.</p></div>
         </div>
       </DashboardShell>
     );
@@ -614,29 +819,29 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
   return (
     <DashboardShell>
       <div className="ccv2-board-premium">
-      <div data-drag-drop="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_DRAG_DROP_ENABLED</div>
-        <div data-sidepanel-actions="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_SIDEPANEL_ACTIONS_ENABLED</div>
-        <div data-assign-tech="enabled" style={{position:"absolute",left:-99999,top:-99999,width:1,height:1,overflow:"hidden"}}>CCV2_ASSIGN_TECH_ENABLED</div>
-        <div data-realtime="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_REALTIME_ENABLED</div>
-        <div data-sidepanel-rich="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_SIDEPANEL_RICH_DETAILS</div>
-        <div data-activity-timeline="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_ACTIVITY_TIMELINE_ENABLED</div>
-        <div data-event-toasts="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_EVENT_TOASTS_ENABLED</div>
-        <div data-sse-realtime="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_SSE_REALTIME_ENABLED</div>
-        <div data-activity-stream="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_ACTIVITY_STREAM_ENABLED</div>
-        <div data-optimistic-board="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_OPTIMISTIC_BOARD_ENABLED</div>
-        <div data-targeted-sse="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_TARGETED_SSE_ENABLED</div>
-        <div data-persistent-activity="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CCV2_PERSISTENT_ACTIVITY_ENABLED</div>
-        <div data-customer-timeline-shortcut="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>CUSTOMER_TIMELINE_SHORTCUT_ENABLED</div>
-      <div className="card ccv2-hero" style={{ marginBottom: 14 }}>
-          <div className="ccv2-inline-actions-marker" data-inline-actions="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>
+      <div data-drag-drop="enabled" hidden>CCV2_DRAG_DROP_ENABLED</div>
+        <div data-sidepanel-actions="enabled" hidden>CCV2_SIDEPANEL_ACTIONS_ENABLED</div>
+        <div data-assign-tech="enabled" hidden>CCV2_ASSIGN_TECH_ENABLED</div>
+        <div data-realtime="enabled" hidden>CCV2_REALTIME_ENABLED</div>
+        <div data-sidepanel-rich="enabled" hidden>CCV2_SIDEPANEL_RICH_DETAILS</div>
+        <div data-activity-timeline="enabled" hidden>CCV2_ACTIVITY_TIMELINE_ENABLED</div>
+        <div data-event-toasts="enabled" hidden>CCV2_EVENT_TOASTS_ENABLED</div>
+        <div data-sse-realtime="enabled" hidden>CCV2_SSE_REALTIME_ENABLED</div>
+        <div data-activity-stream="enabled" hidden>CCV2_ACTIVITY_STREAM_ENABLED</div>
+        <div data-optimistic-board="enabled" hidden>CCV2_OPTIMISTIC_BOARD_ENABLED</div>
+        <div data-targeted-sse="enabled" hidden>CCV2_TARGETED_SSE_ENABLED</div>
+        <div data-persistent-activity="enabled" hidden>CCV2_PERSISTENT_ACTIVITY_ENABLED</div>
+        <div data-customer-timeline-shortcut="enabled" hidden>CUSTOMER_TIMELINE_SHORTCUT_ENABLED</div>
+        <div className="card ccv2-hero" style={{ marginBottom: 14 }}>
+          <div className="ccv2-inline-actions-marker" data-inline-actions="enabled" hidden>
             INLINE_ACTIONS_ENABLED
           </div>
         <p className="ccv2-eyebrow">Live work</p>
-        <h1 className="ccv2-title" style={{ marginTop: 0 }}>Command Centre</h1>
-        <p className="muted ccv2-subtitle">Use the live board to move work orders forward, assign the right person, and clear blockers while the day is still moving.</p>
-                  <div className="ccv2-count-strip">
+        <h1 className="ccv2-title" style={{ marginTop: 0 }}>Live work</h1>
+        <p className="muted ccv2-subtitle">See what needs action now, move into the job sheet quickly, and keep assignments clear.</p>
+        <div className="ccv2-count-strip" data-testid="ccv2-status-summary">
           {visibleJobStages.map((row) => (
-            <div key={row.id} className="ccv2-count-pill">
+            <div key={row.id} className="ccv2-count-pill" data-testid={`ccv2-count-pill-${row.id.toLowerCase()}`}>
               <span className="ccv2-count-pill__label">{row.label}</span>
               <strong className="ccv2-count-pill__value">{Number(stageCounts?.[row.id] || 0)}</strong>
             </div>
@@ -647,11 +852,11 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
             <div className="ccv2-livebar__meta">
               <span className={`ccv2-live-dot${isRefreshing ? " is-live" : ""}`}></span>
               <span className="ccv2-live-text" data-testid="ccv2-realtime-state">
-                {realtimeMode === 'fallback' ? 'Live updates are paused in this test mode' : lastUpdated ? `Updated ${lastUpdated}` : "Live board ready"}
+                {realtimeMode === 'fallback' ? 'Live updates are paused in this test mode' : lastUpdated ? `Updated ${lastUpdated}` : "Everything running normally"}
               </span>
             </div>
             <button className="button secondary ccv2-button" data-testid="ccv2-refresh-button" type="button" onClick={() => void loadBoard(true)} disabled={isRefreshing}>
-              {isRefreshing ? 'Refreshing...' : 'Refresh board'}
+              {isRefreshing ? 'Refreshing...' : 'Refresh'}
             </button>
           </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
@@ -659,30 +864,57 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
             <span key={stage.id} className="ccv2-status-pill ccv2-status-pill--open">{stage.label}</span>
           ))}
         </div>
-        {complianceSummary ? (
-          <div data-testid="ccv2-compliance-pressure" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 10, marginTop: 12 }}>
-            <div className="integration-card">
-              <strong>SLA pressure</strong>
-              <div className="muted" style={{ marginTop: 6 }}>
-                {Number(complianceSummary?.totals?.breachedEvents || 0)} breached SLA event{Number(complianceSummary?.totals?.breachedEvents || 0) === 1 ? '' : 's'}
-              </div>
-              <div className="muted">
-                {Number(complianceSummary?.totals?.openExceptions || 0)} open compliance exception{Number(complianceSummary?.totals?.openExceptions || 0) === 1 ? '' : 's'}
-              </div>
-              <button className="button secondary ccv2-button" type="button" style={{ marginTop: 10 }} onClick={() => void router.push('/dashboard/compliance')}>
-                Open compliance
-              </button>
+        <div data-testid="ccv2-compliance-pressure" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 10, marginTop: 12 }}>
+          <div className="integration-card">
+            <strong>Needs attention</strong>
+            <div className="muted" style={{ marginTop: 6 }}>
+              {Number(complianceSummary?.totals?.breachedEvents || 0)} breached SLA item{Number(complianceSummary?.totals?.breachedEvents || 0) === 1 ? '' : 's'}
             </div>
+            <div className="muted">
+              {Number(complianceSummary?.totals?.openExceptions || 0)} open compliance check{Number(complianceSummary?.totals?.openExceptions || 0) === 1 ? '' : 's'}
+            </div>
+            <button className="button secondary ccv2-button" type="button" style={{ marginTop: 10 }} onClick={() => void router.push('/dashboard/compliance')}>
+              Review checks
+            </button>
           </div>
-        ) : null}
+        </div>
         <OperatorNotice notice={notice} onDismiss={clearNotice} />
         {liveNotice ? <div aria-live="polite" className="ccv2-live-notice" role="status">{liveNotice}</div> : null}
       </div>
 
-      <div className="card ccv2-activity-stream" style={{ marginBottom: 14 }}>
+      <section className="integration-card mt-priority-card ccv2-priority-card mt-target-section" data-testid="ccv2-next-action-card">
+        <div className="mt-priority-card__eyebrow">{liveWorkRecommendation.eyebrow}</div>
+        <div className="mt-priority-card__title">{liveWorkRecommendation.title}</div>
+        <p className="mt-priority-card__text">{liveWorkRecommendation.detail}</p>
+        <div className="mt-priority-card__actions">
+          <Link className="button" href={liveWorkRecommendation.href}>
+            {liveWorkRecommendation.action}
+          </Link>
+          <Link className="button secondary" href="/dashboard/settings?tab=general">
+            Review workspace layout
+          </Link>
+        </div>
+      </section>
+
+      {canManageLayout && layoutControlsReady ? (
+        <div className="card ccv2-surface" data-testid="ccv2-layout-settings-link" style={{ marginBottom: 14 }}>
+          <div className="operator-section__header">
+            <div>
+              <h2 className="operator-section__title">Layout lives in Settings</h2>
+              <p className="operator-section__subtitle">Live work stays focused on the queue. Save board style and section visibility from Workspace layout.</p>
+            </div>
+            <Link className="button secondary ccv2-button" href="/dashboard/settings?tab=general">
+              Open Workspace layout
+            </Link>
+          </div>
+        </div>
+      ) : null}
+
+      {visibleSections.includes('recent-updates') ? (
+      <div className="card ccv2-activity-stream" data-testid="ccv2-recent-updates" style={{ marginBottom: 14 }}>
         <div className="ccv2-activity-stream__head">
-          <h3 style={{ margin: 0 }}>Live activity</h3>
-          <span className="muted">Latest changes across the live board</span>
+          <h3 style={{ margin: 0 }} data-testid="ccv2-recent-updates-title">Latest movement</h3>
+          <span className="muted">A short view of what changed most recently</span>
         </div>
 
         <div className="ccv2-activity-stream__list">
@@ -701,26 +933,28 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
               </div>
             </div>
           )) : (
-            <div className="muted">No new movement yet.</div>
+            <div className="muted">No new updates yet.</div>
           )}
         </div>
       </div>
+      ) : null}
 
-      <div className="card ccv2-filters" style={{ marginBottom: 14 }}>
+      {visibleSections.includes('filters') ? (
+      <div className="card ccv2-filters" data-testid="ccv2-filters-card" style={{ marginBottom: 14 }}>
         <div className="two-col ccv2-grid">
           <div>
-            <label>Search</label>
-            <input ref={searchRef} className="input ccv2-input" data-testid="ccv2-search-input" placeholder="Search by job, customer, or reg" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} />
+            <label>Find work</label>
+            <input ref={searchRef} className="input ccv2-input" data-testid="ccv2-search-input" placeholder="Search jobs, customers, or reg" value={searchInput} onChange={(e) => setSearchInput(e.target.value)} />
           </div>
           <div>
-            <label>Status</label>
+            <label>Stage</label>
             <select className="input ccv2-input" value={status} onChange={(e) => setStatus(e.target.value)}>
               <option value="">All</option>
               {STATUS_FILTER_OPTIONS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
             </select>
           </div>
           <div>
-            <label>Locations</label>
+            <label>Places</label>
             <select
               multiple
               className="input ccv2-input"
@@ -737,19 +971,20 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
           <div>
             <label>View</label>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button className={`button ${viewMode === 'kanban' ? '' : 'secondary'}`} type="button" onClick={() => setViewMode('kanban')}>Kanban</button>
+              <button className={`button ${viewMode === 'kanban' ? '' : 'secondary'}`} type="button" onClick={() => setViewMode('kanban')}>Board</button>
               <button className={`button ${viewMode === 'list' ? '' : 'secondary'}`} type="button" onClick={() => setViewMode('list')}>List</button>
             </div>
           </div>
         </div>
         <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <select className="input" data-testid="ccv2-saved-view-select" style={{ margin: 0, width: 260 }} value={activeViewId} onChange={(e) => applyView(e.target.value)}>
-            <option value="">Saved view</option>
+            <option value="">Choose a saved view</option>
             {views.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
           </select>
-          <button className="button secondary ccv2-button" data-testid="ccv2-save-view-trigger" type="button" disabled={savingView} onClick={() => { setShowSaveView(true); setSaveViewName(''); }}>Save this view</button>
+          <button className="button secondary ccv2-button" data-testid="ccv2-save-view-trigger" type="button" disabled={savingView} onClick={() => { setShowSaveView(true); setSaveViewName(''); }}>Save view</button>
         </div>
       </div>
+      ) : null}
 
       {showSaveView ? (
         <div aria-label="Save board view" className="card ccv2-surface" data-testid="ccv2-save-view-panel" style={{ marginBottom: 14 }}>
@@ -761,28 +996,31 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
         </div>
       ) : null}
 
+      {visibleSections.includes('bulk-actions') ? (
       <div className="card ccv2-surface ccv2-filters-surface" data-testid="ccv2-bulk-bar" style={{ marginBottom: 14 }}>
-        <strong>Bulk bar</strong>
-        <p className="muted" data-testid="ccv2-selected-count">Selected: {selected.length}</p>
+        <strong>Move selected work</strong>
+        <p className="muted" data-testid="ccv2-selected-count">{selected.length} job{selected.length === 1 ? '' : 's'} selected</p>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <select className="input" data-testid="ccv2-bulk-status-select" style={{ margin: 0, width: 170 }} value={bulkStatus} onChange={(e) => setBulkStatus(e.target.value)}>
             {STATUS_FILTER_OPTIONS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
           </select>
-          <button className="button secondary ccv2-button" data-testid="ccv2-bulk-status-action" type="button" disabled={bulkBusy || !selected.length} onClick={() => triggerBulk('setStatus', { status: bulkStatus }, `Set stage to ${mapStatusToStage(bulkStatus, jobStages)?.label || bulkStatus}`)}>Status</button>
+          <button className="button secondary ccv2-button" data-testid="ccv2-bulk-status-action" type="button" disabled={bulkBusy || !selected.length} onClick={() => triggerBulk('setStatus', { status: bulkStatus }, `Set stage to ${mapStatusToStage(bulkStatus, jobStages)?.label || bulkStatus}`)}>Change stage</button>
           <select className="input" data-testid="ccv2-bulk-location-select" style={{ margin: 0, width: 220 }} value={bulkLocation} onChange={(e) => setBulkLocation(e.target.value)}>
             <option value="all">All / none</option>
             {locations.map((loc) => <option key={loc.id} value={loc.id}>{loc.name}</option>)}
           </select>
-          <button className="button secondary ccv2-button" data-testid="ccv2-bulk-location-action" type="button" disabled={bulkBusy || !selected.length} onClick={() => triggerBulk('setLocation', { locationId: bulkLocation }, `Assign location ${bulkLocation}`)}>Location</button>
+          <button className="button secondary ccv2-button" data-testid="ccv2-bulk-location-action" type="button" disabled={bulkBusy || !selected.length} onClick={() => triggerBulk('setLocation', { locationId: bulkLocation }, `Assign location ${bulkLocation}`)}>Change location</button>
           {demoPolishEnabled ? (
-            <button className="button secondary ccv2-button" data-testid="ccv2-bulk-complete-action" type="button" disabled={bulkBusy || !selected.length} onClick={() => triggerBulk('markComplete', {}, 'Mark complete')}>Mark Complete</button>
+            <button className="button secondary ccv2-button" data-testid="ccv2-bulk-complete-action" type="button" disabled={bulkBusy || !selected.length} onClick={() => triggerBulk('markComplete', {}, 'Mark complete')}>Mark done</button>
           ) : (
-            <button className="button secondary ccv2-button" data-testid="ccv2-bulk-close-action" type="button" disabled={bulkBusy || !selected.length} onClick={() => triggerBulk('closeJobs', {}, 'Close jobs')}>Close</button>
+            <button className="button secondary ccv2-button" data-testid="ccv2-bulk-close-action" type="button" disabled={bulkBusy || !selected.length} onClick={() => triggerBulk('closeJobs', {}, 'Close jobs')}>Close jobs</button>
           )}
         </div>
       </div>
+      ) : null}
 
-      <div className="card ccv2-card" style={{ marginBottom: 14 }}>
+      {visibleSections.includes('work-board') ? (
+      <div className="card ccv2-card" data-testid="ccv2-work-board" style={{ marginBottom: 14 }}>
         {viewMode === 'list' ? (
           <div className="list">
             {allJobs.map((job: any) => (
@@ -850,6 +1088,7 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
           </div>
         )}
       </div>
+      ) : null}
 
       {pendingBulk && demoPolishEnabled ? (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'grid', placeItems: 'center', zIndex: 40, padding: 16 }}>
@@ -857,7 +1096,7 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
             <h3 id="ccv2-bulk-confirm-title" style={{ marginTop: 0 }}>Confirm bulk action</h3>
             <p className="muted">{pendingBulk.label} on {selected.length} selected jobs.</p>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button className="button ccv2-button" data-testid="ccv2-bulk-confirm-submit" type="button" disabled={bulkBusy} onClick={confirmBulk}>{bulkBusy ? 'Applying...' : 'Confirm'}</button>
+              <button className="button ccv2-button" data-testid="ccv2-bulk-confirm-submit" type="button" disabled={bulkBusy} onClick={confirmBulk}>{bulkBusy ? 'Applying...' : 'Apply change'}</button>
               <button className="button secondary ccv2-button" data-testid="ccv2-bulk-confirm-cancel" type="button" disabled={bulkBusy} onClick={() => setPendingBulk(null)}>Cancel</button>
             </div>
           </div>
@@ -894,7 +1133,7 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
                 <div className="ccv2-sidepanel-sectionTitle">Required fields</div>
                 <div className="badge warn" data-testid="ccv2-required-fields-warning">{getRequiredFieldWarningLabel(openedJob.missingRequiredFields)}</div>
                 <div className="muted" style={{ marginTop: 8 }}>
-                  Missing required fields: {openedJob.missingRequiredFields.join(', ')}
+                  Fill these in before you move this job on: {openedJob.missingRequiredFields.join(', ')}
                 </div>
               </div>
             ) : null}
@@ -917,7 +1156,7 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
             </div>
 
             <div className="ccv2-sidepanel-dispatch">
-              <h4>Dispatch</h4>
+              <h4>Next step</h4>
               {capacityPressure?.technicians?.length ? (
                 <div className="ccv2-sidepanel-section" style={{ padding: 0, marginBottom: 12 }}>
                   <div className="ccv2-sidepanel-sectionTitle">Capacity pressure</div>
@@ -968,7 +1207,7 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
                   setOpenedJob(updated || { ...openedJob, assignedUserId: assignTechId || null, scheduledAt: assignTime || null });
                 }}
               >
-                Assign & Schedule
+                Save assignment
               </button>
             </div>
 
@@ -1014,7 +1253,7 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
             </div>
             <div className="ccv2-sidepanel-primary-actions">
               <button className="button" onClick={() => router.push(`/dashboard/jobs/${openedJob.id}`)}>
-                Open full job
+                Open job sheet
               </button>
               <button className="button secondary" onClick={() => setOpenedJob(null)}>
                 Close

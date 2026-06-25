@@ -18,6 +18,8 @@ import { emptyPermissionSnapshot, hasWorkspacePermission, normalizePermissionSna
 type BillingReadiness = {
   paymentsEnabled: boolean;
   stripeConfigured: boolean;
+  paymentSetupLabel?: string;
+  paymentSetupDetail?: string;
   summary: {
     completedJobs: number;
     invoiceReady: number;
@@ -54,11 +56,13 @@ type BillingReadiness = {
     billingTimeline?: Array<{ eventType?: string | null; message?: string | null; createdAt?: string | null }>;
     portalUrl?: string | null;
     paymentLinkUrl?: string | null;
+    paymentSetupLabel?: string | null;
+    paymentSetupDetail?: string | null;
   }>;
 };
 
 function money(cents: number, currency: string) {
-  return new Intl.NumberFormat(undefined, { style: "currency", currency: currency || "USD" }).format((cents || 0) / 100);
+  return new Intl.NumberFormat(undefined, { style: "currency", currency: currency || "GBP" }).format((cents || 0) / 100);
 }
 
 export default function BillingReadinessPage() {
@@ -136,7 +140,7 @@ export default function BillingReadinessPage() {
       { label: "Awaiting payment", value: String(data.summary.issuedAwaitingPayment), hint: "Issued invoices still open" },
       { label: "Overdue invoices", value: String(data.summary.overdueInvoices), hint: "Issued invoices already past due" },
       { label: "Paid", value: String(data.summary.paid), hint: "Paid jobs tracked by current billing fields" },
-      { label: "Payment-ready", value: String(data.summary.paymentReady), hint: data.stripeConfigured ? "Stripe can attach later" : "Stripe not configured" },
+      { label: "Payment path", value: String(data.summary.paymentReady), hint: data.paymentSetupLabel || "Manual collection or business provider setup" },
       { label: "Overdue follow-ups", value: String(data.summary.overdueBillingFollowUps), hint: "Billing reminders already past due" },
       { label: "Escalations 7d", value: String(data.summary.billingEscalationsLast7Days), hint: "Billing reminders pushed into faster collections follow-up" },
     ];
@@ -167,9 +171,10 @@ export default function BillingReadinessPage() {
         <OperatorPageHeader
           eyebrow="Business OS"
           title="Billing readiness"
-          subtitle="A revenue-operations slice over completed work, invoice state, payment readiness, and portal access."
+          subtitle="A compact view of completed work, invoice state, customer payment setup, and customer-page access."
           actions={[
             { label: "Billing", href: "/dashboard/billing", variant: "secondary" },
+            { label: "Finance", href: "/dashboard/finance", variant: "secondary" },
             { label: "Portal Ops", href: "/dashboard/portal" },
           ]}
           shortcuts={["This is a readiness layer, not a fake processor", "Use it to move completed work toward invoice and payment"]}
@@ -180,8 +185,8 @@ export default function BillingReadinessPage() {
           title="Readiness guidance"
           items={[
             "Invoice-ready means the job is completed but still waiting for invoice issuance.",
-            "Payment-ready means the workspace can attach a payment flow later with the current billing configuration.",
-            "Portal-ready means the job already has an active customer portal link available.",
+            "Payment path means the job can move forward with the current business payment setup, even if collection is manual.",
+            "Customer page ready means the job already has an active customer-facing link available.",
           ]}
         />
 
@@ -191,7 +196,7 @@ export default function BillingReadinessPage() {
           <div className="operator-section__header">
             <div>
               <h2 className="operator-section__title">Completed work queue</h2>
-              <p className="operator-section__subtitle">Real completed and invoiced jobs, with future billing and customer portal readiness layered on top.</p>
+              <p className="operator-section__subtitle">Completed and invoiced jobs, with truthful payment-setup guidance and customer-page access alongside them.</p>
             </div>
           </div>
 
@@ -218,7 +223,7 @@ export default function BillingReadinessPage() {
                   <div className="operator-table__cell">
                     <div className="operator-cellMeta">
                       <span><strong>{job.invoiceIssuedAt ? "Invoice issued" : job.invoiceReady ? "Invoice ready" : "Not ready"}</strong></span>
-                      <span>{job.invoicePaidAt ? "Paid" : job.paymentReady ? "Payment-capable" : "Payment not ready"}</span>
+                      <span>{job.invoicePaidAt ? "Paid" : job.paymentSetupLabel || (job.paymentReady ? "Manual collection" : "Payment setup needed")}</span>
                       {job.lifecycleState ? <span>Lifecycle {humanizeUnderscoreLabel(job.lifecycleState)}</span> : null}
                       {job.invoiceDueAt ? (
                         <span>{job.invoiceOverdue ? `Payment overdue since ${new Date(job.invoiceDueAt).toLocaleDateString()}` : `Payment due ${new Date(job.invoiceDueAt).toLocaleDateString()}`}</span>
@@ -228,6 +233,7 @@ export default function BillingReadinessPage() {
                         <span>{job.billingFollowUpOverdue ? `Follow-up overdue since ${new Date(job.billingFollowUpAt).toLocaleDateString()}` : `Follow-up due ${new Date(job.billingFollowUpAt).toLocaleDateString()}`}</span>
                       ) : null}
                       {job.nextStep ? <span>{job.nextStep}</span> : null}
+                      {job.paymentSetupDetail ? <span>{job.paymentSetupDetail}</span> : null}
                       {job.billingTimeline?.[0]?.createdAt ? (
                         <span>{job.billingTimeline[0].message || job.billingTimeline[0].eventType} · {new Date(job.billingTimeline[0].createdAt).toLocaleString()}</span>
                       ) : null}
@@ -268,8 +274,7 @@ export default function BillingReadinessPage() {
                             ]
                           : []),
                         { label: "Open job", href: `/dashboard/jobs/${job.id}`, group: "Internal", description: "Open the internal job record" },
-                        ...(job.portalUrl ? [{ label: "Open portal", href: job.portalUrl, group: "Customer access", description: "Open the current customer-facing job summary" }] : []),
-                        ...(job.paymentLinkUrl ? [{ label: "Open payment link", href: job.paymentLinkUrl, group: "Payments", description: "Open the current payment URL" }] : []),
+                        ...(job.portalUrl ? [{ label: "Open customer page", href: job.portalUrl, group: "Customer access", description: "Open the current customer-facing job summary" }] : []),
                         { label: "Open billing", href: "/dashboard/billing", group: "Payments", description: "Review Stripe and tenant billing configuration" },
                       ]}
                     />

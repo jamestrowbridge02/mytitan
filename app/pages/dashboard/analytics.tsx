@@ -1,16 +1,19 @@
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { DashboardShell } from "../../components/dashboard-shell";
 import { OperatorNotice } from "../../components/feedback/OperatorNotice";
 import { useOperatorNotice } from "../../components/feedback/useOperatorNotice";
+import { LoadingState } from "../../components/states/LoadingState";
+import { OperatorChartCard } from "../../components/ui/operator-insights";
 import {
   OperatorDataTable,
   OperatorDataTableHeader,
   OperatorDataTableRow,
   OperatorEmptyStateCard,
-  OperatorGuidance,
   OperatorPageHeader,
 } from "../../components/ui/operator-page";
 import { apiFetch } from "../../lib/api";
+import { ANALYTICS_WIDGET_KEYS, getAnalyticsWorkspaceLayout, type AnalyticsWidgetKey } from "../../lib/business-config";
 import { isAnalyticsV1Enabled } from "../../lib/feature-flags";
 import { readActiveLocationId, subscribeActiveLocationId } from "../../lib/location-context";
 import { emptyPermissionSnapshot, hasWorkspacePermission, normalizePermissionSnapshot } from "../../lib/workspace-permissions";
@@ -106,24 +109,67 @@ type BenchmarksResponse = {
   topPressureChanges: Array<{ key: string; label: string; basis: string; current: number; previous: number; delta: number; deltaPct: number | null }>;
 };
 
-const DEFAULT_WIDGET_ORDER = ["executive-summary", "pressure-panel", "revenue-panel", "capacity-panel", "benchmark-delta"];
+type BillingAnalyticsResponse = {
+  jobCompletionAllowance?: {
+    monthlyIncludedAllowance?: number;
+    monthlyIncludedUsed?: number;
+    monthlyIncludedRemaining?: number;
+    purchasedCreditsTotal?: number;
+    purchasedCreditsUsed?: number;
+    purchasedCreditsRemaining?: number;
+  } | null;
+};
+
+type TrafficSummaryResponse = {
+  visitsToday: number;
+  visitsLast7Days: number;
+  uniqueAnonymousSessions: number;
+  surfaces: {
+    marketing?: number;
+    app?: number;
+    login?: number;
+    publicBooking?: number;
+    publicStatus?: number;
+    customerWorkspace?: number;
+  };
+};
+
+type Phase1KWidgetsResponse = {
+  selectedWidgets: string[];
+  widgets: Array<{ key: string; label: string; value: string | number; source: string }>;
+};
+
+const DEFAULT_WIDGET_ORDER = [...ANALYTICS_WIDGET_KEYS];
+const WIDGET_META: Record<AnalyticsWidgetKey, { title: string; description: string }> = {
+  "executive-summary": {
+    title: "Executive summary",
+    description: "Headline operating posture and recommended focus.",
+  },
+  "pressure-panel": {
+    title: "Pressure areas",
+    description: "Queues and customer friction that need attention.",
+  },
+  "revenue-panel": {
+    title: "Revenue and collections",
+    description: "Quote conversion, collections, and open revenue follow-up.",
+  },
+  "capacity-panel": {
+    title: "Capacity and recurring execution",
+    description: "Technician load and recurring work pressure.",
+  },
+  "benchmark-delta": {
+    title: "Benchmarks and trend deltas",
+    description: "Current period versus your own recent history.",
+  },
+  "customer-commercial-signals": {
+    title: "Customer commercial signals",
+    description: "Which customers drive work and respond fastest.",
+  },
+};
 
 function arraysEqual(left: string[], right: string[]) {
   if (left.length !== right.length) return false;
   return left.every((value, index) => value === right[index]);
-}
-
-function normalizeAnalyticsLayout(raw: any) {
-  const analytics = raw && typeof raw === "object" ? raw : {};
-  return {
-    widgetOrder: Array.isArray(analytics.widgetOrder)
-      ? analytics.widgetOrder.map((item: any) => String(item || "")).filter(Boolean)
-      : [],
-    hiddenWidgets: Array.isArray(analytics.hiddenWidgets)
-      ? analytics.hiddenWidgets.map((item: any) => String(item || "")).filter(Boolean)
-      : [],
-    defaultWindowDays: Math.max(7, Math.min(90, Number(analytics.defaultWindowDays || 30))),
-  };
 }
 
 function wait(ms: number) {
@@ -158,7 +204,7 @@ function moveItem(items: string[], key: string, direction: "up" | "down") {
   return next;
 }
 
-export default function AnalyticsPage() {
+export function AnalyticsPage({ forceExecutiveSummary = false }: { forceExecutiveSummary?: boolean }) {
   const enabled = isAnalyticsV1Enabled();
   const [permissions, setPermissions] = useState(() => emptyPermissionSnapshot());
   const [permissionsReady, setPermissionsReady] = useState(false);
@@ -168,12 +214,18 @@ export default function AnalyticsPage() {
   const [customers, setCustomers] = useState<CustomersResponse | null>(null);
   const [capacity, setCapacity] = useState<CapacityResponse | null>(null);
   const [benchmarks, setBenchmarks] = useState<BenchmarksResponse | null>(null);
+  const [billing, setBilling] = useState<BillingAnalyticsResponse | null>(null);
+  const [traffic, setTraffic] = useState<TrafficSummaryResponse | null>(null);
+  const [phaseWidgets, setPhaseWidgets] = useState<Phase1KWidgetsResponse | null>(null);
   const [windowDays, setWindowDays] = useState(30);
   const [widgetOrder, setWidgetOrder] = useState<string[]>(DEFAULT_WIDGET_ORDER);
   const [hiddenWidgets, setHiddenWidgets] = useState<string[]>([]);
   const widgetOrderRef = useRef<string[]>(DEFAULT_WIDGET_ORDER);
   const hiddenWidgetsRef = useRef<string[]>([]);
   const windowDaysRef = useRef(30);
+  const layoutEditVersionRef = useRef(0);
+  const loadVersionRef = useRef(0);
+  const loadAbortRef = useRef<AbortController | null>(null);
   const [activeLocationId, setActiveLocationId] = useState('all');
   const [loading, setLoading] = useState(true);
   const [savingLayout, setSavingLayout] = useState(false);
@@ -182,31 +234,48 @@ export default function AnalyticsPage() {
   const canView = hasWorkspacePermission(permissions, "dashboard.view_intelligence");
   const canManageRevenue = hasWorkspacePermission(permissions, "billing.manage");
   const canManageLayout = hasWorkspacePermission(permissions, "settings.manage");
+  const initialLayoutRef = useRef(getAnalyticsWorkspaceLayout(null));
 
-  function updateWidgetOrder(next: string[] | ((current: string[]) => string[])) {
-    const current = widgetOrderRef.current;
-    const resolved = typeof next === "function" ? next(current) : next;
+  function updateWidgetOrder(next: string[] | ((current: string[]) => string[]), source: "user" | "server" = "user") {
+    if (source === "user") {
+      layoutEditVersionRef.current += 1;
+    }
+    const resolved = typeof next === "function" ? next(widgetOrderRef.current) : next;
     widgetOrderRef.current = resolved;
     setWidgetOrder(resolved);
   }
 
-  function updateHiddenWidgets(next: string[] | ((current: string[]) => string[])) {
-    const current = hiddenWidgetsRef.current;
-    const resolved = typeof next === "function" ? next(current) : next;
+  function updateHiddenWidgets(next: string[] | ((current: string[]) => string[]), source: "user" | "server" = "user") {
+    if (source === "user") {
+      layoutEditVersionRef.current += 1;
+    }
+    const resolved = typeof next === "function" ? next(hiddenWidgetsRef.current) : next;
     hiddenWidgetsRef.current = resolved;
     setHiddenWidgets(resolved);
   }
 
-  function updateWindowDays(next: number) {
+  function updateWindowDays(next: number, source: "user" | "server" = "user") {
+    if (source === "user") {
+      layoutEditVersionRef.current += 1;
+    }
     windowDaysRef.current = next;
     setWindowDays(next);
   }
 
   async function load(activeWindowDays?: number) {
+    const loadVersion = loadVersionRef.current + 1;
+    loadVersionRef.current = loadVersion;
+    loadAbortRef.current?.abort();
+    const controller = new AbortController();
+    loadAbortRef.current = controller;
+    const request = (path: string) => apiFetch(path, { signal: controller.signal });
+    const isCurrentLoad = () => loadVersionRef.current === loadVersion && !controller.signal.aborted;
+    const layoutEditVersionAtLoadStart = layoutEditVersionRef.current;
     const selectedWindowDays = activeWindowDays || windowDays;
     setLoading(true);
     try {
-      const me = await apiFetch("/me");
+      const me = await request("/me");
+      if (!isCurrentLoad()) return;
       const normalizedPermissions = normalizePermissionSnapshot(me?.permissions);
       setPermissions(normalizedPermissions);
       setPermissionsReady(true);
@@ -218,36 +287,76 @@ export default function AnalyticsPage() {
       const scopedLocationId = activeLocationId || "all";
       const locationSuffix = `&locationId=${encodeURIComponent(scopedLocationId)}`;
 
-      const requests = [
-        apiFetch(`/analytics/executive?windowDays=${selectedWindowDays}${locationSuffix}`),
-        apiFetch(`/analytics/operations?windowDays=${selectedWindowDays}${locationSuffix}`),
-        apiFetch(`/analytics/customers?windowDays=${selectedWindowDays}${locationSuffix}`),
-        apiFetch(`/analytics/capacity?windowDays=7${locationSuffix}`),
-        apiFetch(`/analytics/benchmarks?windowDays=${selectedWindowDays}${locationSuffix}`),
-      ];
+      const settle = <T,>(promise: Promise<unknown>, setter: (value: T | null) => void) => {
+        void promise.then(
+          (value) => {
+            if (isCurrentLoad()) setter((value || null) as T | null);
+          },
+          () => {
+            if (isCurrentLoad()) setter(null);
+          },
+        );
+      };
+      settle<CustomersResponse>(
+        request(`/analytics/customers?windowDays=${selectedWindowDays}${locationSuffix}`),
+        setCustomers,
+      );
+      settle<CapacityResponse>(
+        request(`/analytics/capacity?windowDays=7${locationSuffix}`),
+        setCapacity,
+      );
+      settle<BillingAnalyticsResponse>(request("/billing/me"), setBilling);
+      settle<TrafficSummaryResponse>(request("/analytics/traffic/summary"), setTraffic);
+      settle<Phase1KWidgetsResponse>(request("/enterprise/phase-1k/reports/widgets"), setPhaseWidgets);
       if (normalizedPermissions["billing.manage"]) {
-        requests.push(apiFetch(`/analytics/revenue?windowDays=${selectedWindowDays}${locationSuffix}`));
+        settle<RevenueResponse>(
+          request(`/analytics/revenue?windowDays=${selectedWindowDays}${locationSuffix}`),
+          setRevenue,
+        );
+      } else {
+        setRevenue(null);
       }
 
-      const results = await Promise.all(requests);
-      setExecutive((results[0] || null) as ExecutiveResponse | null);
-      setOperations((results[1] || null) as OperationsResponse | null);
-      setCustomers((results[2] || null) as CustomersResponse | null);
-      setCapacity((results[3] || null) as CapacityResponse | null);
-      const benchmarksResponse = (results[4] || null) as BenchmarksResponse | null;
-      setBenchmarks(benchmarksResponse);
-      if (benchmarksResponse?.widgetLayout) {
-        updateWidgetOrder(benchmarksResponse.widgetLayout.widgetOrder || DEFAULT_WIDGET_ORDER);
-        updateHiddenWidgets(benchmarksResponse.widgetLayout.hiddenWidgets || []);
+      const [executiveResponse, operationsResponse, benchmarksResponse] = await Promise.all([
+        request(`/analytics/executive?windowDays=${selectedWindowDays}${locationSuffix}`),
+        request(`/analytics/operations?windowDays=${selectedWindowDays}${locationSuffix}`),
+        request(`/analytics/benchmarks?windowDays=${selectedWindowDays}${locationSuffix}`),
+      ]);
+      if (!isCurrentLoad()) return;
+      setExecutive((executiveResponse || null) as ExecutiveResponse | null);
+      setOperations((operationsResponse || null) as OperationsResponse | null);
+      const normalizedBenchmarks = (benchmarksResponse || null) as BenchmarksResponse | null;
+      const benchmarkLayout = {
+        widgetOrder: Array.isArray(normalizedBenchmarks?.widgetLayout?.widgetOrder)
+          ? normalizedBenchmarks?.widgetLayout?.widgetOrder
+          : DEFAULT_WIDGET_ORDER,
+        hiddenWidgets: Array.isArray(normalizedBenchmarks?.widgetLayout?.hiddenWidgets)
+          ? normalizedBenchmarks?.widgetLayout?.hiddenWidgets
+          : [],
+        defaultWindowDays: Math.max(7, Math.min(90, Number(normalizedBenchmarks?.widgetLayout?.defaultWindowDays || 30))),
+      };
+      setBenchmarks(normalizedBenchmarks);
+      if (normalizedBenchmarks?.widgetLayout && layoutEditVersionRef.current === layoutEditVersionAtLoadStart) {
+        updateWidgetOrder(benchmarkLayout.widgetOrder || DEFAULT_WIDGET_ORDER, "server");
+        updateHiddenWidgets(benchmarkLayout.hiddenWidgets || [], "server");
         if (!activeWindowDays) {
-          updateWindowDays(benchmarksResponse.widgetLayout.defaultWindowDays || selectedWindowDays);
+          updateWindowDays(benchmarkLayout.defaultWindowDays || selectedWindowDays, "server");
         }
+        initialLayoutRef.current = {
+          widgetOrder: [...(benchmarkLayout.widgetOrder || DEFAULT_WIDGET_ORDER)] as AnalyticsWidgetKey[],
+          hiddenWidgets: [...(benchmarkLayout.hiddenWidgets || [])] as AnalyticsWidgetKey[],
+          defaultWindowDays: benchmarkLayout.defaultWindowDays || selectedWindowDays,
+        };
       }
-      setRevenue(normalizedPermissions["billing.manage"] ? ((results[5] || null) as RevenueResponse | null) : null);
+
+      setLoading(false);
     } catch (error: any) {
+      if (controller.signal.aborted) return;
       showError(error?.message || "Failed to load analytics");
     } finally {
-      setLoading(false);
+      if (isCurrentLoad()) {
+        setLoading(false);
+      }
     }
   }
 
@@ -262,6 +371,9 @@ export default function AnalyticsPage() {
       return;
     }
     void load();
+    return () => {
+      loadAbortRef.current?.abort();
+    };
   }, [activeLocationId, enabled]);
 
   async function saveLayout(
@@ -270,6 +382,7 @@ export default function AnalyticsPage() {
     nextWindowDays = windowDaysRef.current,
   ) {
     if (!canManageLayout) return;
+    clearNotice();
     setSavingLayout(true);
     try {
       const settings = await apiFetch("/tenant/settings");
@@ -293,20 +406,46 @@ export default function AnalyticsPage() {
           },
         }),
       });
-      for (let attempt = 0; attempt < 4; attempt += 1) {
-        const refreshedSettings = await apiFetch("/tenant/settings");
-        const refreshedLayout = normalizeAnalyticsLayout(refreshedSettings?.businessConfigJson?.analytics);
+      const scopedLocationId = activeLocationId || "all";
+      const benchmarkPath = `/analytics/benchmarks?windowDays=${nextWindowDays}&locationId=${encodeURIComponent(scopedLocationId)}`;
+      for (let attempt = 0; attempt < 12; attempt += 1) {
+        const [refreshedSettings, refreshedBenchmarks] = await Promise.all([
+          apiFetch("/tenant/settings"),
+          apiFetch(benchmarkPath),
+        ]);
+        const refreshedLayout = getAnalyticsWorkspaceLayout(refreshedSettings as any);
+        const refreshedBenchmarkLayout = {
+          widgetOrder: Array.isArray(refreshedBenchmarks?.widgetLayout?.widgetOrder)
+            ? refreshedBenchmarks.widgetLayout.widgetOrder
+            : DEFAULT_WIDGET_ORDER,
+          hiddenWidgets: Array.isArray(refreshedBenchmarks?.widgetLayout?.hiddenWidgets)
+            ? refreshedBenchmarks.widgetLayout.hiddenWidgets
+            : [],
+          defaultWindowDays: Math.max(7, Math.min(90, Number(refreshedBenchmarks?.widgetLayout?.defaultWindowDays || 30))),
+        };
         if (
           arraysEqual(refreshedLayout.widgetOrder, nextOrder) &&
           arraysEqual(refreshedLayout.hiddenWidgets, nextHidden) &&
-          refreshedLayout.defaultWindowDays === nextWindowDays
+          refreshedLayout.defaultWindowDays === nextWindowDays &&
+          arraysEqual(refreshedBenchmarkLayout.widgetOrder, nextOrder) &&
+          arraysEqual(refreshedBenchmarkLayout.hiddenWidgets, nextHidden) &&
+          refreshedBenchmarkLayout.defaultWindowDays === nextWindowDays
         ) {
+          updateWidgetOrder(refreshedLayout.widgetOrder.length > 0 ? refreshedLayout.widgetOrder : DEFAULT_WIDGET_ORDER, "server");
+          updateHiddenWidgets(refreshedLayout.hiddenWidgets, "server");
+          updateWindowDays(refreshedLayout.defaultWindowDays, "server");
+          initialLayoutRef.current = {
+            widgetOrder: [...(refreshedLayout.widgetOrder.length > 0 ? refreshedLayout.widgetOrder : DEFAULT_WIDGET_ORDER)] as AnalyticsWidgetKey[],
+            hiddenWidgets: [...refreshedLayout.hiddenWidgets] as AnalyticsWidgetKey[],
+            defaultWindowDays: refreshedLayout.defaultWindowDays,
+          };
+          setBenchmarks((refreshedBenchmarks || null) as BenchmarksResponse | null);
           showSuccess("Analytics layout saved");
           return;
         }
-        await wait(150);
+        await wait(250);
       }
-      showSuccess("Analytics layout saved");
+      showError("Analytics layout is still saving. Please try again.");
     } catch (error: any) {
       showError(error?.message || "Failed to save analytics layout");
     } finally {
@@ -315,10 +454,293 @@ export default function AnalyticsPage() {
   }
 
   const orderedWidgets = useMemo(() => {
-    return Array.from(new Set([...widgetOrder, ...DEFAULT_WIDGET_ORDER]));
+    return Array.from(new Set([...widgetOrder, ...DEFAULT_WIDGET_ORDER])) as AnalyticsWidgetKey[];
   }, [widgetOrder]);
 
-  const visibleWidgets = orderedWidgets.filter((widgetKey) => !hiddenWidgets.includes(widgetKey));
+  const visibleWidgets = orderedWidgets.filter((widgetKey) => {
+    if (forceExecutiveSummary && widgetKey === "executive-summary") {
+      return true;
+    }
+    return !hiddenWidgets.includes(widgetKey);
+  });
+  const layoutDirty =
+    !arraysEqual(widgetOrder, initialLayoutRef.current.widgetOrder) ||
+    !arraysEqual(hiddenWidgets, initialLayoutRef.current.hiddenWidgets) ||
+    windowDays !== initialLayoutRef.current.defaultWindowDays;
+  const layoutAtDefaults =
+    arraysEqual(widgetOrder, DEFAULT_WIDGET_ORDER) &&
+    hiddenWidgets.length === 0 &&
+    windowDays === 30;
+  const ownerSnapshot = useMemo(() => {
+    if (!operations || !customers || !executive) return [];
+    return [
+      {
+        label: "Booking to job conversion",
+        value: formatMetricValue(operations.conversions.bookingsToJobsRate, "%"),
+        hint: `${operations.conversions.bookingsConverted} of ${operations.conversions.bookingsCreated} bookings converted in the current window.`,
+        href: "/dashboard/bookings",
+      },
+      {
+        label: "Completed job trend",
+        value: String(operations.jobs.completedSeries.at(-1)?.value ?? 0),
+        hint: "Latest daily completion value from authoritative analytics series.",
+        href: "/dashboard/jobs",
+      },
+      {
+        label: "Customers with overdue balances",
+        value: String(customers.summary.customersWithOverdueBalances),
+        hint: "Commercial follow-up pressure visible at customer level instead of just invoice count.",
+        href: "/dashboard/finance",
+      },
+      {
+        label: "Operational pressure",
+        value: String(executive.pressureAreas[0]?.value ?? 0),
+        hint: executive.pressureAreas[0]?.label || "No dominant pressure signal right now.",
+        href: executive.pressureAreas[0]?.href || "/dashboard/analytics",
+      },
+    ];
+  }, [customers, executive, operations]);
+  const pulseSummary = useMemo(() => {
+    if (!operations || !revenue || !capacity || !customers || !benchmarks) return [];
+    const conversionDelta = benchmarks.metrics.find((item) => item.key === "bookings_to_jobs_rate");
+    const paidDelta = benchmarks.metrics.find((item) => item.key === "invoice_issued_to_paid_rate");
+    const overloadedDelta = benchmarks.topPressureChanges.find((item) => item.key === "overloaded_days");
+    return [
+      {
+        label: "Revenue",
+        text:
+          revenue.funnel.invoiceIssuedToPaidRate !== null
+            ? paidDelta && paidDelta.delta !== 0
+              ? paidDelta.delta > 0
+                ? `Payments are arriving faster. ${formatMetricValue(revenue.funnel.invoiceIssuedToPaidRate, "%")} of issued invoices are paid in this window.`
+                : `Collections slowed a little. ${formatMetricValue(revenue.funnel.invoiceIssuedToPaidRate, "%")} of issued invoices are paid in this window.`
+              : `Cash collection is tracking at ${formatMetricValue(revenue.funnel.invoiceIssuedToPaidRate, "%")} in this window.`
+            : "Cash collection does not have enough live data yet.",
+        href: "/dashboard/finance",
+      },
+      {
+        label: "Demand",
+        text:
+          operations.conversions.bookingsToJobsRate !== null
+            ? conversionDelta && conversionDelta.delta !== 0
+              ? conversionDelta.delta > 0
+                ? `Customer requests are converting more often at ${formatMetricValue(operations.conversions.bookingsToJobsRate, "%")}.`
+                : `Bookings slowed this week. Conversion is ${formatMetricValue(operations.conversions.bookingsToJobsRate, "%")} right now.`
+              : `Most customer requests are converting at ${formatMetricValue(operations.conversions.bookingsToJobsRate, "%")}.`
+            : "Customer request conversion does not have enough live data yet.",
+        href: "/dashboard/bookings",
+      },
+      {
+        label: "Workload",
+        text:
+          capacity.summary.overloadedDays > 0
+            ? `${capacity.summary.overloadedDays} overloaded day${capacity.summary.overloadedDays === 1 ? "" : "s"} need attention.`
+            : overloadedDelta && overloadedDelta.delta > 0
+            ? "Workload is getting tighter. Keep an eye on the next few days."
+            : "Workload looks steady right now.",
+        href: "/dashboard/scheduling",
+      },
+      {
+        label: "Payments",
+        text:
+          customers.summary.customersWithOverdueBalances > 0
+            ? `${customers.summary.customersWithOverdueBalances} customer balance${customers.summary.customersWithOverdueBalances === 1 ? "" : "s"} need attention.`
+            : "Payments are up to date right now.",
+        href: "/dashboard/finance",
+      },
+    ];
+  }, [benchmarks, capacity, customers, operations, revenue]);
+
+  const phase6ForecastCards = useMemo(() => {
+    if (!operations || !capacity || !customers) return [];
+    const completedLast7 = (operations.jobs.completedSeries || []).slice(-7).reduce((sum, row) => sum + Number(row.value || 0), 0);
+    const createdLast7 = (operations.jobs.createdSeries || []).slice(-7).reduce((sum, row) => sum + Number(row.value || 0), 0);
+    const overdueValue = revenue?.overdueInvoices?.amountCents || 0;
+    const overloadedDays = capacity.summary.overloadedDays;
+    const lowConfidence = completedLast7 + createdLast7 < 5;
+    return [
+      {
+        key: "revenue",
+        title: "Revenue forecast",
+        value: revenue ? formatMoney(overdueValue) : "Unavailable",
+        source: revenue ? "Invoice aging and collection funnel" : "Finance permission required",
+        assumption: "Uses issued invoice and overdue balance history only.",
+        confidence: revenue ? (overdueValue > 0 ? "Medium" : "Low") : "Limited",
+        limitation: "No generated revenue prediction is shown when source records are insufficient.",
+        href: "/dashboard/finance",
+      },
+      {
+        key: "workload",
+        title: "Workload forecast",
+        value: `${createdLast7} created / ${completedLast7} completed`,
+        source: "Job creation and completion series",
+        assumption: "Compares the last seven visible job events with current open pressure.",
+        confidence: lowConfidence ? "Low" : "Medium",
+        limitation: "No route optimisation or synthetic demand is inferred.",
+        href: "/dashboard/jobs",
+      },
+      {
+        key: "technician_capacity",
+        title: "Technician capacity",
+        value: `${capacity.summary.technicians} technicians`,
+        source: "Scheduling capacity and technician utilisation",
+        assumption: "Uses scheduled minutes, available minutes, and overloaded-day counts.",
+        confidence: overloadedDays > 0 ? "Medium" : "Low",
+        limitation: "Holiday and sickness only affect the signal when they exist in capacity records.",
+        href: "/dashboard/scheduling",
+      },
+      {
+        key: "location_capacity",
+        title: "Location capacity",
+        value: activeLocationId === "all" ? "All locations" : "Filtered location",
+        source: "Active location filter and operational analytics",
+        assumption: "Location scope comes from the current workspace location context.",
+        confidence: activeLocationId === "all" ? "Medium" : "High",
+        limitation: "Location profitability appears only where cost and revenue records exist.",
+        href: "/dashboard/locations",
+      },
+      {
+        key: "invoice_risk",
+        title: "Unpaid invoice risk",
+        value: revenue ? String(revenue.overdueInvoices.count) : "Hidden",
+        source: "Overdue invoice aging buckets",
+        assumption: "Risk increases when overdue count or overdue value rises.",
+        confidence: revenue ? "Medium" : "Limited",
+        limitation: "This is not a payment prediction and never marks invoices paid optimistically.",
+        href: "/dashboard/finance",
+      },
+      {
+        key: "stock_demand",
+        title: "Stock demand trend",
+        value: `${operations.pressure.unassignedDueWork} due work`,
+        source: "Due work, recurring pressure, and inventory pressure panels",
+        assumption: "Stock pressure is surfaced from actual due work and inventory records.",
+        confidence: "Low",
+        limitation: "Supplier demand is not forecast without material usage history.",
+        href: "/dashboard/inventory",
+      },
+      {
+        key: "absence_impact",
+        title: "Holiday/sickness impact",
+        value: `${capacity.summary.overloadedDays} overloaded day${capacity.summary.overloadedDays === 1 ? "" : "s"}`,
+        source: "Capacity exceptions and scheduling pressure",
+        assumption: "Absence impact is only visible when capacity exceptions exist.",
+        confidence: capacity.summary.overloadedDays > 0 ? "Medium" : "Low",
+        limitation: "No staff absence is invented.",
+        href: "/dashboard/scheduling",
+      },
+      {
+        key: "completion_velocity",
+        title: "Completion velocity",
+        value: `${completedLast7} completed`,
+        source: "Authoritative completed job series",
+        assumption: "Uses completed job records in the selected analytics window.",
+        confidence: completedLast7 > 0 ? "Medium" : "Low",
+        limitation: "Completion velocity does not use assigned technician as performer.",
+        href: "/dashboard/jobs",
+      },
+    ];
+  }, [activeLocationId, capacity, customers, operations, revenue]);
+
+  const chartCards = useMemo(() => {
+    if (!operations || !capacity) return [];
+    const completedJobsRows = (operations.jobs.completedSeries || [])
+      .slice(-7)
+      .map((row) => ({ label: row.day.slice(5), value: row.value, tone: row.value > 0 ? "success" as const : "neutral" as const }));
+    const bookingConversionRows = [
+      { label: "Bookings created", value: operations.conversions.bookingsCreated, tone: "info" as const, detail: "Authoritative public and operator bookings in the selected window." },
+      { label: "Converted to jobs", value: operations.conversions.bookingsConverted, tone: "success" as const, detail: `${formatMetricValue(operations.conversions.bookingsToJobsRate, "%")} conversion rate.` },
+    ];
+    const technicianWorkloadRows = capacity.technicians
+      .slice(0, 5)
+      .map((row) => ({
+        label: row.technicianName,
+        value: Math.round(row.utilizationPct || 0),
+        tone: (row.utilizationPct || 0) >= 100 ? "critical" as const : (row.utilizationPct || 0) >= 80 ? "warning" as const : "info" as const,
+        detail: `${Math.round(row.scheduledMinutes / 60)}h scheduled · ${row.overloadedDays} overloaded days`,
+      }));
+    const jobPackRows = billing?.jobCompletionAllowance
+      ? [
+          { label: "Included used", value: Number(billing.jobCompletionAllowance.monthlyIncludedUsed || 0), tone: "info" as const },
+          { label: "Included remaining", value: Number(billing.jobCompletionAllowance.monthlyIncludedRemaining || 0), tone: "success" as const },
+          { label: "Purchased used", value: Number(billing.jobCompletionAllowance.purchasedCreditsUsed || 0), tone: "warning" as const },
+          { label: "Purchased remaining", value: Number(billing.jobCompletionAllowance.purchasedCreditsRemaining || 0), tone: "success" as const },
+        ]
+      : [];
+    const revenueFunnelRows = revenue
+      ? [
+          { label: "Quote to approved", value: Math.round(revenue.funnel.sentToApprovedRate || 0), tone: "info" as const },
+          { label: "Approved to job", value: Math.round(revenue.funnel.approvedToConvertedRate || 0), tone: "success" as const },
+          { label: "Issued to paid", value: Math.round(revenue.funnel.invoiceIssuedToPaidRate || 0), tone: "warning" as const },
+        ]
+      : [];
+    const overduePaymentRows = revenue
+      ? revenue.overdueInvoices.agingBuckets.map((bucket) => ({
+          label: bucket.label,
+          value: bucket.count,
+          tone: bucket.count > 0 ? "critical" as const : "neutral" as const,
+          detail: formatMoney(bucket.amountCents),
+        }))
+      : [];
+    return [
+      {
+        key: "completed-jobs",
+        title: "Jobs completed",
+        description: "Latest daily completion counts from the authoritative analytics series.",
+        icon: "work" as const,
+        rows: completedJobsRows,
+        testId: "analytics-chart-completed-jobs",
+      },
+      {
+        key: "revenue-funnel",
+        title: "Revenue funnel",
+        description: "Quote, conversion, and collection rates from live billing analytics.",
+        icon: "billing" as const,
+        rows: revenueFunnelRows,
+        testId: "analytics-chart-revenue-funnel",
+      },
+      {
+        key: "overdue-payments",
+        title: "Overdue payments",
+        description: "Invoice aging buckets by count, with authoritative overdue value in each bucket.",
+        icon: "billing" as const,
+        rows: overduePaymentRows,
+        testId: "analytics-chart-overdue-payments",
+      },
+      {
+        key: "booking-conversion",
+        title: "Booking conversion",
+        description: "Public and operator booking throughput against actual job conversion.",
+        icon: "calendar" as const,
+        rows: bookingConversionRows,
+        testId: "analytics-chart-booking-conversion",
+      },
+      {
+        key: "technician-workload",
+        title: "Technician workload",
+        description: "Utilization percentage by technician in the current capacity window.",
+        icon: "customers" as const,
+        rows: technicianWorkloadRows,
+        testId: "analytics-chart-technician-workload",
+      },
+      {
+        key: "job-pack-usage",
+        title: "Job-pack usage",
+        description: "Included and purchased completion allowance from the live billing ledger.",
+        icon: "spark" as const,
+        rows: jobPackRows,
+        testId: "analytics-chart-job-pack-usage",
+      },
+    ];
+  }, [billing?.jobCompletionAllowance, capacity, operations, revenue]);
+
+  function resetLayout() {
+    clearNotice();
+    updateWidgetOrder(DEFAULT_WIDGET_ORDER);
+    updateHiddenWidgets([]);
+    updateWindowDays(30);
+    void load(30);
+  }
   const stats = useMemo(() => {
     if (!executive) return [];
     return executive.summaryCards.map((card) => ({
@@ -333,14 +755,14 @@ export default function AnalyticsPage() {
       <DashboardShell>
         <div className="operator-stack">
           <OperatorPageHeader
-            eyebrow="Decision support"
+            eyebrow="Overview"
             title="Analytics"
-            subtitle="Enable Analytics V1 to open executive and operational benchmarking."
+            subtitle="Enable Analytics V1 to open the business pulse and trend view."
             stats={[]}
           />
           <OperatorEmptyStateCard
             title="Analytics are not enabled"
-            description="The analytics layer is feature-flagged and currently unavailable in this environment."
+            description="This analytics layer is feature-flagged and currently unavailable in this environment."
           />
         </div>
       </DashboardShell>
@@ -352,14 +774,14 @@ export default function AnalyticsPage() {
       <DashboardShell>
         <div className="operator-stack">
           <OperatorPageHeader
-            eyebrow="Decision support"
+            eyebrow="Overview"
             title="Analytics"
-            subtitle="Executive analytics is limited to roles with intelligence access."
+            subtitle="Analytics is limited to roles with intelligence access."
             stats={[]}
           />
           <OperatorEmptyStateCard
             title="Analytics access restricted"
-            description="Your role can’t access executive benchmarking, operational deltas, or capacity analytics."
+            description="Your role can’t open this view."
           />
         </div>
       </DashboardShell>
@@ -370,50 +792,67 @@ export default function AnalyticsPage() {
     <DashboardShell>
       <div className="operator-stack">
         <OperatorPageHeader
-          eyebrow="Decision support"
+          eyebrow="Overview"
           title="Analytics"
-          subtitle="Executive-grade operating metrics built from live tenant jobs, quotes, invoices, approvals, service plans, and technician capacity."
+          subtitle="Read the business pulse without reporting clutter getting in the way."
           actions={[
-            { label: "Performance", href: "/dashboard/performance", variant: "secondary" },
-            { label: "Intelligence", href: "/dashboard/intelligence", variant: "secondary" },
-            { label: "Revenue", href: "/dashboard/revenue", variant: "secondary" },
-            { label: "Scheduling", href: "/dashboard/scheduling" },
+            ...(canManageRevenue ? [{ label: "Revenue", href: "/dashboard/revenue", variant: "secondary" as const }] : []),
+            { label: "Open schedule", href: "/dashboard/scheduling" },
           ]}
-          shortcuts={[
-            "Benchmarks compare this tenant against its own previous periods",
-            "No forecasting or external benchmark claims are used",
-          ]}
+          shortcuts={["Benchmarks compare this workspace with its own recent pace", "Only live workspace data is shown here"]}
           stats={stats}
         />
 
         {activeLocationId !== "all" ? (
           <div className="card" style={{ marginBottom: 16 }}>
-            <p className="muted" style={{ margin: 0 }}>Analytics scope is filtered to the active business location selection.</p>
+            <p className="muted" style={{ margin: 0 }}>This view is filtered to the active business location.</p>
           </div>
         ) : null}
 
-        <OperatorGuidance
-          title="How to read this surface"
-          items={[
-            "Executive summary cards show current operating posture without hiding the underlying basis.",
-            "Pressure panels prioritize cash, dispatch, and recurring-work debt before it turns into missed revenue.",
-            "Benchmarks compare live tenant performance against the previous 7 and 30 day periods only.",
-          ]}
-        />
+        <OperatorNotice notice={savingLayout ? null : notice} onDismiss={clearNotice} />
 
-        <OperatorNotice notice={notice} onDismiss={clearNotice} />
+        {!loading && phase6ForecastCards.length ? (
+          <section className="card operator-section" data-testid="phase6-forecasting-engine">
+            <div className="operator-section__header">
+              <div>
+                <p className="operator-eyebrow">Forecasting</p>
+                <h2 className="operator-section__title">Evidence-led forecast signals</h2>
+                <p className="operator-section__subtitle">
+                  Real source data only. Every signal shows assumptions, confidence, and limitations instead of fabricated predictions.
+                </p>
+              </div>
+              <a className="button secondary" href="/dashboard/analytics">Open reports</a>
+            </div>
+            <div className="operator-grid operator-grid--four">
+              {phase6ForecastCards.map((card) => (
+                <a className="operator-mini-card mt-linkCard" href={card.href} key={card.key} data-testid={`phase6-forecast-${card.key}`}>
+                  <div className="operator-row">
+                    <strong>{card.title}</strong>
+                    <span className="operator-tag">{card.confidence}</span>
+                  </div>
+                  <p style={{ margin: "8px 0 0" }}><strong>{card.value}</strong></p>
+                  <p className="muted">Source data: {card.source}</p>
+                  <p className="muted">Assumption: {card.assumption}</p>
+                  <p className="muted">Limitation: {card.limitation}</p>
+                  <span className="mt-linkCard__action">Open source records</span>
+                </a>
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         <section className="card operator-section">
           <div className="operator-section__header">
             <div>
-              <h2 className="operator-section__title">Analytics controls</h2>
-              <p className="operator-section__subtitle">Change the default time range and widget layout only if you manage workspace settings.</p>
+                <h2 className="operator-section__title">Window</h2>
+              <p className="operator-section__subtitle">Keep this page focused on live insight. Layout choices stay in Settings.</p>
             </div>
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
               <label className="muted" htmlFor="analytics-window-range">Window</label>
               <select
                 id="analytics-window-range"
                 className="input"
+                data-testid="analytics-window-range"
                 value={windowDays}
                 onChange={(event) => {
                   const nextWindowDays = Number(event.target.value);
@@ -426,52 +865,111 @@ export default function AnalyticsPage() {
                 <option value={60}>60 days</option>
                 <option value={90}>90 days</option>
               </select>
-              {canManageLayout ? (
-                <button className="button secondary" type="button" disabled={savingLayout} onClick={() => void saveLayout()}>
-                  {savingLayout ? "Saving..." : "Save layout"}
-                </button>
-              ) : null}
+              {canManageLayout ? <Link className="button secondary" href="/dashboard/settings?tab=general">Open layout settings</Link> : null}
             </div>
           </div>
-          {canManageLayout ? (
-            <div style={{ display: "grid", gap: 10 }}>
-              {orderedWidgets.map((widgetKey) => {
-                const hidden = hiddenWidgets.includes(widgetKey);
-                return (
-                  <div key={widgetKey} className="integration-card" style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-                    <div>
-                      <strong>{widgetKey}</strong>
-                      <p className="muted" style={{ margin: "4px 0 0 0" }}>{hidden ? "Hidden from default layout" : "Visible in default layout"}</p>
-                    </div>
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                      <button className="button secondary" type="button" onClick={() => updateWidgetOrder((current) => moveItem(current, widgetKey, "up"))}>
-                        Move up
-                      </button>
-                      <button className="button secondary" type="button" onClick={() => updateWidgetOrder((current) => moveItem(current, widgetKey, "down"))}>
-                        Move down
-                      </button>
-                      <button
-                        className="button secondary"
-                        type="button"
-                        onClick={() => {
-                          updateHiddenWidgets((current) => current.includes(widgetKey)
-                            ? current.filter((item) => item !== widgetKey)
-                            : [...current, widgetKey]);
-                        }}
-                      >
-                        {hidden ? "Show widget" : "Hide widget"}
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <p className="muted" style={{ margin: 0 }}>Your role can view analytics but cannot change the saved layout.</p>
-          )}
+          <p className="muted" style={{ margin: 0 }}>
+            {canManageLayout
+              ? "Layout settings stay in Settings so this view stays focused on insight."
+              : "Your role can view analytics but cannot change the saved layout."}
+          </p>
         </section>
 
-        {loading ? <div className="operator-note" role="status">Loading analytics...</div> : null}
+        {loading ? <LoadingState title="Loading analytics" description="Bringing in live commercial, workload, and conversion signals." /> : null}
+
+        {!loading && phaseWidgets?.widgets?.length ? (
+          <section className="card operator-section" data-testid="phase1k-custom-kpi-widgets">
+            <div className="operator-section__header">
+              <div>
+                <h2 className="operator-section__title">Custom KPI widgets</h2>
+                <p className="operator-section__subtitle">Owner-selected operational signals using real workspace data only.</p>
+              </div>
+            </div>
+            <div className="analytics-stat-grid">
+              {phaseWidgets.widgets.map((widget) => (
+                <article key={widget.key} className="integration-card">
+                  <div className="operator-page__statLabel">{widget.label}</div>
+                  <div className="operator-page__statValue">{widget.value}</div>
+                  <div className="operator-page__statHint">{widget.source}</div>
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {!loading && visibleWidgets.length === 0 ? (
+          <OperatorEmptyStateCard
+            title="No analytics panels are showing"
+            description="Reset the saved layout to bring the default analytics view back."
+          />
+        ) : null}
+
+        {!loading && ownerSnapshot.length ? (
+          <section className="card operator-section" data-testid="analytics-owner-snapshot">
+            <div className="operator-section__header">
+              <div>
+                <h2 className="operator-section__title">Business pulse</h2>
+                <p className="operator-section__subtitle">Start with the few signals that best describe demand, completed work, collections pressure, and operating load.</p>
+              </div>
+            </div>
+            {pulseSummary.length ? (
+              <div className="mt-pulse-grid" style={{ marginBottom: 16 }}>
+                {pulseSummary.map((item) => (
+                  <Link key={item.label} href={item.href} className="mt-surface-note mt-linkCard">
+                    <strong>{item.label}</strong>
+                    <p className="muted" style={{ margin: "6px 0 0 0" }}>{item.text}</p>
+                    <span className="mt-linkCard__action">Open</span>
+                  </Link>
+                ))}
+              </div>
+            ) : null}
+            <div className="analytics-stat-grid">
+              {ownerSnapshot.map((item) => (
+                <Link key={item.label} href={item.href} className="integration-card mt-linkCard" data-testid={`analytics-owner-snapshot-${item.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}>
+                  <div className="operator-page__statLabel">{item.label}</div>
+                  <div className="operator-page__statValue">{item.value}</div>
+                  <div className="operator-page__statHint">{item.hint}</div>
+                  <span className="mt-linkCard__action">Open</span>
+                </Link>
+              ))}
+              <Link href="/dashboard/analytics" className="integration-card mt-linkCard" data-testid="analytics-owner-snapshot-booking-page-visits">
+                <div className="operator-page__statLabel">Booking page visits</div>
+                <div className="operator-page__statValue">{traffic?.surfaces?.publicBooking || 0}</div>
+                <div className="operator-page__statHint">{traffic?.visitsLast7Days || 0} safe first-party visits recorded in 7 days.</div>
+                <span className="mt-linkCard__action">Open</span>
+              </Link>
+              <Link href="/customer" className="integration-card mt-linkCard" data-testid="analytics-owner-snapshot-customer-workspace-visits">
+                <div className="operator-page__statLabel">Customer workspace visits</div>
+                <div className="operator-page__statValue">{traffic?.surfaces?.customerWorkspace || 0}</div>
+                <div className="operator-page__statHint">Anonymous sessions only; no raw IPs or public tokens are exposed.</div>
+                <span className="mt-linkCard__action">Open</span>
+              </Link>
+            </div>
+          </section>
+        ) : null}
+
+        {!loading ? (
+          <section className="card operator-section" data-testid="analytics-chart-suite">
+            <div className="operator-section__header">
+              <div>
+                <h2 className="operator-section__title">Operational view</h2>
+                <p className="operator-section__subtitle">A tighter chart set for completion, conversion, collections, workload, and job-pack use.</p>
+              </div>
+            </div>
+            <div className="two-col">
+              {chartCards.map((card) => (
+                <OperatorChartCard
+                  key={card.key}
+                  title={card.title}
+                  description={card.description}
+                  icon={card.icon}
+                  rows={card.rows}
+                  testId={card.testId}
+                />
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         {!loading && visibleWidgets.includes("executive-summary") && executive ? (
           <section className="card operator-section" data-testid="analytics-executive-summary">
@@ -481,7 +979,7 @@ export default function AnalyticsPage() {
                 <p className="operator-section__subtitle">Current operating posture plus the next focus signals most likely to move the business.</p>
               </div>
             </div>
-            <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+            <div className="analytics-stat-grid">
               {executive.summaryCards.map((card) => (
                 <div key={card.key} className="integration-card">
                   <div className="operator-page__statLabel">{card.label}</div>
@@ -537,10 +1035,10 @@ export default function AnalyticsPage() {
                 <div className="operator-table__cell"><a href="/dashboard/customers">Open CRM</a></div>
               </OperatorDataTableRow>
               <OperatorDataTableRow key="portal-adoption">
-                <div className="operator-table__cell"><strong>Portal adoption</strong></div>
+                <div className="operator-table__cell"><strong>Customer page use</strong></div>
                 <div className="operator-table__cell">{operations.adoption.activePortalAccounts}</div>
                 <div className="operator-table__cell">Active customer accounts show whether self-service is actually being used.</div>
-                <div className="operator-table__cell"><a href="/dashboard/portal">Open portal ops</a></div>
+                <div className="operator-table__cell"><a href="/dashboard/portal">Open customer-page ops</a></div>
               </OperatorDataTableRow>
             </OperatorDataTable>
           </section>
@@ -551,12 +1049,12 @@ export default function AnalyticsPage() {
             <div className="operator-section__header">
               <div>
                 <h2 className="operator-section__title">Revenue and collections</h2>
-                <p className="operator-section__subtitle">Quote conversion, invoice collection performance, and open revenue follow-through work.</p>
+                <p className="operator-section__subtitle">Quote conversion, collections performance, and the follow-through work that still needs attention.</p>
               </div>
             </div>
             {canManageRevenue && revenue ? (
               <>
-                <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+                <div className="analytics-stat-grid">
                   <div className="integration-card">
                     <div className="operator-page__statLabel">Quote sent to approved</div>
                     <div className="operator-page__statValue">{formatMetricValue(revenue.funnel.sentToApprovedRate, "%")}</div>
@@ -610,7 +1108,7 @@ export default function AnalyticsPage() {
                 <p className="operator-section__subtitle">Technician utilization plus recurring-work pressure already landing on the schedule.</p>
               </div>
             </div>
-            <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+            <div className="analytics-stat-grid">
               <div className="integration-card">
                 <div className="operator-page__statLabel">Technicians in view</div>
                 <div className="operator-page__statValue">{capacity.summary.technicians}</div>
@@ -682,7 +1180,7 @@ export default function AnalyticsPage() {
               ))}
             </OperatorDataTable>
 
-            <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+            <div className="analytics-stat-grid analytics-stat-grid--compact">
               <div className="integration-card">
                 <div className="operator-page__statLabel">Top pressure change</div>
                 <div className="operator-page__statValue">{benchmarks.topPressureChanges[0]?.label || "-"}</div>
@@ -702,8 +1200,8 @@ export default function AnalyticsPage() {
           </section>
         ) : null}
 
-        {!loading && customers ? (
-          <section className="card operator-section">
+        {!loading && visibleWidgets.includes("customer-commercial-signals") && customers ? (
+          <section className="card operator-section" data-testid="analytics-customer-commercial-signals">
             <div className="operator-section__header">
               <div>
                 <h2 className="operator-section__title">Customer commercial signals</h2>
@@ -732,4 +1230,8 @@ export default function AnalyticsPage() {
       </div>
     </DashboardShell>
   );
+}
+
+export default function AnalyticsPageRoute() {
+  return <AnalyticsPage />;
 }

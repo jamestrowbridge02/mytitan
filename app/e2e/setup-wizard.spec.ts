@@ -45,8 +45,9 @@ test.describe("guided setup continuity", () => {
     await loginAs(page, request, "e2e.operator@mytitan.local", "MyTitanE2E!2026");
 
     await page.goto("/dashboard/setup-wizard");
-    await expect(page.getByRole("heading", { name: "Setup" })).toBeVisible();
-    await page.getByRole("button", { name: "Next" }).evaluate((element: HTMLButtonElement) => element.click());
+    await expect(page.getByRole("heading", { name: "Set up your workspace" })).toBeVisible();
+    await expect(page.getByText(/set up the workspace, open the booking path, complete the first job, send the result, and get paid/i)).toBeVisible();
+    await page.getByRole("button", { name: "Save and continue" }).evaluate((element: HTMLButtonElement) => element.click());
     await page.getByTestId("guided-setup-company-name").fill("E2E Guided Setup Resume");
     await page.getByTestId("guided-setup-save-exit-header").evaluate((element: HTMLButtonElement) => element.click());
 
@@ -68,32 +69,40 @@ test.describe("guided setup continuity", () => {
     await loginAs(page, request, "e2e.operator@mytitan.local", "MyTitanE2E!2026");
 
     await page.goto("/dashboard/settings");
-    await page.getByRole("button", { name: /Resume guided setup|Review guided setup/i }).first().evaluate((element: HTMLButtonElement) => element.click());
+    await page.getByRole("button", { name: /Finish setup|Review setup/i }).first().evaluate((element: HTMLButtonElement) => element.click());
 
     await expect(page).toHaveURL(/\/dashboard\/setup-wizard$/);
-    await expect(page.getByRole("heading", { name: "Setup" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Set up your workspace" })).toBeVisible();
   });
 
-  test("billing and calendar setup stay truthful when Stripe is unavailable", async ({ page, request }) => {
+  test("billing and calendar setup stay truthful to Stripe readiness", async ({ page, request }) => {
     await installApiProxy(page, request);
     await loginAs(page, request, "e2e.operator@mytitan.local", "MyTitanE2E!2026");
 
     await page.goto("/dashboard/setup-wizard");
-    await page.getByRole("button", { name: "Next" }).evaluate((element: HTMLButtonElement) => element.click());
-    await expect(page.getByRole("heading", { name: "Business details" })).toBeVisible();
-    await page.getByRole("button", { name: "Next" }).evaluate((element: HTMLButtonElement) => element.click());
-    await expect(page.getByText(/^Services$/i)).toBeVisible();
-    await page.getByRole("button", { name: "Next" }).evaluate((element: HTMLButtonElement) => element.click());
+    await expect(page.getByRole("heading", { name: "Set up your workspace" })).toBeVisible();
+    await page.getByRole("button", { name: "Save and continue" }).evaluate((element: HTMLButtonElement) => element.click());
+    await expect(page.getByRole("heading", { name: "Your business" })).toBeVisible();
+    await page.getByRole("button", { name: "Save and continue" }).evaluate((element: HTMLButtonElement) => element.click());
+    await expect(page.getByRole("heading", { name: "Your services" })).toBeVisible();
+    await page.getByRole("button", { name: "Save and continue" }).evaluate((element: HTMLButtonElement) => element.click());
     const calendarStep = page.getByTestId("guided-setup-calendar-step");
     await expect(calendarStep).toBeVisible();
     await calendarStep.getByRole("checkbox").check();
     await page.getByTestId("guided-setup-start-time").fill("08:30");
     await page.getByTestId("guided-setup-end-time").fill("17:30");
-    await page.getByRole("button", { name: "Next" }).evaluate((element: HTMLButtonElement) => element.click());
+    await page.getByRole("button", { name: "Save and continue" }).evaluate((element: HTMLButtonElement) => element.click());
 
     const billingStep = page.getByTestId("guided-setup-billing-step");
-    await expect(billingStep).toContainText(/Stripe not ready|Stripe ready/i);
-    await expect(page.getByTestId("guided-setup-enable-payments")).toBeDisabled();
+    await expect(billingStep).toContainText(/Stripe is not ready|Stripe is ready/i);
+    await expect(billingStep).toContainText(/Manual follow-up stays available/i);
+    const billingCopy = (await billingStep.textContent()) || "";
+    const enablePayments = page.getByTestId("guided-setup-enable-payments");
+    if (/Stripe is ready/i.test(billingCopy)) {
+      await expect(enablePayments).toBeEnabled();
+    } else {
+      await expect(enablePayments).toBeDisabled();
+    }
   });
 
   test("calendar setup lets operators choose operating days", async ({ page, request }) => {
@@ -101,20 +110,23 @@ test.describe("guided setup continuity", () => {
     await loginAs(page, request, "e2e.operator@mytitan.local", "MyTitanE2E!2026");
 
     await page.goto("/dashboard/setup-wizard");
-    await page.getByRole("button", { name: "Next" }).evaluate((element: HTMLButtonElement) => element.click());
-    await expect(page.getByRole("heading", { name: "Business details" })).toBeVisible();
-    await page.getByRole("button", { name: "Next" }).evaluate((element: HTMLButtonElement) => element.click());
-    await expect(page.getByRole("heading", { name: "Services" })).toBeVisible();
-    await page.getByRole("button", { name: "Next" }).evaluate((element: HTMLButtonElement) => element.click());
+    await expect(page.getByRole("heading", { name: "Set up your workspace" })).toBeVisible();
+    await page.getByRole("button", { name: "Save and continue" }).evaluate((element: HTMLButtonElement) => element.click());
+    await expect(page.getByRole("heading", { name: "Your business" })).toBeVisible();
+    await page.getByRole("button", { name: "Save and continue" }).evaluate((element: HTMLButtonElement) => element.click());
+    await expect(page.getByRole("heading", { name: "Your services" })).toBeVisible();
+    await page.getByRole("button", { name: "Save and continue" }).evaluate((element: HTMLButtonElement) => element.click());
     const operatingDays = page.getByTestId("guided-setup-operating-days");
     await expect(operatingDays).toBeVisible();
     const saturdayButton = operatingDays.getByRole("button", { name: "Sat" });
-    await saturdayButton.click();
+    if ((await saturdayButton.getAttribute("aria-pressed")) !== "true") {
+      await saturdayButton.click();
+    }
     await expect(saturdayButton).toHaveAttribute("aria-pressed", "true");
     await page.getByTestId("guided-setup-start-time").fill("08:00");
     await page.getByTestId("guided-setup-end-time").fill("16:00");
-    await page.getByRole("button", { name: "Next" }).evaluate((element: HTMLButtonElement) => element.click());
-    await expect(page.getByRole("heading", { name: "Billing and payments" })).toBeVisible();
+    await page.getByRole("button", { name: "Save and continue" }).evaluate((element: HTMLButtonElement) => element.click());
+    await expect(page.getByRole("heading", { name: "Payments" })).toBeVisible();
 
     const token = await operatorToken();
     const statusResponse = await request.get("http://127.0.0.1:3000/guided-setup/status", {

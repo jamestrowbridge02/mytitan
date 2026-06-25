@@ -7,6 +7,7 @@ export type EntityAction = {
   onClick?: () => void;
   target?: string;
   rel?: string;
+  disabled?: boolean;
 };
 
 type EntityHeaderProps = {
@@ -42,7 +43,7 @@ function ActionButton({ action, primary }: { action: EntityAction; primary: bool
   }
 
   return (
-    <button className={className} type="button" onClick={action.onClick}>
+    <button className={className} type="button" onClick={action.onClick} disabled={action.disabled}>
       {action.label}
     </button>
   );
@@ -59,20 +60,12 @@ export default function EntityHeader({
   const hasActions = Boolean(primaryAction || secondaryActions.length);
 
   return (
-    <div className="card" style={{ marginBottom: 16 }}>
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 16,
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-        }}
-      >
-        <div style={{ flex: "1 1 260px", minWidth: 0 }}>
-          <h1 style={{ marginTop: 0, marginBottom: 6 }}>{title}</h1>
+    <div className="card entity-header" style={{ marginBottom: 16 }}>
+      <div className="entity-header__layout">
+        <div className="entity-header__main">
+          <h1 className="entity-header__title">{title}</h1>
           {subtitle ? (
-            <p className="muted" style={{ margin: 0 }}>
+            <p className="muted entity-header__subtitle">
               {subtitle}
             </p>
           ) : null}
@@ -83,15 +76,15 @@ export default function EntityHeader({
           ) : null}
         </div>
         {hasActions ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-start" }}>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+          <div className="entity-header__actions">
+            <div className="entity-header__actionRow">
               {primaryAction ? <ActionButton action={primaryAction} primary /> : null}
               {secondaryActions.map((action) => (
                 <ActionButton key={`${action.label}-${action.href || "button"}`} action={action} primary={false} />
               ))}
             </div>
             {primaryAction && primaryActionHint ? (
-              <p className="muted" style={{ margin: 0, fontSize: 13 }}>
+              <p className="muted entity-header__hint">
                 {primaryActionHint}
               </p>
             ) : null}

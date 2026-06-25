@@ -1,8 +1,11 @@
+import Link from "next/link";
 import { useRouter } from "next/router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { EntityArtifactsCard } from "../../../components/artifacts/EntityArtifactsCard";
 import { EntityCustomFieldsCard } from "../../../components/custom-fields/EntityCustomFieldsCard";
 import { DashboardShell } from "../../../components/dashboard-shell";
+import { OperatorActionTile } from "../../../components/ui/operator-insights";
+import { OperatorPageHeader } from "../../../components/ui/operator-page";
 import { apiFetch } from "../../../lib/api";
 import { emptyPermissionSnapshot, hasWorkspacePermission, normalizePermissionSnapshot } from "../../../lib/workspace-permissions";
 
@@ -21,9 +24,10 @@ export default function CustomerTimelinePage() {
   const [accountStatus, setAccountStatus] = useState<any>(null);
   const [approvalRequests, setApprovalRequests] = useState<any[]>([]);
   const [customerCommercial, setCustomerCommercial] = useState<any>(null);
-  const [inviteLink, setInviteLink] = useState("");
   const [actionBusy, setActionBusy] = useState(false);
+  const [paymentTermsDays, setPaymentTermsDays] = useState<string>("");
   const [permissions, setPermissions] = useState(() => emptyPermissionSnapshot());
+  const communicationCardRef = useRef<HTMLDivElement | null>(null);
   const canManagePortal = hasWorkspacePermission(permissions, "portal.manage");
   const recurringActivity = items.filter((item) => {
     const type = String(item?.type || "");
@@ -127,6 +131,7 @@ export default function CustomerTimelinePage() {
         if (typeof id === "string" && id) {
           resolved = await apiFetch(`/customers/${encodeURIComponent(id)}`);
           setCustomer(resolved || null);
+          setPaymentTermsDays(resolved?.paymentTermsDays == null ? "" : String(resolved.paymentTermsDays));
         }
       } catch {
         setCustomer(null);
@@ -135,6 +140,14 @@ export default function CustomerTimelinePage() {
     };
     void run();
   }, [router.isReady, id, name]);
+
+  useEffect(() => {
+    if (!router.isReady) return;
+    const focus = router.query.focus;
+    if (focus === "communications" && communicationCardRef.current) {
+      communicationCardRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [router.isReady, router.query.focus]);
 
   async function inviteCustomerAccount() {
     const customerKey =
@@ -148,11 +161,36 @@ export default function CustomerTimelinePage() {
         method: "POST",
         body: JSON.stringify({ customerId: customerKey }),
       });
-      setInviteLink(String(response?.activationUrl || ""));
-      setNotice("Customer account invite prepared");
-      await loadWorkspaceGovernance({ id: customerKey });
+      setNotice(String(response?.message || "Customer account invite processed"));
+      if (response?.status === "sent") {
+        await loadWorkspaceGovernance({ id: customerKey });
+      }
     } catch {
-      setNotice("Could not invite customer account");
+      setNotice("Could not send customer account invite");
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  async function savePaymentTerms() {
+    const customerKey = String(customer?.id || (typeof id === "string" ? id : ""));
+    if (!customerKey) return;
+    setActionBusy(true);
+    setNotice("");
+    try {
+      const updated = await apiFetch(`/customers/${encodeURIComponent(customerKey)}/payment-terms`, {
+        method: "PATCH",
+        body: JSON.stringify({ paymentTermsDays: paymentTermsDays === "" ? null : Number(paymentTermsDays) }),
+      });
+      const readback = await apiFetch(`/customers/${encodeURIComponent(customerKey)}`);
+      setCustomer(readback);
+      setPaymentTermsDays(readback?.paymentTermsDays == null ? "" : String(readback.paymentTermsDays));
+      if ((readback?.paymentTermsDays ?? null) !== (updated?.paymentTermsDays ?? null)) {
+        throw new Error("Saved value could not be verified.");
+      }
+      setNotice("Customer payment terms saved.");
+    } catch (nextError: any) {
+      setNotice(nextError?.message || "Customer payment terms could not be saved.");
     } finally {
       setActionBusy(false);
     }
@@ -182,21 +220,168 @@ export default function CustomerTimelinePage() {
     }
   }
 
+  const customerName = customer?.name || (typeof name === "string" && name ? name : `Customer ${typeof id === "string" ? id : ""}`);
+  const customerStats = useMemo(
+    () => [
+      {
+        label: "Activity",
+        value: String(items.length),
+        hint: items.length ? "Recent contact stays attached to the record" : "No activity recorded yet",
+      },
+      {
+        label: "Service plans",
+        value: String(servicePlans.length),
+        hint: servicePlans.length ? "Recurring work already linked" : "No recurring work linked yet",
+      },
+      {
+        label: "Quotes",
+        value: String(quotes.length),
+        hint: quotes.length ? "Commercial work is active" : "No open quote activity",
+      },
+      {
+        label: "Unpaid invoices",
+        value: String(Number(customerCommercial?.unpaidInvoiceCount || 0)),
+        hint: Number(customerCommercial?.overdueBalanceCents || 0)
+          ? `${new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 }).format(Number(customerCommercial?.overdueBalanceCents || 0) / 100)} overdue`
+          : "No overdue balance detected",
+      },
+    ],
+    [customerCommercial?.overdueBalanceCents, customerCommercial?.unpaidInvoiceCount, items.length, quotes.length, servicePlans.length],
+  );
+  const createLinkedJobHref = useMemo(() => {
+    const params = new URLSearchParams({
+      guided: "1",
+      entry: "work",
+      customerName,
+    });
+    if (customer?.email) params.set("customerEmail", customer.email);
+    if (customer?.phone) params.set("customerPhone", customer.phone);
+    return `/dashboard/jobs/new?${params.toString()}`;
+  }, [customer?.email, customer?.phone, customerName]);
+  const nextCustomerAction = useMemo(() => {
+    if (!accountStatus?.account && canManagePortal) {
+      return {
+        title: "Invite the customer account",
+        detail: "Create the workspace access path before follow-up becomes scattered across channels.",
+        actionLabel: actionBusy ? "Sending..." : "Invite account",
+        onClick: () => void inviteCustomerAccount(),
+      };
+    }
+    if (Number(customerCommercial?.openQuoteCount || 0) > 0) {
+      return {
+        title: "Quotes still need follow-through",
+        detail: "Commercial work is open, so the next step should stay visible from the customer record.",
+        actionLabel: "Open quotes",
+        href: "/dashboard/quotes",
+      };
+    }
+    if (Number(customerCommercial?.unpaidInvoiceCount || 0) > 0) {
+      return {
+        title: "Billing follow-up is waiting",
+        detail: "Customer money pressure should resolve through the billing workflow, not by hunting across screens.",
+        actionLabel: "Open finance",
+        href: "/dashboard/finance",
+      };
+    }
+    if (servicePlans.length > 0) {
+      return {
+        title: "Recurring work is active",
+        detail: "Use this record to keep scheduled work and customer communication in one place.",
+        actionLabel: "Open plans",
+        href: "/dashboard/service-plans",
+      };
+    }
+    return {
+      title: "The next update should stay close to the record",
+      detail: "Send the next SMS or email from here so the timeline stays operational instead of CRM-heavy.",
+      actionLabel: "Open communications",
+      onClick: () => communicationCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+    };
+  }, [accountStatus?.account, actionBusy, canManagePortal, customerCommercial?.openQuoteCount, customerCommercial?.unpaidInvoiceCount, servicePlans.length]);
+
   return (
     <DashboardShell>
-      <div data-customer-comms-timeline="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>
+      <div data-customer-comms-timeline="enabled" hidden>
         CUSTOMER_COMMS_TIMELINE_ENABLED
       </div>
-      <div data-customer-timeline="enabled" style={{ position: "absolute", left: -99999, top: -99999, width: 1, height: 1, overflow: "hidden" }}>
+      <div data-customer-timeline="enabled" hidden>
         CUSTOMER_TIMELINE_ENABLED
       </div>
 
-      <div className="card customer-timeline-card">
+      <div className="operator-stack">
+        <OperatorPageHeader
+          eyebrow="Customer flow"
+          title={customerName}
+          subtitle="Keep customer context, communication, recurring work, and commercial follow-through moving from one record."
+          actions={[
+            { label: "Create linked job", href: createLinkedJobHref },
+            { label: "Send update", onClick: () => communicationCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }) },
+            { label: "Open quotes", href: "/dashboard/quotes", variant: "secondary" },
+          ]}
+          shortcuts={["Use one record for communication, recurring work, and follow-through", "Keep the next step visible instead of switching between modules"]}
+          stats={customerStats}
+        />
+
+        <section className="operator-quickRail" data-testid="customer-detail-quick-rail">
+          <OperatorActionTile
+            title={nextCustomerAction.title}
+            description={nextCustomerAction.detail}
+            icon="spark"
+            tone="info"
+            action={
+              nextCustomerAction.href ? (
+                <Link className="button" href={nextCustomerAction.href}>
+                  {nextCustomerAction.actionLabel}
+                </Link>
+              ) : (
+                <button className="button" type="button" onClick={nextCustomerAction.onClick} disabled={actionBusy}>
+                  {nextCustomerAction.actionLabel}
+                </button>
+              )
+            }
+          />
+          <OperatorActionTile
+            title={accountStatus?.account ? "Customer access is connected" : "Customer access is not invited yet"}
+            description={
+              accountStatus?.account
+                ? `Status: ${accountStatus.account.status}. Keep account access and approvals visible from the same workflow.`
+                : "Invite access only when the customer should see documents or approvals directly."
+            }
+            icon="customers"
+            tone={accountStatus?.account ? "success" : "warning"}
+            action={
+              canManagePortal ? (
+                <button className="button secondary" type="button" onClick={() => void inviteCustomerAccount()} disabled={actionBusy}>
+                  {accountStatus?.account ? "Resend invite" : "Invite account"}
+                </button>
+              ) : (
+                <span className="muted">Portal access depends on your role permissions.</span>
+              )
+            }
+          />
+          <OperatorActionTile
+            title="Commercial pressure"
+            description={
+              customerCommercial
+                ? `${customerCommercial.openQuoteCount || 0} open quotes, ${customerCommercial.unpaidInvoiceCount || 0} unpaid invoices, ${customerCommercial.activeServicePlans || 0} active plans.`
+                : "Commercial analytics appear here once the customer has quotes, invoices, or recurring work."
+            }
+            icon="billing"
+            tone={Number(customerCommercial?.unpaidInvoiceCount || 0) > 0 ? "warning" : "neutral"}
+            action={
+              <Link className="button secondary" href={Number(customerCommercial?.unpaidInvoiceCount || 0) > 0 ? "/dashboard/finance" : "/dashboard/quotes"}>
+                {Number(customerCommercial?.unpaidInvoiceCount || 0) > 0 ? "Open finance" : "Open quotes"}
+              </Link>
+            }
+          />
+        </section>
+
+        <div className="card customer-timeline-card">
         <div className="customer-timeline-head">
           <div>
             <h1 className="settings-premium-title" style={{ marginTop: 0, marginBottom: 6 }}>Customer timeline</h1>
             <p className="muted settings-premium-muted" style={{ margin: 0 }}>
-              {customer?.name || (typeof name === "string" && name ? name : `Customer ${typeof id === "string" ? id : ""}`)}
+              {customerName}
             </p>
           </div>
         </div>
@@ -238,13 +423,8 @@ export default function CustomerTimelinePage() {
           {canManagePortal ? (
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
               <button className="button" type="button" onClick={() => void inviteCustomerAccount()} disabled={actionBusy} data-testid="customer-account-invite">
-                {actionBusy ? "Preparing..." : accountStatus?.account ? "Resend invite" : "Invite customer account"}
+                {actionBusy ? "Sending..." : accountStatus?.account ? "Resend invite" : "Invite customer account"}
               </button>
-              {inviteLink ? (
-                <a className="button secondary" href={inviteLink} target="_blank" rel="noreferrer noopener">
-                  Open activation link
-                </a>
-              ) : null}
             </div>
           ) : (
             <p className="muted" style={{ marginTop: 12 }}>Your role cannot manage customer account access.</p>
@@ -341,6 +521,26 @@ export default function CustomerTimelinePage() {
           )}
         </div>
 
+        <div className="card customer-comms-card" data-testid="customer-payment-terms">
+          <div className="customer-comms-head">
+            <h3 style={{ margin: 0 }}>Payment terms</h3>
+          </div>
+          <p className="muted">Leave blank to use the business default. Invoice-level terms can still override this value.</p>
+          <label htmlFor="customer-payment-terms-days">Days after invoice</label>
+          <input
+            id="customer-payment-terms-days"
+            className="input"
+            type="number"
+            min={0}
+            max={365}
+            value={paymentTermsDays}
+            onChange={(event) => setPaymentTermsDays(event.target.value)}
+          />
+          <button className="button" type="button" disabled={actionBusy} onClick={() => void savePaymentTerms()}>
+            {actionBusy ? "Saving..." : "Save payment terms"}
+          </button>
+        </div>
+
         <div className="card customer-comms-card" data-testid="customer-quotes">
           <div className="customer-comms-head">
             <h3 style={{ margin: 0 }}>Quotes</h3>
@@ -364,7 +564,7 @@ export default function CustomerTimelinePage() {
           )}
         </div>
 
-        <div className="card customer-comms-card">
+        <div className="card customer-comms-card" ref={communicationCardRef} data-testid="customer-communication-card">
           <div className="customer-comms-head">
             <h3 style={{ margin: 0 }}>Send communication</h3>
             {notice ? <div className="ccv2-toast ccv2-toast--info">{notice}</div> : null}
@@ -414,6 +614,7 @@ export default function CustomerTimelinePage() {
             <div className="muted">No customer activity recorded yet.</div>
           )}
         </div>
+      </div>
       </div>
     </DashboardShell>
   );

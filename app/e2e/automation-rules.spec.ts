@@ -44,7 +44,7 @@ test.describe("automation rules", () => {
     await expect(page.getByTestId("automation-rule-save")).toBeDisabled();
 
     await page.getByTestId("automation-template-technician-arrival-office-notification").evaluate((element: HTMLButtonElement) => element.click());
-    await expect(page.getByTestId("automation-rule-summary")).toContainText("technician arrived");
+    await expect(page.getByTestId("automation-rule-summary")).toContainText("team member arrived");
     await expect(page.getByTestId("automation-rule-validation-error")).toHaveCount(0);
     await expect(page.getByTestId("automation-rule-save")).toBeEnabled();
   });

@@ -16,6 +16,12 @@ type PortalInfo = {
   pdfDownloadAllowed?: boolean;
   supportEmail?: string | null;
   supportPhone?: string | null;
+  feedbackRequest?: {
+    enabled?: boolean;
+    promptText?: string | null;
+    publicReviewUrl?: string | null;
+    thankYouText?: string | null;
+  } | null;
   brand?: {
     tenantName?: string | null;
     logoUrl?: string | null;
@@ -35,6 +41,24 @@ type PortalInfo = {
     paymentMethod?: string | null;
     paymentStatus?: string | null;
     paymentAvailable?: boolean | null;
+    paymentRequest?: {
+      status?: string | null;
+      provider?: string | null;
+      providerLabel?: string | null;
+      amountCents?: number | null;
+      currency?: string | null;
+      dueAt?: string | null;
+      paidAt?: string | null;
+      manualMethod?: string | null;
+      amountReceivedCents?: number | null;
+      evidenceReceived?: boolean | null;
+      evidenceLabel?: string | null;
+      receiptNote?: string | null;
+      actionAvailable?: boolean | null;
+      actionUrl?: string | null;
+      manualInstructions?: string | null;
+      separationMessage?: string | null;
+    } | null;
     billingState?: string | null;
     nextCustomerStep?: string | null;
     invoiceOverdue?: boolean | null;
@@ -49,6 +73,51 @@ type PortalInfo = {
     createdAt?: string | null;
     downloadUrl?: string | null;
   }>;
+  booking?: {
+    enabled?: boolean;
+    available?: boolean;
+    bookingUrl?: string | null;
+    message?: string | null;
+    services?: Array<{
+      id: string;
+      name: string;
+      description?: string | null;
+      durationMinutes?: number | null;
+    }>;
+    nextSlots?: Array<{
+      serviceId: string;
+      serviceName: string;
+      startsAt: string;
+      endsAt: string;
+      date?: string | null;
+      bookingUrl?: string | null;
+    }>;
+  };
+  workHistory?: {
+    available?: boolean;
+    summary?: {
+      totalJobs?: number;
+      outstandingInvoices?: number;
+      paidJobs?: number;
+    };
+    jobs?: Array<{
+      id: string;
+      jobRef: string;
+      status?: string | null;
+      serviceName?: string | null;
+      createdAt?: string | null;
+      completedAt?: string | null;
+      invoiceIssuedAt?: string | null;
+      invoiceDueAt?: string | null;
+      invoicePaidAt?: string | null;
+      totalCents?: number | null;
+      currency?: string | null;
+      approvalState?: string | null;
+      billingState?: string | null;
+      vehicleLabel?: string | null;
+      active?: boolean;
+    }>;
+  };
   servicePlans?: Array<{
     id: string;
     name: string;
@@ -72,6 +141,72 @@ type PortalInfo = {
       } | null;
     }>;
   } | null;
+  journey?: {
+    enabled?: boolean;
+    currentStage?: string | null;
+    stages?: Array<{ key: string; label: string; state: string }>;
+    eta?: {
+      available?: boolean;
+      scheduledAt?: string | null;
+      windowStart?: string | null;
+      windowEnd?: string | null;
+      status?: string | null;
+      confidence?: string | null;
+      delayed?: boolean;
+      delayMinutes?: number;
+      customerNote?: string | null;
+      label?: string | null;
+      precisionNotice?: string | null;
+    };
+    appointment?: {
+      rescheduled?: boolean;
+    };
+    technician?: {
+      assigned?: boolean;
+      displayName?: string | null;
+      visible?: boolean;
+    };
+    statusUpdate?: string | null;
+    preparationChecklist?: string[];
+    trustNotice?: string | null;
+    recentUpdates?: Array<{ eventType?: string | null; message?: string | null; createdAt?: string | null }>;
+  };
+};
+
+type CustomerProfile = {
+  customerName?: string | null;
+  businessName?: string | null;
+  invoiceNumber?: string | null;
+  vatNumber?: string | null;
+  companyNumber?: string | null;
+  businessAddress?: {
+    formatted?: string | null;
+  } | null;
+  billingAddress?: {
+    formatted?: string | null;
+  } | null;
+  primaryContact?: {
+    name?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    mobile?: string | null;
+    summary?: string | null;
+  } | null;
+  secondaryContact?: {
+    name?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    mobile?: string | null;
+    summary?: string | null;
+  } | null;
+};
+
+type CustomerPresentation = {
+  displayName?: string | null;
+  accountLabel?: string | null;
+  businessDetails?: Array<{ label: string; value: string }>;
+  contactDetails?: Array<{ label: string; value: string }>;
+  billingDetails?: Array<{ label: string; value: string }>;
 };
 
 const formatDateTime = (value?: string | null) => {
@@ -82,6 +217,27 @@ const formatDateTime = (value?: string | null) => {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
+
+const formatDate = (value?: string | null) => {
+  if (!value) return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+};
+
+const formatTime = (value?: string | null) => {
+  if (!value) return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toLocaleTimeString('en-GB', {
     hour: '2-digit',
     minute: '2-digit',
   });
@@ -103,6 +259,15 @@ const formatPaymentMethod = (value?: string | null) => {
   return value;
 };
 
+const PORTAL_HERO_BACKGROUND =
+  'linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(239, 246, 255, 0.96) 100%)';
+const PORTAL_PANEL_BORDER = '1px solid rgba(148, 163, 184, 0.24)';
+const PORTAL_SUCCESS_BACKGROUND = '#ecfdf5';
+const PORTAL_SUCCESS_TEXT = '#0f766e';
+const PORTAL_ERROR_TEXT = '#b91c1c';
+const PORTAL_INFO_BACKGROUND = 'linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.98))';
+const PORTAL_STEP_SHADOW = '0 18px 42px rgba(15, 23, 42, 0.07)';
+
 function StepCard({
   title,
   description,
@@ -122,10 +287,12 @@ function StepCard({
     <section
       className="card"
       style={{
-        padding: 16,
+        padding: 18,
         marginTop: 14,
-        border: `1px solid ${done ? '#2f8f5b' : '#2a3042'}`,
+        border: done ? '1px solid rgba(15, 118, 110, 0.24)' : PORTAL_PANEL_BORDER,
         opacity: enabled ? 1 : 0.75,
+        background: PORTAL_INFO_BACKGROUND,
+        boxShadow: PORTAL_STEP_SHADOW,
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
@@ -137,18 +304,18 @@ function StepCard({
               alignItems: 'center',
               borderRadius: 999,
               padding: '4px 10px',
-              background: '#163e2a',
-              color: '#7ff3b0',
+              background: PORTAL_SUCCESS_BACKGROUND,
+              color: PORTAL_SUCCESS_TEXT,
               fontSize: 12,
               fontWeight: 700,
             }}
           >
-            Done
+            Completed
           </span>
         ) : null}
       </div>
-      <p className="muted" style={{ marginBottom: done ? 0 : 12 }}>{description}</p>
-      {done && summary ? <p className="muted" style={{ marginTop: 8 }}>{summary}</p> : null}
+      <p className="muted" style={{ marginBottom: done ? 0 : 12, color: '#526071' }}>{description}</p>
+      {done && summary ? <p className="muted" style={{ marginTop: 8, color: '#334155' }}>{summary}</p> : null}
       {!done ? <div>{children}</div> : null}
     </section>
   );
@@ -163,12 +330,64 @@ function StatusChip({ label, value }: { label: string; value: boolean }) {
         padding: '6px 10px',
         fontSize: 12,
         fontWeight: 700,
-        background: value ? '#163e2a' : '#2a3042',
-        color: value ? '#7ff3b0' : '#b8c3d8',
+        background: value ? PORTAL_SUCCESS_BACKGROUND : '#f8fafc',
+        color: value ? PORTAL_SUCCESS_TEXT : '#475569',
+        border: PORTAL_PANEL_BORDER,
       }}
     >
       {label}: {value ? 'Yes' : 'No'}
     </span>
+  );
+}
+
+function SectionCard({
+  title,
+  eyebrow,
+  children,
+  testId,
+}: {
+  title: string;
+  eyebrow?: string;
+  children: ReactNode;
+  testId?: string;
+}) {
+  return (
+    <section className="card" data-testid={testId} style={{ padding: 18, marginTop: 14, borderRadius: 16, background: PORTAL_INFO_BACKGROUND, boxShadow: PORTAL_STEP_SHADOW }}>
+      {eyebrow ? (
+        <p className="muted" style={{ margin: '0 0 6px 0', textTransform: 'uppercase', letterSpacing: '0.08em', fontSize: 11 }}>
+          {eyebrow}
+        </p>
+      ) : null}
+      <h3 style={{ marginTop: 0, marginBottom: 14 }}>{title}</h3>
+      {children}
+    </section>
+  );
+}
+
+function DetailRows({
+  rows,
+  columns = 1,
+}: {
+  rows: Array<{ label: string; value: ReactNode }>;
+  columns?: 1 | 2;
+}) {
+  if (!rows.length) return null;
+  return (
+    <dl
+      style={{
+        display: 'grid',
+        gridTemplateColumns: columns === 2 ? 'repeat(auto-fit, minmax(220px, 1fr))' : '1fr',
+        gap: 12,
+        margin: 0,
+      }}
+    >
+      {rows.map((row) => (
+        <div key={`${row.label}-${String(row.value)}`} style={{ padding: '12px 14px', border: PORTAL_PANEL_BORDER, borderRadius: 12, background: '#fff' }}>
+          <dt className="muted" style={{ marginBottom: 6, fontSize: 12 }}>{row.label}</dt>
+          <dd style={{ margin: 0, fontWeight: 600 }}>{row.value}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 
@@ -225,7 +444,7 @@ export default function PublicJobPortal() {
       setReceiptUrl(data?.receiptUrl || null);
       setPaymentConfigured(data?.configured !== false);
       if (data?.configured === false) {
-        setCheckoutHint('Secure payment updates are unavailable in this environment. Contact support to confirm payment status.');
+        setCheckoutHint('Online payment is not available right now. Please contact the business.');
         setStatus('Payment status cannot be refreshed here.');
         return;
       }
@@ -405,7 +624,7 @@ export default function PublicJobPortal() {
       if (!res.ok) {
         const message =
           res.status === 503 || res.status === 400
-            ? 'Secure payment is unavailable for this job right now. Please contact support to complete payment.'
+            ? 'Secure payment is unavailable for this job right now. Please contact the business directly to arrange payment.'
             : data?.message || 'Payment failed to start';
         setError(message);
         setPaymentConfigured(false);
@@ -421,7 +640,7 @@ export default function PublicJobPortal() {
         setPaymentConfigured(true);
         return;
       }
-      setError('Secure payment is unavailable for this job right now. Please contact support to complete payment.');
+      setError('Secure payment is unavailable for this job right now. Please contact the business directly to arrange payment.');
       setPaymentConfigured(false);
     } catch {
       setError('Payment failed to start');
@@ -438,9 +657,9 @@ export default function PublicJobPortal() {
     return (
       <div className="container">
         <div className="card">
-          <h1>Customer portal</h1>
-          {error && <p role="alert" style={{ color: '#ff8a8a' }}>{error}</p>}
-          {status && <p aria-live="polite" role="status" style={{ color: '#7bdba5' }}>{status}</p>}
+          <h1>Your completed work</h1>
+          {error && <p role="alert" style={{ color: PORTAL_ERROR_TEXT }}>{error}</p>}
+          {status && <p aria-live="polite" role="status" style={{ color: PORTAL_SUCCESS_TEXT }}>{status}</p>}
 
           {job && (
             <>
@@ -558,9 +777,9 @@ export default function PublicJobPortal() {
                     {pendingAction === 'pay' ? 'Opening payment...' : 'Pay securely'}
                   </button>
                 ) : (
-                  <p className="muted">Payments are not configured for this job.</p>
+                  <p className="muted">Customer payments are handled by the business payment setup, not MyTitan billing.</p>
                 )}
-                {paymentStatus ? <p className="muted">Payment status: {paymentStatus}</p> : null}
+                {paymentStatus ? <p className="muted">Payment: {paymentStatus}</p> : null}
                 {receiptUrl ? (
                   <p>
                     <a href={receiptUrl} target="_blank" rel="noreferrer">View receipt</a>
@@ -587,11 +806,10 @@ export default function PublicJobPortal() {
     marketplaceEnabled &&
     Boolean(portal?.enabled) &&
     Boolean(portal?.paymentsEnabled) &&
-    Boolean(portal?.stripeConfigured) &&
+    Boolean(portal?.summary?.paymentAvailable) &&
     paymentConfigured !== false;
   const brandColor = portal?.brand?.primaryColor || '#4fd1c5';
 
-  const step2Enabled = true;
   const step3Enabled = approvalDone && approved;
   const step4Enabled = step3Enabled;
   const step4Done = paid;
@@ -615,6 +833,8 @@ export default function PublicJobPortal() {
 
   const paidTime = formatDateTime(portal?.summary?.invoicePaidAt || job?.invoicePaidAt);
   const paymentAmount = formatMoney(portal?.summary?.totalCents ?? job?.totalCents, portal?.summary?.currency ?? job?.currency);
+  const paymentRequest = portal?.summary?.paymentRequest || null;
+  const paymentRequestAmount = formatMoney(paymentRequest?.amountCents, paymentRequest?.currency);
   const paymentMethod = formatPaymentMethod(
     portal?.summary?.paymentMethod ?? (job?.formData?.paymentMethod as string | undefined),
   );
@@ -624,10 +844,10 @@ export default function PublicJobPortal() {
         .join(' • ')
     : paymentsConfigured
       ? 'Payment pending'
-      : 'Payments not enabled';
+      : 'Handled directly by the business';
   const dueTime = formatDateTime(portal?.summary?.invoiceDueAt);
   const nextStepMessage = declined
-    ? 'This job is currently declined. Contact support if you need the scope corrected before continuing.'
+    ? 'This job is currently declined. Contact the business directly if the scope needs correcting before continuing.'
     : portal?.summary?.nextCustomerStep
       ? portal.summary.nextCustomerStep
       : !approved
@@ -636,41 +856,189 @@ export default function PublicJobPortal() {
           ? 'Add your signature to confirm the approved work.'
           : paymentsConfigured && !paid
             ? dueTime
-              ? `Payment is the next step. The current invoice is due by ${dueTime}. Once payment is complete, your receipt and PDF will be available here.`
-              : 'Payment is the next step. Once payment is complete, your receipt and PDF will be available here.'
+              ? `Payment is the next step. The current invoice is due by ${dueTime}. The business will confirm payment here after their provider updates them.`
+              : 'Payment is the next step. The business will confirm payment here after their provider updates them.'
             : !step5Done
-              ? 'Your PDF will unlock once the remaining steps complete.'
-              : 'Everything is complete. You can download the PDF or contact support if you need anything else.';
+              ? 'Your summary PDF will unlock once the remaining steps complete.'
+              : 'Everything is complete. You can download your service summary or contact the business directly if you need anything else.';
 
   const pdfSummary = step5Done ? (
     <>
-      PDF ready{' '}
+      Service summary ready{' '}
       <a href={`${API_BASE}/public/job/${tokenValue}/pdf`} target="_blank" rel="noreferrer">
         Download
       </a>
     </>
   ) : null;
 
-  const wheels = Array.isArray(job?.formData?.selectedWheels)
-    ? job.formData.selectedWheels
-    : Array.isArray(job?.formData?.wheels)
-      ? job.formData.wheels
-      : null;
-  const services = Array.isArray(job?.formData?.services)
-    ? job.formData.services
-    : job?.serviceName
-      ? [job.serviceName]
-      : [];
+  const customerProfile = (job?.customerProfile || null) as CustomerProfile | null;
+  const customerPresentation = (job?.customerPresentation || null) as CustomerPresentation | null;
+  const services = Array.isArray(job?.formData?.serviceTypes)
+    ? job.formData.serviceTypes
+    : Array.isArray(job?.formData?.services)
+      ? job.formData.services
+      : job?.serviceName
+        ? [job.serviceName]
+        : [];
+  const wheelPositions = Array.isArray(job?.formData?.wheelPositions)
+    ? job.formData.wheelPositions
+    : [];
+  const vehicleSummary = [job?.vehicleMake, job?.vehicleModel, job?.formData?.vehicleColour, job?.vehicleReg || job?.formData?.registration].filter(Boolean).join(' ');
+  const additionalServicePrice =
+    typeof job?.formData?.additionalServicePrice === 'number'
+      ? job.formData.additionalServicePrice
+      : Number(job?.formData?.additionalServicePrice || 0);
+  const additionalServicePriceLabel = additionalServicePrice > 0 && job?.currency
+    ? formatMoney(Math.round(additionalServicePrice * 100), job.currency)
+    : null;
+  const summaryRows = [
+    { label: 'Job reference', value: job?.jobRef || 'Not assigned' },
+    ...(job?.formData?.jobDate ? [{ label: 'Job date', value: formatDate(job.formData.jobDate) || job.formData.jobDate }] : []),
+    ...(job?.jobType || job?.formData?.jobType ? [{ label: 'Job type', value: job?.jobType || job?.formData?.jobType }] : []),
+    ...(job?.formData?.siteLocation ? [{ label: 'Site location', value: job.formData.siteLocation }] : []),
+    ...(vehicleSummary ? [{ label: 'Vehicle', value: vehicleSummary }] : []),
+    ...(services.length ? [{ label: 'Services', value: services.join(', ') }] : []),
+    ...(wheelPositions.length ? [{ label: 'Wheel positions', value: wheelPositions.join(', ') }] : []),
+    ...(job?.formData?.looseWheels ? [{ label: 'Loose wheels', value: String(job.formData.looseWheels) }] : []),
+    ...(job?.formData?.numberOfWheels ? [{ label: 'Number of wheels', value: String(job.formData.numberOfWheels) }] : []),
+    ...(job?.formData?.additionalServicesText ? [{ label: 'Additional services', value: String(job.formData.additionalServicesText) }] : []),
+    ...(additionalServicePriceLabel ? [{ label: 'Additional service price', value: additionalServicePriceLabel }] : []),
+    ...(job?.formData?.customerNotes || job?.formData?.jobNotes
+      ? [{ label: 'Notes', value: String(job.formData.customerNotes || job.formData.jobNotes) }]
+      : []),
+    ...(paymentAmount ? [{ label: 'Total due', value: paymentAmount }] : []),
+    ...(customerProfile?.invoiceNumber ? [{ label: 'Invoice number', value: customerProfile.invoiceNumber }] : []),
+  ];
+  const businessRows = customerPresentation?.businessDetails || [];
+  const contactRows = customerPresentation?.contactDetails || [];
+  const billingRows = customerPresentation?.billingDetails || [];
+  const bookingRows = (portal?.booking?.services || []).map((service) => ({
+    label: service.name,
+    value: service.durationMinutes ? `${service.durationMinutes} min visit` : 'Published service',
+  }));
+  const bookingSlots = portal?.booking?.nextSlots || [];
+  const historyJobs = portal?.workHistory?.jobs || [];
+  const actionStateRows = [
+    { label: 'Approval', value: approvalDone ? approvalSummary : 'Awaiting customer review' },
+    { label: 'Signature', value: signed ? signatureSummary : 'Awaiting signature' },
+    { label: 'Billing', value: humanizeUnderscoreLabel(portal?.summary?.billingState || (paid ? 'paid' : 'pre_invoice')) },
+    { label: 'Next step', value: nextStepMessage },
+  ];
+  const nextStepRows = [
+    { label: 'Current step', value: nextStepMessage },
+    {
+      label: 'Available now',
+      value: paid
+        ? 'Your receipt and service summary are ready to download.'
+        : pdfReady
+          ? 'Your service summary is ready below.'
+          : portal?.summary?.paymentAvailable
+            ? 'You can review, sign, and pay here.'
+            : 'Review the summary below and follow the guided steps.',
+    },
+  ];
+  const lifecycleRows = [
+    {
+      label: 'Completed work',
+      value: completed ? 'Complete' : 'In progress',
+    },
+    {
+      label: 'Customer confirmation',
+      value: signed ? 'Confirmed' : approved ? 'Waiting for signature' : 'Waiting for approval',
+    },
+    {
+      label: 'Payment',
+      value: paid ? 'Paid' : paymentsConfigured ? 'Pending with provider' : 'Handled directly by the team',
+    },
+  ];
+  const handoffStateLabel = declined
+    ? 'Waiting for scope confirmation'
+    : !approved
+      ? 'Waiting for approval'
+      : !signed
+        ? 'Waiting for signature'
+        : paid
+          ? 'Closed and paid'
+          : pdfReady
+            ? 'Service summary ready'
+            : paymentsConfigured
+              ? 'Waiting for payment'
+              : 'Waiting for final documents';
+  const handoffStateSummary = declined
+    ? 'The job has been declined for now. The team can review the scope and send an updated handoff if needed.'
+    : !approved
+      ? 'The completed work is ready for your review.'
+      : !signed
+        ? 'Approval is in place. Add your signature to finish this off.'
+        : paid
+          ? 'Everything is complete. Your receipt and service summary stay available here.'
+          : pdfReady
+            ? 'Your service summary is ready to review.'
+            : paymentsConfigured
+              ? 'The work is complete and payment is the final remaining step.'
+              : 'The work is complete and the team is preparing the final documents.';
+  const portalTrustRows = [
+    { label: 'Customer handoff', value: handoffStateLabel },
+    { label: 'Shared by', value: portal?.brand?.tenantName || 'MyTitan' },
+    { label: 'Service summary', value: pdfReady ? 'Ready' : 'Preparing from the completed job' },
+    {
+      label: 'Payment',
+      value: paid ? 'Paid and closed' : paymentsConfigured ? 'Waiting for provider update' : 'Handled through the business payment setup',
+    },
+  ];
+  const timelineRows = (portal?.timeline || []).map((item, index) => ({
+    key: `${item.eventType || 'event'}-${index}`,
+    title: item.message || item.eventType || 'Update',
+    subtitle: formatDateTime(item.createdAt) || 'Time unavailable',
+  }));
+  const journey = portal?.journey || null;
+  const journeyStages = journey?.stages || [];
+  const eta = journey?.eta || null;
+  const appointmentRows = [
+    { label: 'Appointment window', value: eta?.available ? eta.label || [formatTime(eta.windowStart), formatTime(eta.windowEnd)].filter(Boolean).join('-') : 'Window not confirmed yet' },
+    { label: 'Confidence', value: eta?.confidence ? humanizeUnderscoreLabel(eta.confidence) : 'Not available' },
+    { label: 'Technician', value: journey?.technician?.assigned ? journey.technician.visible && journey.technician.displayName ? journey.technician.displayName : 'Assigned' : 'Not assigned yet' },
+    { label: 'Progress', value: journey?.currentStage ? humanizeUnderscoreLabel(journey.currentStage) : handoffStateLabel },
+    ...(eta?.delayed ? [{ label: 'Delay', value: eta.delayMinutes ? `Running approximately ${eta.delayMinutes} minutes behind schedule` : 'Running behind schedule' }] : []),
+    ...(journey?.appointment?.rescheduled ? [{ label: 'Schedule update', value: 'This appointment was rescheduled by the team' }] : []),
+  ];
+  const brandBadge = (portal?.brand?.tenantName || 'Customer').slice(0, 1).toUpperCase();
+  const selfServiceRows = [
+    { label: 'Active status', value: handoffStateLabel },
+    { label: 'Booking history', value: historyJobs.length ? `${historyJobs.length} recent visit${historyJobs.length === 1 ? '' : 's'}` : 'No previous visits shown yet' },
+    { label: 'ETA window', value: eta?.available ? eta.label || [formatTime(eta.windowStart), formatTime(eta.windowEnd)].filter(Boolean).join('-') : 'Not shared yet' },
+    { label: 'Photos and documents', value: `${portal?.documents?.length || 0} shared file${Number(portal?.documents?.length || 0) === 1 ? '' : 's'}` },
+    { label: 'Invoices and receipts', value: portal?.summary?.receiptReady ? 'Receipt ready' : humanizeUnderscoreLabel(portal?.summary?.billingState || 'not_ready') },
+    { label: 'Warranty and service history', value: portal?.servicePlans?.length ? 'Service plan status available' : 'Ready when the business publishes coverage' },
+  ];
+  const contactHref = hasTenantPhone ? `tel:${tenantPhoneSanitized}` : `mailto:${supportEmail}`;
 
   return (
     <div className="container" style={{ maxWidth: 760 }}>
-      <div className="card" style={{ padding: 16 }}>
-        <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+      <div
+        className="card"
+        style={{
+          padding: 18,
+          borderRadius: 18,
+          background: PORTAL_HERO_BACKGROUND,
+        }}
+      >
+        <header style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
           <div>
-            <div style={{ marginBottom: 8 }}>
+            <p className="muted" style={{ margin: 0, textTransform: 'uppercase', letterSpacing: '0.08em', fontSize: 11 }}>
+              My service account
+            </p>
+            <h1 style={{ margin: '8px 0 6px 0', color: brandColor }}>{portal?.brand?.tenantName || 'Your service account'}</h1>
+            <p style={{ margin: 0, maxWidth: 520, fontSize: 16, lineHeight: 1.5 }}>
+              {customerPresentation?.displayName || job?.customerName || 'Customer'}
+              {customerPresentation?.accountLabel ? ` for ${customerPresentation.accountLabel}` : ''}.
+              {' '}
+              Check your visit status, completed work, documents, invoices, service history, and next booking options in one secure place.
+            </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
               <MyTitanLogo size="sm" />
+              <span className="muted" style={{ fontSize: 12 }}>Secure customer delivery via MyTitan</span>
             </div>
-            <h1 style={{ margin: '6px 0 0 0', color: brandColor }}>{portal?.brand?.tenantName || 'Customer portal'}</h1>
           </div>
           {portal?.brand?.logoUrl ? (
             <img
@@ -679,7 +1047,22 @@ export default function PublicJobPortal() {
               style={{ width: 52, height: 52, objectFit: 'contain', borderRadius: 10, background: '#fff' }}
             />
           ) : (
-            <MyTitanLogo variant="mark" size="sm" />
+            <div
+              aria-hidden="true"
+              style={{
+                width: 52,
+                height: 52,
+                borderRadius: 14,
+                display: 'grid',
+                placeItems: 'center',
+                fontWeight: 800,
+                fontSize: 22,
+                color: '#08111f',
+                background: brandColor,
+              }}
+            >
+              {brandBadge}
+            </div>
           )}
         </header>
 
@@ -690,35 +1073,273 @@ export default function PublicJobPortal() {
           <StatusChip label="Completed" value={completed} />
         </div>
 
-        <section className="card" data-testid="public-portal-billing-progress" style={{ padding: 16, marginTop: 14 }}>
-          <h3 style={{ marginTop: 0 }}>Billing progress</h3>
-          <div style={{ display: 'grid', gap: 8 }}>
-            <p style={{ margin: 0 }}>
-              <strong>Billing state:</strong> {humanizeUnderscoreLabel(portal?.summary?.billingState || (paid ? 'paid' : job?.invoiceIssuedAt ? 'invoice_issued' : 'pre_invoice'))}
-            </p>
-            {dueTime ? (
-              <p style={{ margin: 0 }}>
-                <strong>Invoice due:</strong> {dueTime}
-                {portal?.summary?.invoiceOverdue ? ' · overdue' : ''}
-              </p>
-            ) : null}
-            <p style={{ margin: 0 }}>
-              <strong>Payment availability:</strong> {portal?.summary?.paymentAvailable ? 'Secure payment available here' : 'Payment handoff not enabled for this job'}
-            </p>
-            <p style={{ margin: 0 }}>
-              <strong>Receipt:</strong> {portal?.summary?.receiptReady ? 'Available after payment' : 'Not available yet'}
+        <SectionCard title="Next steps" eyebrow="What happens now">
+          <div style={{ display: 'grid', gap: 12 }}>
+            <DetailRows rows={nextStepRows} columns={2} />
+            <DetailRows rows={lifecycleRows} columns={2} />
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Your service account" eyebrow="Self-service" testId="public-portal-self-service-hub">
+          <div style={{ display: 'grid', gap: 14 }}>
+            <DetailRows rows={selfServiceRows} columns={2} />
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+              {portal?.booking?.bookingUrl ? (
+                <a className="button secondary" data-testid="public-portal-rebook-action" href={portal.booking.bookingUrl}>
+                  Rebook
+                </a>
+              ) : null}
+              <a className="button secondary" data-testid="public-portal-contact-business" href={contactHref}>
+                Contact the team
+              </a>
+              {portal?.documents?.length ? (
+                <a className="button secondary" href="#documents">
+                  View documents
+                </a>
+              ) : null}
+            </div>
+            <p className="muted" style={{ margin: 0 }}>
+              {portal?.summary?.nextCustomerStep || portal?.booking?.message || 'Use this account page to check progress, documents, billing, feedback, and booking options shared by the business.'}
             </p>
           </div>
-        </section>
+        </SectionCard>
 
-        <section className="card" data-testid="public-portal-documents" style={{ padding: 16, marginTop: 14 }}>
-          <h3 style={{ marginTop: 0 }}>Documents</h3>
+        {journey?.enabled ? (
+          <SectionCard title="Visit progress" eyebrow="Journey and ETA" testId="public-portal-journey">
+            <div style={{ display: 'grid', gap: 14 }}>
+              <DetailRows rows={appointmentRows} columns={2} />
+              {journey.statusUpdate ? (
+                <div style={{ padding: '12px 14px', border: PORTAL_PANEL_BORDER, borderRadius: 12, background: '#fff' }}>
+                  <div style={{ fontWeight: 700, marginBottom: 4 }}>Latest customer update</div>
+                  <div className="muted">{journey.statusUpdate}</div>
+                </div>
+              ) : null}
+              {eta?.customerNote ? (
+                <p className="muted" style={{ margin: 0 }}>{eta.customerNote}</p>
+              ) : null}
+              <div data-testid="public-portal-journey-timeline" style={{ display: 'grid', gap: 8 }}>
+                {journeyStages.map((stage) => (
+                  <div
+                    key={stage.key}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '24px 1fr',
+                      gap: 10,
+                      alignItems: 'center',
+                      padding: '10px 12px',
+                      border: PORTAL_PANEL_BORDER,
+                      borderRadius: 12,
+                      background: stage.state === 'current' ? 'rgba(79, 209, 197, 0.13)' : '#fff',
+                    }}
+                  >
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        width: 16,
+                        height: 16,
+                        borderRadius: 999,
+                        background: stage.state === 'complete' ? PORTAL_SUCCESS_TEXT : stage.state === 'current' ? brandColor : '#cbd5e1',
+                      }}
+                    />
+                    <div>
+                      <div style={{ fontWeight: 700 }}>{stage.label}</div>
+                      <div className="muted" style={{ fontSize: 12 }}>{humanizeUnderscoreLabel(stage.state)}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {Array.isArray(journey.preparationChecklist) && journey.preparationChecklist.length ? (
+                <div style={{ border: PORTAL_PANEL_BORDER, borderRadius: 12, padding: '12px 14px', background: '#fff' }}>
+                  <div style={{ fontWeight: 700, marginBottom: 8 }}>Before your visit</div>
+                  <ul style={{ margin: 0, paddingLeft: 18 }}>
+                    {journey.preparationChecklist.map((item) => <li key={item}>{item}</li>)}
+                  </ul>
+                </div>
+              ) : null}
+              <p className="muted" style={{ margin: 0 }}>{eta?.precisionNotice || journey.trustNotice || 'Live GPS tracking is not used.'}</p>
+              <p className="muted" style={{ margin: 0 }}>No technician location or internal route is shared here.</p>
+            </div>
+          </SectionCard>
+        ) : null}
+
+        <SectionCard title="What happens next" eyebrow="Trusted delivery" testId="public-portal-handoff-status">
+          <div style={{ display: 'grid', gap: 12 }}>
+            <DetailRows rows={portalTrustRows} columns={2} />
+            <div style={{ padding: '12px 14px', border: PORTAL_PANEL_BORDER, borderRadius: 12, background: '#fff' }}>
+              <div style={{ fontWeight: 700, marginBottom: 6 }}>{handoffStateLabel}</div>
+              <div className="muted">{handoffStateSummary}</div>
+            </div>
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Service summary" eyebrow="Overview">
+          <DetailRows rows={summaryRows} columns={2} />
+        </SectionCard>
+
+        <SectionCard title="Customer details" eyebrow="Resolved identity">
+          <div style={{ display: 'grid', gap: 12 }}>
+            {businessRows.length ? <DetailRows rows={businessRows.map((row) => ({ label: row.label, value: row.value }))} columns={2} /> : null}
+            {contactRows.length ? <DetailRows rows={contactRows.map((row) => ({ label: row.label, value: row.value }))} columns={2} /> : null}
+            {billingRows.length ? <DetailRows rows={billingRows.map((row) => ({ label: row.label, value: row.value }))} columns={2} /> : null}
+            {!businessRows.length && !contactRows.length && !billingRows.length ? (
+              <p className="muted" style={{ margin: 0 }}>No customer business details have been published for this job yet.</p>
+            ) : null}
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Current progress" eyebrow="Live update">
+          <DetailRows rows={actionStateRows} columns={2} />
+        </SectionCard>
+
+        <SectionCard title="Billing and payment" eyebrow="Payments" testId="public-portal-billing-progress">
+          <DetailRows
+            rows={[
+              { label: 'Billing', value: humanizeUnderscoreLabel(portal?.summary?.billingState || (paid ? 'paid' : job?.invoiceIssuedAt ? 'invoice_issued' : 'pre_invoice')) },
+              ...(dueTime ? [{ label: 'Invoice due', value: `${dueTime}${portal?.summary?.invoiceOverdue ? ' · overdue' : ''}` }] : []),
+              { label: 'Payment route', value: paymentRequest?.providerLabel || (portal?.summary?.paymentAvailable ? 'Available through the business payment provider' : 'Handled by the business payment setup') },
+              ...(paymentRequestAmount ? [{ label: 'Amount due', value: paymentRequestAmount }] : []),
+              ...(paymentRequest?.status ? [{ label: 'Payment request', value: humanizeUnderscoreLabel(paymentRequest.status) }] : []),
+              ...(paymentRequest?.manualMethod ? [{ label: 'Manual method', value: humanizeUnderscoreLabel(paymentRequest.manualMethod) }] : []),
+              ...(paymentRequest?.amountReceivedCents ? [{ label: 'Received', value: formatMoney(paymentRequest.amountReceivedCents, paymentRequest.currency) }] : []),
+              ...(paymentRequest?.evidenceReceived ? [{ label: 'Evidence', value: paymentRequest.evidenceLabel || 'Received by the business' }] : []),
+              { label: 'Receipt', value: portal?.summary?.receiptReady ? 'Ready to download' : 'Not available yet' },
+            ]}
+            columns={2}
+          />
+          {paymentRequest?.manualInstructions ? (
+            <p className="muted" style={{ margin: '12px 0 0 0' }}>{paymentRequest.manualInstructions}</p>
+          ) : null}
+          {paymentRequest?.actionAvailable && paymentRequest?.actionUrl ? (
+            <a className="button" href={paymentRequest.actionUrl} style={{ marginTop: 12, display: 'inline-flex' }} rel="noreferrer noopener">
+              Pay securely
+            </a>
+          ) : null}
+          {paymentRequest?.receiptNote ? (
+            <p className="muted" style={{ margin: '6px 0 0 0' }}>{paymentRequest.receiptNote}</p>
+          ) : null}
+          {paymentRequest?.separationMessage ? (
+            <p className="muted" style={{ margin: '6px 0 0 0' }}>{paymentRequest.separationMessage}</p>
+          ) : null}
+        </SectionCard>
+
+        {portal?.feedbackRequest?.enabled ? (
+          <SectionCard title="Share feedback" eyebrow="Aftercare" testId="public-portal-feedback-card">
+            <div style={{ display: 'grid', gap: 12 }}>
+              <p style={{ margin: 0 }}>
+                {portal.feedbackRequest.promptText || "If the work went well, you can leave a quick rating or review for the team."}
+              </p>
+              {portal.feedbackRequest.publicReviewUrl ? (
+                <a className="button secondary" href={portal.feedbackRequest.publicReviewUrl} target="_blank" rel="noreferrer noopener">
+                  Leave feedback
+                </a>
+              ) : null}
+              {portal.feedbackRequest.thankYouText ? (
+                <p className="muted" style={{ margin: 0 }}>{portal.feedbackRequest.thankYouText}</p>
+              ) : null}
+            </div>
+          </SectionCard>
+        ) : null}
+
+        <SectionCard title="Book another visit" eyebrow="Availability" testId="public-portal-booking">
+          <div style={{ display: 'grid', gap: 12 }}>
+            <p style={{ margin: 0 }}>
+              {portal?.booking?.message || 'Online booking is not available here right now.'}
+            </p>
+            {bookingRows.length ? <DetailRows rows={bookingRows} columns={2} /> : null}
+            {bookingSlots.length ? (
+              <div style={{ display: 'grid', gap: 10 }}>
+                {bookingSlots.map((slot) => (
+                  <div
+                    key={`${slot.serviceId}-${slot.startsAt}`}
+                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, border: PORTAL_PANEL_BORDER, borderRadius: 12, padding: '12px 14px', background: '#fff' }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 600 }}>{slot.serviceName}</div>
+                      <div className="muted" style={{ marginTop: 4 }}>
+                        {[formatDate(slot.startsAt), formatTime(slot.startsAt)].filter(Boolean).join(' • ')}
+                      </div>
+                    </div>
+                    {slot.bookingUrl ? (
+                      <a className="button secondary" data-testid="public-portal-booking-link" href={slot.bookingUrl}>
+                        Book this time
+                      </a>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            {!bookingSlots.length && portal?.booking?.bookingUrl ? (
+              <a className="button secondary" data-testid="public-portal-booking-link" href={portal.booking.bookingUrl}>
+                Open booking page
+              </a>
+            ) : null}
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Service history" eyebrow="Your recent visits" testId="public-portal-work-history">
+          {historyJobs.length ? (
+            <div style={{ display: 'grid', gap: 10 }}>
+              {portal?.workHistory?.summary ? (
+                <DetailRows
+                  rows={[
+                    { label: 'Recent jobs shown', value: String(portal.workHistory.summary.totalJobs || historyJobs.length) },
+                    { label: 'Outstanding invoices', value: String(portal.workHistory.summary.outstandingInvoices || 0) },
+                    { label: 'Paid jobs', value: String(portal.workHistory.summary.paidJobs || 0) },
+                  ]}
+                  columns={2}
+                />
+              ) : null}
+              {historyJobs.map((entry) => (
+                <div
+                  key={entry.id}
+                  style={{
+                    border: PORTAL_PANEL_BORDER,
+                    borderRadius: 12,
+                    padding: '12px 14px',
+                    background: entry.active ? 'rgba(15, 118, 110, 0.06)' : '#fff',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+                    <div>
+                      <div style={{ fontWeight: 700 }}>
+                        {entry.jobRef}
+                        {entry.active ? ' · Current job' : ''}
+                      </div>
+                      <div className="muted" style={{ marginTop: 4 }}>
+                        {[entry.serviceName, entry.vehicleLabel, entry.status ? humanizeUnderscoreLabel(entry.status) : null].filter(Boolean).join(' • ')}
+                      </div>
+                    </div>
+                    <div style={{ fontWeight: 700 }}>
+                      {formatMoney(entry.totalCents, entry.currency) || 'Price pending'}
+                    </div>
+                  </div>
+                  <div className="muted" style={{ marginTop: 8 }}>
+                    {[
+                      entry.createdAt ? `Opened ${formatDate(entry.createdAt)}` : null,
+                      entry.completedAt ? `Completed ${formatDate(entry.completedAt)}` : null,
+                      entry.invoicePaidAt
+                        ? `Paid ${formatDate(entry.invoicePaidAt)}`
+                        : entry.invoiceIssuedAt
+                          ? `Invoice ${entry.invoiceDueAt ? `due ${formatDate(entry.invoiceDueAt)}` : 'issued'}`
+                          : 'Invoice not issued yet',
+                    ].filter(Boolean).join(' • ')}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="muted" style={{ marginBottom: 0 }}>No previous work history is available here yet.</p>
+          )}
+        </SectionCard>
+
+        <div id="documents">
+        <SectionCard title="Documents and downloads" eyebrow="Files" testId="public-portal-documents">
           {portal?.documents?.length ? (
             <div style={{ display: "grid", gap: 10 }}>
               {portal.documents.map((item) => (
                 <div
                   key={item.id}
-                  style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", border: "1px solid #2a3042", borderRadius: 12, padding: "12px 14px" }}
+                  style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", border: PORTAL_PANEL_BORDER, borderRadius: 12, padding: "12px 14px", background: "#fff" }}
                 >
                   <div>
                     <div style={{ fontWeight: 600 }}>{item.label}</div>
@@ -733,20 +1354,20 @@ export default function PublicJobPortal() {
                       target="_blank"
                       rel="noreferrer"
                     >
-                      Open
+                      Open file
                     </a>
                   ) : null}
                 </div>
               ))}
             </div>
           ) : (
-            <p className="muted" style={{ marginBottom: 0 }}>No customer-safe documents are available yet.</p>
+            <p className="muted" style={{ marginBottom: 0 }}>No shared documents are available yet.</p>
           )}
-        </section>
+        </SectionCard>
+        </div>
 
         {portal?.executionRecord ? (
-          <section className="card" style={{ padding: 16, marginTop: 14 }} data-testid="public-portal-completion-proof">
-            <h3 style={{ marginTop: 0 }}>Completion proof</h3>
+          <SectionCard title="This is your completed work" eyebrow="Shared proof" testId="public-portal-completion-proof">
             <p style={{ margin: 0 }}>
               <strong>Status:</strong> {portal.executionRecord.status || "Submitted"}
             </p>
@@ -758,29 +1379,28 @@ export default function PublicJobPortal() {
             <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
               {(portal.executionRecord.evidence || []).length ? (
                 portal.executionRecord.evidence?.map((item) => (
-                  <div key={item.id} style={{ display: "flex", justifyContent: "space-between", gap: 12, border: "1px solid #2a3042", borderRadius: 12, padding: "12px 14px" }}>
+                  <div key={item.id} style={{ display: "flex", justifyContent: "space-between", gap: 12, border: PORTAL_PANEL_BORDER, borderRadius: 12, padding: "12px 14px", background: "#fff" }}>
                     <div>
                       <div style={{ fontWeight: 600 }}>{item.label}</div>
                       <div className="muted" style={{ marginTop: 4 }}>{humanizeUnderscoreLabel(item.kind)}</div>
                     </div>
                     {item.artifact ? (
-                      <div className="muted">{item.artifact.label}</div>
+                      <div className="muted">Saved as {item.artifact.label}</div>
                     ) : null}
                   </div>
                 ))
               ) : (
-                <p className="muted" style={{ marginBottom: 0 }}>No customer-safe evidence has been published yet.</p>
+                <p className="muted" style={{ marginBottom: 0 }}>No shared evidence is available yet.</p>
               )}
             </div>
-          </section>
+          </SectionCard>
         ) : null}
 
         {portal?.servicePlans?.length ? (
-          <section className="card" style={{ padding: 16, marginTop: 14 }}>
-            <h3 style={{ marginTop: 0 }}>Service plan status</h3>
+          <SectionCard title="Service plan status" eyebrow="Ongoing coverage">
             <div style={{ display: "grid", gap: 10 }}>
               {portal.servicePlans.map((plan) => (
-                <div key={plan.id} style={{ border: "1px solid #2a3042", borderRadius: 12, padding: "12px 14px" }}>
+                <div key={plan.id} style={{ border: PORTAL_PANEL_BORDER, borderRadius: 12, padding: "12px 14px", background: "#fff" }}>
                   <div style={{ fontWeight: 600 }}>{plan.name}</div>
                   <div className="muted" style={{ marginTop: 4 }}>
                     {[plan.status, plan.nextRunAt ? `Next run ${formatDateTime(plan.nextRunAt)}` : null, plan.lastRunStatus ? `Last run ${plan.lastRunStatus}` : null]
@@ -790,47 +1410,32 @@ export default function PublicJobPortal() {
                 </div>
               ))}
             </div>
-          </section>
+          </SectionCard>
         ) : null}
 
-        <p className="muted" data-testid="public-portal-next-step" style={{ marginTop: 12 }}>{nextStepMessage}</p>
-
-        {error && <p data-testid="public-portal-error" role="alert" style={{ color: '#ff8a8a', marginTop: 12 }}>{error}</p>}
-        {status && <p aria-live="polite" data-testid="public-portal-status" role="status" style={{ color: '#7bdba5', marginTop: 12 }}>{status}</p>}
-
-        <StepCard
-          title="Step 1: Review job summary"
-          description="Confirm vehicle, work selected, and pricing before continuing."
-          done={false}
-          enabled={true}
-        >
-          <p><strong>Job:</strong> {job?.jobRef || 'N/A'}</p>
-          <p><strong>Vehicle:</strong> {job?.vehicleMake || ''} {job?.vehicleModel || ''} {job?.vehicleReg || ''}</p>
-          <p><strong>Registration:</strong> {job?.vehicleReg || 'Not provided'}</p>
-          <p><strong>Wheels selected:</strong> {wheels?.length ? wheels.join(', ') : 'Not specified'}</p>
-          <p><strong>Services:</strong> {services.length ? services.join(', ') : 'Not specified'}</p>
-          <p><strong>Pricing:</strong> {job?.currency} {(job?.subtotalCents / 100 || 0).toFixed(2)} subtotal</p>
-          <p><strong>Total:</strong> {job?.currency} {(job?.totalCents / 100 || 0).toFixed(2)}</p>
-          {portal?.timeline?.length ? (
-            <div style={{ marginTop: 16 }}>
-              <p><strong>Recent progress</strong></p>
-              <div style={{ display: 'grid', gap: 8 }}>
-                {portal.timeline.map((item, index) => (
-                  <div key={`${item.eventType || 'event'}-${index}`} style={{ padding: '10px 12px', border: '1px solid #2a3042', borderRadius: 12 }}>
-                    <div style={{ fontWeight: 600 }}>{item.message || item.eventType || 'Update'}</div>
-                    <div className="muted" style={{ marginTop: 4 }}>{formatDateTime(item.createdAt) || 'Time unavailable'}</div>
-                  </div>
-                ))}
-              </div>
+        {timelineRows.length ? (
+          <SectionCard title="Recent progress" eyebrow="Timeline">
+            <div style={{ display: 'grid', gap: 8 }}>
+              {timelineRows.map((item) => (
+                <div key={item.key} style={{ padding: '12px 14px', border: PORTAL_PANEL_BORDER, borderRadius: 12, background: '#fff' }}>
+                  <div style={{ fontWeight: 600 }}>{item.title}</div>
+                  <div className="muted" style={{ marginTop: 4 }}>{item.subtitle}</div>
+                </div>
+              ))}
             </div>
-          ) : null}
-        </StepCard>
+          </SectionCard>
+        ) : null}
+
+        <p className="muted" data-testid="public-portal-next-step" style={{ marginTop: 14 }}>{nextStepMessage}</p>
+
+        {error && <p data-testid="public-portal-error" role="alert" style={{ color: PORTAL_ERROR_TEXT, marginTop: 12 }}>{error}</p>}
+        {status && <p aria-live="polite" data-testid="public-portal-status" role="status" style={{ color: PORTAL_SUCCESS_TEXT, marginTop: 12 }}>{status}</p>}
 
         <StepCard
-          title="Step 2: Approve or Decline"
-          description={declined ? 'You declined this job.' : 'Approve to continue. Decline if details are not correct.'}
+          title="Approval"
+          description={declined ? 'This job is currently declined.' : 'Confirm the scope before work is accepted.'}
           done={approvalDone}
-          enabled={step2Enabled}
+          enabled={true}
           summary={approvalDone ? approvalSummary : null}
         >
           <label>Name</label>
@@ -842,25 +1447,25 @@ export default function PublicJobPortal() {
             </>
           ) : null}
           <div style={{ display: 'grid', gap: 10, marginTop: 10 }}>
-            <button className="button" data-testid="public-portal-approve" type="button" onClick={approve} style={{ width: '100%', minHeight: 46 }}>
-              Approve Job
+            <button className="button" data-testid="public-portal-approve" type="button" onClick={approve} disabled={pendingAction !== ''} style={{ width: '100%', minHeight: 46 }}>
+              {pendingAction === 'approve' ? 'Approving...' : 'Approve Job'}
             </button>
             {marketplaceEnabled ? (
-              <button className="button secondary" data-testid="public-portal-decline" type="button" onClick={decline} style={{ width: '100%', minHeight: 46 }}>
-                Decline Job
+              <button className="button secondary" data-testid="public-portal-decline" type="button" onClick={decline} disabled={pendingAction !== ''} style={{ width: '100%', minHeight: 46 }}>
+                {pendingAction === 'decline' ? 'Declining...' : 'Decline Job'}
               </button>
             ) : null}
           </div>
         </StepCard>
 
         <StepCard
-          title="Step 3: Sign"
+          title="Customer signature"
           description={
             step3Enabled
-              ? 'Draw your signature and save it.'
+              ? 'Add your signature to confirm the approved work.'
               : declined
-                ? 'Signing is disabled because this job was declined.'
-                : 'Complete Step 2 first.'
+                ? 'Signing is unavailable while this job is declined.'
+                : 'Approval is required before signing.'
           }
           done={signed}
           enabled={step3Enabled}
@@ -898,62 +1503,50 @@ export default function PublicJobPortal() {
         </StepCard>
 
         <StepCard
-          title="Step 4: Pay"
+          title="Payment"
           description={
             step4Enabled
               ? portal?.summary?.invoiceOverdue
-                ? 'Your invoice is overdue. Pay now or contact support if anything is unclear.'
+                ? 'Your invoice is overdue. Contact the team if anything is unclear.'
                 : dueTime
-                  ? `Pay now. The current invoice is due by ${dueTime}.`
-                  : 'Pay now, then come back and refresh your payment status.'
-              : 'Complete Step 3 first.'
+                  ? `The current invoice is due by ${dueTime}.`
+                  : 'The business will confirm payment here after their payment provider updates them.'
+              : 'Complete signing first.'
           }
           done={step4Done}
           enabled={step4Enabled}
           summary={step4Done ? paymentSummary : null}
         >
           {paid ? (
-            <p style={{ fontSize: 24, fontWeight: 800, color: '#7ff3b0', margin: 0 }}>Paid ✅</p>
+            <p style={{ fontSize: 24, fontWeight: 800, color: '#7ff3b0', margin: 0 }}>Payment complete</p>
           ) : paymentsConfigured ? (
             <div style={{ display: 'grid', gap: 10 }}>
               {portal?.summary?.billingState ? (
                 <p className="muted" style={{ margin: 0 }}>
-                  Billing state: {humanizeUnderscoreLabel(portal.summary.billingState)}
+                  Billing: {humanizeUnderscoreLabel(portal.summary.billingState)}
                 </p>
               ) : null}
-              <button className="button" data-testid="public-portal-pay" type="button" onClick={pay} disabled={!step4Enabled || pendingAction !== ''} style={{ width: '100%', minHeight: 46 }}>
-                {pendingAction === 'pay' ? 'Opening payment...' : 'Pay now'}
-              </button>
-              <button className="button secondary" data-testid="public-portal-refresh-payment" type="button" onClick={refreshPaymentStatus} disabled={pendingAction !== ''} style={{ width: '100%', minHeight: 46 }}>
-                {pendingAction === 'refresh-payment' ? 'Refreshing...' : 'Refresh payment status'}
-              </button>
-              {checkoutHint ? <p className="muted" style={{ margin: 0 }}>{checkoutHint}</p> : null}
-              {paymentStatus ? <p className="muted" style={{ margin: 0 }}>Payment status: {paymentStatus}</p> : null}
-              {receiptUrl ? (
-                <p style={{ margin: 0 }}>
-                  <a href={receiptUrl} target="_blank" rel="noreferrer">View receipt</a>
-                </p>
-              ) : null}
+              <p className="muted" style={{ margin: 0 }}>The business payment provider handles customer payment collection. MyTitan billing is separate from customer payments.</p>
             </div>
           ) : (
             <p className="muted" style={{ margin: 0 }}>
               {portal?.enabled && portal?.paymentsEnabled
-                ? 'Secure payment is unavailable for this workspace right now. Contact support to complete payment.'
-                : 'Secure payment is not enabled for this job.'}
+                ? 'Customer payments are handled by the business payment setup. Contact the team if you need payment help.'
+                : 'Customer payments are not enabled for this job.'}
             </p>
           )}
         </StepCard>
 
         <StepCard
-          title="Step 5: Download PDF"
+          title="Service summary PDF"
           description={
             step5Enabled
               ? pdfReady
-                ? 'Download your job PDF.'
-                : 'PDF generating. Please check back shortly.'
+                ? 'Download your service summary.'
+                : 'Your summary PDF is still being prepared. Please check back shortly.'
               : paymentsConfigured
-                ? 'Pay first to unlock download.'
-                : 'Complete signing first to unlock download.'
+                ? 'Payment is required before the download unlocks.'
+                : 'Complete signing first to unlock the summary.'
           }
           done={step5Done}
           enabled={step5Enabled}
@@ -972,23 +1565,24 @@ export default function PublicJobPortal() {
               }
             }}
           >
-            Download PDF
+            Download service summary PDF
           </a>
         </StepCard>
 
-        <section className="card" style={{ padding: 16, marginTop: 14 }}>
-          <h3 style={{ marginTop: 0 }}>Need help?</h3>
-          <p style={{ marginBottom: 8 }}>
-            Email: <a href={`mailto:${supportEmail}`}>{supportEmail}</a>
-          </p>
-          {hasTenantPhone ? (
-            <p style={{ margin: 0 }}>
-              WhatsApp: <a href={`https://wa.me/${tenantPhoneSanitized}`} target="_blank" rel="noreferrer">Message us</a>
-            </p>
-          ) : (
-            <p className="muted" style={{ margin: 0 }}>WhatsApp support is not available for this tenant.</p>
-          )}
-        </section>
+        <SectionCard title="Support" eyebrow="Need help?">
+          <DetailRows
+            rows={[
+              { label: 'Email', value: <a href={`mailto:${supportEmail}`}>{supportEmail}</a> },
+              {
+                label: 'WhatsApp',
+                value: hasTenantPhone
+                  ? <a href={`https://wa.me/${tenantPhoneSanitized}`} target="_blank" rel="noreferrer">Message us</a>
+                  : 'WhatsApp support is not available for this tenant.',
+              },
+            ]}
+            columns={2}
+          />
+        </SectionCard>
       </div>
     </div>
   );

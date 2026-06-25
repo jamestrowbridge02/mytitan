@@ -2,32 +2,48 @@ import { useEffect, useMemo, useState } from 'react';
 import { DashboardShell } from '../../components/dashboard-shell';
 import { apiFetch } from '../../lib/api';
 import { isLocationsAdvancedV1Enabled, isLocationsV1Enabled } from '../../lib/feature-flags';
+import { DEFAULT_WORKSPACE_TIMEZONE, fetchGeoDefaults, type GeoDefaults } from '../../lib/geo-defaults';
+import { formatBusinessTime, parseBusinessTime, weekdayHours } from '../../lib/business-hours';
+import { UPLOAD_LIMITS, validateUploadFile } from '../../lib/upload-policy';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+function createLocationForm(defaults?: GeoDefaults | null) {
+  return {
+    code: '',
+    name: '',
+    kind: 'BRANCH',
+    addressLine1: '',
+    addressLine2: '',
+    city: '',
+    state: '',
+    postalCode: '',
+    country: defaults?.country || '',
+    phone: '',
+    email: '',
+    timezone: defaults?.timezone || DEFAULT_WORKSPACE_TIMEZONE,
+    bookingLeadTimeMins: 0,
+    bookingCutoffMins: 0,
+    slotMinutes: 30,
+    arrivalInstructions: '',
+    parkingInstructions: '',
+    metadataJson: {} as Record<string, unknown>,
+    defaultAssigneeId: '',
+    staffUserIds: [] as string[],
+    hours: weekdayHours([1, 2, 3, 4, 5]),
+  };
+}
 
 export default function LocationsPage() {
   const enabled = isLocationsV1Enabled();
   const advancedEnabled = isLocationsAdvancedV1Enabled();
+  const [geoDefaults, setGeoDefaults] = useState<GeoDefaults | null>(null);
   const [items, setItems] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [memberships, setMemberships] = useState<any[]>([]);
   const [summary, setSummary] = useState<any>({ totals: {}, locations: [] });
   const [onlyMyLocation, setOnlyMyLocation] = useState(false);
-  const [form, setForm] = useState<any>({
-    code: '',
-    name: '',
-    kind: 'BRANCH',
-    addressLine1: '',
-    city: '',
-    country: 'UK',
-    phone: '',
-    email: '',
-    timezone: 'UTC',
-    bookingLeadTimeMins: 0,
-    defaultAssigneeId: '',
-    staffUserIds: [] as string[],
-    hours: WEEKDAYS.map((_, i) => ({ weekday: i, startMinute: i === 0 || i === 6 ? null : 540, endMinute: i === 0 || i === 6 ? null : 1020, isClosed: i === 0 || i === 6 })),
-  });
+  const [form, setForm] = useState<any>(() => createLocationForm());
   const [membershipForm, setMembershipForm] = useState<any>({
     userId: '',
     locationId: '',
@@ -36,8 +52,15 @@ export default function LocationsPage() {
   const [editingId, setEditingId] = useState<string>('');
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [savedSnapshot, setSavedSnapshot] = useState(() => JSON.stringify(createLocationForm()));
+  const [hourInputs, setHourInputs] = useState<Record<string, string>>({});
+  const [copyHoursLocationId, setCopyHoursLocationId] = useState('');
+  const [locationImageFile, setLocationImageFile] = useState<File | null>(null);
+  const [locationImagePreviewUrl, setLocationImagePreviewUrl] = useState('');
 
   const isFormValid = useMemo(() => String(form.name || '').trim().length > 0, [form.name]);
+  const isDirty = useMemo(() => JSON.stringify(form) !== savedSnapshot, [form, savedSnapshot]);
 
   async function load() {
     if (!enabled) return;
@@ -63,53 +86,126 @@ export default function LocationsPage() {
     load();
   }, [enabled]);
 
+  useEffect(() => {
+    let cancelled = false;
+    void fetchGeoDefaults().then((defaults) => {
+      if (cancelled) return;
+      setGeoDefaults(defaults);
+      setForm((prev: any) => {
+        if (editingId) return prev;
+        const next = { ...prev };
+        if (!String(prev.country || '').trim()) {
+          next.country = defaults.country || '';
+        }
+        if (!String(prev.timezone || '').trim() || prev.timezone === 'UTC') {
+          next.timezone = defaults.timezone || DEFAULT_WORKSPACE_TIMEZONE;
+        }
+        return next;
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [editingId]);
+
   function buildLocationPayload() {
     const normalize = (value: any) => {
       const next = typeof value === 'string' ? value.trim() : value;
       return next === '' ? undefined : next;
     };
     return {
-      ...form,
       code: normalize(form.code),
+      name: normalize(form.name),
+      kind: form.kind,
       addressLine1: normalize(form.addressLine1),
+      addressLine2: normalize(form.addressLine2),
       city: normalize(form.city),
-      country: normalize(form.country) || 'UK',
+      state: normalize(form.state),
+      postalCode: normalize(form.postalCode),
+      country: normalize(form.country) || normalize(geoDefaults?.country) || 'United Kingdom',
       phone: normalize(form.phone),
       email: normalize(form.email),
       timezone: normalize(form.timezone),
+      bookingLeadTimeMins: Math.max(0, Number(form.bookingLeadTimeMins || 0)),
       defaultAssigneeId: normalize(form.defaultAssigneeId),
+      staffUserIds: Array.isArray(form.staffUserIds) ? form.staffUserIds : [],
+      hours: Array.isArray(form.hours) ? form.hours : [],
+      metadataJson: {
+        ...(form.metadataJson && typeof form.metadataJson === 'object' ? form.metadataJson : {}),
+        bookingCutoffMins: Math.max(0, Number(form.bookingCutoffMins || 0)),
+        slotMinutes: Math.max(5, Number(form.slotMinutes || 30)),
+        arrivalInstructions: normalize(form.arrivalInstructions) || null,
+        parkingInstructions: normalize(form.parkingInstructions) || null,
+      },
     };
+  }
+
+  function validateHours() {
+    for (const hour of form.hours || []) {
+      if (hour.isClosed) continue;
+      if (!Number.isInteger(hour.startMinute) || !Number.isInteger(hour.endMinute)) {
+        throw new Error(`${WEEKDAYS[hour.weekday]} needs both an opening and closing time.`);
+      }
+      if (hour.endMinute <= hour.startMinute) {
+        throw new Error(`${WEEKDAYS[hour.weekday]} closing time must be later than opening time.`);
+      }
+    }
   }
 
   async function createLocation(e: React.FormEvent) {
     e.preventDefault();
+    if (saving || !isDirty) return;
     setError('');
     setStatus('');
+    setSaving(true);
     try {
+      validateHours();
       await apiFetch(editingId ? `/locations/${editingId}` : '/locations', {
         method: editingId ? 'PATCH' : 'POST',
         body: JSON.stringify(buildLocationPayload()),
       });
-      setForm({
-        code: '',
-        name: '',
-        kind: 'BRANCH',
-        addressLine1: '',
-        city: '',
-        country: 'UK',
-        phone: '',
-        email: '',
-        timezone: 'UTC',
-        bookingLeadTimeMins: 0,
-        defaultAssigneeId: '',
-        staffUserIds: [],
-        hours: WEEKDAYS.map((_, i) => ({ weekday: i, startMinute: i === 0 || i === 6 ? null : 540, endMinute: i === 0 || i === 6 ? null : 1020, isClosed: i === 0 || i === 6 })),
-      });
+      const nextForm = createLocationForm(geoDefaults);
+      setForm(nextForm);
+      setSavedSnapshot(JSON.stringify(nextForm));
       setEditingId('');
-      setStatus(editingId ? 'Location updated' : 'Location saved');
+      setLocationImageFile(null);
+      setHourInputs({});
+      setStatus(editingId ? 'Saved. The location details are up to date.' : 'Saved. Add another location or continue to booking settings.');
       await load();
     } catch (err: any) {
-      setError(err?.message || 'Failed to save location');
+      setError(`${err?.message || 'Failed to save location'}. Your entered details have been kept so you can correct the issue and try again.`);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function uploadLocationImage() {
+    if (!editingId || !locationImageFile) return;
+    setSaving(true);
+    setError('');
+    setStatus('');
+    try {
+      const body = new FormData();
+      body.append('file', locationImageFile);
+      const result = await apiFetch(`/locations/${editingId}/image`, { method: 'POST', body });
+      const nextForm = {
+        ...form,
+        metadataJson: {
+          ...(form.metadataJson && typeof form.metadataJson === 'object' ? form.metadataJson : {}),
+          imageUrl: result?.imageUrl || null,
+        },
+      };
+      setForm(nextForm);
+      setSavedSnapshot(JSON.stringify(nextForm));
+      setLocationImageFile(null);
+      if (locationImagePreviewUrl) URL.revokeObjectURL(locationImagePreviewUrl);
+      setLocationImagePreviewUrl('');
+      setStatus('Location image updated for public booking.');
+      await load();
+    } catch (err: any) {
+      setError(err?.message || 'Failed to upload the location image');
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -182,19 +278,96 @@ export default function LocationsPage() {
     setForm({ ...form, hours: next });
   }
 
+  function setHourInput(index: number, key: 'startMinute' | 'endMinute', value: string) {
+    const inputKey = `${index}-${key}`;
+    setHourInputs((current) => ({ ...current, [inputKey]: value }));
+    try {
+      const parsed = parseBusinessTime(value);
+      setHourValue(index, key, parsed);
+      setError('');
+    } catch (err: any) {
+      setHourValue(index, key, null);
+      setError(`${WEEKDAYS[form.hours[index].weekday]}: ${err?.message || 'Enter a valid time.'}`);
+    }
+  }
+
+  function applyHoursPreset(hours: any[], message: string) {
+    setForm({ ...form, hours });
+    setHourInputs({});
+    setError('');
+    setStatus(message);
+  }
+
+  function copyMondayToWeekdays() {
+    const monday = form.hours.find((hour: any) => hour.weekday === 1);
+    if (!monday) return;
+    applyHoursPreset(
+      form.hours.map((hour: any) => (
+        hour.weekday >= 1 && hour.weekday <= 5 ? { ...monday, weekday: hour.weekday } : hour
+      )),
+      'Monday hours copied to weekdays. Save the location to confirm.',
+    );
+  }
+
+  function copyHoursFromLocation() {
+    const source = items.find((location) => location.id === copyHoursLocationId);
+    if (!source?.businessHours?.length) {
+      setError('Choose a location with saved opening hours.');
+      return;
+    }
+    applyHoursPreset(
+      source.businessHours.map((hour: any) => ({
+        weekday: hour.weekday,
+        startMinute: hour.startMinute,
+        endMinute: hour.endMinute,
+        isClosed: Boolean(hour.isClosed),
+      })),
+      `Hours copied from ${source.name}. Save the location to confirm.`,
+    );
+  }
+
+  async function applyHoursToAllLocations() {
+    if (!editingId || isDirty) {
+      setError('Save this location first, then apply its saved hours to all active locations.');
+      return;
+    }
+    if (!window.confirm('Apply these saved hours to every other active location?')) return;
+    setSaving(true);
+    setError('');
+    try {
+      const result = await apiFetch(`/locations/${editingId}/hours/apply-all`, { method: 'POST' });
+      setStatus(`Hours applied to ${Number(result?.updatedLocations || 0)} active locations.`);
+      await load();
+    } catch (err: any) {
+      setError(err?.message || 'Hours could not be applied to all locations.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   function editLocation(location: any) {
+    const metadata = location.metadataJson && typeof location.metadataJson === 'object' ? location.metadataJson : {};
     setEditingId(location.id);
-    setForm({
+    setLocationImageFile(null);
+    const nextForm = {
       code: location.code || '',
       name: location.name || '',
       kind: location.kind || 'BRANCH',
       addressLine1: location.addressLine1 || '',
+      addressLine2: location.addressLine2 || '',
       city: location.city || '',
-      country: location.country || 'UK',
+      state: location.state || '',
+      postalCode: location.postalCode || '',
+      country: location.country || geoDefaults?.country || '',
       phone: location.phone || '',
       email: location.email || '',
       timezone: location.timezone || 'UTC',
       bookingLeadTimeMins: Number(location.bookingLeadTimeMins || 0),
+      bookingCutoffMins: Number(metadata.bookingCutoffMins || 0),
+      slotMinutes: Number(metadata.slotMinutes || 30),
+      arrivalInstructions: String(metadata.arrivalInstructions || ''),
+      parkingInstructions: String(metadata.parkingInstructions || ''),
+      metadataJson: metadata,
       defaultAssigneeId: location.defaultAssigneeId || '',
       staffUserIds: Array.isArray(location.memberships) ? location.memberships.filter((membership: any) => membership.active).map((membership: any) => membership.userId) : [],
       hours: Array.isArray(location.businessHours) && location.businessHours.length
@@ -204,8 +377,13 @@ export default function LocationsPage() {
             endMinute: hour.endMinute,
             isClosed: Boolean(hour.isClosed),
           }))
-        : WEEKDAYS.map((_, i) => ({ weekday: i, startMinute: i === 0 || i === 6 ? null : 540, endMinute: i === 0 || i === 6 ? null : 1020, isClosed: i === 0 || i === 6 })),
-    });
+        : weekdayHours([1, 2, 3, 4, 5]),
+    };
+    setForm(nextForm);
+    setHourInputs({});
+    setSavedSnapshot(JSON.stringify(nextForm));
+    setStatus('Edit mode. Unsaved changes will be shown here.');
+    setError('');
   }
 
   return (
@@ -248,6 +426,9 @@ export default function LocationsPage() {
 
       <div className="card" style={{ marginBottom: 16 }} data-testid="location-create">
         <h2 style={{ marginTop: 0 }}>{editingId ? 'Edit Location' : 'Add Location'}</h2>
+        <p className="muted" role="status" data-testid="location-save-state">
+          {saving ? 'Saving...' : isDirty ? 'Unsaved changes' : editingId ? 'Saved' : 'Ready for a new location'}
+        </p>
         <form onSubmit={createLocation}>
           <label>Code</label>
           <input
@@ -272,15 +453,91 @@ export default function LocationsPage() {
             <option value="FRANCHISE">Franchise</option>
           </select>
           <label>Address line 1</label>
-          <input className="input" value={form.addressLine1} onChange={(e) => setForm({ ...form, addressLine1: e.target.value })} />
-          <label>City</label>
-          <input className="input" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
+          <input className="input" data-testid="location-address-line-1" value={form.addressLine1} onChange={(e) => setForm({ ...form, addressLine1: e.target.value })} />
+          <label>Address line 2</label>
+          <input className="input" data-testid="location-address-line-2" value={form.addressLine2} onChange={(e) => setForm({ ...form, addressLine2: e.target.value })} />
+          <label>Town / City</label>
+          <input className="input" data-testid="location-city" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
+          <label>County / Region</label>
+          <input className="input" data-testid="location-region" value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} />
+          <label>Postcode</label>
+          <input className="input" data-testid="location-postcode" value={form.postalCode} onChange={(e) => setForm({ ...form, postalCode: e.target.value })} />
           <label>Country</label>
           <input className="input" value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value })} />
+          {!editingId ? (
+            <p className="muted" style={{ marginTop: 6 }}>
+              {geoDefaults?.detected && geoDefaults.country
+                ? `Detected from your connection. You can change it before saving.`
+                : 'Country stays editable and falls back safely if detection is unavailable.'}
+            </p>
+          ) : null}
           <label>Phone</label>
           <input className="input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
           <label>Email</label>
           <input className="input" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+          {editingId ? (
+            <div className="integration-card" data-testid="location-image-settings" style={{ margin: '14px 0' }}>
+              <div>
+                <strong>Public booking image</strong>
+                <p className="muted" style={{ margin: '4px 0 10px' }}>Shown on the location card. PNG, JPEG, or WebP up to 5 MB.</p>
+                {locationImagePreviewUrl || form.metadataJson?.imageUrl ? (
+                  <img
+                    src={locationImagePreviewUrl || String(form.metadataJson.imageUrl)}
+                    alt={`${form.name || 'Location'} preview`}
+                    data-testid="location-image-preview"
+                    style={{ width: 180, height: 110, objectFit: 'cover', borderRadius: 14, display: 'block' }}
+                  />
+                ) : null}
+              </div>
+              <div className="integration-actions">
+                <input
+                  id="location-image-file"
+                  className="visually-hidden"
+                  data-testid="location-image-input"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] || null;
+                    const validationError = file
+                      ? validateUploadFile(file, { category: 'image', maxBytes: UPLOAD_LIMITS.image })
+                      : null;
+                    if (validationError) {
+                      setError(validationError);
+                      event.currentTarget.value = '';
+                      return;
+                    }
+                    if (locationImagePreviewUrl) URL.revokeObjectURL(locationImagePreviewUrl);
+                    setLocationImageFile(file);
+                    setLocationImagePreviewUrl(file ? URL.createObjectURL(file) : '');
+                  }}
+                />
+                <label className="button secondary" htmlFor="location-image-file">Choose image</label>
+                <span data-testid="location-image-file-name">
+                  {locationImageFile ? locationImageFile.name : 'No image selected'}
+                </span>
+                {locationImageFile ? (
+                  <div data-testid="location-image-selection">
+                    <strong>{locationImageFile.name}</strong>
+                    <span className="muted" style={{ display: 'block' }}>{(locationImageFile.size / 1024).toFixed(1)} KB selected</span>
+                    <button className="button secondary" type="button" onClick={() => {
+                      if (locationImagePreviewUrl) URL.revokeObjectURL(locationImagePreviewUrl);
+                      setLocationImagePreviewUrl('');
+                      setLocationImageFile(null);
+                    }}>Clear</button>
+                  </div>
+                ) : null}
+                <button
+                  className="button secondary"
+                  data-testid="location-image-upload"
+                  type="button"
+                  disabled={!locationImageFile || saving}
+                  onClick={() => void uploadLocationImage()}
+                >
+                  Upload image
+                </button>
+              </div>
+            </div>
+          ) : null}
 
           {advancedEnabled ? (
             <>
@@ -288,6 +545,14 @@ export default function LocationsPage() {
               <input className="input" value={form.timezone} onChange={(e) => setForm({ ...form, timezone: e.target.value })} />
               <label>Booking lead time mins</label>
               <input className="input" type="number" value={form.bookingLeadTimeMins} onChange={(e) => setForm({ ...form, bookingLeadTimeMins: Number(e.target.value || 0) })} />
+              <label>Booking cutoff mins</label>
+              <input className="input" type="number" min={0} value={form.bookingCutoffMins} onChange={(e) => setForm({ ...form, bookingCutoffMins: Number(e.target.value || 0) })} />
+              <label>Booking slot length mins</label>
+              <input className="input" type="number" min={5} step={5} value={form.slotMinutes} onChange={(e) => setForm({ ...form, slotMinutes: Number(e.target.value || 30) })} />
+              <label>Arrival instructions</label>
+              <textarea className="input" value={form.arrivalInstructions} onChange={(e) => setForm({ ...form, arrivalInstructions: e.target.value })} />
+              <label>Parking instructions</label>
+              <textarea className="input" value={form.parkingInstructions} onChange={(e) => setForm({ ...form, parkingInstructions: e.target.value })} />
               <label>Default assignee</label>
               <select className="input" value={form.defaultAssigneeId} onChange={(e) => setForm({ ...form, defaultAssigneeId: e.target.value })}>
                 <option value="">None</option>
@@ -303,20 +568,58 @@ export default function LocationsPage() {
                 {users.map((u) => <option key={u.id} value={u.id}>{u.email}</option>)}
               </select>
               <h3>Hours</h3>
+              <p className="muted">Enter times as 08:00, 0800, 8:00, or 800. Saved hours use 24-hour time.</p>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                <button className="button secondary" type="button" onClick={() => applyHoursPreset(weekdayHours([1, 2, 3, 4, 5]), 'Mon-Fri 08:00-17:00 applied. Save to confirm.')}>Mon-Fri 08:00-17:00</button>
+                <button className="button secondary" type="button" onClick={() => applyHoursPreset(weekdayHours([1, 2, 3, 4, 5, 6]), 'Mon-Sat 08:00-17:00 applied. Save to confirm.')}>Mon-Sat 08:00-17:00</button>
+                <button className="button secondary" type="button" onClick={() => applyHoursPreset(weekdayHours([0, 1, 2, 3, 4, 5, 6], 0, 1440), '24/7 hours applied. Save to confirm.')}>24/7</button>
+                <button className="button secondary" type="button" onClick={() => applyHoursPreset(form.hours.map((hour: any) => hour.weekday === 0 || hour.weekday === 6 ? { ...hour, startMinute: null, endMinute: null, isClosed: true } : hour), 'Weekends closed. Save to confirm.')}>Closed weekends</button>
+                <button className="button secondary" type="button" onClick={copyMondayToWeekdays}>Copy Monday to weekdays</button>
+              </div>
               {form.hours.map((hour: any, idx: number) => (
                 <div key={hour.weekday} style={{ display: 'grid', gridTemplateColumns: '80px 120px 120px 120px', gap: 8, alignItems: 'center', marginBottom: 6 }}>
                   <strong>{WEEKDAYS[hour.weekday]}</strong>
-                  <input className="input" type="number" value={hour.startMinute ?? ''} onChange={(e) => setHourValue(idx, 'startMinute', e.target.value === '' ? null : Number(e.target.value))} />
-                  <input className="input" type="number" value={hour.endMinute ?? ''} onChange={(e) => setHourValue(idx, 'endMinute', e.target.value === '' ? null : Number(e.target.value))} />
-                  <label><input type="checkbox" checked={Boolean(hour.isClosed)} onChange={(e) => setHourValue(idx, 'isClosed', Boolean(e.target.checked))} /> Closed</label>
+                  <input aria-label={`${WEEKDAYS[hour.weekday]} opening time`} className="input" inputMode="numeric" placeholder="08:00" disabled={hour.isClosed} value={hourInputs[`${idx}-startMinute`] ?? formatBusinessTime(hour.startMinute)} onChange={(e) => setHourInput(idx, 'startMinute', e.target.value)} />
+                  <input aria-label={`${WEEKDAYS[hour.weekday]} closing time`} className="input" inputMode="numeric" placeholder="17:00" disabled={hour.isClosed} value={hourInputs[`${idx}-endMinute`] ?? formatBusinessTime(hour.endMinute)} onChange={(e) => setHourInput(idx, 'endMinute', e.target.value)} />
+                  <label><input type="checkbox" checked={Boolean(hour.isClosed)} onChange={(e) => {
+                    const isClosed = Boolean(e.target.checked);
+                    const next = [...form.hours];
+                    next[idx] = {
+                      ...next[idx],
+                      isClosed,
+                      startMinute: isClosed ? null : next[idx].startMinute ?? 8 * 60,
+                      endMinute: isClosed ? null : next[idx].endMinute ?? 17 * 60,
+                    };
+                    setForm({ ...form, hours: next });
+                    setHourInputs({});
+                  }} /> Closed</label>
                 </div>
               ))}
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(220px,1fr) auto', gap: 8, marginTop: 12 }}>
+                <select className="input" value={copyHoursLocationId} onChange={(event) => setCopyHoursLocationId(event.target.value)}>
+                  <option value="">Copy hours from another location</option>
+                  {items.filter((location) => location.id !== editingId).map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
+                </select>
+                <button className="button secondary" type="button" onClick={copyHoursFromLocation} disabled={!copyHoursLocationId}>Copy hours</button>
+              </div>
+              {editingId ? <button className="button secondary" style={{ marginTop: 8 }} type="button" onClick={() => void applyHoursToAllLocations()} disabled={saving}>Apply saved hours to all locations</button> : null}
+              <p className="muted"><a href="/dashboard/booking/settings">Manage holiday closures and special booking dates</a></p>
             </>
           ) : null}
 
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button className="button" data-testid="location-save" type="submit" disabled={!isFormValid}>{editingId ? 'Update location' : 'Save location'}</button>
-            {editingId ? <button className="button secondary" type="button" onClick={() => setEditingId('')}>Cancel edit</button> : null}
+            <button className="button" data-testid="location-save" type="submit" disabled={!isFormValid || !isDirty || saving}>
+              {saving ? 'Saving...' : editingId ? 'Save changes' : 'Save location'}
+            </button>
+            {editingId ? <button className="button secondary" type="button" disabled={saving} onClick={() => {
+              const nextForm = createLocationForm(geoDefaults);
+              setEditingId('');
+              setLocationImageFile(null);
+              setForm(nextForm);
+              setSavedSnapshot(JSON.stringify(nextForm));
+              setStatus('');
+              setError('');
+            }}>Cancel edit</button> : null}
           </div>
         </form>
       </div>
@@ -366,9 +669,20 @@ export default function LocationsPage() {
           {items.map((loc) => (
             <div key={loc.id} className="integration-card">
               <div>
-                <strong>{loc.name}</strong>
+                {loc.metadataJson?.imageUrl ? (
+                  <img
+                    src={String(loc.metadataJson.imageUrl)}
+                    alt=""
+                    loading="lazy"
+                    style={{ width: 92, height: 64, objectFit: 'cover', borderRadius: 12, marginBottom: 8 }}
+                  />
+                ) : null}
+                <strong style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span aria-hidden="true" style={{ width: 12, height: 12, borderRadius: 999, background: loc.color || '#C2410C', border: '1px solid currentColor' }} />
+                  {loc.name}
+                </strong>
                 <p className="muted" style={{ margin: '4px 0 0 0' }}>
-                  {[loc.code, loc.kind, loc.addressLine1, loc.city, loc.country].filter(Boolean).join(' • ')}
+                  {[loc.code, loc.kind, loc.addressLine1, loc.addressLine2, loc.city, loc.state, loc.postalCode, loc.country].filter(Boolean).join(' • ')}
                 </p>
                 {advancedEnabled ? (
                   <p className="muted" style={{ margin: '4px 0 0 0' }}>

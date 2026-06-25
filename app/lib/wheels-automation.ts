@@ -7,20 +7,31 @@ export function buildWhatsAppMessage(input: {
   name?: string | null;
   jobRef?: string | null;
   completedDate?: string | null;
+  completionLink?: string | null;
 }): string {
   const name = (input.name || 'Customer').trim();
   const jobRef = (input.jobRef || 'job').trim();
   const completedDate = (input.completedDate || new Date().toISOString().slice(0, 10)).trim();
+  const completionLink = (input.completionLink || '').trim();
   const template = (input.template || '').trim();
 
   if (!template) {
-    return `Hi ${name}, your wheels service ${jobRef} was completed on ${completedDate}.`;
+    return completionLink
+      ? `Hi ${name}, your service for ${jobRef} was completed on ${completedDate}. View your service record here: ${completionLink}`
+      : `Hi ${name}, your service for ${jobRef} was completed on ${completedDate}.`;
   }
 
-  return template
+  const rendered = template
     .replace(/\{\{\s*name\s*\}\}/gi, name)
     .replace(/\{\{\s*jobRef\s*\}\}/gi, jobRef)
-    .replace(/\{\{\s*completedDate\s*\}\}/gi, completedDate);
+    .replace(/\{\{\s*completedDate\s*\}\}/gi, completedDate)
+    .replace(/\{\{\s*completionLink\s*\}\}/gi, completionLink);
+
+  if (completionLink && !/\{\{\s*completionLink\s*\}\}/i.test(template) && !rendered.includes(completionLink)) {
+    return `${rendered} View your service record here: ${completionLink}`.trim();
+  }
+
+  return rendered;
 }
 
 export function applyPricingPreset(
@@ -40,6 +51,7 @@ export function computeTotals(input: {
   qty: number;
   wheelCount?: number;
   pricePerWheel?: number;
+  additionalServicePrice?: number;
   discount: number;
   vatEnabled: boolean;
   vatRate: number;
@@ -48,10 +60,11 @@ export function computeTotals(input: {
   const qty = Number.isFinite(input.qty) ? input.qty : 0;
   const wheelCount = Number.isFinite(input.wheelCount ?? 0) ? Number(input.wheelCount ?? 0) : 0;
   const pricePerWheel = Number.isFinite(input.pricePerWheel ?? 0) ? Number(input.pricePerWheel ?? 0) : 0;
+  const additionalServicePrice = Number.isFinite(input.additionalServicePrice ?? 0) ? Number(input.additionalServicePrice ?? 0) : 0;
   const discount = Number.isFinite(input.discount) ? input.discount : 0;
   const vatRate = Number.isFinite(input.vatRate) ? input.vatRate : 0;
 
-  const subtotal = Math.max(0, unitPrice * qty + pricePerWheel * wheelCount - discount);
+  const subtotal = Math.max(0, unitPrice * qty + pricePerWheel * wheelCount + additionalServicePrice - discount);
   const vat = input.vatEnabled ? Math.max(0, subtotal * (vatRate / 100)) : 0;
   return {
     subtotal,

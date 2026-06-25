@@ -1,5 +1,6 @@
 export type NavItem = {
   title: string;
+  sidebarTitle?: string;
   description?: string;
   href?: string;
   children?: NavItem[];
@@ -15,38 +16,46 @@ export type NavGroup = {
 
 export const NAV_GROUPS: NavGroup[] = [
   {
-    title: "",
+    title: "Complete Work",
     items: [
-      { title: "Dashboard", description: "Today at a glance", href: "/dashboard", icon: "dashboard" },
-      { title: "Command Centre", description: "Move live work, assign owners, and clear blockers", href: "/dashboard/command-centre-v2", icon: "command" },
-      { title: "Analytics", description: "Performance and trends", href: "/dashboard/analytics", icon: "analytics" },
-      { title: "Compliance", description: "Checks and controls", href: "/dashboard/compliance", icon: "shield" },
+      { title: "Dashboard", description: "Business pulse and the next decision", href: "/dashboard", icon: "dashboard" },
+      { title: "Complete Work", sidebarTitle: "Work", description: "Open the main job sheet path", href: "/dashboard/work", icon: "work" },
+      { title: "Assigned work", sidebarTitle: "Assigned", description: "Assigned jobs, ETA, evidence, and field actions", href: "/dashboard/technician", icon: "technician" },
+      { title: "Live Work", description: "Run the active day from one command view", href: "/dashboard/command-centre-v2", icon: "command" },
+      { title: "Jobs", description: "Authoritative work records and follow-through", href: "/dashboard/jobs", icon: "jobs" },
+      { title: "Calendar", description: "Book work by shaping capacity, timing, and assignment flow", href: "/dashboard/calendar", icon: "calendar" },
+      { title: "Bookings", description: "Turn new demand into scheduled work", href: "/dashboard/bookings", icon: "bookings" },
+      { title: "Grow Business", sidebarTitle: "Reports", description: "See workload, revenue, and benchmark movement", href: "/dashboard/analytics", icon: "analytics" },
+      { title: "Compliance", description: "Find what needs attention before it becomes drag", href: "/dashboard/compliance", icon: "shield" },
+      { title: "Assets & Tools", sidebarTitle: "Assets", description: "Equipment checkout, maintenance, and availability", href: "/dashboard/assets", icon: "assets" },
     ],
   },
   {
-    title: "Operations",
+    title: "Get Customers",
     items: [
-      { title: "Jobs", description: "All live, upcoming, and finished jobs", href: "/dashboard/jobs", icon: "jobs" },
-      { title: "Scheduling", description: "Who is free, busy, or overloaded", href: "/dashboard/scheduling", icon: "calendar" },
-      { title: "Bookings", description: "New requests and appointments", href: "/dashboard/bookings", icon: "bookings" },
-      { title: "Customers", description: "Contact details, updates, and job history", href: "/dashboard/customers", icon: "customers" },
+      { title: "Get Customers", sidebarTitle: "Customers", description: "Relationship history, context, and follow-up in one place", href: "/dashboard/customers", icon: "customers" },
       { title: "Communications", sidebarTitle: "Comms", description: "Customer messages, portal updates, and delivery status", href: "/dashboard/communications", icon: "mail" },
-      { title: "Service Plans", description: "Repeat work and renewals", href: "/dashboard/service-plans", icon: "plans" },
+      { title: "Portal", sidebarTitle: "Customer page", description: "Customer-safe updates, documents, and self-service access", href: "/dashboard/portal", icon: "portal" },
+      { title: "Service Plans", sidebarTitle: "Plans", description: "Keep repeat work dependable and visible", href: "/dashboard/service-plans", icon: "plans" },
     ],
   },
   {
-    title: "Commercial",
+    title: "Get Paid",
     items: [
-      { title: "Quotes", description: "Pricing to send, track, and approve", href: "/dashboard/quotes", icon: "quotes" },
-      { title: "Revenue", description: "Sales, cash, and follow-up", href: "/dashboard/revenue", icon: "revenue" },
+      { title: "Get Paid", sidebarTitle: "Payments", description: "Money owed, overdue balances, and finance control", href: "/dashboard/finance", icon: "revenue" },
+      { title: "Payment Setup", description: "Connect tenant-owned payment providers and bank transfer details", href: "/dashboard/settings/payments", icon: "billing" },
+      { title: "Quotes", description: "Send prices with a cleaner approval path", href: "/dashboard/quotes", icon: "quotes" },
+      { title: "Revenue", description: "Track invoices, cash collection, and follow-up", href: "/dashboard/revenue", icon: "revenue" },
+      { title: "Billing", description: "Workspace commercial state, plan continuity, and pack readiness", href: "/dashboard/billing", icon: "billing" },
     ],
   },
   {
-    title: "Platform",
+    title: "Grow Business",
     items: [
-      { title: "Integrations", description: "Connect the tools you already use", href: "/dashboard/integrations", icon: "integrations" },
-      { title: "Automations", description: "Set follow-up rules that run for you", href: "/dashboard/settings/automations", icon: "automations" },
-      { title: "Settings", description: "Branding, defaults, and team setup", href: "/dashboard/settings", icon: "settings" },
+      { title: "Settings", description: "Branding, workflow, and workspace controls", href: "/dashboard/settings", icon: "settings" },
+      { title: "Team", description: "Invite members and keep access deliberate", href: "/dashboard/users", icon: "team" },
+      { title: "Integrations", sidebarTitle: "Tools", description: "Connected tools and provider state", href: "/dashboard/integrations", icon: "integrations" },
+      { title: "Enterprise", description: "Readiness for integrations, offline, reports, growth, and trust", href: "/dashboard/enterprise", icon: "enterprise" },
     ],
   },
   {

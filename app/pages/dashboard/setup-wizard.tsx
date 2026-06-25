@@ -4,6 +4,8 @@ import { useRouter } from "next/router";
 import { DashboardShell } from "../../components/dashboard-shell";
 import { apiFetch, getApiBase, getToken } from "../../lib/api";
 import { isGuidedSetupV2Enabled } from "../../lib/feature-flags";
+import LaunchReadinessControls from "../../components/phase6b/LaunchReadinessControls";
+import { UPLOAD_LIMITS, validateUploadFile } from "../../lib/upload-policy";
 
 const API_BASE = getApiBase();
 
@@ -18,13 +20,26 @@ const DEFAULT_SERVICES = [
 ];
 
 const steps = [
-  { key: "trade", title: "Confirm your trade" },
+  { key: "template", title: "Choose your job sheet" },
   { key: "branding", title: "Business details" },
   { key: "services", title: "Services" },
   { key: "operations", title: "Hours and pricing" },
   { key: "payments", title: "Billing and payments" },
   { key: "ready", title: "Ready" },
 ] as const;
+
+const phase6OnboardingPath = [
+  { key: "business", label: "Business profile", href: "/dashboard/setup-wizard?step=branding" },
+  { key: "locations", label: "Locations", href: "/dashboard/locations" },
+  { key: "services", label: "Services", href: "/dashboard/setup-wizard?step=services" },
+  { key: "job_sheet", label: "Job sheet template", href: "/dashboard/setup-wizard?step=template" },
+  { key: "booking", label: "Booking settings", href: "/dashboard/booking/settings" },
+  { key: "portal", label: "Portal settings", href: "/dashboard/portal" },
+  { key: "payments", label: "Payment setup", href: "/dashboard/billing/readiness" },
+  { key: "team", label: "Team invite", href: "/dashboard/users" },
+  { key: "import", label: "Import data", href: "#phase6-import-wizard" },
+  { key: "golive", label: "Go-live checklist", href: "/dashboard/settings/launch-control" },
+];
 
 const OPERATING_DAYS = [
   { dayOfWeek: 1, shortLabel: "Mon" },
@@ -60,6 +75,8 @@ export default function SetupWizard() {
   const [error, setError] = useState("");
   const [completedSteps, setCompletedSteps] = useState<string[]>([]);
   const [skippedSteps, setSkippedSteps] = useState<string[]>([]);
+  const [templateLibrary, setTemplateLibrary] = useState<any>(null);
+  const [selectedTemplateId, setSelectedTemplateId] = useState("blank");
 
   const [branding, setBranding] = useState<any>({
     companyName: "",
@@ -93,6 +110,9 @@ export default function SetupWizard() {
   const [startHour, setStartHour] = useState("09:00");
   const [endHour, setEndHour] = useState("17:00");
   const [enablePayments, setEnablePayments] = useState(false);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreviewUrl, setLogoPreviewUrl] = useState("");
+  const [logoUploadState, setLogoUploadState] = useState<"idle" | "uploading" | "saved" | "error">("idle");
 
   const updateBranding = (next: any) => {
     brandingRef.current = next;
@@ -115,6 +135,8 @@ export default function SetupWizard() {
     };
     brandingRef.current = nextBranding;
     setBranding(nextBranding);
+    setTemplateLibrary(data?.templateLibrary || null);
+    setSelectedTemplateId(String(data?.activeJobSheetTemplateId || data?.templateLibrary?.activeTemplate?.id || "blank"));
     setServices(
       Array.isArray(data?.services) && data.services.length > 0
         ? data.services.map((svc: any) => ({
@@ -152,19 +174,24 @@ export default function SetupWizard() {
     );
     setEnablePayments(Boolean(data?.paymentsEnabled));
 
-    const currentStep = Number(data?.currentStep ?? 0);
+    const requestedStepKey = typeof router.query.step === "string" ? router.query.step.trim().toLowerCase() : "";
+    const requestedStepIndex = steps.findIndex((entry) => entry.key === requestedStepKey);
+    const currentStep = requestedStepIndex >= 0 ? requestedStepIndex : Number(data?.currentStep ?? 0);
     const maxStep = steps.length - 1;
     setStep(Number.isFinite(currentStep) ? Math.max(0, Math.min(currentStep, maxStep)) : 0);
-  }, []);
+  }, [router.query.step]);
 
   useEffect(() => {
     if (!guidedEnabled) return;
     loadStatus().catch((err: any) => {
-      setError(err?.message || "Failed to load guided setup");
+      setError("We could not load setup right now.");
     });
   }, [guidedEnabled, loadStatus]);
 
   const uploadLogo = async (file: File) => {
+    const validationError = validateUploadFile(file, { category: "image", maxBytes: UPLOAD_LIMITS.logo });
+    if (validationError) throw new Error(validationError);
+    setLogoUploadState("uploading");
     const formData = new FormData();
     formData.append("file", file);
     const token = getToken();
@@ -175,9 +202,11 @@ export default function SetupWizard() {
     });
     const data = await res.json().catch(() => null);
     if (!res.ok) {
+      setLogoUploadState("error");
       throw new Error(data?.message || "Logo upload failed");
     }
     updateBranding({ ...brandingRef.current, logoUrl: data?.logoUrl || brandingRef.current.logoUrl });
+    setLogoUploadState("saved");
   };
 
   const persistStep = async (
@@ -195,6 +224,8 @@ export default function SetupWizard() {
       await loadStatus();
       if (options?.goBack) {
         setStep((prev) => Math.max(prev - 1, 0));
+      } else if (!options?.saveAndExit) {
+        setStep(Math.min(stepNumber + 1, steps.length - 1));
       }
       if (options?.saveAndExit) {
         router.push("/dashboard");
@@ -233,7 +264,7 @@ export default function SetupWizard() {
       <DashboardShell>
         <div className="card">
           <h1>Setup</h1>
-          <p className="muted">The guided setup flow is not turned on in this environment.</p>
+          <p className="muted">Setup is not turned on in this workspace.</p>
         </div>
       </DashboardShell>
     );
@@ -249,20 +280,20 @@ export default function SetupWizard() {
           onClick={() => (isLast ? completeSetup() : persistStep(stepNumber, payload))}
           disabled={nextDisabled}
         >
-          {isLast ? "Finish setup" : "Next"}
+          {isLast ? "Finish setup" : "Save and continue"}
         </button>
         <button
           className="button secondary"
           onClick={() => setStep((prev) => Math.max(prev - 1, 0))}
           disabled={saving || stepNumber === 0}
         >
-          Back
+          Go back
         </button>
         <button className="button secondary" onClick={() => persistStep(stepNumber, {}, { skipped: true })} disabled={saving}>
-          Skip for now
+          Skip this step
         </button>
         <button className="button secondary" onClick={() => persistStep(stepNumber, payload, { saveAndExit: true })} disabled={saving}>
-          Save & exit for now
+          Save and exit
         </button>
       </div>
     );
@@ -281,7 +312,7 @@ export default function SetupWizard() {
   }, [operatingDays, startHour, endHour]);
 
   const getCurrentPayload = () => {
-    if (step === 0) return { trade: "WHEELS" };
+    if (step === 0) return { templateId: selectedTemplateId };
     if (step === 1) return brandingRef.current;
     if (step === 2) return { services };
     if (step === 3) return { ...charging, bookingPublicEnabled, businessHours: businessHoursPayload || [] };
@@ -291,12 +322,36 @@ export default function SetupWizard() {
 
   return (
     <DashboardShell>
+      <section className="card" style={{ marginBottom: 16 }} data-testid="phase6-onboarding-wizard">
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
+          <div>
+            <p className="operator-eyebrow">Launch onboarding</p>
+            <h1 style={{ marginTop: 0 }}>Get operational in 15 minutes</h1>
+            <p className="muted">
+              Finish the essentials in one path: profile, locations, services, job sheet, bookings, portal, payments, team, import, and go-live.
+            </p>
+          </div>
+          <Link className="button secondary" href="/dashboard/settings/launch-control">Open go-live checklist</Link>
+        </div>
+        <div className="operator-grid operator-grid--five" style={{ marginTop: 14 }}>
+          {phase6OnboardingPath.map((item, index) => (
+            <a className="operator-mini-card mt-linkCard" href={item.href} key={item.key} data-testid={`phase6-onboarding-step-${item.key}`}>
+              <span className="operator-tag">Step {index + 1}</span>
+              <strong>{item.label}</strong>
+              <span className="mt-linkCard__action">Open</span>
+            </a>
+          ))}
+        </div>
+      </section>
+
+      <LaunchReadinessControls />
+
       <div className="card" style={{ marginBottom: 16 }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
           <div>
-            <h1>Guided setup</h1>
+            <h1>Set up your workspace</h1>
             <p className="muted">Step {step + 1} of {steps.length}: {steps[step].title}</p>
-            <p className="muted">Work through the basics once so your team can start from a clean, ready workspace.</p>
+            <p className="muted">Follow these steps to set up the workspace, open the booking path, complete the first job, send the result, and get paid.</p>
             <p className="muted">Status: {stepState === "done" ? "Done" : stepState === "skipped" ? "Skipped" : "In progress"}</p>
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -319,38 +374,102 @@ export default function SetupWizard() {
 
       {step === 0 ? (
         <div className="card">
-          <h2>Confirm your trade</h2>
-          <p className="muted">We&apos;ll set your main trade to Wheels and load the matching setup for you.</p>
-          {renderControls(0, { trade: "WHEELS" })}
+          <h2>Choose your starting job sheet</h2>
+          <p className="muted">Pick the closest template now, then refine it later in Settings &gt; Work &amp; Job Sheet without losing control of the live authority flow.</p>
+          <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", marginTop: 16 }}>
+            {(templateLibrary?.templates || []).map((template: any) => {
+              const active = selectedTemplateId === template.id;
+              const preview = template?.payload || {};
+              return (
+                <button
+                  key={template.id}
+                  type="button"
+                  className="tab-button settings-tab-button"
+                  style={{ textAlign: "left", borderColor: active ? "#0f766e" : undefined, background: active ? "rgba(15,118,110,0.08)" : undefined }}
+                  onClick={() => setSelectedTemplateId(template.id)}
+                  data-testid={`guided-setup-template-${String(template.key || template.id)}`}
+                >
+                  <em style={{ fontStyle: "normal", fontSize: 12, letterSpacing: "0.04em", textTransform: "uppercase", color: "#0f766e" }}>
+                    {template.tradeCategory || "GENERAL"}
+                  </em>
+                  <strong>{template.name}</strong>
+                  <span>{template.description || "Start from a safe service record structure."}</span>
+                  <span>
+                    {(preview.serviceTypes || []).length} service types • {(preview.sections || []).length} sections • {(preview.fields || []).length} fields
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="muted" style={{ marginTop: 14, marginBottom: 0 }}>
+            Deeper customisation lives in <strong>Settings &gt; Work &amp; Job Sheet</strong> after setup.
+          </p>
+          {renderControls(0, { templateId: selectedTemplateId })}
         </div>
       ) : null}
 
       {step === 1 ? (
         <div className="card">
-          <h2>Business details</h2>
-          <p className="muted">Add your business name, logo, and contact details so customers recognise you right away.</p>
+          <h2>Your business</h2>
+          <p className="muted">Add the basics customers will recognise first. You can refine branding later.</p>
           <label>Business name</label>
           <input className="input" value={branding.companyName} onChange={(e) => updateBranding({ ...brandingRef.current, companyName: e.target.value })} data-testid="guided-setup-company-name" />
 
           <label style={{ marginTop: 12 }}>Logo (upload)</label>
           <input
+            id="guided-setup-logo-file"
+            className="visually-hidden"
             type="file"
+            accept="image/png,image/jpeg,image/webp"
             onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) uploadLogo(file).catch((err) => setError(err.message || "Logo upload failed"));
+              const file = e.target.files?.[0] || null;
+              if (!file) return;
+              const validationError = validateUploadFile(file, { category: "image", maxBytes: UPLOAD_LIMITS.logo });
+              if (validationError) {
+                setError(validationError);
+                e.currentTarget.value = "";
+                return;
+              }
+              if (logoPreviewUrl) URL.revokeObjectURL(logoPreviewUrl);
+              setLogoFile(file);
+              setLogoPreviewUrl(URL.createObjectURL(file));
+              setLogoUploadState("idle");
             }}
           />
+          <div className="operator-inline-actions" style={{ marginTop: 8 }}>
+            <label className="button secondary" htmlFor="guided-setup-logo-file">Choose image</label>
+            <span data-testid="guided-setup-logo-file-name">{logoFile?.name || "No image selected"}</span>
+          </div>
+          {logoFile ? (
+            <div style={{ marginTop: 10 }}>
+              <img src={logoPreviewUrl} alt="Selected logo preview" style={{ width: 180, height: 90, objectFit: "contain", display: "block" }} />
+              <p className="muted">{(logoFile.size / 1024).toFixed(1)} KB selected</p>
+              <div className="operator-inline-actions">
+                <button className="button secondary" type="button" disabled={logoUploadState === "uploading"} onClick={() => {
+                  uploadLogo(logoFile).catch((err) => setError(err.message || "Logo upload failed"));
+                }}>{logoUploadState === "uploading" ? "Uploading..." : "Upload logo"}</button>
+                <button className="button secondary" type="button" onClick={() => {
+                  if (logoPreviewUrl) URL.revokeObjectURL(logoPreviewUrl);
+                  setLogoFile(null);
+                  setLogoPreviewUrl("");
+                  setLogoUploadState("idle");
+                }}>Clear</button>
+              </div>
+              {logoUploadState === "saved" ? <p role="status">Logo saved.</p> : null}
+              {logoUploadState === "error" ? <p role="alert">Logo upload failed. Your selected file is still available to retry.</p> : null}
+            </div>
+          ) : null}
 
-          <label style={{ marginTop: 12 }}>Logo URL (optional)</label>
+          <label style={{ marginTop: 12 }}>Logo link (optional)</label>
           <input className="input" value={branding.logoUrl} onChange={(e) => updateBranding({ ...brandingRef.current, logoUrl: e.target.value })} />
 
-          <label style={{ marginTop: 12 }}>Primary color</label>
+          <label style={{ marginTop: 12 }}>Main color</label>
           <input className="input" value={branding.brandPrimaryColor} onChange={(e) => updateBranding({ ...brandingRef.current, brandPrimaryColor: e.target.value })} />
 
           <label style={{ marginTop: 12 }}>Support email</label>
           <input className="input" value={branding.supportEmail} onChange={(e) => updateBranding({ ...brandingRef.current, supportEmail: e.target.value })} />
 
-          <label style={{ marginTop: 12 }}>Support phone (WhatsApp)</label>
+          <label style={{ marginTop: 12 }}>Support phone</label>
           <input className="input" value={branding.supportPhone} onChange={(e) => updateBranding({ ...brandingRef.current, supportPhone: e.target.value })} />
 
           {renderControls(1, branding)}
@@ -359,11 +478,11 @@ export default function SetupWizard() {
 
       {step === 2 ? (
         <div className="card">
-          <h2>Services</h2>
-          <p className="muted">Choose the services you offer and set your starting prices.</p>
+          <h2>Your services</h2>
+          <p className="muted">Choose what you offer and set starting prices so the first job is fast to create.</p>
           <div style={{ marginBottom: 12 }}>
             <button className="button secondary" onClick={() => setServices(DEFAULT_SERVICES.map((svc) => ({ ...svc, enabled: true })))}>
-              Use Wheels defaults
+              Use starter services
             </button>
           </div>
           <div style={{ display: "grid", gap: 12 }}>
@@ -371,7 +490,6 @@ export default function SetupWizard() {
               <div key={service.key || service.name} className="integration-card" style={{ padding: 12 }}>
                 <div style={{ flex: 1 }}>
                   <strong>{service.name}</strong>
-                  <div className="muted" style={{ fontSize: 12 }}>Key: {service.key}</div>
                 </div>
                 <div style={{ display: "grid", gap: 6, minWidth: 180 }}>
                   <label style={{ margin: 0 }}>
@@ -383,7 +501,7 @@ export default function SetupWizard() {
                         next[idx] = { ...next[idx], enabled: e.target.checked };
                         setServices(next);
                       }}
-                    /> Enabled
+                    /> Turn on this service
                   </label>
                   <input
                     className="input"
@@ -405,7 +523,7 @@ export default function SetupWizard() {
                         next[idx] = { ...next[idx], vatEligible: e.target.checked };
                         setServices(next);
                       }}
-                    /> VAT eligible
+                    /> VAT applies
                   </label>
                 </div>
               </div>
@@ -417,15 +535,15 @@ export default function SetupWizard() {
 
       {step === 3 ? (
         <div className="card">
-          <h2>Charging and calendar</h2>
-          <p className="muted">Set your default pricing and the hours customers can book against.</p>
+          <h2>Working hours and pricing</h2>
+          <p className="muted">Set the defaults that make bookings and job creation feel ready on day one.</p>
           <label style={{ marginBottom: 8 }}>
             <input type="checkbox" checked={charging.pricePerWheel} onChange={(e) => setCharging({ ...charging, pricePerWheel: e.target.checked })} />
             Price per wheel by default
           </label>
           <label style={{ marginTop: 12 }}>
             <input type="checkbox" checked={charging.vatEnabled} onChange={(e) => setCharging({ ...charging, vatEnabled: e.target.checked })} />
-            VAT enabled
+            Turn VAT on
           </label>
           <label style={{ marginTop: 12 }}>VAT rate (%)</label>
           <input className="input" type="number" min={0} value={charging.vatRate} onChange={(e) => setCharging({ ...charging, vatRate: Number(e.target.value || 0) })} />
@@ -434,11 +552,11 @@ export default function SetupWizard() {
           <label style={{ marginTop: 12 }}>Default tyre pressure (optional)</label>
           <input className="input" value={charging.defaultTyrePressure} onChange={(e) => setCharging({ ...charging, defaultTyrePressure: e.target.value })} />
           <div className="integration-card" style={{ marginTop: 16, padding: 16 }} data-testid="guided-setup-calendar-step">
-            <h3 style={{ marginTop: 0 }}>Calendar availability</h3>
-            <p className="muted">These hours set your first booking calendar and can be refined later in Scheduling.</p>
+            <h3 style={{ marginTop: 0 }}>Booking hours</h3>
+            <p className="muted">These hours set your first booking calendar. You can change them later without affecting the rest of setup.</p>
             <label style={{ marginBottom: 8 }}>
               <input type="checkbox" checked={bookingPublicEnabled} onChange={(e) => setBookingPublicEnabled(e.target.checked)} />
-              Accept booking requests during these hours
+              Let people request bookings during these hours
             </label>
             <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
               <div>
@@ -451,7 +569,7 @@ export default function SetupWizard() {
               </div>
             </div>
             <div style={{ marginTop: 12 }}>
-              <label style={{ display: "block", marginBottom: 8 }}>Operating days</label>
+              <label style={{ display: "block", marginBottom: 8 }}>Working days</label>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }} data-testid="guided-setup-operating-days">
                 {OPERATING_DAYS.map((day) => {
                   const active = operatingDays.includes(day.dayOfWeek);
@@ -475,7 +593,7 @@ export default function SetupWizard() {
                 })}
               </div>
             </div>
-            {!businessHoursPayload ? <p style={{ color: "#ff8a8a", marginBottom: 0 }}>Choose at least one operating day, and make sure end time is later than start time.</p> : null}
+            {!businessHoursPayload ? <p style={{ color: "#ff8a8a", marginBottom: 0 }}>Choose at least one working day, and make sure the end time is later than the start time.</p> : null}
           </div>
           {renderControls(3, { ...charging, bookingPublicEnabled, businessHours: businessHoursPayload || [] })}
         </div>
@@ -483,18 +601,21 @@ export default function SetupWizard() {
 
       {step === 4 ? (
         <div className="card">
-          <h2>Billing and payments</h2>
+          <h2>Payments</h2>
           {status?.stripeConfigured ? (
-            <p className="muted">Stripe is connected. Turn on customer payments here, then fine-tune anything else in billing.</p>
+            <p className="muted">Stripe is connected. Turn on payments here, then fine-tune anything else in billing.</p>
           ) : (
-            <p className="muted">Stripe is not connected yet, so online payments are not ready.</p>
+            <p className="muted">Stripe is not connected yet, so online payments are not ready. You can still run jobs and publish service records now.</p>
           )}
           <div className="integration-card" style={{ padding: 16, marginBottom: 12 }} data-testid="guided-setup-billing-step">
-            <strong>{status?.stripeConfigured ? "Stripe ready" : "Stripe not ready"}</strong>
-            <p className="muted" style={{ marginBottom: 12 }}>
+              <strong>{status?.stripeConfigured ? "Stripe is ready" : "Stripe is not ready"}</strong>
+              <p className="muted" style={{ marginBottom: 12 }}>
               {status?.stripeConfigured
-                ? "Customers can pay through Stripe as soon as payments are enabled for this workspace."
-                : "Connect Stripe first. MyTitan will not show payments as ready until that is done."}
+                ? "Customers can pay through Stripe as soon as you turn payments on for this workspace."
+                : "Connect Stripe first. Payments will stay off until that is done."}
+              </p>
+            <p className="muted" style={{ marginBottom: 12 }}>
+              Manual follow-up stays available if you want to collect after the booking or after the job is complete.
             </p>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <Link className="button secondary" href="/dashboard/billing">Open billing</Link>
@@ -503,20 +624,30 @@ export default function SetupWizard() {
           </div>
           <label style={{ marginBottom: 12 }}>
             <input type="checkbox" checked={enablePayments} onChange={(e) => setEnablePayments(e.target.checked)} disabled={!status?.stripeConfigured} data-testid="guided-setup-enable-payments" />
-            Enable online payments
+            Turn on online payments
           </label>
-          {!status?.stripeConfigured ? <p className="muted">This stays disabled until Stripe is connected correctly.</p> : null}
+          {!status?.stripeConfigured ? <p className="muted">This stays off until Stripe is connected.</p> : null}
           {renderControls(4, { enablePayments })}
         </div>
       ) : null}
 
       {step === 5 ? (
         <div className="card">
-          <h2>Ready</h2>
-          <p className="muted">Your workspace is ready for day-to-day work.</p>
+          <h2>You&apos;re ready</h2>
+          <p className="muted">Your workspace basics are ready. Now run the first full path: create or receive the booking, complete the job, send the result, and follow up for payment.</p>
           <div style={{ display: "grid", gap: 12 }}>
-            <Link className="button" href="/dashboard/jobs/new?guided=1">Create your first job</Link>
-            <Link className="button secondary" href="/dashboard">Go to dashboard</Link>
+            <Link className="button" href="/dashboard/booking/settings">Open booking setup</Link>
+            <Link className="button secondary" href="/dashboard/jobs/new?guided=1">Create your first job</Link>
+            <Link className="button secondary" href="/dashboard/work">Open work queue</Link>
+            <Link className="button secondary" href="/dashboard/jobs">Open jobs workspace</Link>
+            <Link className="button secondary" href="/dashboard/calendar">Open calendar</Link>
+            <Link className="button secondary" href="/dashboard">Open dashboard</Link>
+          </div>
+          <div className="integration-card" style={{ marginTop: 16, padding: 16 }}>
+            <strong>Suggested first run</strong>
+            <p className="muted" style={{ marginBottom: 0 }}>
+              1. Share your booking link. 2. Receive or create the first booking or job. 3. Complete the work. 4. Send the result. 5. Collect payment through Stripe or manual follow-up.
+            </p>
           </div>
           {renderControls(5, {})}
         </div>

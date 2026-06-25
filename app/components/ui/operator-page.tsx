@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
+import { forwardRef, useEffect, useId, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 
 type OperatorAction = {
   label: string;
@@ -156,7 +156,10 @@ export function OperatorPageHeader({
         {actions?.length ? (
           <div className="operator-page__actions">
             {actions.map((action) => (
-              <OperatorActionButton key={`${action.label}-${action.href || "action"}`} action={action} />
+              <div key={`${action.label}-${action.href || "action"}`} className="operator-page__actionItem">
+                <OperatorActionButton action={action} />
+                {action.description ? <div className="operator-page__actionMeta">{action.description}</div> : null}
+              </div>
             ))}
           </div>
         ) : null}
@@ -289,7 +292,7 @@ export function OperatorActiveFilters({
 }
 
 export function OperatorGuidance({
-  title = "Operator tips",
+  title = "Why this matters",
   items,
   defaultOpen = false,
 }: {
@@ -310,7 +313,7 @@ export function OperatorGuidance({
         onClick={() => setOpen((prev) => !prev)}
       >
         <span>{title}</span>
-        <span className="operator-guidance__toggleMeta">{open ? "Hide" : "Show"}</span>
+        <span className="operator-guidance__toggleMeta">{open ? "Hide detail" : "Open detail"}</span>
       </button>
       {open ? (
         <div className="operator-guidance__panel">
@@ -378,9 +381,10 @@ export function OperatorDataTable({
   return (
     <div
       className="operator-table"
-      style={{ "--operator-table-columns": columns } as CSSProperties}
     >
-      {children}
+      <div className="operator-table__inner" style={{ "--operator-table-columns": columns } as CSSProperties}>
+        {children}
+      </div>
     </div>
   );
 }
@@ -389,16 +393,16 @@ export function OperatorDataTableHeader({ children }: { children: ReactNode }) {
   return <div className="operator-table__header">{children}</div>;
 }
 
-export function OperatorDataTableRow({
+export const OperatorDataTableRow = forwardRef<HTMLDivElement, {
+  children: ReactNode;
+  selected?: boolean;
+} & React.HTMLAttributes<HTMLDivElement>>(function OperatorDataTableRow({
   children,
   selected,
   ...rest
-}: {
-  children: ReactNode;
-  selected?: boolean;
-} & React.HTMLAttributes<HTMLDivElement>) {
-  return <div {...rest} aria-selected={selected ? true : undefined} className={`operator-table__row${selected ? " is-selected" : ""}${rest.className ? ` ${rest.className}` : ""}`}>{children}</div>;
-}
+}, ref) {
+  return <div ref={ref} {...rest} aria-selected={selected ? true : undefined} className={`operator-table__row${selected ? " is-selected" : ""}${rest.className ? ` ${rest.className}` : ""}`}>{children}</div>;
+});
 
 export function OperatorFilterField({
   label,
@@ -615,7 +619,8 @@ export function OperatorEmptyStateCard({
   actions?: OperatorAction[];
 }) {
   return (
-    <div className="operator-empty">
+    <div className="operator-empty app-state app-state--empty">
+      <div className="app-state__eyebrow">Workspace</div>
       <h3>{title}</h3>
       <p className="muted">{description}</p>
       {actions?.length ? (

@@ -7,6 +7,12 @@ test.describe("team performance and compensation ops", () => {
   test.describe.configure({ mode: "serial" });
   test.skip(!hasDashboardAuth(), "Seed the E2E fixtures or provide dashboard credentials before running authenticated performance tests.");
 
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      window.localStorage.setItem("mytitan_active_location_id_v1", "all");
+    });
+  });
+
   test("performance page renders scorecards, leaderboard, and risks", async ({ page, request }) => {
     await installApiProxy(page, request);
     await page.goto("/dashboard/performance");

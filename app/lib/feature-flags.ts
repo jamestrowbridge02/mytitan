@@ -6,6 +6,7 @@ const isEnabled = (value?: string) => {
 export const isMarketplaceEnabled = () => isEnabled(process.env.NEXT_PUBLIC_MYTITAN_FEATURE_MARKETPLACE);
 export const isTradePacksEnabled = () => isEnabled(process.env.NEXT_PUBLIC_MYTITAN_FEATURE_TRADE_PACKS);
 export const isStartHereEnabled = () => isEnabled(process.env.NEXT_PUBLIC_MYTITAN_FEATURE_START_HERE);
+export const isPublicDemoEnabled = () => isEnabled(process.env.NEXT_PUBLIC_MYTITAN_FEATURE_PUBLIC_DEMO);
 
 export const isWheelsFormV1Enabled = () => isEnabled(process.env.NEXT_PUBLIC_MYTITAN_FEATURE_WHEELS_FORM_V1);
 
@@ -43,6 +44,9 @@ export const isLocationsV1Enabled = () =>
 
 export const isInventoryV1Enabled = () =>
   isEnabled(process.env.NEXT_PUBLIC_MYTITAN_FEATURE_INVENTORY_V1);
+
+export const isTruckStockV1Enabled = () =>
+  isEnabled(process.env.NEXT_PUBLIC_MYTITAN_FLAG_TRUCK_STOCK_V1) || isInventoryV1Enabled();
 
 export const isLogoutV1Enabled = () =>
   isEnabled(process.env.NEXT_PUBLIC_MYTITAN_FEATURE_LOGOUT_V1);

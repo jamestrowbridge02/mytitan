@@ -35,10 +35,9 @@ export function validateUploadFile(file: File, options?: { category?: keyof type
   }
   const maxBytes = options?.maxBytes || UPLOAD_LIMITS[policy.category];
   if (file.size > maxBytes) {
-    const guidance =
-      policy.category === "image" || policy.category === "video"
-        ? " Compress or export the file at a lower resolution, then try again."
-        : "";
+    const guidance = policy.category === "image" || policy.category === "video"
+      ? " Compress or export the file at a lower resolution, then try again."
+      : "";
     return `This file is too large. Maximum allowed is ${formatUploadLimit(maxBytes)} for this file type.${guidance}`;
   }
   return null;

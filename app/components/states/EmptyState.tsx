@@ -7,6 +7,7 @@ type Action = {
 };
 
 type EmptyStateProps = {
+  eyebrow?: string;
   title?: string;
   description?: string;
   primaryAction?: Action;
@@ -31,21 +32,25 @@ function ActionButton({ action, primary }: { action: Action; primary: boolean })
 }
 
 export function EmptyState({
-  title = 'Nothing here yet',
-  description = 'There is no data to show for this view.',
+  eyebrow = 'Quiet for now',
+  title = 'Nothing needs attention here',
+  description = 'Everything in this area is clear, so you can move on with confidence.',
   primaryAction,
   secondaryAction,
   icon,
 }: EmptyStateProps) {
   return (
-    <div className="card">
-      {icon ? <div style={{ marginBottom: 10 }}>{icon}</div> : null}
-      <h3 style={{ marginTop: 0 }}>{title}</h3>
-      <p className="muted">{description}</p>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
-        {primaryAction ? <ActionButton action={primaryAction} primary /> : null}
-        {secondaryAction ? <ActionButton action={secondaryAction} primary={false} /> : null}
-      </div>
+    <div className="card app-state app-state--empty">
+      {icon ? <div className="app-state__icon">{icon}</div> : null}
+      <div className="app-state__eyebrow">{eyebrow}</div>
+      <h3 className="app-state__title">{title}</h3>
+      <p className="muted app-state__description">{description}</p>
+      {primaryAction || secondaryAction ? (
+        <div className="app-state__actions">
+          {primaryAction ? <ActionButton action={primaryAction} primary /> : null}
+          {secondaryAction ? <ActionButton action={secondaryAction} primary={false} /> : null}
+        </div>
+      ) : null}
     </div>
   );
 }

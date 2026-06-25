@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ApiError, apiFetch } from "../../lib/api";
 import { isNotificationsV1Enabled } from "../../lib/feature-flags";
 
@@ -47,6 +47,14 @@ export default function SendUpdatePanel({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [requestId, setRequestId] = useState<string | undefined>(undefined);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [emailReadiness, setEmailReadiness] = useState<any>(null);
+
+  useEffect(() => {
+    void apiFetch("/tenant/settings/email-readiness")
+      .then((response) => setEmailReadiness(response || null))
+      .catch(() => setEmailReadiness(null));
+  }, []);
 
   const templateOptions = useMemo(() => {
     if (entityType === "job") {
@@ -73,6 +81,7 @@ export default function SendUpdatePanel({
     setLoading(true);
     setError("");
     setRequestId(undefined);
+    setSuccessMessage("");
     try {
       await apiFetch("/notifications/send", {
         method: "POST",
@@ -85,9 +94,10 @@ export default function SendUpdatePanel({
         }),
       });
       setNote("");
+      setSuccessMessage(`${channelLabel} update sent. Stay on this record to track delivery and the next step.`);
       onSent?.();
     } catch (err: any) {
-      setError(err?.message || "Failed to send update");
+      setError(err?.message || `Could not send the ${channelLabel.toLowerCase()} update. Try again from this record.`);
       setRequestId(err instanceof ApiError ? err.requestId : undefined);
     } finally {
       setLoading(false);
@@ -117,6 +127,17 @@ export default function SendUpdatePanel({
             ))}
           </select>
         </label>
+        {channel === "email" ? (
+          emailReadiness?.effective?.canSend ? (
+            <p className="muted" style={{ marginTop: 0, color: emailReadiness?.effective?.usingFallback ? "#9a3412" : "#0f766e" }}>
+              {emailReadiness?.effective?.notice || "Customer email will use the workspace sender that is ready."}
+            </p>
+          ) : (
+            <p className="muted" style={{ marginTop: 0 }}>
+              {emailReadiness?.effective?.guidance || "Customer email is unavailable right now. Finish setup in Settings."}
+            </p>
+          )
+        ) : null}
         <label>
           Note (optional)
           <textarea className="input" rows={3} value={note} onChange={(e) => setNote(e.target.value)} />
@@ -124,6 +145,11 @@ export default function SendUpdatePanel({
         <button className="button secondary" type="button" onClick={sendUpdate} disabled={loading}>
           {sendButtonLabel}
         </button>
+        {successMessage ? (
+          <p className="muted" style={{ marginTop: 0, color: "#0f766e" }}>
+            {successMessage}
+          </p>
+        ) : null}
         {error ? (
           <p className="muted" style={{ marginTop: 0 }}>
             {error}{requestId ? ` (Support code: ${requestId})` : ""}

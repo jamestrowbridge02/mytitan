@@ -45,12 +45,43 @@ type IntelligenceData = {
   };
   attentionQueue: Array<{ key: string; label: string; count: number; href: string; hint: string }>;
   alerts: Array<{ key: string; severity: string; label: string; count: number; href: string }>;
+  operationalIssues?: Array<{ key: string; severity: string; count: number; issue: string; happened: string; impact: string; suggestedAction: string; href: string }>;
   trends: {
     completedLast7Days: number;
     completedPrevious7Days: number;
     completionDelta: number;
     communicationByDay: Array<{ day: string; count: number }>;
   };
+};
+
+type BusinessHealthData = {
+  platformDiagnosticsVisible: boolean;
+  source: string;
+  summary: {
+    bookingsTrend: { current: number; previous: number; delta: number };
+    invoiceAgeing: Array<{ key: string; label: string; count: number; amountCents: number }>;
+    unpaidValueCents: number;
+    jobCompletionVelocity: { current: number; previous: number; delta: number };
+    locationUtilisation: number | null;
+    technicianUtilisation: number | null;
+    customerRepeatRatePct: number | null;
+    reviewGenerationStatus: { generated: number; eligibleCompletedJobs: number };
+    stockPressure: { lowStockRows: number; shortageRows: number };
+    revenueCollectionPressure: { overdueInvoices: number; unpaidInvoices: number; unpaidValueCents: number };
+    revenueTrend?: { currentCents: number; previousCents: number; delta: number };
+    marginTrend?: { available: boolean; reason?: string; currentMarginCents?: number | null; previousMarginCents?: number | null; delta?: number | null };
+    utilisation?: { locationPct: number | null; technicianActiveAssignments: number };
+    technicianProductivity?: { completedExecutionRecords: number; basis: string };
+    locationProductivity?: { completedCurrent30Days: number; completedPrevious30Days: number; delta: number };
+    bookingConversion?: { bookings: number; convertedJobs: number; conversionPct: number | null };
+    reviewPerformance?: { generated: number; eligibleCompletedJobs: number; coveragePct: number | null };
+    customerRetention?: { repeatCustomers: number; activeCustomers: number; repeatRatePct: number | null };
+    collectionPerformance?: { paidInvoiceCount: number; paidValueCents: number; unpaidInvoiceCount: number; unpaidValueCents: number; collectionPct: number | null };
+    sourceLinks?: Record<string, string>;
+  };
+  locations: Array<{ locationId: string; locationName: string; workload: number; bookings: number; revenueCents: number; invoiceAgeing: { overdueCount: number; amountCents: number }; completionVelocity: number; completionRatePct?: number | null; utilisationPct?: number | null; capacity?: { scheduledWorkload: number; activeStaffContext: number; basis: string }; staffingPressure: string }>;
+  technicians: Array<{ technicianId: string; technicianName: string; activeAssignments: number; completedExecutionRecords: number; utilizationBasis: string }>;
+  issues: Array<{ key: string; issue: string; impact: string; action: string; href: string }>;
 };
 
 const EMPTY: IntelligenceData = {
@@ -96,13 +127,27 @@ const EMPTY: IntelligenceData = {
   },
 };
 
+function formatMoney(cents: number) {
+  return new Intl.NumberFormat("en-GB", {
+    style: "currency",
+    currency: "GBP",
+    maximumFractionDigits: 0,
+  }).format((Number(cents || 0)) / 100);
+}
+
 export default function IntelligencePage() {
   const [data, setData] = useState<IntelligenceData>(EMPTY);
+  const [businessHealth, setBusinessHealth] = useState<BusinessHealthData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
     const load = async () => {
+      void apiFetch("/metrics/business-health")
+        .then((health) => {
+          if (health) setBusinessHealth(health as BusinessHealthData);
+        })
+        .catch(() => setBusinessHealth(null));
       try {
         const res = await apiFetch("/metrics/intelligence");
         setData({ ...EMPTY, ...(res || {}) });
@@ -137,11 +182,48 @@ export default function IntelligencePage() {
     [data],
   );
 
+  const employeeSignals = useMemo(() => {
+    const rows = new Map<string, { employeeId: string; employeeName: string; assignedJobs: number; completedJobs: number }>();
+    data.technicianLoad.forEach((row) => {
+      rows.set(row.technicianId, {
+        employeeId: row.technicianId,
+        employeeName: row.technicianName || "Unknown employee",
+        assignedJobs: row.assignedJobs,
+        completedJobs: rows.get(row.technicianId)?.completedJobs || 0,
+      });
+    });
+    data.technicianThroughput.forEach((row) => {
+      const existing = rows.get(row.technicianId);
+      rows.set(row.technicianId, {
+        employeeId: row.technicianId,
+        employeeName: row.technicianName || existing?.employeeName || "Unknown employee",
+        assignedJobs: existing?.assignedJobs || 0,
+        completedJobs: row.completedJobs,
+      });
+    });
+    return Array.from(rows.values()).sort((left, right) => right.completedJobs - left.completedJobs || right.assignedJobs - left.assignedJobs);
+  }, [data.technicianLoad, data.technicianThroughput]);
+
+  const businessHealthStats = useMemo(() => {
+    if (!businessHealth) return [];
+    return [
+      { key: "bookingsTrend", label: "Bookings trend", value: `${businessHealth.summary.bookingsTrend.current}`, hint: `Previous 30 days: ${businessHealth.summary.bookingsTrend.previous}` },
+      { key: "invoiceAgeing", label: "Unpaid value", value: formatMoney(businessHealth.summary.unpaidValueCents), hint: `${businessHealth.summary.revenueCollectionPressure.unpaidInvoices} unpaid invoices` },
+      { key: "locationProductivity", label: "Completion velocity", value: `${businessHealth.summary.jobCompletionVelocity.current}`, hint: `Previous 7 days: ${businessHealth.summary.jobCompletionVelocity.previous}` },
+      { key: "bookingConversion", label: "Booking conversion", value: businessHealth.summary.bookingConversion?.conversionPct === null || businessHealth.summary.bookingConversion?.conversionPct === undefined ? "-" : `${businessHealth.summary.bookingConversion.conversionPct}%`, hint: `${businessHealth.summary.bookingConversion?.convertedJobs || 0} jobs from ${businessHealth.summary.bookingConversion?.bookings || 0} bookings` },
+      { key: "collectionPerformance", label: "Collection performance", value: businessHealth.summary.collectionPerformance?.collectionPct === null || businessHealth.summary.collectionPerformance?.collectionPct === undefined ? "-" : `${businessHealth.summary.collectionPerformance.collectionPct}%`, hint: `${businessHealth.summary.revenueCollectionPressure.unpaidInvoices} unpaid invoices` },
+      { key: "revenueTrend", label: "Revenue trend", value: formatMoney(businessHealth.summary.revenueTrend?.currentCents || 0), hint: `Previous 30 days: ${formatMoney(businessHealth.summary.revenueTrend?.previousCents || 0)}` },
+      { key: "customerRetention", label: "Retention", value: businessHealth.summary.customerRetention?.repeatRatePct === null || businessHealth.summary.customerRetention?.repeatRatePct === undefined ? "-" : `${businessHealth.summary.customerRetention.repeatRatePct}%`, hint: "Repeat customers from real job history" },
+      { key: "reviewPerformance", label: "Review performance", value: businessHealth.summary.reviewPerformance?.coveragePct === null || businessHealth.summary.reviewPerformance?.coveragePct === undefined ? "-" : `${businessHealth.summary.reviewPerformance.coveragePct}%`, hint: `${businessHealth.summary.reviewPerformance?.generated || 0} prompts from ${businessHealth.summary.reviewPerformance?.eligibleCompletedJobs || 0} eligible jobs` },
+      { key: "technicianProductivity", label: "Technician productivity", value: `${businessHealth.summary.technicianProductivity?.completedExecutionRecords || 0}`, hint: businessHealth.summary.technicianProductivity?.basis || "Completed execution records" },
+    ];
+  }, [businessHealth]);
+
   return (
     <DashboardShell>
       <div className="operator-stack">
         <OperatorPageHeader
-          eyebrow="Business OS"
+          eyebrow="Overview"
           title="Intelligence"
           subtitle="See what needs attention today across bookings, billing, dispatch, stock, and customer access."
           actions={[
@@ -149,30 +231,30 @@ export default function IntelligencePage() {
             { label: "Portal Ops", href: "/dashboard/portal", variant: "secondary" },
             { label: "Billing readiness", href: "/dashboard/billing/readiness" },
           ]}
-          shortcuts={["Start with the attention queue", "Use this view to spot load, follow-up debt, and conversion bottlenecks"]}
+          shortcuts={["Start with the attention queue", "Use this view to spot load, follow-up gaps, and slowdowns"]}
           stats={stats}
         />
 
         <OperatorGuidance
           title="How to use this view"
           items={[
-            "Upcoming bookings and public booking conversion show dispatch pressure before it becomes operational debt.",
-            "Billing-ready and portal-ready counts expose which completed jobs can move into revenue or customer self-service next.",
-            "Technician load reveals assignment imbalance using current active job ownership only.",
+            "Upcoming bookings and public booking conversion show dispatch pressure before it turns into delays.",
+            "Billing-ready and portal-ready counts show which completed jobs can move forward next.",
+            "Technician load shows where work is uneven across the team.",
           ]}
         />
 
         {error ? <p role="alert" style={{ color: "#ff8a8a", marginTop: 0 }}>{error}</p> : null}
-        {loading ? <div aria-live="polite" className="operator-note" role="status">Loading intelligence...</div> : null}
+        {loading ? <div aria-live="polite" className="operator-note" role="status">Loading attention view...</div> : null}
 
-        {data.attentionQueue.length ? (
-          <section className="card operator-section">
-            <div className="operator-section__header">
-              <div>
-                <h2 className="operator-section__title">Needs attention now</h2>
-                <p className="operator-section__subtitle">The next set of operational queues most likely to create revenue, dispatch, or customer-experience debt.</p>
-              </div>
+        <section className="card operator-section">
+          <div className="operator-section__header">
+            <div>
+              <h2 className="operator-section__title">Needs attention now</h2>
+              <p className="operator-section__subtitle">The next queues most likely to slow down revenue, dispatch, or customer updates.</p>
             </div>
+          </div>
+          {data.attentionQueue.length ? (
             <OperatorDataTable columns="minmax(220px, 1fr) minmax(100px, 0.5fr) minmax(220px, 1fr) minmax(160px, auto)">
               <OperatorDataTableHeader>
                 <div className="operator-table__cell">Queue</div>
@@ -189,15 +271,21 @@ export default function IntelligencePage() {
                 </OperatorDataTableRow>
               ))}
             </OperatorDataTable>
-          </section>
-        ) : null}
+          ) : (
+            <OperatorEmptyStateCard
+              title="Attention queues are calm right now"
+              description="The live queue is currently clear. Open the broader work surface if you want to review active jobs and follow-through anyway."
+              actions={[{ label: "Open queue", href: "/dashboard/work" }]}
+            />
+          )}
+        </section>
 
         {data.alerts.length ? (
           <section className="card operator-section">
             <div className="operator-section__header">
               <div>
                 <h2 className="operator-section__title">Operational alerts</h2>
-                <p className="operator-section__subtitle">Live backlog signals that need operator attention now.</p>
+                <p className="operator-section__subtitle">Live backlog signals that need attention now.</p>
               </div>
             </div>
             <OperatorDataTable columns="minmax(220px, 1fr) minmax(100px, 0.5fr) minmax(160px, auto)">
@@ -211,6 +299,96 @@ export default function IntelligencePage() {
                   <div className="operator-table__cell"><strong>{alert.label}</strong></div>
                   <div className="operator-table__cell">{alert.count}</div>
                   <div className="operator-table__cell"><a href={alert.href}>Open queue</a></div>
+                </OperatorDataTableRow>
+              ))}
+            </OperatorDataTable>
+          </section>
+        ) : null}
+
+        <section className="card operator-section" data-testid="business-health-engine">
+          <div className="operator-section__header">
+            <div>
+              <h2 className="operator-section__title">Business health</h2>
+              <p className="operator-section__subtitle">Tenant business health from real bookings, jobs, invoices, locations, technicians, customers, reviews, and stock records.</p>
+            </div>
+          </div>
+          {businessHealth ? (
+            <>
+              <div className="operator-grid operator-grid--three" data-testid="business-health-summary">
+                {businessHealthStats.map((stat) => (
+                  <a key={stat.label} className="jobs-lifecycleStep" href={businessHealth.summary.sourceLinks?.[stat.key] || "/dashboard/reports"} data-testid={`business-health-kpi-${stat.key}`}>
+                    <span className="jobs-lifecycleLabel">{stat.label}</span>
+                    <strong>{stat.value}</strong>
+                    <p className="muted" style={{ margin: "6px 0 0 0" }}>{stat.hint}</p>
+                  </a>
+                ))}
+              </div>
+              {businessHealth.issues.length ? (
+                <OperatorDataTable columns="minmax(220px, 1fr) minmax(240px, 1.2fr) minmax(160px, auto)">
+                  <OperatorDataTableHeader>
+                    <div className="operator-table__cell">Issue</div>
+                    <div className="operator-table__cell">Impact</div>
+                    <div className="operator-table__cell">Action</div>
+                  </OperatorDataTableHeader>
+                  {businessHealth.issues.map((issue) => (
+                    <OperatorDataTableRow key={issue.key}>
+                      <div className="operator-table__cell"><strong>{issue.issue}</strong></div>
+                      <div className="operator-table__cell">{issue.impact}</div>
+                      <div className="operator-table__cell"><a href={issue.href}>{issue.action}</a></div>
+                    </OperatorDataTableRow>
+                  ))}
+                </OperatorDataTable>
+              ) : null}
+              <OperatorDataTable columns="minmax(180px, 1fr) minmax(90px, 0.5fr) minmax(90px, 0.5fr) minmax(120px, 0.7fr) minmax(120px, 0.7fr) minmax(140px, 0.8fr)">
+                <OperatorDataTableHeader>
+                  <div className="operator-table__cell">Location</div>
+                  <div className="operator-table__cell">Jobs</div>
+                  <div className="operator-table__cell">Bookings</div>
+                  <div className="operator-table__cell">Revenue</div>
+                  <div className="operator-table__cell">Completion</div>
+                  <div className="operator-table__cell">Invoice pressure</div>
+                </OperatorDataTableHeader>
+                {businessHealth.locations.map((row) => (
+                  <OperatorDataTableRow key={row.locationId}>
+                    <div className="operator-table__cell"><strong>{row.locationName}</strong></div>
+                    <div className="operator-table__cell">{row.workload}</div>
+                    <div className="operator-table__cell">{row.bookings}</div>
+                    <div className="operator-table__cell">{formatMoney(row.revenueCents)}</div>
+                    <div className="operator-table__cell">{row.completionRatePct === null || row.completionRatePct === undefined ? "-" : `${row.completionRatePct}%`}</div>
+                    <div className="operator-table__cell">{row.invoiceAgeing.overdueCount} overdue</div>
+                  </OperatorDataTableRow>
+                ))}
+              </OperatorDataTable>
+              <p className="muted" style={{ marginBottom: 0 }}>
+                Platform diagnostics visible: {businessHealth.platformDiagnosticsVisible ? "yes" : "no"}. Source: {businessHealth.source.replaceAll("_", " ")}.
+              </p>
+            </>
+          ) : (
+            <OperatorEmptyStateCard title="Business health is unavailable" description="The tenant business-health endpoint did not return a payload for this workspace." />
+          )}
+        </section>
+
+        {data.operationalIssues?.length ? (
+          <section className="card operator-section" data-testid="operational-intelligence-engine">
+            <div className="operator-section__header">
+              <div>
+                <h2 className="operator-section__title">Operational intelligence</h2>
+                <p className="operator-section__subtitle">Real issue detection with impact and exact workflow links. No fabricated urgency or forecasts.</p>
+              </div>
+            </div>
+            <OperatorDataTable columns="minmax(220px, 1fr) minmax(260px, 1.2fr) minmax(220px, 1fr) minmax(160px, auto)">
+              <OperatorDataTableHeader>
+                <div className="operator-table__cell">Issue</div>
+                <div className="operator-table__cell">What happened</div>
+                <div className="operator-table__cell">Impact</div>
+                <div className="operator-table__cell">Action</div>
+              </OperatorDataTableHeader>
+              {data.operationalIssues.map((issue) => (
+                <OperatorDataTableRow key={issue.key}>
+                  <div className="operator-table__cell"><strong>{issue.issue}</strong></div>
+                  <div className="operator-table__cell">{issue.happened}</div>
+                  <div className="operator-table__cell">{issue.impact}</div>
+                  <div className="operator-table__cell"><a href={issue.href}>{issue.suggestedAction}</a></div>
                 </OperatorDataTableRow>
               ))}
             </OperatorDataTable>
@@ -381,6 +559,51 @@ export default function IntelligencePage() {
               title="No technician throughput yet"
               description="Completed-work throughput appears once assigned technicians start closing jobs."
               actions={[{ label: "Open technician queue", href: "/dashboard/technician", variant: "secondary" }]}
+            />
+          )}
+        </section>
+
+        <section className="card operator-section" data-testid="employee-performance-signals">
+          <div className="operator-section__header">
+            <div>
+              <h2 className="operator-section__title">Employee performance signals</h2>
+              <p className="operator-section__subtitle">Owner-visible employee metrics drawn only from authoritative assignment and completion data.</p>
+            </div>
+          </div>
+          <OperatorGuidance
+            title="What is included"
+            items={[
+              "Jobs completed comes from technician-owned completions in the last 7 days.",
+              "Current assigned jobs shows active load still sitting with that employee.",
+              "Revenue handled, refunds, and productivity scoring are intentionally excluded here until the data is authoritative.",
+            ]}
+          />
+          {employeeSignals.length ? (
+            <OperatorDataTable columns="minmax(220px, 1fr) minmax(140px, 0.7fr) minmax(140px, 0.7fr) minmax(220px, 1fr)">
+              <OperatorDataTableHeader>
+                <div className="operator-table__cell">Employee</div>
+                <div className="operator-table__cell">Completed jobs</div>
+                <div className="operator-table__cell">Current load</div>
+                <div className="operator-table__cell">Operational reading</div>
+              </OperatorDataTableHeader>
+              {employeeSignals.map((row) => (
+                <OperatorDataTableRow key={row.employeeId}>
+                  <div className="operator-table__cell"><strong>{row.employeeName}</strong></div>
+                  <div className="operator-table__cell">{row.completedJobs}</div>
+                  <div className="operator-table__cell">{row.assignedJobs}</div>
+                  <div className="operator-table__cell">
+                    {row.completedJobs > 0
+                      ? `Closed ${row.completedJobs} jobs recently and currently holds ${row.assignedJobs} active assignments.`
+                      : `No recent completions yet and currently holds ${row.assignedJobs} active assignments.`}
+                  </div>
+                </OperatorDataTableRow>
+              ))}
+            </OperatorDataTable>
+          ) : (
+            <OperatorEmptyStateCard
+              title="No employee metrics yet"
+              description="Employee signals appear when technician assignments and completions exist in this workspace."
+              actions={[{ label: "Open jobs", href: "/dashboard/jobs", variant: "secondary" }]}
             />
           )}
         </section>

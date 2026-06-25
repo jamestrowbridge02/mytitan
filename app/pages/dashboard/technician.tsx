@@ -8,13 +8,26 @@ import {
   OperatorDataTableHeader,
   OperatorDataTableRow,
   OperatorEmptyStateCard,
-  OperatorGuidance,
   OperatorPageHeader,
   OperatorRowActions,
 } from "../../components/ui/operator-page";
 import { apiFetch } from "../../lib/api";
 import { getBusinessTerms } from "../../lib/business-config";
 import { getMissingRequiredCustomFieldKeys, type CustomField, type CustomFieldValue } from "../../lib/custom-fields";
+import {
+  clearOfflineBinaryQueue,
+  clearOfflineQueue,
+  getOfflineBinaryQueue,
+  getOfflineQueue,
+  loadOfflinePacket,
+  queueOfflineBinaryAttachment,
+  queueOfflineMutation,
+  registerOfflineBinaryServiceWorker,
+  syncOfflineBinaryQueue,
+  syncOfflineQueue,
+  type OfflineBinaryQueueItem,
+  type OfflineMutation,
+} from "../../lib/offline-mobile";
 import { useTenantSettings } from "../../lib/tenant-settings";
 import { getTechnicianStages, mapStatusToStage } from "../../lib/workflow-config";
 import { emptyPermissionSnapshot, hasWorkspacePermission, normalizePermissionSnapshot } from "../../lib/workspace-permissions";
@@ -82,6 +95,11 @@ export default function TechnicianPage() {
   const [technicianFields, setTechnicianFields] = useState<CustomField[]>([]);
   const [technicianFieldValues, setTechnicianFieldValues] = useState<CustomFieldValue[]>([]);
   const [capacityStatus, setCapacityStatus] = useState<any>(null);
+  const [offlinePacket, setOfflinePacket] = useState<any>(null);
+  const [offlineQueue, setOfflineQueue] = useState<OfflineMutation[]>([]);
+  const [offlineBinaryQueue, setOfflineBinaryQueue] = useState<OfflineBinaryQueueItem[]>([]);
+  const [offlineWorkerReady, setOfflineWorkerReady] = useState(false);
+  const [offlineBusy, setOfflineBusy] = useState(false);
   const [permissions, setPermissions] = useState(() => emptyPermissionSnapshot());
   const [permissionsReady, setPermissionsReady] = useState(false);
   const { notice, showError, showSuccess, clearNotice } = useOperatorNotice();
@@ -123,6 +141,47 @@ export default function TechnicianPage() {
   useEffect(() => {
     if (!permissionsReady || !hasWorkspacePermission(permissions, "technician.execute")) return;
     void load();
+    setOfflineQueue(getOfflineQueue());
+    setOfflineBinaryQueue(getOfflineBinaryQueue());
+  }, [permissions, permissionsReady]);
+
+  useEffect(() => {
+    if (!permissionsReady || !hasWorkspacePermission(permissions, "technician.execute")) return;
+    let cancelled = false;
+    void registerOfflineBinaryServiceWorker().then((result) => {
+      if (!cancelled) setOfflineWorkerReady(Boolean(result.registered));
+    });
+    const onMessage = (event: MessageEvent) => {
+      if (event.data?.type === "MYTITAN_RUN_OFFLINE_BINARY_SYNC") {
+        void syncOffline();
+      }
+    };
+    if (typeof navigator !== "undefined" && navigator.serviceWorker) {
+      navigator.serviceWorker.addEventListener("message", onMessage);
+    }
+    return () => {
+      cancelled = true;
+      if (typeof navigator !== "undefined" && navigator.serviceWorker) {
+        navigator.serviceWorker.removeEventListener("message", onMessage);
+      }
+    };
+  }, [permissions, permissionsReady]);
+
+  useEffect(() => {
+    if (!permissionsReady || !hasWorkspacePermission(permissions, "technician.execute")) return;
+    let cancelled = false;
+    const loadPacket = async () => {
+      try {
+        const packet = await loadOfflinePacket();
+        if (!cancelled) setOfflinePacket(packet);
+      } catch {
+        if (!cancelled) setOfflinePacket(null);
+      }
+    };
+    void loadPacket();
+    return () => {
+      cancelled = true;
+    };
   }, [permissions, permissionsReady]);
 
   useEffect(() => {
@@ -172,7 +231,7 @@ export default function TechnicianPage() {
     try {
       await apiFetch(`/tech/jobs/${jobId}/arrive`, {
         method: "POST",
-        body: JSON.stringify({ note: "Technician arrived on site" }),
+        body: JSON.stringify({ note: "Team member arrived on site" }),
       });
       showSuccess("Arrival logged");
       await load();
@@ -225,7 +284,7 @@ export default function TechnicianPage() {
       showSuccess("Execution record ready");
       await load();
     } catch (err: any) {
-      showError(err?.message || "Failed to start execution record");
+      showError(err?.message || "Failed to start completed work record");
     } finally {
       setBusyId(null);
     }
@@ -247,7 +306,7 @@ export default function TechnicianPage() {
       showSuccess(submit ? "Completion submitted" : "Execution record saved");
       await load();
     } catch (err: any) {
-      showError(err?.message || `Failed to ${submit ? "submit" : "save"} execution record`);
+      showError(err?.message || `Failed to ${submit ? "submit" : "save"} completed work record`);
     } finally {
       setBusyId(null);
     }
@@ -276,15 +335,113 @@ export default function TechnicianPage() {
     }
   }
 
+  function queueOfflineAction(job: TechQueue["jobs"][number], type: OfflineMutation["type"], payload: Record<string, unknown>, successLabel: string) {
+    const mutation = queueOfflineMutation({
+      jobId: job.id,
+      type,
+      baseVersion: offlinePacket?.jobs?.find((item: any) => item.id === job.id)?.version || null,
+      payload: { ...payload, source: "technician_mobile_queue", storesTokens: false, storesSecrets: false },
+    });
+    setOfflineQueue(getOfflineQueue());
+    showSuccess(`${successLabel}: ${mutation.state}`);
+  }
+
+  function queueOfflineEvidence(job: TechQueue["jobs"][number]) {
+    queueOfflineAction(job, "photo_metadata", { label: executionEvidenceDrafts[job.id] || "Photo/evidence metadata" }, "Offline evidence queued");
+  }
+
+  async function queueOfflineBinary(job: TechQueue["jobs"][number], file: File | undefined | null, kind: "before_photo" | "after_photo" | "supporting_document" | "payment_evidence" = "before_photo") {
+    if (!file) return;
+    try {
+      const item = await queueOfflineBinaryAttachment({
+        jobId: job.id,
+        kind,
+        file,
+        baseVersion: offlinePacket?.jobs?.find((packetJob: any) => packetJob.id === job.id)?.version || null,
+      });
+      setOfflineBinaryQueue(getOfflineBinaryQueue());
+      showSuccess(`Saved offline: ${item.filename}`);
+    } catch (err: any) {
+      showError(err?.message || "Failed to save file offline");
+    }
+  }
+
+  async function syncOffline() {
+    setOfflineBusy(true);
+    try {
+      const [result, binaryResult] = await Promise.all([syncOfflineQueue(), syncOfflineBinaryQueue()]);
+      setOfflineQueue(getOfflineQueue());
+      setOfflineBinaryQueue(getOfflineBinaryQueue());
+      const conflicts = [
+        ...(Array.isArray(result?.results) ? result.results : []),
+        ...(Array.isArray(binaryResult?.results) ? binaryResult.results : []),
+      ].filter((row: any) => row.state === "conflict").length;
+      if (conflicts) showError(`${conflicts} offline update${conflicts === 1 ? "" : "s"} need conflict review`);
+      else showSuccess("Offline queue synced");
+      await load();
+    } catch (err: any) {
+      setOfflineQueue(getOfflineQueue());
+      showError(err?.message || "Offline sync failed");
+    } finally {
+      setOfflineBusy(false);
+    }
+  }
+
+  async function clearBinaryQueue() {
+    const result = await clearOfflineBinaryQueue();
+    setOfflineBinaryQueue(getOfflineBinaryQueue());
+    showSuccess(`Cleared ${result.cleared} offline file${result.cleared === 1 ? "" : "s"}`);
+  }
+
+  function clearMetadataQueue() {
+    const result = clearOfflineQueue();
+    setOfflineQueue(getOfflineQueue());
+    showSuccess(`Cleared ${result.cleared} offline update${result.cleared === 1 ? "" : "s"}`);
+  }
+
   const stats = useMemo(() => {
     if (!data) return [];
     return [
-      { label: "Assigned jobs", value: String(data.summary.assignedJobs), hint: "Current active workload" },
+      { label: "Assigned jobs", value: String(data.summary.assignedJobs), hint: "What is on your list right now" },
       { label: "In progress", value: String(data.summary.inProgress), hint: "Work already underway" },
-      { label: "Bookings today", value: String(data.summary.dueTodayBookings), hint: "Today’s assigned booking windows" },
-      { label: "Overdue", value: String(data.summary.overdueAssignedJobs), hint: "Assigned jobs now behind schedule" },
+      { label: "Bookings today", value: String(data.summary.dueTodayBookings), hint: "Today’s planned visit windows" },
+      { label: "Overdue", value: String(data.summary.overdueAssignedJobs), hint: "Jobs that need attention first" },
     ];
   }, [data]);
+
+  const nextJob = data?.jobs?.[0] || null;
+  const nextActionCards = useMemo(
+    () => [
+      {
+        label: "What matters now",
+        text: nextJob
+          ? `${nextJob.jobRef} for ${nextJob.customerName} is next. ${nextJob.nextStep || "Open the job sheet and keep work moving."}`
+          : "You’re clear for now. New work will appear here as soon as it is assigned.",
+        href: nextJob ? `/dashboard/jobs/${nextJob.id}` : "/dashboard/calendar",
+        action: nextJob ? "Open next job" : "Open schedule",
+      },
+      {
+        label: "Do next",
+        text: nextJob
+          ? nextJob.status === "IN_PROGRESS"
+            ? "Finish the work, capture proof, then submit or hand over for invoice."
+            : "Start the job, add notes and proof, then finish it from the same place."
+          : "Check today’s schedule or wait for the next assignment.",
+        href: nextJob ? `/dashboard/jobs/${nextJob.id}` : "/dashboard/scheduling",
+        action: nextJob ? "Open job sheet" : "Open schedule",
+      },
+      {
+        label: "Can wait",
+        text:
+          Number(data?.summary.overdueAssignedJobs || 0) > 0
+            ? `${data?.summary.overdueAssignedJobs} overdue job${Number(data?.summary.overdueAssignedJobs || 0) === 1 ? "" : "s"} should stay visible, but lower-priority items can wait.`
+            : "Lower-priority updates can wait until today’s live work is done.",
+        href: "/dashboard/jobs",
+        action: "View all jobs",
+      },
+    ],
+    [data?.summary.overdueAssignedJobs, nextJob],
+  );
 
   if (permissionsReady && !hasWorkspacePermission(permissions, "technician.execute")) {
     return (
@@ -310,37 +467,66 @@ export default function TechnicianPage() {
       <div className="operator-stack">
         <OperatorPageHeader
           eyebrow="Field OS"
-          title={`${terms.technicians} queue`}
-          subtitle={`A first ${terms.technicians.toLowerCase()}-facing surface for assigned work, mobile-friendly triage, and simple status handoff from dispatch.`}
+          title="Today’s work"
+          subtitle="Open the next job, finish the work cleanly, add proof, and hand back a result the team can use straight away."
           actions={[
-            { label: "Calendar", href: "/dashboard/calendar", variant: "secondary" },
-            { label: "Jobs", href: "/dashboard/jobs" },
+            { label: nextJob ? "Open next job" : "Open schedule", href: nextJob ? `/dashboard/jobs/${nextJob.id}` : "/dashboard/scheduling" },
+            { label: "Offline queue", href: "/dashboard/technician/offline", variant: "secondary" },
+            { label: "All jobs", href: "/dashboard/jobs", variant: "secondary" },
           ]}
-          shortcuts={["Start and complete only assigned jobs here", "This route is a simplified field workflow, not a replacement for dispatch"]}
+          shortcuts={["Open job → do the work → add proof → hand it back cleanly", "Lower-priority updates can wait until the live job is under control"]}
           stats={stats}
         />
 
-        <OperatorGuidance
-          title="Field workflow guidance"
-          items={[
-            `This route is intentionally simplified for ${terms.technicians.toLowerCase()} use and mobile scanning.`,
-            "Status actions here reuse the existing job lifecycle so audit, activity, and automation hooks stay intact.",
-            "Dispatch remains in Command Centre and Calendar; this page is for technician handoff and execution.",
-          ]}
-        />
+        <section className="card operator-section mt-focus-panel" data-testid="technician-my-day-strip">
+          <div className="operator-section__header">
+            <div>
+              <h2 className="operator-section__title">My Day</h2>
+              <p className="operator-section__subtitle">Next job, directions, start work, upload evidence, complete job, and sync status stay one tap away.</p>
+            </div>
+            <span className="operator-tag">Sync {offlineQueue.length + offlineBinaryQueue.length ? "queued" : "clear"}</span>
+          </div>
+          <div className="mt-pulse-grid">
+            <a className="mt-surface-note mt-linkCard" href={nextJob ? `/dashboard/jobs/${nextJob.id}` : "/dashboard/scheduling"} data-testid="technician-next-job-action">
+              <strong>Next Job</strong>
+              <p className="muted" style={{ margin: "6px 0 0" }}>{nextJob ? `${nextJob.jobRef || "Assigned job"} · ${nextJob.customerName || "Customer"}` : "No assigned job is waiting."}</p>
+              <span className="mt-linkCard__action">{nextJob ? "Open job" : "Open schedule"}</span>
+            </a>
+            <a className="mt-surface-note mt-linkCard" href={nextJob ? `/dashboard/jobs/${nextJob.id}` : "/dashboard/technician"} data-testid="technician-start-work-action">
+              <strong>Start Work</strong>
+              <p className="muted" style={{ margin: "6px 0 0" }}>Use the job sheet as the authority for notes, evidence, materials, and completion.</p>
+              <span className="mt-linkCard__action">Open job sheet</span>
+            </a>
+            <a className="mt-surface-note mt-linkCard" href="/dashboard/technician/offline" data-testid="technician-sync-status-action">
+              <strong>Sync Status</strong>
+              <p className="muted" style={{ margin: "6px 0 0" }}>{offlineQueue.length + offlineBinaryQueue.length} queued item{offlineQueue.length + offlineBinaryQueue.length === 1 ? "" : "s"} on this device.</p>
+              <span className="mt-linkCard__action">Review offline queue</span>
+            </a>
+          </div>
+        </section>
+
+        <section className="card operator-section mt-focus-panel" data-testid="technician-route-flow">
+          <div className="operator-section__header">
+            <div>
+              <h2 className="operator-section__title">Keep the next step obvious</h2>
+              <p className="operator-section__subtitle">What matters now, what to do next, and what can wait.</p>
+            </div>
+          </div>
+          <div className="mt-pulse-grid">
+            {nextActionCards.map((item) => (
+              <a key={item.label} className="mt-surface-note mt-linkCard" href={item.href}>
+                <strong>{item.label}</strong>
+                <p className="muted" style={{ margin: "6px 0 0" }}>{item.text}</p>
+                <span className="mt-linkCard__action">{item.action}</span>
+              </a>
+            ))}
+          </div>
+        </section>
 
         <OperatorNotice notice={notice} onDismiss={clearNotice} />
 
-        {meId ? (
-          <EntityCustomFieldsCard
-            title={`${terms.technicians.slice(0, -1) || "Technician"} details`}
-            entityType="technician"
-            entityId={meId}
-          />
-        ) : null}
-
         {capacityStatus ? (
-          <section className="card operator-section">
+          <section className="card operator-section mt-focus-panel--quiet">
             <div className="operator-section__header">
               <div>
                 <h2 className="operator-section__title">Capacity status</h2>
@@ -359,11 +545,74 @@ export default function TechnicianPage() {
           </section>
         ) : null}
 
-        <section className="card operator-section">
+        <section className="card operator-section mt-focus-panel--quiet" data-testid="offline-mobile-foundation">
+          <div className="operator-section__header">
+            <div>
+              <h2 className="operator-section__title">Offline-ready packet</h2>
+              <p className="operator-section__subtitle">Assigned job summaries plus an IndexedDB evidence queue. No tokens, secrets, portal links, or full app pages are cached.</p>
+            </div>
+            <button className="button secondary" type="button" onClick={() => void syncOffline()} disabled={offlineBusy || (offlineQueue.length + offlineBinaryQueue.length) === 0}>
+              {offlineBusy ? "Syncing..." : `Sync queue (${offlineQueue.length + offlineBinaryQueue.length})`}
+            </button>
+          </div>
+          <div className="mt-pulse-grid">
+            <div className="integration-card">
+              <strong>{offlinePacket?.jobs?.length ?? data?.jobs?.length ?? 0} assigned jobs scoped</strong>
+              <div className="muted" style={{ marginTop: 4 }}>Packet state: {offlinePacket ? "ready" : "online refresh needed"}</div>
+              <div className="muted" style={{ marginTop: 4 }}>Field workflow: {offlinePacket?.fieldOperation?.usableOffline ? "usable offline" : "refresh online"} · server remains source of truth</div>
+            </div>
+            <div className="integration-card">
+              <strong>{offlineQueue.filter((item) => item.state === "conflict").length} conflicts</strong>
+              <div className="muted" style={{ marginTop: 4 }} data-testid="offline-conflict-warning">Queued · syncing · conflict · synced states are preserved locally.</div>
+            </div>
+            <div className="integration-card">
+              <strong>{offlineBinaryQueue.length} offline files</strong>
+              <div className="muted" style={{ marginTop: 4 }}>{offlineWorkerReady ? "Service worker ready" : "IndexedDB queue ready"} · saved offline · syncing · conflict · uploaded.</div>
+            </div>
+          </div>
+          {offlineBinaryQueue.length ? (
+            <div className="operator-chipRow" style={{ marginTop: 12 }} data-testid="offline-binary-queue-state">
+              {offlineBinaryQueue.slice(0, 6).map((item) => (
+                <span key={item.clientMutationId} className="operator-tag">
+                  {item.kind.replaceAll("_", " ")} · {item.state}
+                </span>
+              ))}
+              <button className="button secondary" type="button" onClick={() => void clearBinaryQueue()} disabled={offlineBusy}>
+                Clear offline files
+              </button>
+            </div>
+          ) : null}
+          {Array.isArray(offlinePacket?.conflictResolution) && offlinePacket.conflictResolution.length ? (
+            <details style={{ marginTop: 12 }} data-testid="offline-conflict-resolution-options">
+              <summary>Conflict options</summary>
+              <div className="operator-chipRow" style={{ marginTop: 10 }}>
+                {offlinePacket.conflictResolution.slice(0, 7).map((item: any) => (
+                  <span className="operator-tag" key={item.key}>
+                    {String(item.key || "").replaceAll("_", " ")} · no blind overwrite
+                  </span>
+                ))}
+              </div>
+            </details>
+          ) : null}
+          {offlineQueue.length ? (
+            <div className="operator-chipRow" style={{ marginTop: 12 }} data-testid="offline-metadata-queue-state">
+              {offlineQueue.slice(0, 8).map((item) => (
+                <span key={item.clientMutationId} className="operator-tag">
+                  {item.type.replaceAll("_", " ")} · {item.state}
+                </span>
+              ))}
+              <button className="button secondary" type="button" data-testid="offline-clear-metadata-queue" onClick={() => clearMetadataQueue()} disabled={offlineBusy}>
+                Clear offline updates
+              </button>
+            </div>
+          ) : null}
+        </section>
+
+        <section className="card operator-section mt-focus-panel">
           <div className="operator-section__header">
             <div>
               <h2 className="operator-section__title">Assigned {terms.jobs.toLowerCase()}</h2>
-              <p className="operator-section__subtitle">A simplified queue of active work owned by the current {terms.technicians.slice(0, -1).toLowerCase() || "technician"}.</p>
+              <p className="operator-section__subtitle">Open the job sheet, capture proof, and keep live work moving without extra admin clutter.</p>
             </div>
           </div>
           {data?.jobs?.length ? (
@@ -412,11 +661,11 @@ export default function TechnicianPage() {
                   <div className="operator-table__cell operator-table__cell--actions">
                     <OperatorRowActions
                       primaryAction={job.status === "IN_PROGRESS"
-                        ? { label: busyId === job.id ? "Completing..." : "Complete", onClick: () => void run(job.id, "complete"), disabled: busyId === job.id, testId: `technician-complete-${job.id}` }
-                        : { label: busyId === job.id ? "Starting..." : "Start", onClick: () => void run(job.id, "start"), disabled: busyId === job.id, testId: `technician-start-${job.id}` }}
+                        ? { label: busyId === job.id ? "Completing..." : "Complete job", onClick: () => void run(job.id, "complete"), disabled: busyId === job.id, testId: `technician-complete-${job.id}` }
+                        : { label: busyId === job.id ? "Starting..." : "Start job", onClick: () => void run(job.id, "start"), disabled: busyId === job.id, testId: `technician-start-${job.id}` }}
                       actions={[
-                        { label: busyId === job.id ? "Arriving..." : "Log arrival", onClick: () => void arrive(job.id), group: "Field actions", description: "Record that the technician has arrived on site", disabled: busyId === job.id || job.status === "COMPLETED" || job.status === "CANCELLED", testId: `technician-arrive-${job.id}` },
-                        { label: "Open job", href: `/dashboard/jobs/${job.id}`, group: "Internal", description: "Open the full internal job record" },
+                        { label: busyId === job.id ? "Arriving..." : "Log arrival", onClick: () => void arrive(job.id), group: "Field actions", description: "Record that the team has arrived on site", disabled: busyId === job.id || job.status === "COMPLETED" || job.status === "CANCELLED", testId: `technician-arrive-${job.id}` },
+                        { label: "Open job sheet", href: `/dashboard/jobs/${job.id}`, group: "Internal", description: "Open the full internal job record" },
                       ]}
                     />
                     <div style={{ display: "grid", gap: 6, marginTop: 10 }}>
@@ -433,10 +682,10 @@ export default function TechnicianPage() {
                         {busyId === job.id ? "Saving..." : "Save note"}
                       </button>
                     </div>
-                    <section className="card" style={{ marginTop: 10, padding: 14 }} data-testid="execution-record-card">
+                    <section className="card mt-focus-panel--quiet" style={{ marginTop: 10, padding: 14 }} data-testid="execution-record-card">
                       <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                         <div>
-                          <strong>Completion record</strong>
+                          <strong>Completed work record</strong>
                           <div className="muted" style={{ marginTop: 4, fontSize: 13 }}>
                             {job.executionRecord?.status || "Not started"}
                             {job.executionRecord?.submittedAt ? ` • Submitted ${new Date(job.executionRecord.submittedAt).toLocaleString()}` : ""}
@@ -452,13 +701,13 @@ export default function TechnicianPage() {
                           className="input"
                           value={executionSummaryDrafts[job.id] ?? job.executionRecord?.summary ?? ""}
                           onChange={(event) => setExecutionSummaryDrafts((current) => ({ ...current, [job.id]: event.target.value }))}
-                          placeholder="Execution summary"
+                          placeholder="Completed work summary"
                         />
                         <textarea
                           className="textarea"
                           value={executionNoteDrafts[job.id] ?? job.executionRecord?.notesJson?.completionNotes ?? ""}
                           onChange={(event) => setExecutionNoteDrafts((prev) => ({ ...prev, [job.id]: event.target.value }))}
-                          placeholder="Completion notes"
+                          placeholder="Completed work notes"
                           data-testid="execution-notes-input"
                         />
                         <div data-testid="execution-checklist" style={{ display: "grid", gap: 6 }}>
@@ -491,6 +740,70 @@ export default function TechnicianPage() {
                             <button className="button secondary" type="button" onClick={() => void addEvidence(job.id)} disabled={busyId === job.id}>
                               Add
                             </button>
+                            <button className="button secondary" type="button" onClick={() => queueOfflineEvidence(job)} disabled={busyId === job.id} data-testid={`offline-queue-photo-metadata-${job.id}`}>
+                              Queue offline
+                            </button>
+                          </div>
+                          <div className="mt-inline-form" style={{ alignItems: "center" }} data-testid="offline-technician-workflow">
+                            <label className="button secondary" style={{ cursor: "pointer" }}>
+                              Queue before photo
+                              <input
+                                type="file"
+                                accept="image/jpeg,image/png,image/webp,application/pdf,text/plain"
+                                data-testid={`offline-before-photo-input-${job.id}`}
+                                style={{ position: "absolute", opacity: 0, pointerEvents: "none", width: 1, height: 1 }}
+                                onChange={(event) => {
+                                  const file = event.currentTarget.files?.[0];
+                                  void queueOfflineBinary(job, file, "before_photo");
+                                  event.currentTarget.value = "";
+                                }}
+                              />
+                              <input
+                                type="file"
+                                accept="image/jpeg,image/png,image/webp,application/pdf,text/plain"
+                                data-testid={`offline-binary-input-${job.id}`}
+                                style={{ position: "absolute", opacity: 0, pointerEvents: "none", width: 1, height: 1 }}
+                                onChange={(event) => {
+                                  const file = event.currentTarget.files?.[0];
+                                  void queueOfflineBinary(job, file, "before_photo");
+                                  event.currentTarget.value = "";
+                                }}
+                              />
+                            </label>
+                            <label className="button secondary" style={{ cursor: "pointer" }}>
+                              Queue after photo
+                              <input
+                                type="file"
+                                accept="image/jpeg,image/png,image/webp,application/pdf,text/plain"
+                                data-testid={`offline-after-photo-input-${job.id}`}
+                                style={{ position: "absolute", opacity: 0, pointerEvents: "none", width: 1, height: 1 }}
+                                onChange={(event) => {
+                                  const file = event.currentTarget.files?.[0];
+                                  void queueOfflineBinary(job, file, "after_photo");
+                                  event.currentTarget.value = "";
+                                }}
+                              />
+                            </label>
+                            <span className="muted" style={{ fontSize: 13 }}>
+                              Saved offline first, then synced with conflict review.
+                            </span>
+                          </div>
+                          <div className="mt-inline-form" style={{ alignItems: "center" }}>
+                            <button className="button secondary" type="button" data-testid={`offline-queue-signature-${job.id}`} onClick={() => queueOfflineAction(job, "signature_metadata", { signerRole: "customer", capturedAt: new Date().toISOString() }, "Signature metadata queued")}>
+                              Queue signature
+                            </button>
+                            <button className="button secondary" type="button" data-testid={`offline-queue-completion-notes-${job.id}`} onClick={() => queueOfflineAction(job, "completion_notes", { notes: executionNoteDrafts[job.id] ?? job.executionRecord?.notesJson?.completionNotes ?? "" }, "Completion notes queued")}>
+                              Queue notes
+                            </button>
+                            <button className="button secondary" type="button" data-testid={`offline-queue-material-${job.id}`} onClick={() => queueOfflineAction(job, "material_usage", { item: "field_material", quantity: 1 }, "Material usage queued")}>
+                              Queue material
+                            </button>
+                            <button className="button secondary" type="button" data-testid={`offline-queue-payment-${job.id}`} onClick={() => queueOfflineAction(job, "payment_note", { method: "offline_record", amountCents: 0 }, "Payment note queued")}>
+                              Queue payment note
+                            </button>
+                            <button className="button" type="button" data-testid={`offline-queue-complete-${job.id}`} onClick={() => queueOfflineAction(job, "status_change", { status: "COMPLETED", pendingSync: true }, "Completion queued pending sync")}>
+                              Queue complete
+                            </button>
                           </div>
                         </div>
                         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -513,15 +826,15 @@ export default function TechnicianPage() {
           ) : (
             <OperatorEmptyStateCard
               title={`No assigned ${terms.jobs.toLowerCase()}`}
-              description={`Assigned field work will appear here once dispatch hands ${terms.jobs.toLowerCase()} over to this ${terms.technicians.slice(0, -1).toLowerCase() || "technician"}.`}
-              actions={[{ label: "Open calendar", href: "/dashboard/calendar", variant: "secondary" }]}
+              description={`You’re clear for now. New assigned work will appear here as soon as it is handed over to this ${terms.technicians.slice(0, -1).toLowerCase() || "technician"}.`}
+              actions={[{ label: "Open schedule", href: "/dashboard/scheduling", variant: "secondary" }]}
             />
           )}
         </section>
 
         {meId ? (
           <EntityCustomFieldsCard
-            title={`${terms.technicians.slice(0, -1) || "Technician"} profile fields`}
+            title={`${terms.technicians.slice(0, -1) || "Technician"} details`}
             entityType="technician"
             entityId={meId}
             onSaved={() => undefined}
@@ -556,7 +869,7 @@ export default function TechnicianPage() {
           ) : (
             <OperatorEmptyStateCard
               title="No bookings due today"
-              description="Assigned booking windows will appear here as dispatch schedules work for this technician."
+              description="New visit windows will appear here if the day changes."
             />
           )}
         </section>

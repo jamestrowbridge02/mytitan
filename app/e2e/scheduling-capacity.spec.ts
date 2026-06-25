@@ -66,6 +66,9 @@ test.describe("scheduling capacity planning", () => {
     await loginAs(page, request, "e2e.operator@mytitan.local", "MyTitanE2E!2026");
 
     await page.goto("/dashboard/command-centre-v2");
+    await page.getByTestId("location-scope-switcher").locator("select").selectOption({ label: "All locations" });
+    await page.getByRole("button", { name: "List", exact: true }).click();
+    await page.getByTestId("ccv2-search-input").fill(fixtureRefs.commandCentreJobRef);
     await page.getByTestId(`ccv2-open-${fixtureRefs.commandCentreJobId}`).evaluate((element: HTMLButtonElement) => element.click());
     const sidepanel = page.getByTestId("ccv2-sidepanel");
     await expect(sidepanel).toBeVisible();

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { EntityCustomFieldsCard } from "../../components/custom-fields/EntityCustomFieldsCard";
 import { OperatorNotice } from "../../components/feedback/OperatorNotice";
 import { useOperatorNotice } from "../../components/feedback/useOperatorNotice";
@@ -24,6 +24,7 @@ import { getBusinessTerms } from "../../lib/business-config";
 import { getMissingRequiredCustomFieldKeys, type CustomField, type CustomFieldValue } from "../../lib/custom-fields";
 import { isMarketplaceEnabled } from "../../lib/feature-flags";
 import { readActiveLocationId, subscribeActiveLocationId } from "../../lib/location-context";
+import { useOperationalRefresh } from "../../lib/operational-refresh";
 import { useStickyOperatorView } from "../../lib/operator-view-state";
 import { useTenantSettings } from "../../lib/tenant-settings";
 import { getBookingStages, mapStatusToStage } from "../../lib/workflow-config";
@@ -32,9 +33,35 @@ type BookingSettings = {
   publicEnabled: boolean;
   publicUrl?: string | null;
   icsUrl?: string | null;
+  autoConfirmPublicBookings?: boolean;
+  bookingWorkflow?: {
+    autoCreateJobFromBooking?: boolean;
+    autoAssignWorkflow?: boolean;
+    manualReviewMode?: boolean;
+    locationFirstScheduling?: boolean;
+  };
   businessHours: Array<{ dayOfWeek: number; startMinute: number; endMinute: number }>;
-  blackoutDates: Array<{ date: string; reason?: string | null }>;
   slotMinutes: number;
+  publicState?: "live" | "setup_required" | "no_slots";
+  publicMessage?: string | null;
+  publishedServiceCount?: number;
+  nextAvailableSlot?: string | null;
+};
+
+type BookingServiceOption = {
+  id: string;
+  name: string;
+  durationMinutes?: number | null;
+  effectivePriceCents?: number | null;
+  standardPriceCents?: number | null;
+  priceCents?: number | null;
+  depositDueCents?: number | null;
+  remainingBalanceCents?: number | null;
+};
+
+type DraftBookingServiceLine = {
+  serviceId: string;
+  quantity: number;
 };
 
 type TimingFilter = "all" | "upcoming" | "today" | "unlinked";
@@ -54,12 +81,110 @@ function formatDateTime(value?: string | null) {
   return date.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
+function formatMoney(value?: number | null) {
+  if (typeof value !== "number") return "No price set";
+  return `£${(value / 100).toFixed(2)}`;
+}
+
+function toDateTimeLocalValue(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+function addMinutesToDateTimeLocal(value: string, minutes: number) {
+  const date = new Date(value);
+  if (!value || Number.isNaN(date.getTime())) return "";
+  return toDateTimeLocalValue(new Date(date.getTime() + Math.max(5, minutes) * 60_000));
+}
+
 function isToday(value?: string | null) {
   if (!value) return false;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return false;
   const now = new Date();
   return date.toDateString() === now.toDateString();
+}
+
+function describeBookingOperatorState(booking: any, readinessIssues: string[]) {
+  const hasLinkedJob = Boolean(booking?.jobId);
+  const today = isToday(booking?.startsAt);
+  const status = String(booking?.status || "").toUpperCase();
+  const source = String(booking?.source || "").toUpperCase();
+
+  if (status === "CANCELLED") {
+    return {
+      label: "Closed",
+      summary: "This booking was cancelled and no further action is needed.",
+      actionLabel: "Review booking",
+    };
+  }
+
+  if (!hasLinkedJob && status === "PENDING" && source === "PUBLIC") {
+    return {
+      label: "Needs action",
+      summary: "The customer is waiting for confirmation, a move, or a cancellation.",
+      actionLabel: "Review booking",
+    };
+  }
+
+  if (!hasLinkedJob && status === "CONFIRMED" && source === "PUBLIC") {
+    return {
+      label: "Upcoming work",
+      summary: "The booking is confirmed and ready to move into live work.",
+      actionLabel: "Start job",
+    };
+  }
+
+  if (!hasLinkedJob && readinessIssues.length) {
+      return {
+        label: "Blocked",
+        summary: `Add ${readinessIssues.join(", ")} before this booking can become work.`,
+        actionLabel: "Review booking",
+      };
+  }
+
+  if (!hasLinkedJob && today) {
+    return {
+      label: "Ready to convert today",
+      summary: "This visit is due today and can move straight into a job.",
+      actionLabel: "Convert to job",
+    };
+  }
+
+  if (!hasLinkedJob) {
+    return {
+      label: "Needs conversion",
+      summary: "The visit is booked but not linked to a job yet.",
+      actionLabel: "Convert to job",
+    };
+  }
+
+  if (today) {
+    return {
+      label: "In today's schedule",
+      summary: "The booking is linked and should move with today's work.",
+      actionLabel: "Open linked job",
+    };
+  }
+
+  return {
+    label: "Linked and scheduled",
+    summary: "The booking is already attached to live work.",
+    actionLabel: "Review linked job",
+  };
+}
+
+function hydrateBookingSettingsForm(
+  nextSettings: BookingSettings | null,
+  apply: {
+    setSettings: (value: BookingSettings | null) => void;
+  },
+) {
+  apply.setSettings(nextSettings);
 }
 
 export default function BookingsPage() {
@@ -71,14 +196,15 @@ export default function BookingsPage() {
   const [startsAt, setStartsAt] = useState("");
   const [endsAt, setEndsAt] = useState("");
   const [jobId, setJobId] = useState("");
+  const [customerName, setCustomerName] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [serviceId, setServiceId] = useState("");
+  const [serviceLines, setServiceLines] = useState<DraftBookingServiceLine[]>([]);
+  const [bookingServices, setBookingServices] = useState<BookingServiceOption[]>([]);
   const [settings, setSettings] = useState<BookingSettings | null>(null);
-  const [publicEnabled, setPublicEnabled] = useState(false);
-  const [startHour, setStartHour] = useState("09:00");
-  const [endHour, setEndHour] = useState("17:00");
-  const [blackoutDates, setBlackoutDates] = useState<Array<{ date: string; reason?: string | null }>>([]);
-  const [newBlackoutDate, setNewBlackoutDate] = useState("");
-  const [newBlackoutReason, setNewBlackoutReason] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [creatingBooking, setCreatingBooking] = useState(false);
+  const creatingBookingRef = useRef(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [timingFilter, setTimingFilter] = useState<TimingFilter>("all");
@@ -101,15 +227,20 @@ export default function BookingsPage() {
       showError(err.message || "Failed to load bookings");
     }
   };
+  const { refreshNow, lastUpdatedAt, isRefreshing } = useOperationalRefresh(load);
 
   const loadSettings = async () => {
     if (!marketplaceEnabled) return;
     try {
-      const data = await apiFetch("/bookings/settings");
-      setSettings(data);
-      setPublicEnabled(Boolean(data.publicEnabled));
-      setBlackoutDates(Array.isArray(data.blackoutDates) ? data.blackoutDates : []);
-    } catch {
+      const [data, serviceRows] = await Promise.all([
+        apiFetch("/bookings/settings"),
+        apiFetch("/booking/services").catch(() => []),
+      ]);
+      hydrateBookingSettingsForm(data as BookingSettings, {
+        setSettings,
+      });
+      setBookingServices(Array.isArray(serviceRows) ? serviceRows : []);
+    } catch (err: any) {
       return undefined;
     }
   };
@@ -147,49 +278,48 @@ export default function BookingsPage() {
 
   async function onCreate(e: React.FormEvent) {
     e.preventDefault();
+    const selectedLines = serviceLines
+      .map((line, index) => ({
+        serviceId: line.serviceId,
+        quantity: Math.max(1, Math.min(99, Math.round(Number(line.quantity || 1)))),
+        sortOrder: index,
+      }))
+      .filter((line) => line.serviceId);
+    if (creatingBookingRef.current) return;
+    const selectedService = bookingServices.find((service) => service.id === selectedLines[0]?.serviceId);
+    const normalizedCustomerName = customerName.trim();
 
+    creatingBookingRef.current = true;
+    setCreatingBooking(true);
     try {
       await apiFetch("/bookings", {
         method: "POST",
         body: JSON.stringify({
           startsAt,
           endsAt,
+          serviceId: selectedLines[0]?.serviceId || undefined,
+          serviceLines: selectedLines.length ? selectedLines : undefined,
           jobId: jobId || undefined,
+          customerName: normalizedCustomerName || undefined,
+          customerEmail: customerEmail.trim() || undefined,
+          customerPhone: customerPhone.trim() || undefined,
         }),
       });
       setStartsAt("");
       setEndsAt("");
       setJobId("");
-      showSuccess("Booking created");
-      await load();
+      setCustomerName("");
+      setCustomerEmail("");
+      setCustomerPhone("");
+      setServiceId("");
+      setServiceLines([]);
+      showSuccess(selectedService ? `Booking created with ${selectedService.name}${selectedLines.length > 1 ? ` and ${selectedLines.length - 1} more service${selectedLines.length > 2 ? "s" : ""}` : ""}. It is now ready in the queue.` : "Booking created. It is now ready in the queue.");
+      await refreshNow();
     } catch (err: any) {
       showError(err.message || "Failed to create booking");
-    }
-  }
-
-  async function saveSettings() {
-    setSaving(true);
-    try {
-      const [startH, startM] = startHour.split(":").map(Number);
-      const [endH, endM] = endHour.split(":").map(Number);
-      const startMinute = startH * 60 + startM;
-      const endMinute = endH * 60 + endM;
-      const businessHours = [1, 2, 3, 4, 5].map((dayOfWeek) => ({ dayOfWeek, startMinute, endMinute }));
-
-      const updated = await apiFetch("/bookings/settings", {
-        method: "POST",
-        body: JSON.stringify({
-          publicEnabled,
-          businessHours,
-          blackoutDates,
-        }),
-      });
-      setSettings(updated);
-      showSuccess("Booking settings saved");
-    } catch (err: any) {
-      showError(err.message || "Failed to update booking settings");
     } finally {
-      setSaving(false);
+      creatingBookingRef.current = false;
+      setCreatingBooking(false);
     }
   }
 
@@ -219,15 +349,19 @@ export default function BookingsPage() {
       showSuccess(
         res?.alreadyLinked
           ? duplicatePrevented
-            ? `Duplicate conversion prevented. Booking is linked to ${jobRef}`
-            : `Booking already linked to ${jobRef}`
+            ? `Duplicate conversion prevented. Opening the linked job ${jobRef}.`
+            : `Booking already linked to ${jobRef}. Opening the job now.`
           : dispatchFollowUpCreated
-          ? `Converted booking to ${jobRef} and queued dispatch follow-up`
-          : `Converted booking to ${jobRef}`,
+          ? `Converted booking to ${jobRef}. Dispatch follow-up is queued and the linked job is opening.`
+          : `Converted booking to ${jobRef}. Opening the linked job now.`,
       );
-      await load();
       if (jobId) {
-        void router.push(`/dashboard/jobs/${jobId}`);
+        setBookings((current) =>
+          current.map((item) => (item.id === bookingId ? { ...item, jobId } : item)),
+        );
+        window.setTimeout(() => window.location.assign(`/dashboard/jobs/${jobId}`), 1_000);
+      } else {
+        await load();
       }
     } catch (err: any) {
       if (err instanceof ApiError && err.payload && typeof err.payload === "object" && (err.payload as any).code === "BOOKING_CONVERSION_NOT_READY") {
@@ -250,15 +384,41 @@ export default function BookingsPage() {
 
   const stats = useMemo(() => {
     const linkedJobs = bookings.filter((booking) => booking.jobId).length;
-    const upcoming = bookings.filter((booking) => booking.startsAt && new Date(booking.startsAt).getTime() >= Date.now()).length;
+    const needsConversion = bookings.filter((booking) => !booking.jobId).length;
+    const readyToConvert = bookings.filter((booking) => !booking.jobId && getConversionIssues(booking).length === 0).length;
+    const todaysWork = bookings.filter((booking) => isToday(booking.startsAt)).length;
     return [
-      { label: terms.bookings, value: String(bookings.length), hint: `${linkedJobs} linked to ${terms.jobs.toLowerCase()}` },
-      { label: "Upcoming", value: String(upcoming), hint: "Future schedule load" },
-      { label: "Public booking", value: publicEnabled ? "Live" : "Off", hint: publicEnabled ? "Customers can request time" : "Internal only" },
+      { label: terms.bookings, value: String(bookings.length), hint: `${linkedJobs} already linked to ${terms.jobs.toLowerCase()}` },
+      { label: "Needs conversion", value: String(needsConversion), hint: "Booked visits still waiting to become work" },
+      { label: "Ready to convert", value: String(readyToConvert), hint: "Can move straight into a job now" },
+      { label: "Today's workload", value: String(todaysWork), hint: "Visits that should move today" },
     ];
-  }, [bookings, publicEnabled]);
+  }, [bookings, terms.bookings, terms.jobs]);
 
   const statusOptions = useMemo(() => Array.from(new Set(bookings.map((booking) => String(booking.status || "PLANNED")))).sort(), [bookings]);
+  const bookingReadinessGuidance = useMemo(() => {
+    if (!settings?.publicState || settings.publicState === "live") {
+      return null;
+    }
+
+    if (settings.publicState === "setup_required") {
+      return {
+        title: "Bookings are ready to set up.",
+        items: [
+          settings.publicMessage || "Finish your booking settings to start taking bookings.",
+          "Turn on public bookings, confirm your hours, and publish at least one booking service before you share the link.",
+        ],
+      };
+    }
+
+    return {
+      title: "Bookings are live, but there are no open slots right now.",
+      items: [
+        settings.publicMessage || "Bookings are live, but there are no open slots right now.",
+        "Check business hours, blackout dates, and team availability before sharing the link.",
+      ],
+    };
+  }, [settings]);
 
   const filteredBookings = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
@@ -294,6 +454,35 @@ export default function BookingsPage() {
     return counts;
   }, [bookings]);
 
+  const nextWorkflowActions = useMemo(
+    () => [
+      {
+        title: "Convert ready bookings",
+        detail: `${savedViewCounts.unlinked} booked visit${savedViewCounts.unlinked === 1 ? "" : "s"} still need a job record.`,
+        action: "Open conversion queue",
+        onClick: () => {
+          setSavedView("unlinked");
+          setTimingFilter("unlinked");
+        },
+      },
+      {
+        title: "Plan by location",
+        detail: settings?.bookingWorkflow?.locationFirstScheduling === false ? "Technician-first scheduling is selected." : "Location-first scheduling is selected for booking work.",
+        action: "Open calendar",
+        href: "/dashboard/calendar?from=bookings",
+      },
+      {
+        title: settings?.autoConfirmPublicBookings ? "Auto-confirm is on" : "Approval path is on",
+        detail: settings?.autoConfirmPublicBookings
+          ? "Real available slots can confirm immediately."
+          : "Public requests stay in review until a user confirms them.",
+        action: "Change workflow",
+        href: "/dashboard/booking/settings#workflow",
+      },
+    ],
+    [savedViewCounts.unlinked, settings?.autoConfirmPublicBookings, settings?.bookingWorkflow?.locationFirstScheduling, setSavedView],
+  );
+
   const clearFilters = () => {
     setSavedView("all");
     setSearch("");
@@ -309,6 +498,69 @@ export default function BookingsPage() {
   ].filter((chip): chip is { id: string; label: string; onClear: () => void } => Boolean(chip));
 
   const allVisibleSelected = filteredBookings.length > 0 && filteredBookings.every((booking) => selectedIds.includes(booking.id));
+  const selectedServiceLineDetails = serviceLines
+    .map((line) => ({ ...line, service: bookingServices.find((service) => service.id === line.serviceId) || null }))
+    .filter((line) => line.service);
+  const serviceBundleTotalCents = selectedServiceLineDetails.reduce((sum, line) => {
+    const unit = Number(line.service?.effectivePriceCents ?? line.service?.standardPriceCents ?? line.service?.priceCents ?? 0);
+    return sum + unit * Math.max(1, Number(line.quantity || 1));
+  }, 0);
+  const serviceBundleDurationMinutes = selectedServiceLineDetails.reduce((sum, line) => sum + Number(line.service?.durationMinutes || 60) * Math.max(1, Number(line.quantity || 1)), 0);
+  const updateStart = (value: string) => {
+    setStartsAt(value);
+    if (serviceBundleDurationMinutes && value) {
+      setEndsAt(addMinutesToDateTimeLocal(value, serviceBundleDurationMinutes));
+    }
+  };
+  const updateService = (value: string) => {
+    setServiceId(value);
+  };
+  const addSelectedService = () => {
+    if (!serviceId) return;
+    setServiceLines((current) => {
+      if (current.some((line) => line.serviceId === serviceId)) return current;
+      const next = [...current, { serviceId, quantity: 1 }];
+      const nextDuration = next.reduce((sum, line) => {
+        const service = bookingServices.find((item) => item.id === line.serviceId);
+        return sum + Number(service?.durationMinutes || 60) * Math.max(1, Number(line.quantity || 1));
+      }, 0);
+      if (startsAt && nextDuration) setEndsAt(addMinutesToDateTimeLocal(startsAt, nextDuration));
+      return next;
+    });
+  };
+  const updateServiceLineQuantity = (lineServiceId: string, quantity: number) => {
+    setServiceLines((current) => {
+      const next = current.map((line) => line.serviceId === lineServiceId ? { ...line, quantity: Math.max(1, Math.min(99, Math.round(Number(quantity || 1)))) } : line);
+      const nextDuration = next.reduce((sum, line) => {
+        const service = bookingServices.find((item) => item.id === line.serviceId);
+        return sum + Number(service?.durationMinutes || 60) * Math.max(1, Number(line.quantity || 1));
+      }, 0);
+      if (startsAt && nextDuration) setEndsAt(addMinutesToDateTimeLocal(startsAt, nextDuration));
+      return next;
+    });
+  };
+  const removeServiceLine = (lineServiceId: string) => {
+    setServiceLines((current) => {
+      const next = current.filter((line) => line.serviceId !== lineServiceId);
+      const nextDuration = next.reduce((sum, line) => {
+        const service = bookingServices.find((item) => item.id === line.serviceId);
+        return sum + Number(service?.durationMinutes || 60) * Math.max(1, Number(line.quantity || 1));
+      }, 0);
+      if (startsAt && nextDuration) setEndsAt(addMinutesToDateTimeLocal(startsAt, nextDuration));
+      return next;
+    });
+  };
+  const moveServiceLine = (lineServiceId: string, direction: -1 | 1) => {
+    setServiceLines((current) => {
+      const index = current.findIndex((line) => line.serviceId === lineServiceId);
+      const target = index + direction;
+      if (index < 0 || target < 0 || target >= current.length) return current;
+      const next = [...current];
+      const [line] = next.splice(index, 1);
+      next.splice(target, 0, line);
+      return next;
+    });
+  };
 
   return (
     <DashboardShell>
@@ -316,35 +568,137 @@ export default function BookingsPage() {
         <OperatorPageHeader
           eyebrow="Scheduling"
           title={terms.bookings}
-          subtitle={`A denser ${terms.bookings.toLowerCase()} queue with local filtering, quick conversion to ${terms.jobs.toLowerCase()}, and safer operator actions around the public calendar.`}
+          subtitle={`See what is booked, convert the right visits into ${terms.jobs.toLowerCase()}, and keep the schedule ready to move.`}
           actions={[
+            { label: "Start work", href: "/dashboard/work" },
             { label: "Calendar", href: "/dashboard/calendar", variant: "secondary" },
-            { label: `${terms.bookings} settings`, href: "/dashboard/booking/settings" },
+            { label: `${terms.bookings} settings`, href: "/dashboard/booking/settings", variant: "secondary" },
           ]}
-          shortcuts={[`Use filters to isolate today's ${terms.bookings.toLowerCase()} load or unlinked items`, `Convert unlinked ${terms.bookings.toLowerCase()} into ${terms.jobs.toLowerCase()} from the queue`]}
+          shortcuts={[`Use filters to isolate today's ${terms.bookings.toLowerCase()} load or unlinked items`, `Convert ready visits into ${terms.jobs.toLowerCase()} and open linked work from the same queue`]}
           stats={stats}
         />
+        <div className="operator-inline-actions">
+          <span className="muted">{isRefreshing ? "Refreshing bookings..." : lastUpdatedAt ? "Updated just now" : "Live booking queue"}</span>
+          <button className="button secondary operator-compact-button" type="button" disabled={isRefreshing} onClick={() => void refreshNow()}>
+            Refresh
+          </button>
+        </div>
 
         <OperatorNotice notice={notice} onDismiss={clearNotice} />
+        {bookingReadinessGuidance ? <OperatorGuidance title={bookingReadinessGuidance.title} items={bookingReadinessGuidance.items} /> : null}
+
+        <section className="operator-quickRail" data-testid="booking-click-to-action-rail">
+          {nextWorkflowActions.map((item) => (
+            <article className="operator-actionTile" key={item.title}>
+              <div className="operator-actionTile__body">
+                <h3>{item.title}</h3>
+                <p>{item.detail}</p>
+              </div>
+              {item.href ? (
+                <Link className="button secondary" href={item.href}>
+                  {item.action}
+                </Link>
+              ) : (
+                <button className="button secondary" type="button" onClick={item.onClick}>
+                  {item.action}
+                </button>
+              )}
+            </article>
+          ))}
+        </section>
 
         <div className={marketplaceEnabled && settings ? "operator-split" : "operator-stack"}>
           <section className="card operator-section">
             <div className="operator-section__header">
               <div>
                 <h2 className="operator-section__title">Create {terms.bookings.slice(0, -1).toLowerCase() || "booking"}</h2>
-                <p className="operator-section__subtitle">Keep manual entry compact and adjacent to the live queue.</p>
+              <p className="operator-section__subtitle">Keep manual entry compact so the next visit can be added without leaving the queue.</p>
               </div>
             </div>
 
             <form onSubmit={onCreate} className="operator-stack">
+              <div>
+                <label>Service</label>
+                <div className="operator-inline-actions" style={{ alignItems: "stretch" }}>
+                  <select className="input" data-testid="booking-create-service" value={serviceId} onChange={(event) => updateService(event.target.value)}>
+                    <option value="">Choose a service</option>
+                    {bookingServices.map((service) => (
+                      <option key={service.id} value={service.id}>
+                        {service.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button className="button secondary" type="button" data-testid="booking-create-service-add" onClick={addSelectedService} disabled={!serviceId || serviceLines.some((line) => line.serviceId === serviceId)}>
+                    Add service
+                  </button>
+                </div>
+                {selectedServiceLineDetails.length ? (
+                  <div className="operator-guidance" data-testid="booking-create-service-summary" style={{ marginTop: 10 }}>
+                    <strong>Selected services</strong>
+                    <div className="booking-service-bundle">
+                      {selectedServiceLineDetails.map((line, index) => {
+                        const service = line.service!;
+                        const unitPrice = Number(service.effectivePriceCents ?? service.standardPriceCents ?? service.priceCents ?? 0);
+                        const quantity = Math.max(1, Number(line.quantity || 1));
+                        return (
+                          <article className="booking-service-bundle__line" data-testid={`booking-create-service-line-${service.id}`} key={service.id}>
+                            <div>
+                              <strong>{index === 0 ? "Primary: " : ""}{service.name}</strong>
+                              <p>{service.durationMinutes || 60} min · {formatMoney(unitPrice)} each · {formatMoney(unitPrice * quantity)}</p>
+                            </div>
+                            <div className="booking-service-bundle__controls">
+                              <input
+                                aria-label={`Quantity for ${service.name}`}
+                                className="input"
+                                data-testid={`booking-create-service-quantity-${service.id}`}
+                                type="number"
+                                min="1"
+                                max="99"
+                                value={quantity}
+                                onChange={(event) => updateServiceLineQuantity(service.id, Number(event.target.value))}
+                              />
+                              <button className="button secondary operator-compact-button" type="button" onClick={() => moveServiceLine(service.id, -1)} disabled={index === 0}>Up</button>
+                              <button className="button secondary operator-compact-button" type="button" onClick={() => moveServiceLine(service.id, 1)} disabled={index === selectedServiceLineDetails.length - 1}>Down</button>
+                              <button className="button secondary operator-compact-button" type="button" data-testid={`booking-create-service-remove-${service.id}`} onClick={() => removeServiceLine(service.id)}>Remove</button>
+                            </div>
+                          </article>
+                        );
+                      })}
+                    </div>
+                    <p data-testid="booking-create-service-total">
+                      Total duration {serviceBundleDurationMinutes} minutes · Estimated total {formatMoney(serviceBundleTotalCents)}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="operator-note" style={{ marginTop: 8 }}>
+                    Services come from Booking settings and are preserved as a pricing snapshot when selected.
+                  </p>
+                )}
+              </div>
+
+              <div className="operator-formGrid">
+                <div>
+                  <label>Customer name</label>
+                  <input className="input" data-testid="booking-create-customer-name" value={customerName} onChange={(event) => setCustomerName(event.target.value)} />
+                </div>
+                <div>
+                  <label>Customer email</label>
+                  <input className="input" type="email" data-testid="booking-create-customer-email" value={customerEmail} onChange={(event) => setCustomerEmail(event.target.value)} />
+                </div>
+                <div>
+                  <label>Customer phone</label>
+                  <input className="input" data-testid="booking-create-customer-phone" value={customerPhone} onChange={(event) => setCustomerPhone(event.target.value)} />
+                </div>
+              </div>
+
               <div className="operator-formGrid">
                 <div>
                   <label>Start time</label>
-                  <input className="input" type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} required />
+                  <input className="input" type="datetime-local" data-testid="booking-create-start" value={startsAt} onChange={(e) => updateStart(e.target.value)} required />
                 </div>
                 <div>
                   <label>End time</label>
-                  <input className="input" type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} required />
+                  <input className="input" type="datetime-local" data-testid="booking-create-end" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} required />
                 </div>
               </div>
 
@@ -354,7 +708,9 @@ export default function BookingsPage() {
               </div>
 
               <div className="operator-inline-actions">
-                <button className="button" type="submit">Create booking</button>
+                <button className="button" type="submit" disabled={creatingBooking}>
+                  {creatingBooking ? "Creating booking..." : "Create booking"}
+                </button>
                 <Link className="button secondary" href="/dashboard/calendar">
                   Open calendar
                 </Link>
@@ -363,96 +719,53 @@ export default function BookingsPage() {
           </section>
 
           {marketplaceEnabled && settings ? (
-            <section className="card operator-section">
+            <section className="card operator-section" data-testid="bookings-settings-handoff">
               <div className="operator-section__header">
                 <div>
-                  <h2 className="operator-section__title">Public {terms.bookings.toLowerCase()} controls</h2>
-                  <p className="operator-section__subtitle">Keep the share link, working hours, and blackout dates together.</p>
+                  <h2 className="operator-section__title">Public {terms.bookings.toLowerCase()} setup</h2>
+                  <p className="operator-section__subtitle">Operational work stays here. Configuration and customer-facing customisation live in Settings.</p>
                 </div>
               </div>
 
               <div className="operator-stack">
-                <div>
-                  <div className="operator-kicker">Public link</div>
-                  <div className="operator-row__subtitle" style={{ marginTop: 6 }}>
-                    {settings.publicUrl || "Enable public bookings to generate a shareable link."}
-                  </div>
-                  {settings.icsUrl ? <div className="operator-note" style={{ marginTop: 6 }}>ICS feed: {settings.icsUrl}</div> : null}
+                <div className="booking-summary-grid">
+                  <article className="booking-lifecycle-card">
+                    <strong>Public status</strong>
+                    <p>{settings.publicEnabled ? "Live or ready to share" : "Needs setup in Settings"}</p>
+                    <p>{settings.publicMessage || "Manage services, hours, appearance, and notifications from Booking settings."}</p>
+                  </article>
+                  <article className="booking-lifecycle-card">
+                    <strong>Share link</strong>
+                    <p>{settings.publicUrl || "No public link is ready yet."}</p>
+                    <p>{settings.icsUrl ? "ICS feed is available from the booking settings screen." : "Publish from Settings to generate the public route and related feeds."}</p>
+                  </article>
+                  <article className="booking-lifecycle-card">
+                    <strong>Published services</strong>
+                    <p>{String(settings.publishedServiceCount || 0)} visible to customers</p>
+                    <p>{settings.nextAvailableSlot ? `Next open slot: ${formatDateTime(settings.nextAvailableSlot)}` : "No next slot is visible yet."}</p>
+                  </article>
                 </div>
 
-                <label className="toggle-row">
-                  <input type="checkbox" checked={publicEnabled} onChange={(e) => setPublicEnabled(e.target.checked)} />
-                  Enable public bookings
-                </label>
-
-                <div className="operator-formGrid">
-                  <div>
-                    <label>Start time</label>
-                    <input className="input" type="time" value={startHour} onChange={(e) => setStartHour(e.target.value)} />
-                  </div>
-                  <div>
-                    <label>End time</label>
-                    <input className="input" type="time" value={endHour} onChange={(e) => setEndHour(e.target.value)} />
-                  </div>
-                </div>
-
-                <div>
-                  <div className="operator-kicker">Blackout dates</div>
-                  <div className="operator-note" style={{ marginTop: 6 }}>Block dates you cannot accept bookings.</div>
-                  <div className="operator-formGrid" style={{ marginTop: 10 }}>
-                    <input className="input" type="date" value={newBlackoutDate} onChange={(e) => setNewBlackoutDate(e.target.value)} />
-                    <input className="input" placeholder="Reason (optional)" value={newBlackoutReason} onChange={(e) => setNewBlackoutReason(e.target.value)} />
-                  </div>
-                  <div className="operator-inline-actions" style={{ marginTop: 8 }}>
-                    <button
-                      className="button secondary"
-                      type="button"
-                      onClick={() => {
-                        if (!newBlackoutDate) return;
-                        setBlackoutDates((prev) => [...prev, { date: newBlackoutDate, reason: newBlackoutReason || null }]);
-                        setNewBlackoutDate("");
-                        setNewBlackoutReason("");
-                      }}
-                    >
-                      Add blackout date
-                    </button>
-                    {settings.publicUrl ? (
-                      <button className="button secondary" type="button" onClick={() => void copyText(settings.publicUrl || "", "Public booking link")}>
-                        Copy link
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-
-                {blackoutDates.length ? (
-                  <div className="operator-list">
-                    {blackoutDates.map((item) => (
-                      <article key={`${item.date}-${item.reason || ""}`} className="operator-row">
-                        <div className="operator-row__main">
-                          <div className="operator-row__title">{item.date}</div>
-                          <div className="operator-row__subtitle">{item.reason || "No reason added"}</div>
-                        </div>
-                        <div className="operator-row__meta">
-                          <div className="operator-row__metaLine">Availability block</div>
-                        </div>
-                        <div className="operator-row__actions">
-                          <button
-                            className="button secondary operator-compact-button"
-                            type="button"
-                            onClick={() => setBlackoutDates((prev) => prev.filter((entry) => entry !== item))}
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                ) : null}
+                <OperatorGuidance
+                  title="Manage in Settings"
+                  items={[
+                    "Use Booking settings for services, hours, blackout dates, public page appearance, and payment collection setup.",
+                    "Use Email & Notifications for senders, ops recipients, and reusable wording instead of editing those on operational pages.",
+                  ]}
+                />
 
                 <div className="operator-inline-actions">
-                  <button className="button" type="button" onClick={saveSettings} disabled={saving}>
-                    {saving ? "Saving..." : "Save booking settings"}
-                  </button>
+                  <Link className="button" href="/dashboard/booking/settings">
+                    Manage in Settings
+                  </Link>
+                  <Link className="button secondary" href="/dashboard/settings?tab=messages">
+                    Email & notifications
+                  </Link>
+                  {settings.publicUrl ? (
+                    <button className="button secondary" type="button" onClick={() => void copyText(settings.publicUrl || "", "Public booking link")}>
+                      Copy link
+                    </button>
+                  ) : null}
                 </div>
               </div>
             </section>
@@ -463,7 +776,7 @@ export default function BookingsPage() {
           <div className="operator-section__header">
             <div>
               <h2 className="operator-section__title">{terms.bookings} queue</h2>
-              <p className="operator-section__subtitle">Filter the visible queue before you reschedule, convert, or open the booking detail.</p>
+              <p className="operator-section__subtitle">Filter the queue first, then convert ready visits, open linked work, or clear blockers quickly.</p>
             </div>
           </div>
 
@@ -508,11 +821,11 @@ export default function BookingsPage() {
           <OperatorActiveFilters chips={activeFilters} onClearAll={activeFilters.length ? clearFilters : undefined} />
 
           <OperatorGuidance
-            title={`${terms.bookings} queue tips`}
+            title={`Move booked demand into work`}
             items={[
-              "Saved views keep upcoming, today, and conversion-focused queues sticky on this device.",
-              "Select rows to copy booking references or customer names before dispatch handoff.",
-              "Use the row menu for detail and conversion actions while keeping schedule access as the primary action.",
+              "Use Needs conversion to find visits that still need to become real work.",
+              "Use Convert to job when the visit is ready, then review the linked job to start work without switching context.",
+              "Keep Schedule as a supporting control while the primary action follows the real booking state.",
             ]}
           />
 
@@ -581,11 +894,12 @@ export default function BookingsPage() {
                 const selected = selectedIds.includes(booking.id);
                 const readinessIssues = getConversionIssues(booking);
                 const canConvert = !booking.jobId && readinessIssues.length === 0;
+                const operatorState = describeBookingOperatorState(booking, readinessIssues);
                 const stage = mapStatusToStage(String(booking.status || "PLANNED"), bookingStages);
                 const missingStageFields = getMissingRequiredCustomFieldKeys(stage?.requiredCustomFieldKeys, customFields, customFieldValues, "booking", booking.id);
                 const visibleFieldSummaries = customFieldValues.filter((value) => value.entityId === booking.id && value.field?.visible !== false).slice(0, 2);
                 return (
-                  <OperatorDataTableRow key={booking.id} selected={selected}>
+                  <OperatorDataTableRow key={booking.id} selected={selected} data-testid={`booking-row-${booking.id}`}>
                     <div className="operator-table__cell">
                       <input
                         aria-label={`Select booking ${booking.customerName || booking.id}`}
@@ -598,8 +912,10 @@ export default function BookingsPage() {
                     <div className="operator-table__cell">
                       <div className="operator-cellTitle">
                         <Link href={`/dashboard/bookings/${booking.id}`}>{booking.customerName || booking.id}</Link>
+                        <span className="badge">{operatorState.label}</span>
                       </div>
-                      <div className="operator-cellSubtle">Booking ID {booking.id}</div>
+                      {booking.serviceName ? <div className="operator-cellSubtle">{booking.serviceName}</div> : null}
+                      <div className="operator-cellSubtle">{operatorState.summary}</div>
                       {visibleFieldSummaries.length ? (
                         <div className="operator-cellSubtle" style={{ marginTop: 6 }}>
                           {visibleFieldSummaries.map((value) => `${value.field?.label}: ${String(value.valueJson)}`).join(" | ")}
@@ -633,49 +949,80 @@ export default function BookingsPage() {
                       </div>
                     </div>
                     <div className="operator-table__cell operator-table__cell--actions">
-                      <OperatorRowActions
-                        primaryAction={{ label: "Schedule", href: "/dashboard/calendar", testId: `booking-schedule-${booking.id}` }}
-                        actions={[
-                          {
-                            label: "Open booking",
-                            description: "Open the booking detail record",
-                            shortcut: "Open",
-                            group: "Booking",
-                            href: `/dashboard/bookings/${booking.id}`,
-                            testId: `booking-open-${booking.id}`,
-                          },
-                          ...(!booking.jobId ? [{
-                            label: busyConvertId === booking.id ? "Converting..." : "Convert to job",
-                            description: canConvert ? "Create a linked scheduled job from this booking" : `Blocked until ${readinessIssues.join(" and ")} ${readinessIssues.length > 1 ? "are" : "is"} added`,
-                            shortcut: "New",
-                            group: "Booking",
-                            onClick: () => void convertBooking(booking.id),
-                            disabled: busyConvertId === booking.id || !canConvert,
-                            testId: `booking-convert-${booking.id}`,
-                          }] : []),
-                          ...(booking.jobId ? [{
-                            label: "Open linked job",
-                            description: "Open the linked job record",
-                            shortcut: "Open",
-                            group: "Booking",
-                            href: `/dashboard/jobs/${booking.jobId}`,
-                            testId: `booking-open-job-${booking.id}`,
-                          }] : []),
-                          {
-                            label: "Copy booking ID",
-                            description: "Copy the booking reference",
-                            shortcut: "Copy",
-                            group: "Tools",
-                            onClick: () => void copyText(booking.id, "Booking ID"),
-                          },
-                          {
-                            label: "Custom fields",
-                            description: "Review and edit workspace-specific booking fields",
-                            group: "Tools",
-                            onClick: () => setCustomFieldBookingId(booking.id),
-                          },
-                        ]}
-                      />
+                      {(() => {
+                        const primaryAction = !booking.jobId
+                          ? canConvert
+                            ? {
+                                label: busyConvertId === booking.id ? "Converting..." : "Convert to job",
+                                onClick: () => void convertBooking(booking.id),
+                                disabled: busyConvertId === booking.id,
+                                testId: `booking-convert-primary-${booking.id}`,
+                              }
+                            : {
+                                label: "Convert to job",
+                                onClick: () => void convertBooking(booking.id),
+                                disabled: true,
+                                testId: `booking-convert-${booking.id}`,
+                              }
+                          : {
+                              label: "Review linked job",
+                              href: `/dashboard/jobs/${booking.jobId}`,
+                              testId: `booking-open-job-primary-${booking.id}`,
+                            };
+                        return (
+                          <OperatorRowActions
+                            primaryAction={primaryAction}
+                            actions={[
+                              {
+                                label: "Schedule",
+                                description: "Open the calendar and schedule around the visit",
+                                shortcut: "Cal",
+                                group: "Booking",
+                                href: "/dashboard/calendar",
+                                testId: `booking-schedule-${booking.id}`,
+                              },
+                              {
+                                label: "Review booking",
+                                description: "Review the booking detail record",
+                                shortcut: "View",
+                                group: "Booking",
+                                href: `/dashboard/bookings/${booking.id}`,
+                                testId: `booking-open-${booking.id}`,
+                              },
+                              ...(!booking.jobId ? [{
+                                label: busyConvertId === booking.id ? "Converting..." : operatorState.actionLabel,
+                                description: canConvert ? "Create a linked scheduled job from this booking" : `Blocked until ${readinessIssues.join(" and ")} ${readinessIssues.length > 1 ? "are" : "is"} added`,
+                                shortcut: "New",
+                                group: "Booking",
+                                onClick: () => void convertBooking(booking.id),
+                                disabled: busyConvertId === booking.id || !canConvert,
+                                testId: canConvert ? `booking-convert-${booking.id}` : `booking-convert-menu-${booking.id}`,
+                              }] : []),
+                              ...(booking.jobId ? [{
+                                label: operatorState.actionLabel,
+                                description: "Review the linked job record",
+                                shortcut: "View",
+                                group: "Booking",
+                                href: `/dashboard/jobs/${booking.jobId}`,
+                                testId: `booking-open-job-${booking.id}`,
+                              }] : []),
+                              {
+                                label: "Copy booking ID",
+                                description: "Copy the booking reference",
+                                shortcut: "Copy",
+                                group: "Tools",
+                                onClick: () => void copyText(booking.id, "Booking ID"),
+                              },
+                              {
+                                label: "Custom fields",
+                                description: "Review and edit workspace-specific booking fields",
+                                group: "Tools",
+                                onClick: () => setCustomFieldBookingId(booking.id),
+                              },
+                            ]}
+                          />
+                        );
+                      })()}
                     </div>
                   </OperatorDataTableRow>
                 );
@@ -684,10 +1031,11 @@ export default function BookingsPage() {
           ) : !notice || notice.kind !== "error" ? (
             <OperatorEmptyStateCard
               title={`No ${terms.bookings.toLowerCase()} match this view`}
-              description="Clear the filters, open the calendar, or create a fresh booking from this page."
+              description="Clear the filters, open the calendar, or create a booking so the next visit can move cleanly into work."
               actions={[
                 { label: "Reset filters", variant: "secondary", onClick: clearFilters },
-                { label: "Open calendar", href: "/dashboard/calendar" },
+                { label: "Start work", href: "/dashboard/work" },
+                { label: "Review calendar", href: "/dashboard/calendar", variant: "secondary" },
               ]}
             />
           ) : null}

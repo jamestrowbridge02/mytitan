@@ -151,6 +151,70 @@ test.describe("revenue operations", () => {
     await expect(row).toContainText(/CONVERTED/i);
   });
 
+  test("job-sheet estimate workflow is feature-gated, audited, and converts into the job", async ({ page, request }) => {
+    const headers = await operatorAuthHeaders(request);
+    const flagsResponse = await request.get("http://127.0.0.1:3000/enterprise/feature-flags", { headers });
+    expect(flagsResponse.ok()).toBeTruthy();
+    const flagsPayload = await flagsResponse.json();
+    const estimateFlag = (flagsPayload?.flags || []).find((flag: any) => flag?.key === "enterprise_estimates_v1");
+    expect(estimateFlag?.enabled).toBe(true);
+
+    const jobResponse = await request.post("http://127.0.0.1:3000/jobs", {
+      headers,
+      data: {
+        customerName: `E2E Estimate Customer ${Date.now()}`,
+        customerEmail: `estimate-${Date.now()}@example.test`,
+        customerPhone: "01133009901",
+        serviceName: "Enterprise estimate workflow",
+        tradeCode: "WHEELS",
+        jobType: "Trade",
+      },
+    });
+    expect(jobResponse.ok()).toBeTruthy();
+    const job = await jobResponse.json();
+
+    const createResponse = await request.post(`http://127.0.0.1:3000/quotes/job/${job.id}/estimates`, {
+      headers,
+      data: {
+        title: `Job sheet estimate ${Date.now()}`,
+        summary: "Scoped estimate created from the job workflow",
+        currency: "GBP",
+        taxCents: 1250,
+        lineItems: [
+          { sortOrder: 0, type: "LABOUR", title: "Diagnostic labour", quantity: 1, unitPriceCents: 12500 },
+        ],
+      },
+    });
+    expect(createResponse.ok()).toBeTruthy();
+    const estimate = await createResponse.json();
+    expect(estimate.jobId).toBe(job.id);
+    expect(estimate.totalCents).toBe(13750);
+
+    const sendResponse = await request.post(`http://127.0.0.1:3000/quotes/${estimate.id}/send`, { headers, data: {} });
+    expect(sendResponse.ok()).toBeTruthy();
+    const approveResponse = await request.post(`http://127.0.0.1:3000/quotes/${estimate.id}/approve`, { headers, data: {} });
+    expect(approveResponse.ok()).toBeTruthy();
+    const convertResponse = await request.post(`http://127.0.0.1:3000/quotes/job/${job.id}/estimates/${estimate.id}/convert`, {
+      headers,
+      data: {},
+    });
+    expect(convertResponse.ok()).toBeTruthy();
+    const converted = await convertResponse.json();
+    expect(converted.job.id).toBe(job.id);
+    expect(converted.quote.status).toBe("CONVERTED");
+
+    const auditResponse = await request.get("http://127.0.0.1:3000/audit?type=enterprise_estimate.converted&pageSize=5", { headers });
+    expect(auditResponse.ok()).toBeTruthy();
+    const auditPayload = await auditResponse.json();
+    expect(JSON.stringify(auditPayload)).toContain("enterprise_estimate.converted");
+
+    await installApiProxy(page, request);
+    await loginAs(page, request, "e2e.operator@mytitan.local", "MyTitanE2E!2026");
+    await page.goto(`/dashboard/jobs/${job.id}`);
+    await expect(page.getByTestId("job-estimate-builder")).toBeVisible();
+    await expect(page.getByTestId("job-estimate-card").filter({ hasText: estimate.quoteNumber }).first()).toContainText(/CONVERTED/i);
+  });
+
   test("revenue task list renders due and overdue follow-up state", async ({ page, request }) => {
     await installApiProxy(page, request);
     await loginAs(page, request, "e2e.operator@mytitan.local", "MyTitanE2E!2026");

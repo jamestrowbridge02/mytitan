@@ -96,6 +96,10 @@ export default function TradeAccountsPage() {
     <DashboardShell>
       <div className="card">
         <h1>Trade Accounts CRM</h1>
+        <p className="muted">Setup: create account → add contact → choose trade access → set terms → send secure invite.</p>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+          <Link className="button secondary" href="/dashboard/trade-applications">Trade account application form</Link>
+        </div>
         {!crmEnabled ? <p className="muted">CRM feature flag is off. Showing basic list only.</p> : null}
         {crmProEnabled && segmentView ? (
           <p className="muted">Segments view is enabled. Choose a segment filter below.</p>

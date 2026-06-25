@@ -40,16 +40,17 @@ export function ErrorState({
   icon,
 }: ErrorStateProps) {
   return (
-    <div className="card" role="alert">
-      {icon ? <div style={{ marginBottom: 10 }}>{icon}</div> : null}
-      <h3 style={{ marginTop: 0, color: '#ff8a8a' }}>{title}</h3>
-      <p className="muted">{description}</p>
+    <div className="card app-state app-state--error" role="alert">
+      {icon ? <div className="app-state__icon">{icon}</div> : null}
+      <div className="app-state__eyebrow">Attention needed</div>
+      <h3 className="app-state__title">{title}</h3>
+      <p className="muted app-state__description">{description}</p>
       {requestId ? (
-        <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+        <p className="muted app-state__meta">
           Support code: <code>{requestId}</code>
         </p>
       ) : null}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+      <div className="app-state__actions">
         {primaryAction ? <ActionButton action={primaryAction} primary /> : null}
         {secondaryAction ? <ActionButton action={secondaryAction} primary={false} /> : null}
       </div>

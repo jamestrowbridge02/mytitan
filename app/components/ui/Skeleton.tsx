@@ -1,5 +1,5 @@
 import React from 'react';
 
 export function Skeleton({ className = '' }: { className?: string }) {
-  return <div className={`animate-pulse rounded-xl bg-white/5 border border-white/10 ${className}`} />;
+  return <div className={`animate-pulse rounded-xl border border-slate-200/80 bg-slate-100/90 ${className}`} />;
 }

@@ -3,8 +3,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { AiAssistant } from '../components/ai-assistant';
 import { apiFetch } from '../lib/api';
-import { isGuidedSetupV2Enabled, isMarketplaceEnabled, isStartHereEnabled } from '../lib/feature-flags';
+import { isMarketplaceEnabled, isStartHereEnabled } from '../lib/feature-flags';
 import { useTenantSettings } from '../lib/tenant-settings';
+import { UPLOAD_LIMITS, validateUploadFile } from '../lib/upload-policy';
 
 type Integration = {
   key: string;
@@ -81,7 +82,6 @@ export default function OnboardingPage() {
 
   const marketplaceEnabled = isMarketplaceEnabled();
   const startHereEnabled = isStartHereEnabled();
-  const guidedSetupV2Enabled = isGuidedSetupV2Enabled();
   const guidedEnabled = marketplaceEnabled || startHereEnabled;
   const stepTitles = startHereEnabled ? START_HERE_TITLES : CLASSIC_TITLES;
   const progress = useMemo(() => Math.round(((step + 1) / stepTitles.length) * 100), [step, stepTitles.length]);
@@ -89,11 +89,6 @@ export default function OnboardingPage() {
   const index = startHereEnabled
     ? { trade: 0, branding: 1, email: 2, pack: -1, services: 3, bookings: 4, billing: 5, live: 6 }
     : { trade: -1, branding: 0, email: 1, pack: 2, services: 3, bookings: 4, billing: 5, live: 6 };
-
-  useEffect(() => {
-    if (!guidedSetupV2Enabled) return;
-    router.replace('/dashboard/setup-wizard');
-  }, [guidedSetupV2Enabled, router]);
 
   useEffect(() => {
     if (!guidedEnabled) return;
@@ -353,7 +348,7 @@ export default function OnboardingPage() {
         <div className="wizard-header">
           <div>
             <h1>Let&apos;s set up your workspace</h1>
-            <p className="muted">Simple steps so you can start taking customers quickly.</p>
+            <p className="muted">Keep this lightweight. The goal is to help you create a job, complete it, and share the customer record quickly.</p>
           </div>
           <div className="wizard-step">
             Step {step + 1} of {stepTitles.length}
@@ -368,7 +363,7 @@ export default function OnboardingPage() {
 
         {step === index.trade && (
           <>
-            <p className="muted">Choose your main trade. We will install the matching defaults for you.</p>
+            <p className="muted">Choose the trade that best matches your day-to-day work. We will load the closest defaults for services, wording, and workflow.</p>
             {selectedTrade ? (
               <p className="muted" style={{ marginBottom: 8 }}>
                 Selected: <strong>{selectedTrade}</strong>. You can change this any time. Changing trade updates defaults and does not delete your existing data.
@@ -401,10 +396,17 @@ export default function OnboardingPage() {
 
         {step === index.branding && (
           <>
+            <p className="muted">These details show up first in quotes, emails, and customer-facing records. Keep it simple for now.</p>
             <label>Business name</label>
             <input className="input" value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
             <label>Logo (upload or paste URL)</label>
-            <input className="input" type="file" onChange={(e) => setLogoFile(e.target.files?.[0] || null)} />
+            <input className="input" type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => {
+              const nextFile = e.target.files?.[0] || null;
+              const validationError = nextFile ? validateUploadFile(nextFile, { category: 'image', maxBytes: UPLOAD_LIMITS.logo }) : null;
+              setError(validationError || '');
+              setLogoFile(validationError ? null : nextFile);
+              if (validationError) e.target.value = '';
+            }} />
             <input className="input" placeholder="https://..." value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} />
             <div className="list">
               <div className="theme-preview">
@@ -421,6 +423,7 @@ export default function OnboardingPage() {
 
         {step === index.email && (
           <>
+            <p className="muted">Set the reply address customers should use. You can add full SMTP later in Settings.</p>
             <label>Sender name</label>
             <input className="input" value={senderName} onChange={(e) => setSenderName(e.target.value)} />
             <label>Support / reply-to email</label>
@@ -428,7 +431,7 @@ export default function OnboardingPage() {
             <button className="button secondary" type="button" onClick={() => setStatus('Test email queued (stub).')}>
               Send test email
             </button>
-            <p className="muted">You can connect SMTP later in Settings.</p>
+            <p className="muted">This step is optional if you want to keep moving now.</p>
           </>
         )}
 
@@ -459,6 +462,7 @@ export default function OnboardingPage() {
 
         {step === index.services && (
           <>
+            <p className="muted">Add one service so your team can create the first real job without editing pricing from scratch.</p>
             <label>Quick service preset</label>
             <div className="pill-row">
               {presets.map((preset) => (
@@ -478,7 +482,7 @@ export default function OnboardingPage() {
 
         {step === index.bookings && (
           <>
-            <p className="muted">Choose how customers can request bookings online.</p>
+            <p className="muted">Set your first available hours. This makes bookings and scheduling feel real straight away.</p>
             <label className="toggle-row">
               <input
                 type="checkbox"
@@ -497,20 +501,20 @@ export default function OnboardingPage() {
                 <input className="input" type="time" value={endHour} onChange={(e) => setEndHour(e.target.value)} />
               </div>
             </div>
-            <p className="muted">These hours apply Monday-Friday. You can fine-tune later in Bookings.</p>
+            <p className="muted">These hours apply Monday-Friday. Fine-tune later in Bookings and Calendar.</p>
           </>
         )}
 
         {step === index.billing && (
           <>
-            <p className="muted">Connect billing so you can take payments and send invoices.</p>
+            <p className="muted">Billing can be finished later. Review readiness now if you want clearer payment and invoice handoff from completed jobs.</p>
             <Link className="button secondary" href="/dashboard/billing">Open billing setup</Link>
           </>
         )}
 
         {step === index.live && (
           <>
-            <p className="muted">Switch on the tools you want to try first. You can change this later.</p>
+            <p className="muted">Start with the tools your team will actually use first. Avoid turning everything on at once.</p>
             <div className="list">
               {integrations.map((item) => (
                 <div key={item.key} className="integration-card">

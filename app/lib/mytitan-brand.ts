@@ -1,7 +1,7 @@
 // Lightweight production brand reference for MyTitan logo usage.
 // Clearspace: keep at least 0.5x the mark height around the lockup.
 // On light surfaces prefer `mytitan-logo-light.svg`; on dark surfaces prefer `mytitan-logo-dark.svg`.
-// Typography follows the Inter / ui-sans-serif / system-ui stack used across the app.
+// Typography follows the Sora / ui-sans-serif / system-ui stack used in the lockups.
 export const MYTITAN_BRAND = {
   primaryBlue: "#2563EB",
   accentBlue: "#38BDF8",

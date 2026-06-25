@@ -3,6 +3,11 @@ import { authFile, fixtureRefs, hasDashboardAuth, installApiProxy } from "./util
 
 test.use({ storageState: authFile });
 
+const tinyPng = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+  "base64",
+);
+
 test.describe("multi-location operations", () => {
   test.skip(!hasDashboardAuth(), "Seed the E2E fixtures or provide dashboard credentials before running authenticated location tests.");
 
@@ -22,13 +27,32 @@ test.describe("multi-location operations", () => {
     const code = `S${suffix}`;
     const name = `E2E South Branch ${suffix}`;
     const updatedName = `${name} Updated`;
+    const postcode = `PO${suffix.slice(0, 2)} ${suffix.slice(2, 5)}`;
     await createCard.getByTestId("location-code-input").fill(code);
     await createCard.getByTestId("location-name-input").fill(name);
+    await createCard.getByTestId("location-address-line-1").fill("12 Test Street");
+    await createCard.getByTestId("location-address-line-2").fill("Workshop 3");
+    await createCard.getByTestId("location-city").fill("Chichester");
+    await createCard.getByTestId("location-region").fill("West Sussex");
+    await createCard.getByTestId("location-postcode").fill(postcode);
+    await expect(createCard.getByTestId("location-save-state")).toContainText("Unsaved changes");
     await page.getByTestId("location-save").evaluate((element: HTMLButtonElement) => element.click());
     await expect(page.getByTestId("location-list")).toContainText(name);
+    await expect(page.getByTestId("location-list")).toContainText(postcode);
 
     const row = page.getByTestId("location-list").locator(".integration-card", { hasText: name }).first();
     await row.getByRole("button", { name: "Edit" }).evaluate((element: HTMLButtonElement) => element.click());
+    await expect(createCard.getByTestId("location-save-state")).toContainText("Saved");
+    await createCard.getByTestId("location-image-input").setInputFiles({
+      name: "location.png",
+      mimeType: "image/png",
+      buffer: tinyPng,
+    });
+    await expect(createCard.getByTestId("location-image-selection")).toContainText("location.png");
+    await expect(createCard.getByTestId("location-image-preview")).toBeVisible();
+    await createCard.getByTestId("location-image-upload").click();
+    await expect(createCard.getByTestId("location-image-preview")).toBeVisible();
+    await expect(page.getByText("Location image updated for public booking.")).toBeVisible();
     await createCard.getByTestId("location-name-input").fill(updatedName);
     await page.getByTestId("location-save").evaluate((element: HTMLButtonElement) => element.click());
     await expect(page.getByTestId("location-list")).toContainText(updatedName);
@@ -58,8 +82,8 @@ test.describe("multi-location operations", () => {
     await installApiProxy(page, request);
     await page.goto("/dashboard/analytics");
     await page.getByTestId("location-scope-switcher").locator("select").selectOption({ label: `${fixtureRefs.northLocationName} (NORTH)` });
-    await expect(page.getByText(/Analytics scope is filtered to the active business location selection/i)).toBeVisible();
-    await expect(page.getByTestId("analytics-executive-summary")).toBeVisible();
+    await expect(page.getByText(/This view is filtered to the active business location/i)).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Operational view" })).toBeVisible();
     await page.getByTestId("location-scope-switcher").locator("select").selectOption({ label: "All locations" });
   });
 

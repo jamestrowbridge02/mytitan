@@ -183,27 +183,34 @@ export default function ServicePlansPage() {
     const load = async () => {
       setLoading(true);
       try {
-        const [me, customerRows, planRows, renewalRows, requestRows] = await Promise.all([
+        const [me, planRows] = await Promise.all([
           apiFetch("/me"),
-          apiFetch("/customers?limit=200"),
           apiFetch("/service-plans"),
-          apiFetch("/service-plans/renewals"),
-          apiFetch("/service-plans/change-requests"),
         ]);
         if (cancelled) return;
         setPermissions(normalizePermissionSnapshot(me?.permissions));
-        setCustomers(Array.isArray(customerRows) ? customerRows : []);
         const nextPlans = Array.isArray(planRows) ? planRows : [];
         setPlans(nextPlans);
-        setRenewals(Array.isArray(renewalRows) ? renewalRows : []);
-        setChangeRequests(Array.isArray(requestRows) ? requestRows : []);
         setSelectedPlanId(nextPlans[0]?.id || null);
+        setLoading(false);
+        setPermissionsReady(true);
+
+        void Promise.allSettled([
+          apiFetch("/customers?limit=200"),
+          apiFetch("/service-plans/renewals"),
+          apiFetch("/service-plans/change-requests"),
+        ]).then((results) => {
+          if (cancelled) return;
+          const [customerRows, renewalRows, requestRows] = results.map((result) =>
+            result.status === "fulfilled" ? result.value : [],
+          );
+          setCustomers(Array.isArray(customerRows) ? customerRows : []);
+          setRenewals(Array.isArray(renewalRows) ? renewalRows : []);
+          setChangeRequests(Array.isArray(requestRows) ? requestRows : []);
+        });
       } catch (error: any) {
         if (!cancelled) {
           showError(error?.message || "Failed to load service plans");
-        }
-      } finally {
-        if (!cancelled) {
           setPermissionsReady(true);
           setLoading(false);
         }

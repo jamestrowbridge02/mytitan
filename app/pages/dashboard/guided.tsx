@@ -9,6 +9,11 @@ function HelpTip({ text }: { text: string }) {
   return <span title={text} style={{ marginLeft: 6, cursor: 'help' }}>?</span>;
 }
 
+function openExternal(url: string) {
+  if (typeof window === "undefined" || !url || url === "#") return;
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
 export default function GuidedEverywherePage() {
   const enabled = isGuidedEverywhereV1Enabled();
   const router = useRouter();
@@ -181,8 +186,12 @@ export default function GuidedEverywherePage() {
           <label>Message</label>
           <textarea className="input" value={message.note} onChange={(e) => setMessage({ ...message, note: e.target.value })} />
           <div style={{ display: 'flex', gap: 8 }}>
-            <a className="button" href={whatsappHref()} target="_blank" rel="noreferrer noopener">Open WhatsApp</a>
-            <a className="button secondary" href={emailHref()}>Open Email</a>
+            <button className="button" type="button" onClick={() => openExternal(whatsappHref())} disabled={!message.phone}>
+              Open WhatsApp
+            </button>
+            <button className="button secondary" type="button" onClick={() => openExternal(emailHref())} disabled={!message.email}>
+              Open Email
+            </button>
             <Link className="button secondary" href="/dashboard">Skip</Link>
           </div>
         </div>

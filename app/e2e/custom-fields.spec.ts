@@ -111,7 +111,7 @@ test.describe("custom fields", () => {
     await setCustomFieldValue(request, token, "job", fixtureRefs.automationJobId, warrantyField.id, null);
 
     await page.reload();
-    await page.getByRole("button", { name: /mark completed/i }).evaluate((element: HTMLButtonElement) => element.click());
+    await page.getByRole("button", { name: /mark completed|review and finish work/i }).first().evaluate((element: HTMLButtonElement) => element.click());
     await expect(page.getByText(/required custom fields/i).first()).toBeVisible();
     await expect(page.getByText(/warranty_status/i).first()).toBeVisible();
   });
@@ -133,8 +133,8 @@ test.describe("custom fields", () => {
     await setCustomFieldValue(request, token, "job", fixtureRefs.automationJobId, warrantyField.id, "active");
 
     await page.reload();
-    await page.getByRole("button", { name: /mark completed/i }).evaluate((element: HTMLButtonElement) => element.click());
-    await expect(page.getByText(/Status updated to COMPLETED/i)).toBeVisible();
+    await page.getByRole("button", { name: /mark completed|review and finish work/i }).first().evaluate((element: HTMLButtonElement) => element.click());
+    await expect(page.getByText(/work complete|work done|work marked complete|status updated to completed/i)).toBeVisible();
   });
 
   test("automation rules can use custom field conditions", async ({ page, request }) => {

@@ -217,13 +217,13 @@ export default function SchedulingPage() {
       };
       if (availabilityForm.id) {
         await apiFetch(`/schedule/availability/${availabilityForm.id}`, { method: "PATCH", body: JSON.stringify(payload) });
-        showSuccess("Availability updated");
       } else {
         await apiFetch("/schedule/availability", { method: "POST", body: JSON.stringify(payload) });
-        showSuccess("Availability saved");
       }
+      const successMessage = availabilityForm.id ? "Availability updated" : "Availability saved";
       setAvailabilityForm((current) => ({ ...current, id: "", notes: "" }));
       await loadAll();
+      showSuccess(successMessage);
     } catch (error: any) {
       showError(error?.message || "Failed to save availability");
     } finally {
@@ -245,13 +245,13 @@ export default function SchedulingPage() {
       };
       if (exceptionForm.id) {
         await apiFetch(`/schedule/exceptions/${exceptionForm.id}`, { method: "PATCH", body: JSON.stringify(payload) });
-        showSuccess("Capacity exception updated");
       } else {
         await apiFetch("/schedule/exceptions", { method: "POST", body: JSON.stringify(payload) });
-        showSuccess("Capacity exception saved");
       }
+      const successMessage = exceptionForm.id ? "Capacity exception updated" : "Capacity exception saved";
       setExceptionForm((current) => ({ ...current, id: "", reason: "" }));
       await loadAll();
+      showSuccess(successMessage);
     } catch (error: any) {
       showError(error?.message || "Failed to save capacity exception");
     } finally {
@@ -275,7 +275,7 @@ export default function SchedulingPage() {
     return (
       <DashboardShell>
         <div className="operator-stack">
-          <OperatorPageHeader eyebrow="Dispatch OS" title="Scheduling" subtitle="Capacity planning is limited to roles that can manage dispatch, field work, or operational intelligence." stats={[]} />
+          <OperatorPageHeader eyebrow="Scheduling" title="Scheduling" subtitle="Capacity planning is limited to roles that can manage dispatch, field work, or operational intelligence." stats={[]} />
           <OperatorEmptyStateCard title="Scheduling access restricted" description="Your workspace role cannot view technician capacity planning." />
         </div>
       </DashboardShell>
@@ -286,7 +286,7 @@ export default function SchedulingPage() {
     <DashboardShell>
       <div className="operator-stack">
         <OperatorPageHeader
-          eyebrow="Dispatch OS"
+          eyebrow="Scheduling"
           title="Scheduling"
           subtitle="Daily technician capacity, overload pressure, and explainable assignment recommendations without fake route optimization."
           stats={stats}
@@ -377,7 +377,15 @@ export default function SchedulingPage() {
                 <OperatorDataTableRow key={row.technicianId}>
                   <div className="operator-table__cell"><strong>{row.technicianName}</strong></div>
                   <div className="operator-table__cell">{formatMinutes(row.remainingMinutes)}</div>
-                  <div className="operator-table__cell">{row.unavailable ? "Unavailable" : row.overloaded ? "Overloaded" : "Available"}</div>
+                  <div className="operator-table__cell">
+                    {row.unavailable && row.overloaded
+                      ? "Unavailable · Overloaded"
+                      : row.unavailable
+                        ? "Unavailable"
+                        : row.overloaded
+                          ? "Overloaded"
+                          : "Available"}
+                  </div>
                   <div className="operator-table__cell">{row.capacityNotes.join(" • ")}</div>
                 </OperatorDataTableRow>
               ))}

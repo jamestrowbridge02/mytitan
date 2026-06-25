@@ -1,8 +1,11 @@
 import fs from "fs";
+import os from "os";
 import path from "path";
 import type { APIRequestContext, Page, Route } from "@playwright/test";
 
-export const authDir = path.join(__dirname, "..", ".playwright");
+const LOCAL_API_BASE = "http://127.0.0.1:3000";
+
+export const authDir = process.env.PLAYWRIGHT_AUTH_DIR?.trim() || path.join(os.tmpdir(), "mytitan-playwright");
 export const authFile = path.join(authDir, "operator-auth.json");
 export const metadataFile = path.join(authDir, "e2e-metadata.json");
 export const defaultOperatorEmail = "e2e.operator@mytitan.local";
@@ -22,6 +25,7 @@ export const fixtureRefs = {
   portalActiveJobRef: "E2E-PORTAL-ACTIVE-001",
   portalActiveJobId: "e2e-job-portal-active",
   portalExpiredJobRef: "E2E-PORTAL-EXPIRED-001",
+  portalExpiredJobId: "e2e-job-portal-expired",
   technicianJobRef: "E2E-TECH-001",
   technicianJobId: "e2e-job-technician",
   technicianRoleJobRef: "E2E-TECH-ROLE-001",
@@ -38,6 +42,8 @@ export const fixtureRefs = {
   customFieldWarrantyKey: "warranty_status",
   customFieldCustomerSiteCode: "site_code",
   seededWebhookName: "E2E Operations Webhook",
+  passwordResetEmail: "e2e.password.reset@mytitan.example",
+  passwordResetPassword: "MyTitanReset!2026",
   seededApiTokenName: "E2E Primary Token",
   seededJobArtifactLabel: "Seeded invoice pack",
   seededPortalArtifactLabel: "Customer completion summary",
@@ -65,12 +71,20 @@ export const fixtureRefs = {
   schedulingOverloadedReason: "Parts collection blocks most of the morning",
   dispatcherEmail: "e2e.dispatcher@mytitan.local",
   dispatcherPassword: "MyTitanE2EDispatch!2026",
+  workspaceAdminEmail: "e2e.admin@mytitan.local",
+  workspaceAdminPassword: "MyTitanE2EAdmin!2026",
   financeEmail: "e2e.finance@mytitan.local",
   financePassword: "MyTitanE2EFinance!2026",
   technicianEmail: "e2e.technician@mytitan.local",
   technicianPassword: "MyTitanE2ETech!2026",
+  externalOperatorEmail: "e2e.external@mytitan.local",
+  externalOperatorPassword: "MyTitanE2EExternal!2026",
   viewerEmail: "e2e.viewer@mytitan.local",
   viewerPassword: "MyTitanE2EViewer!2026",
+  platformAdminEmail: "e2e.platform@mytitan.co.uk",
+  platformAdminPassword: "MyTitanE2EPlatform!2026",
+  supportOwnerEmail: "support@mytitan.co.uk",
+  supportOwnerPassword: "MyTitanSupport!2026",
   customerWorkspaceEmail: "portal-active@mytitan.local",
   customerWorkspacePassword: "MyTitanCustomer!2026",
   customerWorkspaceInviteToken: "custinvite_e2e_customer_invited",
@@ -97,6 +111,9 @@ export const fixtureRefs = {
   performancePeriodName: "E2E March Ops Window",
   compensationRuleName: "Technician completion bonus",
 };
+
+export const workspaceAdminEmail = fixtureRefs.workspaceAdminEmail;
+export const workspaceAdminPassword = fixtureRefs.workspaceAdminPassword;
 
 export type E2EMetadata = {
   email?: string | null;
@@ -129,13 +146,24 @@ const apiOrigins = [
 const e2eBaseURL = process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:3101";
 const e2eOrigin = new URL(e2eBaseURL).origin;
 
+export function resolveE2EAppUrl(rawUrl: string) {
+  const value = String(rawUrl || "").trim();
+  if (!value) return value;
+  try {
+    const parsed = new URL(value, e2eOrigin);
+    return new URL(`${parsed.pathname}${parsed.search}${parsed.hash}`, e2eOrigin).toString();
+  } catch {
+    return value;
+  }
+}
+
 async function fulfillFromLocalApi(route: Route, request: APIRequestContext) {
   const originalUrl = new URL(route.request().url());
   let response;
   let lastError: any = null;
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
-      response = await request.fetch(`http://127.0.0.1:3000${originalUrl.pathname}${originalUrl.search}`, {
+      response = await request.fetch(`${LOCAL_API_BASE}${originalUrl.pathname}${originalUrl.search}`, {
         method: route.request().method(),
         headers: {
           ...route.request().headers(),
@@ -203,15 +231,61 @@ export async function installApiProxy(page: Page, request: APIRequestContext) {
   }
 }
 
+export async function requestLocalApi(
+  request: APIRequestContext,
+  path: string,
+  init: Parameters<APIRequestContext["fetch"]>[1] = {},
+) {
+  let response = null as Awaited<ReturnType<APIRequestContext["fetch"]>> | null;
+  let lastError: any = null;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      response = await request.fetch(`${LOCAL_API_BASE}${path}`, {
+        failOnStatusCode: false,
+        ...init,
+      });
+      break;
+    } catch (error: any) {
+      lastError = error;
+      const message = String(error?.message || "");
+      if (
+        message.includes("Request context disposed") ||
+        message.includes("Target page, context or browser has been closed")
+      ) {
+        throw error;
+      }
+      if (!message.includes("socket hang up") && !message.includes("ECONNRESET")) {
+        throw error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 200 * (attempt + 1)));
+    }
+  }
+  if (!response) {
+    throw lastError;
+  }
+  return response;
+}
+
 export async function loginAs(page: Page, request: APIRequestContext, email: string, password: string) {
   let response = null as Awaited<ReturnType<APIRequestContext["post"]>> | null;
   let lastStatus = 0;
   let lastBody = "";
+  let lastError: unknown = null;
   for (let attempt = 0; attempt < 3; attempt += 1) {
-    response = await request.post("http://127.0.0.1:3000/auth/login", {
-      data: { email, password },
-      headers: { "Content-Type": "application/json" },
-    });
+    try {
+      response = await request.post("http://127.0.0.1:3000/auth/login", {
+        data: { email, password },
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (error: any) {
+      lastError = error;
+      const message = String(error?.message || "");
+      if (!message.includes("socket hang up") && !message.includes("ECONNRESET") && !message.includes("ECONNREFUSED")) {
+        throw error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 200 * (attempt + 1)));
+      continue;
+    }
     lastStatus = response.status();
     if (response.ok()) {
       break;
@@ -220,6 +294,9 @@ export async function loginAs(page: Page, request: APIRequestContext, email: str
     await new Promise((resolve) => setTimeout(resolve, 200 * (attempt + 1)));
   }
   if (!response?.ok()) {
+    if (!response && lastError) {
+      throw lastError;
+    }
     throw new Error(`Failed to log in as ${email} (status ${lastStatus}${lastBody ? `: ${lastBody}` : ""})`);
   }
   const body = await response.json();
@@ -230,13 +307,44 @@ export async function loginAs(page: Page, request: APIRequestContext, email: str
   await page.addInitScript((nextToken) => {
     window.localStorage.setItem("mytitan_token", nextToken);
   }, token);
+  return token;
+}
+
+export async function cleanupGeneratedWorkspace(request: APIRequestContext, token: string) {
+  const response = await request.post("http://127.0.0.1:3000/me/e2e-cleanup-generated-workspace", {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    data: {},
+  });
+  if (!response.ok()) {
+    throw new Error(`generated workspace cleanup failed with status ${response.status()}`);
+  }
 }
 
 export async function loginCustomerAs(page: Page, request: APIRequestContext, email: string, password: string) {
-  const response = await request.post("http://127.0.0.1:3000/customer-auth/login", {
-    data: { email, password },
-    headers: { "Content-Type": "application/json" },
-  });
+  let response = null as Awaited<ReturnType<APIRequestContext["post"]>> | null;
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      response = await request.post("http://127.0.0.1:3000/customer-auth/login", {
+        data: { email, password },
+        headers: { "Content-Type": "application/json" },
+      });
+      break;
+    } catch (error: any) {
+      lastError = error;
+      const message = String(error?.message || "");
+      if (!message.includes("socket hang up") && !message.includes("ECONNRESET") && !message.includes("ECONNREFUSED")) {
+        throw error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 200 * (attempt + 1)));
+    }
+  }
+  if (!response) {
+    throw lastError instanceof Error ? lastError : new Error(`Failed to log in customer ${email}`);
+  }
   if (!response.ok()) {
     const body = await response.text();
     throw new Error(`Failed to log in customer ${email} (${response.status()}: ${body})`);

@@ -2,11 +2,12 @@
 
 This suite uses real app routes, real API auth, and deterministic local fixtures.
 
-Playwright serves the app with `NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:3000`.
-The proxy helper still normalizes browser API traffic during local runs because the container API can otherwise keep production-shaped CORS and host defaults unless you explicitly override them.
+Playwright serves the app against a local API target and the browser uses the app's same-origin `/api` proxy.
+Direct API helpers in the suite still talk to `http://127.0.0.1:3000` on purpose.
 For a more first-class local stack, you can also start Docker with:
 
 ```bash
+MYTITAN_API_PROXY_TARGET=http://api:3000 \
 APP_PUBLIC_URL=http://127.0.0.1:3101 \
 API_PUBLIC_URL=http://127.0.0.1:3000 \
 CORS_ALLOWED_ORIGINS=http://127.0.0.1:3101 \
@@ -66,6 +67,32 @@ If your environment cannot bind the local Playwright Next server on `127.0.0.1:3
 cd app
 npm run test:e2e:docker:local
 ```
+
+## Stable release validation
+
+For durable release proof, use the direct single-worker path against the existing Docker app/API services:
+
+```bash
+cd /opt/mytitan
+bash ./scripts/validate-e2e-stable.sh
+```
+
+Equivalent app-local command:
+
+```bash
+cd /opt/mytitan/app
+PLAYWRIGHT_USE_EXISTING_SERVER=1 \
+PLAYWRIGHT_BASE_URL=http://127.0.0.1:3001 \
+PLAYWRIGHT_API_BASE_URL=http://127.0.0.1:3000 \
+NEXT_PUBLIC_MYTITAN_DISABLE_SSE=1 \
+PLAYWRIGHT_SKIP_DOCKER_SEED=1 \
+npx playwright test --workers=1 --reporter=line,json --output=/tmp/pw-results --timeout=0
+```
+
+Artifacts:
+- log: `/tmp/mytitan-validation/full-suite-stable-<timestamp>.log`
+- JSON report: `/tmp/pw-results/final-proof.json`
+- explicit `EXIT_CODE:<n>` marker in the log
 
 ## Overrides
 

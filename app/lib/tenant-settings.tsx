@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { apiFetch, getToken } from './api';
+import { DEFAULT_WORKSPACE_CURRENCY, DEFAULT_WORKSPACE_LOCALE, DEFAULT_WORKSPACE_TIMEZONE } from './geo-defaults';
 
 export type TenantSettings = {
   planId?: string | null;
@@ -9,7 +10,7 @@ export type TenantSettings = {
   brandSecondaryColor: string;
   brandAccentColor?: string | null;
   brandDefaultMode: 'light' | 'dark';
-  themeMode?: 'light' | 'dark';
+  themeMode?: 'light' | 'dark' | 'system';
   emailSenderName?: string | null;
   emailReplyTo?: string | null;
   emailNotificationRecipients?: string[] | null;
@@ -36,6 +37,10 @@ export type TenantSettings = {
   guidedSetupCompletedSteps?: string[];
   guidedSetupSkippedSteps?: string[];
   guidedSetupCompletedAt?: string | null;
+  activeJobSheetTemplateId?: string | null;
+  activeJobSheetTemplateName?: string | null;
+  activeJobSheetTemplateTrade?: string | null;
+  activeJobSheetTemplateVersion?: number | null;
   primaryTrade?: 'WHEELS' | 'BODYSHOP' | 'GARAGE' | 'MOBILE' | null;
   featurePayments?: boolean;
   featureAccounting?: boolean;
@@ -71,6 +76,92 @@ export type TenantSettings = {
       paidMessage?: string | null;
       paymentUnavailableMessage?: string | null;
     } | null;
+    analytics?: {
+      widgetOrder?: Array<"executive-summary" | "pressure-panel" | "revenue-panel" | "capacity-panel" | "benchmark-delta" | "customer-commercial-signals"> | null;
+      hiddenWidgets?: Array<"executive-summary" | "pressure-panel" | "revenue-panel" | "capacity-panel" | "benchmark-delta" | "customer-commercial-signals"> | null;
+      defaultWindowDays?: number | null;
+    } | null;
+    commandCentre?: {
+      sectionOrder?: Array<"filters" | "recent-updates" | "bulk-actions" | "work-board"> | null;
+      hiddenSections?: Array<"filters" | "recent-updates" | "bulk-actions" | "work-board"> | null;
+      defaultViewMode?: "kanban" | "list" | null;
+    } | null;
+    serviceRecordEmail?: {
+      defaultRecipients?: string[] | null;
+      includeJobCustomerEmail?: boolean | null;
+      includeBusinessDetails?: boolean | null;
+      includeContactDetails?: boolean | null;
+      includeBillingDetails?: boolean | null;
+      includePaymentSummary?: boolean | null;
+      includeEvidenceSummary?: boolean | null;
+      includeSignatureSummary?: boolean | null;
+      includePortalLink?: boolean | null;
+      includePdfLink?: boolean | null;
+      signatureEnabled?: boolean | null;
+      signatureText?: string | null;
+    } | null;
+    notificationRouting?: {
+      internalRecipients?: Array<{
+        email: string;
+        label?: string | null;
+        enabled?: boolean | null;
+        categories?: Array<"bookings" | "payments" | "jobs" | "customer_messages" | "workspace_alerts"> | null;
+      }> | null;
+    } | null;
+    summaryEmails?: {
+      enabled?: boolean | null;
+      enabledCadences?: Array<"daily" | "weekly" | "monthly" | "quarterly" | "annual"> | null;
+      enabledSections?: Array<"bookings" | "jobs" | "payments" | "failed_sends" | "upcoming_work" | "tax_reminders"> | null;
+      lastDispatchedAtByCadence?: Partial<Record<"daily" | "weekly" | "monthly" | "quarterly" | "annual", string>> | null;
+    } | null;
+    operationalAlerts?: {
+      externalEmailRecipients?: string[] | null;
+      enabledCategories?: Array<"failed_email" | "failed_summary_dispatch" | "failed_booking" | "failed_payment" | "failed_refund" | "failed_webhook" | "failed_backup" | "health_degraded"> | null;
+    } | null;
+    customerFeedback?: {
+      enabled?: boolean | null;
+      promptText?: string | null;
+      publicReviewUrl?: string | null;
+      thankYouText?: string | null;
+    } | null;
+    finance?: {
+      vatNumber?: string | null;
+      invoiceNumberPrefix?: string | null;
+      paymentTermsDays?: number | null;
+      defaultVatCategory?: string | null;
+    } | null;
+    jobForms?: {
+      declarationText?: string | null;
+      serviceTypes?: Array<{
+        id: string;
+        name: string;
+        description?: string | null;
+        enabled?: boolean | null;
+        retired?: boolean | null;
+        order?: number | null;
+      }> | null;
+      sections?: Array<{
+        id: string;
+        title: string;
+        description?: string | null;
+        order?: number | null;
+        visible?: boolean | null;
+        serviceTypeIds?: string[] | null;
+      }> | null;
+      fields?: Array<{
+        id: string;
+        key: string;
+        sectionId: string;
+        label: string;
+        helpText?: string | null;
+        type: "text" | "textarea" | "select" | "checkbox" | "number" | "date";
+        required?: boolean | null;
+        visible?: boolean | null;
+        order?: number | null;
+        options?: string[] | null;
+        serviceTypeIds?: string[] | null;
+      }> | null;
+    } | null;
     technicianPrompts?: {
       checklist?: string[] | null;
     } | null;
@@ -79,6 +170,24 @@ export type TenantSettings = {
   bookingPublicToken?: string | null;
   bookingIcsToken?: string | null;
   aiRequestsLimit?: number | null;
+};
+
+export type EmailReadiness = {
+  status: 'ready' | 'not_configured' | 'misconfigured' | 'failing';
+  source: 'environment' | 'missing';
+  transport: 'smtp' | 'none';
+  canSend: boolean;
+  fromEmail?: string | null;
+  fromName?: string | null;
+  replyToEmail?: string | null;
+  guidance: string;
+  dnsRecords: string[];
+  senderOwnership?: 'workspace' | 'system' | 'none';
+  usingFallback?: boolean;
+  notice?: string | null;
+  workspace?: EmailReadiness;
+  fallback?: EmailReadiness;
+  effective?: EmailReadiness;
 };
 
 type TenantSettingsContextValue = {
@@ -105,9 +214,9 @@ const defaultSettings: TenantSettings = {
   vatRateBpsDefault: 0,
   defaultTorqueSetting: null,
   defaultTyrePressure: null,
-  defaultCurrency: 'USD',
-  defaultLocale: 'en-US',
-  defaultTimezone: 'UTC',
+  defaultCurrency: DEFAULT_WORKSPACE_CURRENCY,
+  defaultLocale: DEFAULT_WORKSPACE_LOCALE,
+  defaultTimezone: DEFAULT_WORKSPACE_TIMEZONE,
   bookingsEnabled: false,
   accountingEnabled: false,
   paymentsEnabled: false,
@@ -141,11 +250,27 @@ function applyTheme(settings: TenantSettings | null) {
 
   const root = document.documentElement;
   const merged = settings || defaultSettings;
+  const storedMode = typeof window !== 'undefined'
+    ? window.localStorage.getItem('mytitan_theme_mode')
+    : null;
+  const configuredMode = merged.themeMode === 'dark' || merged.themeMode === 'system' || merged.themeMode === 'light'
+    ? merged.themeMode
+    : storedMode === 'dark' || storedMode === 'system'
+      ? storedMode
+      : 'light';
+  const dark = configuredMode === 'dark'
+    || (configuredMode === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches);
 
   root.style.setProperty('--tenant-primary', merged.brandPrimaryColor || defaultSettings.brandPrimaryColor);
   root.style.setProperty('--tenant-secondary', merged.brandSecondaryColor || defaultSettings.brandSecondaryColor);
   root.style.setProperty('--tenant-accent', merged.brandAccentColor || merged.brandPrimaryColor || defaultSettings.brandPrimaryColor);
   root.style.setProperty('--tenant-mode', merged.brandDefaultMode || defaultSettings.brandDefaultMode);
+  root.classList.toggle('dark', dark);
+  root.dataset.theme = dark ? 'dark' : 'light';
+  root.dataset.themeMode = configuredMode;
+  if (typeof window !== 'undefined') {
+    window.localStorage.setItem('mytitan_theme_mode', configuredMode);
+  }
 }
 
 export function TenantSettingsProvider({ children }: { children: React.ReactNode }) {
@@ -201,6 +326,16 @@ const merged = { ...defaultSettings, ...(data || {}) } as TenantSettings;
       window.removeEventListener('storage', handleStorage);
     };
   }, [refresh]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mode = settings?.themeMode;
+    if (mode !== 'system') return;
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = () => applyTheme(settings);
+    media.addEventListener('change', handleChange);
+    return () => media.removeEventListener('change', handleChange);
+  }, [settings]);
 
   const value = useMemo(
     () => ({

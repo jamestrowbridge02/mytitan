@@ -9,6 +9,7 @@
     "test:e2e:seed": "cd .. && docker compose exec -T api npm run seed:e2e",
     "test:e2e": "playwright test",
     "test:e2e:docker": "PLAYWRIGHT_USE_EXISTING_SERVER=1 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3001 PLAYWRIGHT_API_BASE_URL=http://127.0.0.1:3000 NEXT_PUBLIC_MYTITAN_DISABLE_SSE=1 playwright test",
+    "test:e2e:stable": "PLAYWRIGHT_USE_EXISTING_SERVER=1 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3001 PLAYWRIGHT_API_BASE_URL=http://127.0.0.1:3000 NEXT_PUBLIC_MYTITAN_DISABLE_SSE=1 PLAYWRIGHT_SKIP_DOCKER_SEED=1 playwright test --workers=1 --reporter=line,json --output=/tmp/pw-results --timeout=0",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:debug": "playwright test --debug",
     "test:e2e:install": "playwright install chromium",
@@ -16,7 +17,7 @@
     "test:e2e:docker:local": "npm run test:e2e:seed && npm run test:e2e:docker"
   },
   "dependencies": {
-    "next": "^14.2.5",
+    "next": "16.2.7",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
@@ -26,5 +27,8 @@
     "@types/react": "18.3.28",
     "@types/react-dom": "^18.3.0",
     "typescript": "5.9.3"
+  },
+  "overrides": {
+    "postcss": "8.5.15"
   }
 }

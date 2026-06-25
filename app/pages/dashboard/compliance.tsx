@@ -54,18 +54,22 @@ export default function CompliancePage() {
       if (filters.status) query.set("status", filters.status);
       if (locationId && locationId !== "all") query.set("locationId", locationId);
       const suffix = query.toString();
-      const [policyRows, eventRows, exceptionRows, summaryPayload, locationRows] = await Promise.all([
+      const [policyRows, eventRows, exceptionRows, summaryPayload, locationRows] = await Promise.allSettled([
         apiFetch("/compliance/sla-policies"),
         apiFetch(`/compliance/sla-events${suffix ? `?${suffix}` : ""}`),
         apiFetch(`/compliance/exceptions${suffix ? `?${suffix}` : ""}`),
         apiFetch(`/compliance/summary${locationId && locationId !== "all" ? `?locationId=${encodeURIComponent(locationId)}` : ""}`),
         apiFetch("/locations").catch(() => []),
       ]);
-      setPolicies(Array.isArray(policyRows) ? policyRows : []);
-      setEvents(Array.isArray(eventRows) ? eventRows : []);
-      setExceptions(Array.isArray(exceptionRows) ? exceptionRows : []);
-      setSummary(summaryPayload || { totals: {}, pressure: [] });
-      setLocations(Array.isArray(locationRows) ? locationRows : []);
+      const hasCriticalFailure = [policyRows, eventRows, exceptionRows].some((result) => result.status === "rejected");
+      setPolicies(policyRows.status === "fulfilled" && Array.isArray(policyRows.value) ? policyRows.value : []);
+      setEvents(eventRows.status === "fulfilled" && Array.isArray(eventRows.value) ? eventRows.value : []);
+      setExceptions(exceptionRows.status === "fulfilled" && Array.isArray(exceptionRows.value) ? exceptionRows.value : []);
+      setSummary(summaryPayload.status === "fulfilled" && summaryPayload.value ? summaryPayload.value : { totals: {}, pressure: [] });
+      setLocations(locationRows.status === "fulfilled" && Array.isArray(locationRows.value) ? locationRows.value : []);
+      if (hasCriticalFailure) {
+        showError("Some compliance data could not be loaded. Showing the latest available results.");
+      }
     } catch (error: any) {
       showError(error?.message || "Failed to load compliance workspace");
     } finally {
@@ -134,7 +138,7 @@ export default function CompliancePage() {
         <OperatorPageHeader
           eyebrow="Governance"
           title="Compliance"
-          subtitle="Track workflow SLAs, audit exceptions, and resolve operational control debt without inventing a fake enterprise compliance program."
+          subtitle="Track workflow deadlines and resolve operational exceptions."
           stats={[
             { label: "Active policies", value: String(summary?.totals?.activePolicies || 0), hint: "Enabled SLA rules" },
             { label: "Open events", value: String(summary?.totals?.openEvents || 0), hint: "SLA timers still running" },
