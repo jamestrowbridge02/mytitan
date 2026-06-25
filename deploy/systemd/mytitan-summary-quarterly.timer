@@ -1,0 +1,11 @@
+[Unit]
+Description=Run MyTitan quarterly summary dispatch
+
+[Timer]
+Unit=mytitan-summary@quarterly.service
+OnCalendar=*-01,04,07,10-01 06:30:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+

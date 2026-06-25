@@ -204,7 +204,6 @@ Notes: routes are derived from `app/pages`; dynamic segments are shown as `:para
 | `/dashboard/settings` | `dashboard/settings.tsx` |
 | `/dashboard/setup` | `dashboard/setup.tsx` |
 | `/dashboard/setup-wizard` | `dashboard/setup-wizard.tsx` |
-| `/dashboard/templates/wheels` | `dashboard/templates/wheels.tsx` |
 | `/dashboard/trade-accounts` | `dashboard/trade-accounts.tsx` |
 | `/dashboard/trade-accounts/:id` | `dashboard/trade-accounts/[id].tsx` |
 | `/dashboard/trade-packs` | `dashboard/trade-packs.tsx` |

@@ -1,0 +1,11 @@
+[Unit]
+Description=Run MyTitan weekly summary dispatch
+
+[Timer]
+Unit=mytitan-summary@weekly.service
+OnCalendar=Mon *-*-* 06:10:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+

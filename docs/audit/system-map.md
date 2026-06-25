@@ -49,7 +49,8 @@ TLS:
 
 ## 4) High-level Request Flow
 - Browser -> Nginx -> `app`/`marketing` for UI
-- App/Marketing -> API (`NEXT_PUBLIC_API_BASE_URL`)
+- Browser -> App same-origin `/api`
+- App -> API (`MYTITAN_API_PROXY_TARGET` in Docker, `NEXT_PUBLIC_API_BASE_URL` only for explicit standalone overrides)
 - API -> Postgres/Redis/Stripe/OpenAI/SMTP (feature and config dependent)
 
 ## 5) API Module Map

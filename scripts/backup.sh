@@ -4,6 +4,7 @@ set -euo pipefail
 BASE="/opt/mytitan"
 ENV_FILE="${BASE}/.env"
 BACKUP_DIR="${BASE}/backups"
+BACKUP_MARKER="${BACKUP_DIR}/.last-successful-backup"
 
 if [ ! -f "${ENV_FILE}" ]; then
   echo "Missing ${ENV_FILE}" >&2
@@ -34,5 +35,7 @@ rm -f "${gz}"
 
 echo "Rotating backups older than 30 days..."
 find "${BACKUP_DIR}" -type f -name "*.enc" -mtime +30 -delete
+
+date -u +"%Y-%m-%dT%H:%M:%SZ ${enc}" > "${BACKUP_MARKER}"
 
 echo "Backup complete: ${enc}"

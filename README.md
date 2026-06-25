@@ -32,6 +32,8 @@ Set these before starting services.
 - `TENANT_LOGO_MAX_BYTES=2097152` (optional upload cap)
 - `API_PUBLIC_URL=https://api.mytitan.co.uk` (used for public logo URLs)
 - `APP_PUBLIC_URL=https://app.mytitan.co.uk` (used for public portal redirects)
+- `CORS_ALLOWED_ORIGINS=https://app.mytitan.co.uk,https://mytitan.co.uk,https://www.mytitan.co.uk`
+- `MYTITAN_API_PROXY_TARGET=http://api:3000` (recommended Docker app-to-API proxy target)
 - `STRIPE_SECRET_KEY=...` (server-side only)
 - `STRIPE_WEBHOOK_SECRET=...`
 - `STRIPE_PRICE_SOLE_TRADER_MONTHLY=price_...`
@@ -41,7 +43,15 @@ Set these before starting services.
 - `STRIPE_PRICE_ENTERPRISE_MONTHLY=price_...`
 - `STRIPE_PRICE_ENTERPRISE_ANNUAL=price_...`
 - `STRIPE_BILLING_RETURN_URL=https://app.mytitan.co.uk/dashboard/billing`
-- `INTEGRATIONS_ENCRYPTION_KEY=...` (AES-256-GCM secret for OAuth tokens)
+- `INTEGRATIONS_ENCRYPTION_KEY` (server-side only; required for webhook secret storage)
+- `SMTP_HOST`
+- `SMTP_PORT`
+- `SMTP_SECURE`
+- `SMTP_USER`
+- `SMTP_PASSWORD`
+- `SMTP_FROM_EMAIL`
+- `SMTP_FROM_NAME`
+- `REPLY_TO_EMAIL` (optional)
 - `XERO_CLIENT_ID=...`
 - `XERO_CLIENT_SECRET=...`
 - `XERO_REDIRECT_URL=https://api.mytitan.co.uk/integrations/xero/callback`
@@ -54,7 +64,9 @@ Set these before starting services.
 - `BACKUP_ENCRYPTION_KEY=...` (host backups, not in containers)
 
 ### App (`/opt/mytitan/app`)
-- `NEXT_PUBLIC_API_BASE_URL=http://localhost:3000`
+- Browser requests should use same-origin `/api` and let the app server proxy to the API.
+- `MYTITAN_API_PROXY_TARGET=http://api:3000` for standard Docker Compose deployments
+- `NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:3000` only for standalone Next.js dev or explicit non-Docker overrides
 - `NEXT_PUBLIC_MYTITAN_FEATURE_MARKETPLACE=off`
 - `NEXT_PUBLIC_MYTITAN_FEATURE_START_HERE=off`
 - `NEXT_PUBLIC_MYTITAN_FEATURE_GUIDED_SETUP_V2=off`
@@ -97,6 +109,11 @@ RUN_MIGRATIONS=true docker compose up -d api
 docker compose up -d postgres redis
 docker compose up -d api app
 ```
+
+Standard Docker contract:
+- Browser -> `app` on `3001`
+- App server -> API via `MYTITAN_API_PROXY_TARGET` on the internal Docker network
+- API public URLs (`APP_PUBLIC_URL`, `API_PUBLIC_URL`) should reflect the externally reachable deployment URLs for links, emails, and public assets
 
 Recommended manual migration command:
 ```bash
@@ -178,6 +195,67 @@ NEXT_PUBLIC_API_BASE_URL='http://localhost:3000' npm run dev
 
 Open `http://localhost:3001` (or Next default port if 3001 is occupied).
 
+## Stable E2E Validation
+
+Use the direct Playwright path for durable release validation. Avoid the older wrapper chains that previously stopped mid-session.
+
+One-command path:
+
+```bash
+cd /opt/mytitan
+bash ./scripts/validate-e2e-stable.sh
+```
+
+Equivalent direct command shape:
+
+```bash
+cd /opt/mytitan/app
+PLAYWRIGHT_USE_EXISTING_SERVER=1 \
+PLAYWRIGHT_BASE_URL=http://127.0.0.1:3001 \
+PLAYWRIGHT_API_BASE_URL=http://127.0.0.1:3000 \
+NEXT_PUBLIC_MYTITAN_DISABLE_SSE=1 \
+PLAYWRIGHT_SKIP_DOCKER_SEED=1 \
+npx playwright test --workers=1 --reporter=line,json --output=/tmp/pw-results --timeout=0
+```
+
+What the stable script writes:
+- log: `/tmp/mytitan-validation/full-suite-stable-<timestamp>.log`
+- JSON report: `/tmp/pw-results/final-proof.json`
+- explicit `EXIT_CODE:<n>` marker appended to the log
+
+Release-prep sequence:
+
+```bash
+cd /opt/mytitan
+docker compose build app api marketing
+docker compose up -d --force-recreate app api marketing
+docker exec -w /app mytitan_api /bin/sh -lc 'npx prisma migrate deploy'
+docker exec -w /app mytitan_api /bin/sh -lc 'npm run seed:e2e'
+bash ./scripts/validate-e2e-stable.sh
+```
+
+## Runtime Ops Notes
+
+Production runtime requirements:
+- configure system SMTP for MyTitan-owned delivery flows such as auth, password reset, team invites, fallback customer delivery, and summary emails
+- configure workspace sender details only when a tenant is ready to send from its own identity
+- keep payment truth authoritative: no live collection without valid provider credentials and webhook verification
+- keep public URLs externally correct via `APP_PUBLIC_URL` and `API_PUBLIC_URL`
+- keep UK defaults unless a workspace intentionally overrides them: `GBP`, `en-GB`, `Europe/London`
+
+Summary email scheduler:
+
+```bash
+cd /opt/mytitan/api
+npm run summary:dispatch -- daily
+npm run summary:dispatch -- weekly
+npm run summary:dispatch -- monthly
+npm run summary:dispatch -- quarterly
+npm run summary:dispatch -- annual
+```
+
+Do not place secret values, SMTP credentials, webhook secrets, Stripe keys, or internal-only hosts in user-visible content, exported reports, or customer-facing pages.
+
 ## App Docker build: missing /app/.next
 Symptom: `COPY --from=builder /app/.next ./.next` fails during `docker compose up -d --build`.
 Cause: stale/bad cached builder stage missing `.next`.
@@ -243,6 +321,30 @@ If you need to reset onboarding for a tenant, set:
 ## Integrations (Foundation)
 - Xero, QuickBooks Online, and Google Calendar OAuth foundations are exposed under `/integrations/*`.
 - Tokens are encrypted at rest via `INTEGRATIONS_ENCRYPTION_KEY`.
+
+## Secure Secret Injection
+
+Supply production secrets through server-side environment injection only. Supported options:
+- container runtime environment for the `api` service
+- untracked Docker Compose override on the deployment host
+- Docker secrets or your cloud secret manager mapped into environment variables at start
+
+Do not place real values in tracked files, shell snippets committed to the repo, or tenant-facing settings.
+
+Required secure inputs for outbound email and webhook secret storage:
+- `SMTP_HOST`
+- `SMTP_PORT`
+- `SMTP_SECURE`
+- `SMTP_USER`
+- `SMTP_PASSWORD`
+- `SMTP_FROM_EMAIL`
+- `SMTP_FROM_NAME`
+- `REPLY_TO_EMAIL` (optional)
+- `INTEGRATIONS_ENCRYPTION_KEY`
+
+Operational notes:
+- If SMTP variables are absent or incomplete, email readiness reports `not configured` or `misconfigured` and email actions fail safely without a false sent state.
+- If `INTEGRATIONS_ENCRYPTION_KEY` is absent, webhook/API integration health reports the missing key and webhook secret creation/rotation remains unavailable until it is injected.
 
 ## Production Verification Checklist
 
@@ -754,7 +856,7 @@ cd /opt/mytitan
 ./scripts/ops-smoke.sh
 ```
 
-## Top 1% Modules (Feature-flagged)
+## Premium Modules (Feature-flagged)
 
 New flags (default `off` in `.env.example`):
 
@@ -771,15 +873,25 @@ MYTITAN_FEATURE_INVENTORY_PRO_V1=off
 NEXT_PUBLIC_MYTITAN_FEATURE_INVENTORY_PRO_V1=off
 ```
 
-Optional SMTP env names:
+Supported outbound email env names:
 
 ```bash
 SMTP_HOST=
 SMTP_PORT=587
+SMTP_SECURE=
 SMTP_USER=
-SMTP_PASS=
-SMTP_FROM=
+SMTP_PASSWORD=
+SMTP_FROM_EMAIL=
+SMTP_FROM_NAME=
+REPLY_TO_EMAIL=
+INTEGRATIONS_ENCRYPTION_KEY=
 ```
+
+SMTP rollout note:
+- the runtime prefers `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, and `SMTP_FROM_NAME`
+- legacy server-side aliases remain compatible: `SMTP_PASS`, `SMTP_FROM`, `MAIL_HOST`, `MAIL_PORT`, `MAIL_USER`, `MAIL_PASSWORD`, `MAIL_FROM`, `EMAIL_FROM`, `FROM_EMAIL`, `SYSTEM_EMAIL`, `MAIL_FROM_NAME`, `EMAIL_FROM_NAME`, `SYSTEM_EMAIL_NAME`
+- `REPLY_TO_EMAIL` is optional
+- inject these on the server only; never place real values in browser-visible env vars or tracked files
 
 What was added:
 - Command Centre Premium: saved views API/UI, multi-location filtering, side panel, inline edits, undo endpoint (`POST /jobs/undo-last`), keyboard shortcuts.
@@ -788,12 +900,31 @@ What was added:
 - Locations Advanced: location hours, timezone, lead time, default assignee, staff-location assignment, staff restriction toggle.
 - Inventory Pro: low stock alerts (`GET /inventory/alerts`), valuation (`GET /inventory/valuation`), quick reorder drafts, guided receive flow, allocate-to-job line items.
 
-Top1 smoke:
+Premium smoke:
 
 ```bash
 cd /opt/mytitan
 ./scripts/top1-smoke.sh
 ```
+
+## Stable Release Validation
+
+Validated stable releases use the full Docker-backed rebuild and Playwright suite:
+
+```bash
+cd /opt/mytitan
+./scripts/docker-compose-with-env.sh build app api marketing
+./scripts/docker-compose-with-env.sh up -d --force-recreate app api marketing
+docker exec -w /app mytitan_api /bin/sh -lc 'npx prisma migrate deploy'
+docker exec -w /app mytitan_api /bin/sh -lc 'npm run seed:e2e'
+PLAYWRIGHT_SKIP_DOCKER_SEED=1 npm run test:e2e:docker
+```
+
+`docker compose` env loading:
+- Compose interpolates `${VAR}` from its own process environment and the default `.env`.
+- MyTitan keeps deployment-only overrides in ignored `.env.local`.
+- Use `./scripts/docker-compose-with-env.sh ...` for builds and recreates so `.env.local` is exported into Compose interpolation first.
+- The compose services also reference `.env.local` through `env_file`, which keeps API runtime secrets such as Stripe and SMTP values from silently drifting on plain recreates.
 
 ## Route Inventory Generator
 

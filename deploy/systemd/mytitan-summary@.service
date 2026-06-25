@@ -1,0 +1,13 @@
+[Unit]
+Description=MyTitan summary dispatch (%i)
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/mytitan
+ExecStart=/opt/mytitan/scripts/run-summary-dispatch.sh %i
+User=root
+Group=root
+Nice=10
+
