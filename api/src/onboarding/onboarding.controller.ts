@@ -29,7 +29,7 @@ export class OnboardingController {
   @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
   async status(@CurrentUser() user: JwtPayload) {
     const settings = await this.tenantService.getSettings(user.companyId);
-    const checklist = await this.onboardingService.getChecklist(user.companyId);
+    const checklist = await this.onboardingService.getChecklist(user.companyId, user.role);
     return {
       onboardingCompleted: Boolean(settings.onboardingCompleted),
       onboardingStep: Number(settings.onboardingStep ?? 0),
@@ -182,7 +182,7 @@ export class SetupController {
     if (!isMarketplaceEnabled()) {
       return { items: [], completedCount: 0, total: 0 };
     }
-    return this.onboardingService.getChecklist(user.companyId);
+    return this.onboardingService.getChecklist(user.companyId, user.role);
   }
 }
 

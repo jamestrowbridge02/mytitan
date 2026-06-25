@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
+import * as crypto from 'crypto';
 import { ComplianceService } from '../compliance/compliance.service';
+import { getAnalyticsWorkspaceLayout } from '../common/business-config';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScheduleService } from '../schedule/schedule.service';
 
@@ -29,6 +31,9 @@ type DeltaMetric = {
   delta: number;
   deltaPct: number | null;
 };
+
+type TrafficSurface = 'marketing' | 'app' | 'login' | 'public_booking' | 'public_status' | 'customer_workspace';
+const WEBSITE_VISIT_EVENT_RETENTION_DAYS = 90;
 
 @Injectable()
 export class AnalyticsService {
@@ -126,6 +131,16 @@ export class AnalyticsService {
     return locationId && locationId !== 'all' ? { locationId } : {};
   }
 
+  private classifyAbsenceReason(reason?: string | null) {
+    const text = String(reason || '').toLowerCase();
+    if (/holiday|vacation|annual leave/.test(text)) return 'holiday';
+    if (/sick|sickness|ill/.test(text)) return 'sickness';
+    if (/paternity/.test(text)) return 'paternity';
+    if (/bereavement|compassionate/.test(text)) return 'bereavement';
+    if (/training|course|certification/.test(text)) return 'training';
+    return 'unspecified';
+  }
+
   private customerLocationWhere(locationId?: string) {
     return locationId && locationId !== 'all' ? { homeLocationId: locationId } : {};
   }
@@ -142,6 +157,110 @@ export class AnalyticsService {
       items.push({ day, label, value: byDay.get(day) || 0 });
     }
     return items;
+  }
+
+  async getProductivity(tenantId: string, windowDays: number, locationId?: string) {
+    const range = this.getRange(windowDays);
+    const db = this.db;
+    const [jobs, exceptions] = await Promise.all([
+      db.job.findMany({
+        where: {
+          companyId: tenantId,
+          ...this.jobLocationWhere(locationId),
+          completedAt: { gte: range.start, lt: range.end },
+          status: { in: ['COMPLETED', 'INVOICED'] },
+          deletedAt: null,
+        },
+        select: {
+          id: true,
+          jobRef: true,
+          serviceName: true,
+          jobType: true,
+          totalCents: true,
+          createdAt: true,
+          scheduledAt: true,
+          completedAt: true,
+          assignedUser: { select: { id: true, email: true } },
+          location: { select: { id: true, name: true } },
+        },
+      }),
+      db.technicianCapacityException.findMany({
+        where: {
+          tenantId,
+          date: { gte: range.start, lt: range.end },
+          ...(locationId && locationId !== 'all' ? { technician: { defaultLocationId: locationId } } : {}),
+        },
+        include: { technician: { select: { id: true, email: true } } },
+      }).catch(() => []),
+    ]);
+
+    const byTechnician = new Map<string, any>();
+    const byLocation = new Map<string, any>();
+    const byService = new Map<string, any>();
+    const completionDurations: number[] = [];
+    for (const job of jobs) {
+      const completedAt = job.completedAt ? new Date(job.completedAt) : null;
+      if (completedAt && job.createdAt) {
+        completionDurations.push((completedAt.getTime() - new Date(job.createdAt).getTime()) / (60 * 60 * 1000));
+      }
+      const technicianKey = job.assignedUser?.id || 'unassigned';
+      const technicianRow = byTechnician.get(technicianKey) || {
+        technicianId: job.assignedUser?.id || null,
+        technicianName: job.assignedUser?.email || 'Unassigned',
+        completedJobs: 0,
+        revenueCents: 0,
+      };
+      technicianRow.completedJobs += 1;
+      technicianRow.revenueCents += Number(job.totalCents || 0);
+      byTechnician.set(technicianKey, technicianRow);
+
+      const locationKey = job.location?.id || 'unassigned';
+      const locationRow = byLocation.get(locationKey) || {
+        locationId: job.location?.id || null,
+        locationName: job.location?.name || 'Unassigned',
+        completedJobs: 0,
+        revenueCents: 0,
+      };
+      locationRow.completedJobs += 1;
+      locationRow.revenueCents += Number(job.totalCents || 0);
+      byLocation.set(locationKey, locationRow);
+
+      const serviceKey = String(job.jobType || job.serviceName || 'Service job');
+      const serviceRow = byService.get(serviceKey) || {
+        serviceType: serviceKey,
+        completedJobs: 0,
+        revenueCents: 0,
+        profitMarginState: 'needs_cost_data',
+      };
+      serviceRow.completedJobs += 1;
+      serviceRow.revenueCents += Number(job.totalCents || 0);
+      byService.set(serviceKey, serviceRow);
+    }
+
+    const absenceByType = new Map<string, number>();
+    for (const row of Array.isArray(exceptions) ? exceptions : []) {
+      const type = this.classifyAbsenceReason(row.reason);
+      absenceByType.set(type, (absenceByType.get(type) || 0) + 1);
+    }
+
+    return {
+      windowDays,
+      range: { start: range.start.toISOString(), end: range.end.toISOString() },
+      summary: {
+        completedJobs: jobs.length,
+        revenueCents: jobs.reduce((sum: number, job: any) => sum + Number(job.totalCents || 0), 0),
+        medianCompletionHours: this.medianHours(completionDurations),
+        forecasting: 'not_generated',
+      },
+      technicians: Array.from(byTechnician.values()).sort((a, b) => b.completedJobs - a.completedJobs),
+      locations: Array.from(byLocation.values()).sort((a, b) => b.completedJobs - a.completedJobs),
+      serviceTypes: Array.from(byService.values()).sort((a, b) => b.completedJobs - a.completedJobs),
+      absenceContext: {
+        supportedTypes: ['holiday', 'sickness', 'paternity', 'bereavement', 'training'],
+        counts: Array.from(absenceByType.entries()).map(([type, count]) => ({ type, count })),
+        source: 'technician capacity exceptions; no fake forecast generated',
+      },
+    };
   }
 
   private getDurationMinutes(formData: any) {
@@ -178,19 +297,7 @@ export class AnalyticsService {
   }
 
   private getWidgetLayout(settings: any) {
-    const analytics = settings?.businessConfigJson?.analytics || {};
-    const defaultWidgetOrder = ['executive-summary', 'pressure-panel', 'revenue-panel', 'capacity-panel', 'benchmark-delta'];
-    const hiddenWidgets = Array.isArray(analytics.hiddenWidgets)
-      ? analytics.hiddenWidgets.map((item: any) => String(item || '')).filter(Boolean)
-      : [];
-    const widgetOrder = Array.isArray(analytics.widgetOrder)
-      ? analytics.widgetOrder.map((item: any) => String(item || '')).filter(Boolean)
-      : defaultWidgetOrder;
-    return {
-      widgetOrder: Array.from(new Set([...widgetOrder, ...defaultWidgetOrder])),
-      hiddenWidgets,
-      defaultWindowDays: Math.max(7, Math.min(90, Number(analytics.defaultWindowDays || 30))),
-    };
+    return getAnalyticsWorkspaceLayout(settings);
   }
 
   private buildPressureAreas(items: Array<{ key: string; label: string; value: number; detail: string; href?: string }>) {
@@ -206,6 +313,156 @@ export class AnalyticsService {
       value: item.value,
       context: item.context,
     }));
+  }
+
+  private classifyTrafficSurface(pathname: string, requestedSurface?: string): TrafficSurface {
+    const surface = String(requestedSurface || '').trim();
+    if (['marketing', 'app', 'login', 'public_booking', 'public_status', 'customer_workspace'].includes(surface)) {
+      return surface as TrafficSurface;
+    }
+    if (pathname === '/login' || pathname === '/signup' || pathname === '/forgot-password' || pathname === '/reset-password') return 'login';
+    if (pathname.startsWith('/portal/booking/status/')) return 'public_status';
+    if (pathname.startsWith('/portal/booking/')) return 'public_booking';
+    if (pathname.startsWith('/portal/job/') || pathname.startsWith('/complete/job/')) return 'public_status';
+    if (pathname.startsWith('/customer')) return 'customer_workspace';
+    if (pathname.startsWith('/dashboard') || pathname.startsWith('/platform')) return 'app';
+    return 'marketing';
+  }
+
+  sanitizeTrafficPath(rawPath: unknown) {
+    const raw = String(rawPath || '/').trim() || '/';
+    let pathname = '/';
+    try {
+      const parsed = raw.startsWith('http') ? new URL(raw) : new URL(raw, 'https://mytitan.local');
+      pathname = parsed.pathname || '/';
+    } catch {
+      pathname = raw.split('?')[0]?.split('#')[0] || '/';
+    }
+    return pathname
+      .replace(/\/portal\/job\/[^/]+/i, '/portal/job/[token]')
+      .replace(/\/complete\/job\/[^/]+/i, '/complete/job/[token]')
+      .replace(/\/portal\/booking\/status\/[^/]+/i, '/portal/booking/status/[token]')
+      .replace(/\/portal\/booking\/(?!status\/)[^/]+/i, '/portal/booking/[token]')
+      .replace(/\/reset-password\/?$/i, '/reset-password')
+      .replace(/\/t\/c\/[^/]+/i, '/t/c/[id]')
+      .slice(0, 240);
+  }
+
+  private userAgentFamily(rawUserAgent: unknown) {
+    const userAgent = String(rawUserAgent || '').toLowerCase();
+    if (!userAgent) return 'unknown';
+    if (userAgent.includes('bot') || userAgent.includes('crawler') || userAgent.includes('spider')) return 'bot';
+    if (userAgent.includes('mobile')) return 'mobile_browser';
+    return 'browser';
+  }
+
+  private hashAnonymousSession(input: { sessionId?: unknown; ip?: unknown; userAgent?: unknown; dayKey: string }) {
+    const source = [input.sessionId, input.ip, input.userAgent, input.dayKey].map((value) => String(value || '').trim()).join('|');
+    if (!source.replace(/\|/g, '')) return null;
+    const salt = String(process.env.ANALYTICS_HASH_SALT || process.env.JWT_SECRET || 'mytitan-local-analytics-salt');
+    return crypto.createHmac('sha256', salt).update(source).digest('hex').slice(0, 32);
+  }
+
+  private async pruneWebsiteVisitEvents(now: Date) {
+    const cutoff = new Date(now.getTime() - WEBSITE_VISIT_EVENT_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+    await this.db.websiteVisitEvent.deleteMany({ where: { createdAt: { lt: cutoff } } });
+  }
+
+  async recordWebsiteVisit(input: {
+    tenantId?: string | null;
+    path?: unknown;
+    surface?: unknown;
+    source?: unknown;
+    sessionId?: unknown;
+    ip?: unknown;
+    userAgent?: unknown;
+  }) {
+    const pathSanitized = this.sanitizeTrafficPath(input.path);
+    const surface = this.classifyTrafficSurface(pathSanitized, String(input.surface || ''));
+    const now = new Date();
+    const dayKey = now.toISOString().slice(0, 10);
+    const anonymousSessionHash = this.hashAnonymousSession({
+      sessionId: input.sessionId,
+      ip: input.ip,
+      userAgent: input.userAgent,
+      dayKey,
+    });
+    await this.db.websiteVisitEvent.create({
+      data: {
+        tenantId: input.tenantId || null,
+        surface,
+        pathSanitized,
+        anonymousSessionHash,
+        source: String(input.source || '').trim().slice(0, 80) || null,
+        userAgentFamily: this.userAgentFamily(input.userAgent),
+        dayKey,
+      },
+    });
+    await this.pruneWebsiteVisitEvents(now);
+    return { ok: true, recorded: true };
+  }
+
+  async getWebsiteTrafficSummary(options: { tenantId?: string | null; platformWide?: boolean } = {}) {
+    const now = new Date();
+    const todayStart = this.startOfDay(now);
+    const last7Days = new Date(todayStart.getTime() - 6 * 24 * 60 * 60 * 1000);
+    const whereBase = options.platformWide ? {} : { tenantId: options.tenantId || '__none__' };
+    const where7d = { ...whereBase, createdAt: { gte: last7Days } };
+    const whereToday = { ...whereBase, createdAt: { gte: todayStart } };
+    const publicPageWhere = {
+      ...where7d,
+      surface: { in: ['marketing', 'public_booking', 'public_status'] },
+    };
+    const [visitsToday, visits7d, uniqueRows, bySurface, topPages] = await Promise.all([
+      this.db.websiteVisitEvent.count({ where: whereToday }),
+      this.db.websiteVisitEvent.count({ where: where7d }),
+      this.db.websiteVisitEvent.findMany({
+        where: { ...where7d, anonymousSessionHash: { not: null } },
+        select: { anonymousSessionHash: true },
+        take: 5000,
+      }),
+      this.db.websiteVisitEvent.groupBy({
+        by: ['surface'],
+        where: where7d,
+        _count: { _all: true },
+      }),
+      this.db.websiteVisitEvent.groupBy({
+        by: ['pathSanitized'],
+        where: publicPageWhere,
+        _count: { _all: true },
+        orderBy: { _count: { pathSanitized: 'desc' } },
+        take: 8,
+      }),
+    ]);
+    const uniqueAnonymousSessions = new Set(uniqueRows.map((row: any) => row.anonymousSessionHash).filter(Boolean)).size;
+    const surfaceCounts = Object.fromEntries((bySurface || []).map((row: any) => [row.surface, row._count?._all || 0]));
+    return {
+      label: 'Privacy-safe website visits',
+      recordedBy: 'MyTitan first-party event collection',
+      visitsToday,
+      visitsLast7Days: visits7d,
+      uniqueAnonymousSessions,
+      surfaces: {
+        marketing: surfaceCounts.marketing || 0,
+        app: surfaceCounts.app || 0,
+        login: surfaceCounts.login || 0,
+        publicBooking: surfaceCounts.public_booking || 0,
+        publicStatus: surfaceCounts.public_status || 0,
+        customerWorkspace: surfaceCounts.customer_workspace || 0,
+      },
+      conversionPaths: {
+        marketingToAppOrLogin: Math.min(surfaceCounts.marketing || 0, (surfaceCounts.app || 0) + (surfaceCounts.login || 0)),
+        bookingStarted: surfaceCounts.public_booking || 0,
+        bookingCompleted: 0,
+      },
+      topPublicPages: (topPages || []).map((row: any) => ({ path: row.pathSanitized, visits: row._count?._all || 0 })),
+      privacy: {
+        rawIpStored: false,
+        queryParamsStored: false,
+        tokensSanitized: true,
+        retention: `${WEBSITE_VISIT_EVENT_RETENTION_DAYS} days for first-party visit events; UI exposes aggregates only.`,
+      },
+    };
   }
 
   async getOpsInsights(companyId: string, windowDays: number) {
@@ -1209,7 +1466,9 @@ export class AnalyticsService {
   }
 
   async getExecutive(tenantId: string, windowDays: number, locationId?: string) {
-    await this.compliance.syncTenantState(tenantId);
+    // Keep executive analytics responsive by reading the current compliance state
+    // without blocking on a full tenant-wide sync pass.
+    void this.compliance.syncTenantState(tenantId).catch(() => undefined);
     const [operations, capacity, customers, revenue, benchmarks] = await Promise.all([
       this.getOperations(tenantId, windowDays, locationId),
       this.getCapacityAnalytics(tenantId, 7, locationId),

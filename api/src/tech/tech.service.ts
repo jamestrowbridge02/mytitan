@@ -1,6 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { AutomationsService } from '../automations/automations.service';
 import { ActivityService } from '../events/activity.service';
+import { JwtPayload } from '../auth/auth.types';
+import { CustomerJourneyService } from '../jobs/customer-journey.service';
 import { JobsService } from '../jobs/jobs.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { getTechnicianChecklist } from '../common/business-config';
@@ -13,6 +15,7 @@ export class TechService {
     private readonly jobs: JobsService,
     private readonly activity: ActivityService,
     private readonly automations: AutomationsService,
+    private readonly customerJourney: CustomerJourneyService,
   ) {}
 
   async getMyQueue(companyId: string, userId: string) {
@@ -220,6 +223,19 @@ export class TechService {
       assignedUserId: job.assignedUserId || null,
     });
     return { ok: true };
+  }
+
+  async updateCustomerEta(companyId: string, user: JwtPayload, jobId: string, body: any) {
+    return this.customerJourney.updateCustomerJourney(companyId, user, jobId, {
+      etaStatus: body?.etaStatus,
+      stage: body?.stage,
+      etaWindowStart: body?.etaWindowStart,
+      etaWindowEnd: body?.etaWindowEnd,
+      durationMinutes: body?.durationMinutes,
+      confidence: body?.confidence || 'manual_update',
+      customerFacingStatus: body?.customerFacingStatus,
+      note: body?.note,
+    });
   }
 
   async addJobNote(companyId: string, userId: string, jobId: string, note: string) {

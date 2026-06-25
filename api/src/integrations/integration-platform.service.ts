@@ -7,7 +7,9 @@ import {
 } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { AuditService } from '../audit/audit.service';
+import { EmailService } from '../email/email.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { resolveBookingsEnabled } from '../common/workspace-features';
 import { decryptText, encryptText } from './integrations.crypto';
 
 const TOKEN_PREFIX = 'mtit';
@@ -65,6 +67,13 @@ type PlatformEventPayload = {
   payload: Record<string, any> | null;
 };
 
+type DeliveryAttemptInput = {
+  eventType: IntegrationPlatformEventType;
+  eventId?: string | null;
+  requestUrl: string;
+  payloadJson: Record<string, any> | null;
+};
+
 @Injectable()
 export class IntegrationPlatformService {
   private readonly logger = new Logger(IntegrationPlatformService.name);
@@ -72,6 +81,7 @@ export class IntegrationPlatformService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly email: EmailService,
   ) {}
 
   private cleanName(value: string, label: string) {
@@ -244,6 +254,26 @@ export class IntegrationPlatformService {
     };
   }
 
+  private getEncryptionStatus() {
+    const integrationKey = String(process.env.INTEGRATIONS_ENCRYPTION_KEY || '').trim();
+    if (integrationKey) {
+      return {
+        configured: true,
+        source: 'integrations_key',
+        guidance: 'Webhook secrets are protected with the dedicated integrations key.',
+      } as const;
+    }
+    return {
+      configured: false,
+      source: 'missing',
+      guidance: 'Inject INTEGRATIONS_ENCRYPTION_KEY on the server before creating or rotating webhook secrets.',
+    } as const;
+  }
+
+  private normalizeAutomationDeliveryMode(configJson: any): 'metadata_only' | 'live_send' {
+    return configJson?.automations?.v1?.deliveryMode === 'live_send' ? 'live_send' : 'metadata_only';
+  }
+
   async listWorkspaceModules(tenantId: string) {
     const settings = await this.prisma.tenantSetting.findUnique({
       where: { tenantId },
@@ -255,31 +285,46 @@ export class IntegrationPlatformService {
       },
     });
     const accountingEnabled = Boolean(settings?.featureAccounting ?? settings?.accountingEnabled);
-    const bookingsEnabled = Boolean(settings?.featureBookings ?? settings?.bookingsEnabled);
     return [
       {
         key: 'xero',
         name: 'Xero',
         description: 'Sync invoices and payouts to your accounting ledger.',
-        configureUrl: '/dashboard/settings?tab=business',
+        configureUrl: '/dashboard/settings?tab=general',
         enabled: accountingEnabled,
         allowed: true,
+        ownership: 'workspace',
       },
       {
         key: 'qbo',
         name: 'QuickBooks Online',
         description: 'Send invoices and payments straight into QBO.',
-        configureUrl: '/dashboard/settings?tab=business',
+        configureUrl: '/dashboard/settings?tab=general',
         enabled: accountingEnabled,
         allowed: true,
+        ownership: 'workspace',
       },
+    ];
+  }
+
+  async listPersonalModules(tenantId: string, userId: string) {
+    const settings = await this.prisma.tenantSetting.findUnique({
+      where: { tenantId },
+      select: {
+        featureBookings: true,
+        bookingsEnabled: true,
+      },
+    });
+    return [
       {
         key: 'google',
         name: 'Google Calendar',
-        description: 'Mirror bookings to your team calendars.',
-        configureUrl: '/dashboard/settings?tab=bookings',
-        enabled: bookingsEnabled,
+        description: 'Mirror your assigned bookings into your own calendar.',
+        configureUrl: '/dashboard/integrations',
+        enabled: resolveBookingsEnabled(settings),
         allowed: true,
+        ownership: 'personal',
+        currentUserId: userId,
       },
     ];
   }
@@ -288,7 +333,7 @@ export class IntegrationPlatformService {
     const moduleKey = String(key || '').trim().toLowerCase();
     const patch =
       moduleKey === 'google'
-        ? { featureBookings: enabled, bookingsEnabled: enabled }
+        ? { featureBookings: true, bookingsEnabled: true }
         : moduleKey === 'xero' || moduleKey === 'qbo'
           ? { featureAccounting: enabled, accountingEnabled: enabled }
           : null;
@@ -303,8 +348,13 @@ export class IntegrationPlatformService {
       },
       update: patch,
     });
-    await this.audit.log(tenantId, 'integrations.module.update', `Integration module ${moduleKey} ${enabled ? 'enabled' : 'disabled'}`, null);
-    return { ok: true };
+    await this.audit.log(
+      tenantId,
+      'integrations.module.update',
+      moduleKey === 'google' ? 'Google Calendar readiness reviewed' : `Integration module ${moduleKey} ${enabled ? 'enabled' : 'disabled'}`,
+      null,
+    );
+    return { ok: true, enabled: moduleKey === 'google' ? true : enabled };
   }
 
   async listApiTokens(tenantId: string) {
@@ -508,6 +558,119 @@ export class IntegrationPlatformService {
     return rows.map((row: any) => this.serializeWebhookDelivery(row));
   }
 
+  async getAdminHealth(tenantId: string) {
+    const [tenantSetting, automationsSetting, endpoints, recentDeliveries] = await Promise.all([
+      this.prisma.tenantSetting.findUnique({
+        where: { tenantId },
+        select: {
+          bookingsEnabled: true,
+          featureBookings: true,
+          accountingEnabled: true,
+          featureAccounting: true,
+        },
+      }),
+      (this.prisma as any).automationsSetting.findUnique({
+        where: { tenantId },
+        select: { configJson: true },
+      }),
+      (this.prisma as any).webhookEndpoint.findMany({
+        where: { tenantId },
+        select: {
+          id: true,
+          active: true,
+          lastSuccessAt: true,
+        },
+      }),
+      (this.prisma as any).webhookDelivery.findMany({
+        where: { tenantId },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+        select: {
+          status: true,
+        },
+      }),
+    ]);
+
+    const encryption = this.getEncryptionStatus();
+    const smtp = await this.email.getReadiness(tenantId);
+    const deliveryMode = this.normalizeAutomationDeliveryMode(automationsSetting?.configJson || null);
+    const failedRecentDeliveries = recentDeliveries.filter((row: any) => row.status === 'FAILED').length;
+    const lastSuccessAt =
+      endpoints
+        .map((row: any) => row.lastSuccessAt)
+        .filter(Boolean)
+        .sort((left: Date, right: Date) => right.getTime() - left.getTime())[0] ?? null;
+
+    const webhookState = !endpoints.length
+      ? 'disabled'
+      : failedRecentDeliveries > 0 || encryption.source !== 'integrations_key'
+        ? 'needs_attention'
+        : 'connected';
+    const automationState =
+      deliveryMode === 'metadata_only'
+        ? 'disabled'
+        : smtp.canSend
+          ? 'connected'
+          : 'needs_attention';
+
+    return {
+      webhookPlatform: {
+        state: webhookState,
+        endpointCount: endpoints.length,
+        activeEndpointCount: endpoints.filter((row: any) => row.active).length,
+        failedRecentDeliveries,
+        lastSuccessAt,
+        encryptionConfigured: encryption.configured,
+        encryptionSource: encryption.source,
+        guidance:
+          webhookState === 'connected'
+            ? 'Webhook delivery is ready for active endpoints in this workspace.'
+            : !endpoints.length
+              ? 'Create an endpoint when an external system is ready to receive events.'
+              : encryption.guidance,
+      },
+      automationDelivery: {
+        state: automationState,
+        deliveryMode,
+        smtpConfigured: smtp.canSend,
+        smtpSource: smtp.source,
+        guidance:
+          deliveryMode === 'metadata_only'
+            ? 'Automations are recording activity only. Enable live send when delivery channels are ready.'
+            : smtp.guidance,
+      },
+      moduleFlags: {
+        bookingsEnabled: resolveBookingsEnabled(tenantSetting),
+        accountingEnabled: Boolean(tenantSetting?.featureAccounting ?? tenantSetting?.accountingEnabled),
+      },
+    };
+  }
+
+  private async queueWebhookDeliveryAttempt(tenantId: string, endpoint: any, attempt: DeliveryAttemptInput) {
+    const payload =
+      attempt.payloadJson &&
+      typeof attempt.payloadJson === 'object' &&
+      !Array.isArray(attempt.payloadJson)
+        ? (attempt.payloadJson as PlatformEventPayload)
+        : null;
+    if (!payload || !INTEGRATION_PLATFORM_EVENT_TYPES.includes(attempt.eventType)) {
+      throw new BadRequestException('Webhook delivery payload could not be retried safely');
+    }
+    const delivery = await (this.prisma as any).webhookDelivery.create({
+      data: {
+        tenantId,
+        endpointId: endpoint.id,
+        eventType: attempt.eventType,
+        eventId: attempt.eventId || payload.id,
+        requestUrl: endpoint.url || attempt.requestUrl,
+        payloadJson: payload as any,
+        status: 'PENDING',
+      },
+    });
+    void this.deliverWebhook(delivery.id, endpoint, payload);
+    return this.serializeWebhookDelivery(delivery);
+  }
+
   private async deliverWebhook(deliveryId: string, endpoint: any, event: PlatformEventPayload) {
     const payload = JSON.stringify(event);
     const startedAt = Date.now();
@@ -648,5 +811,28 @@ export class IntegrationPlatformService {
         triggeredByUserId: userId,
       },
     });
+  }
+
+  async retryWebhookDelivery(tenantId: string, userId: string, deliveryId: string) {
+    const delivery = await (this.prisma as any).webhookDelivery.findFirst({
+      where: { id: deliveryId, tenantId },
+      include: {
+        endpoint: true,
+      },
+    });
+    if (!delivery?.endpoint) {
+      throw new NotFoundException('Webhook delivery not found');
+    }
+    const queued = await this.queueWebhookDeliveryAttempt(tenantId, delivery.endpoint, {
+      eventType: delivery.eventType,
+      eventId: delivery.eventId ?? null,
+      requestUrl: delivery.requestUrl,
+      payloadJson:
+        delivery.payloadJson && typeof delivery.payloadJson === 'object' && !Array.isArray(delivery.payloadJson)
+          ? delivery.payloadJson
+          : null,
+    });
+    await this.audit.log(tenantId, 'integrations.webhook.retry', `Retried webhook delivery for ${delivery.endpoint.name}`, userId);
+    return { ok: true, delivery: queued };
   }
 }

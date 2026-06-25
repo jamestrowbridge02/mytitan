@@ -2,12 +2,11 @@ import * as crypto from 'crypto';
 import { ServiceUnavailableException } from '@nestjs/common';
 
 const deriveKey = () => {
-  const secret =
-    process.env.INTEGRATIONS_ENCRYPTION_KEY?.trim() ||
-    process.env.JWT_SECRET?.trim() ||
-    'dev_insecure_integrations_key';
+  const secret = process.env.INTEGRATIONS_ENCRYPTION_KEY?.trim();
   if (!secret) {
-    throw new ServiceUnavailableException('INTEGRATIONS_ENCRYPTION_KEY is not configured');
+    throw new ServiceUnavailableException(
+      'Webhook secret storage is unavailable until INTEGRATIONS_ENCRYPTION_KEY is injected on the server.',
+    );
   }
   return crypto.createHash('sha256').update(secret).digest();
 };

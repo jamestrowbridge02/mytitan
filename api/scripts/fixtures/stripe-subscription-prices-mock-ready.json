@@ -1,0 +1,44 @@
+{
+  "price_sole_monthly": {
+    "id": "price_sole_monthly",
+    "active": true,
+    "currency": "gbp",
+    "unit_amount": 1900,
+    "recurring": { "interval": "month" }
+  },
+  "price_sole_annual": {
+    "id": "price_sole_annual",
+    "active": true,
+    "currency": "gbp",
+    "unit_amount": 19000,
+    "recurring": { "interval": "year" }
+  },
+  "price_business_monthly": {
+    "id": "price_business_monthly",
+    "active": true,
+    "currency": "gbp",
+    "unit_amount": 5900,
+    "recurring": { "interval": "month" }
+  },
+  "price_business_annual": {
+    "id": "price_business_annual",
+    "active": true,
+    "currency": "gbp",
+    "unit_amount": 59000,
+    "recurring": { "interval": "year" }
+  },
+  "price_enterprise_monthly": {
+    "id": "price_enterprise_monthly",
+    "active": true,
+    "currency": "gbp",
+    "unit_amount": 15900,
+    "recurring": { "interval": "month" }
+  },
+  "price_enterprise_annual": {
+    "id": "price_enterprise_annual",
+    "active": true,
+    "currency": "gbp",
+    "unit_amount": 159000,
+    "recurring": { "interval": "year" }
+  }
+}

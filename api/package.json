@@ -13,18 +13,27 @@
     "prisma:generate": "prisma generate",
     "migration:init": "prisma migrate dev --name init",
     "seed:e2e": "MYTITAN_ENABLE_E2E_FIXTURES=1 node scripts/seed-e2e.js",
+    "seed:wheel-ar-pilot": "node scripts/seed-wheel-ar-pilot.js",
     "seed:tenant-settings": "node scripts/seed-tenant-settings.js",
-    "audit:top1": "node scripts/top1-audit.mjs"
+    "audit:top1": "node scripts/top1-audit.mjs",
+    "billing:verify-subscription-prices": "node scripts/verify-subscription-prices.js",
+    "billing:sync-job-products": "node scripts/sync-job-completion-products.js",
+    "billing:verify-job-products": "node scripts/sync-job-completion-products.js --dry-run",
+    "billing:prepare-job-products": "node scripts/prepare-job-completion-products.js",
+    "notifications:verify-routing": "node scripts/test-notification-routing.js",
+    "test:notification-routing": "node scripts/test-notification-routing.js",
+    "summary:dispatch": "ts-node --transpile-only scripts/dispatch-summary-emails.ts",
+    "ops:alert": "ts-node --transpile-only scripts/send-operational-alert.ts"
   },
   "dependencies": {
-    "@nestjs/common": "^10.3.10",
-    "@nestjs/config": "^3.2.3",
-    "@nestjs/core": "^10.3.10",
-    "@nestjs/jwt": "^10.2.0",
-    "@nestjs/passport": "^10.0.3",
-    "@nestjs/platform-express": "^10.3.10",
-    "@nestjs/swagger": "^7.4.2",
-    "@nestjs/throttler": "^5.2.0",
+    "@nestjs/common": "11.1.24",
+    "@nestjs/config": "4.0.4",
+    "@nestjs/core": "11.1.24",
+    "@nestjs/jwt": "11.0.2",
+    "@nestjs/passport": "11.0.5",
+    "@nestjs/platform-express": "11.1.24",
+    "@nestjs/swagger": "11.4.4",
+    "@nestjs/throttler": "6.5.0",
     "@prisma/client": "^5.22.0",
     "bcryptjs": "^2.4.3",
     "class-transformer": "^0.5.1",
@@ -39,14 +48,17 @@
     "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
-    "@nestjs/cli": "^10.4.2",
-    "@nestjs/schematics": "^10.1.1",
-    "@nestjs/testing": "^10.3.10",
+    "@nestjs/cli": "11.0.21",
+    "@nestjs/schematics": "11.1.0",
+    "@nestjs/testing": "11.1.24",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20.14.12",
     "@types/passport-jwt": "^4.0.1",
     "prisma": "^5.22.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.6.3"
+  },
+  "overrides": {
+    "qs": "6.15.2"
   }
 }

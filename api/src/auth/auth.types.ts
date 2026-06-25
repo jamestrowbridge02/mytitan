@@ -5,6 +5,7 @@ export interface JwtPayload {
   companyId: string;
   role: Role;
   email: string;
+  platformAdmin?: boolean;
   tokenVersion?: number;
   emailVerified?: boolean;
   demoUser?: boolean;

@@ -1,18 +1,38 @@
 import { Injectable } from '@nestjs/common';
-import { ComplianceService } from '../compliance/compliance.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScheduleService } from '../schedule/schedule.service';
 
 @Injectable()
 export class MetricsService {
+  private readonly intelligenceCache = new Map<string, { expiresAt: number; value: any }>();
+  private readonly intelligenceInFlight = new Map<string, Promise<any>>();
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly schedule: ScheduleService,
-    private readonly compliance: ComplianceService,
   ) {}
 
   private getMonthStart(date: Date) {
     return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
+  }
+
+  private pct(numerator: number, denominator: number) {
+    if (!denominator) return null;
+    return Math.round((numerator / denominator) * 1000) / 10;
+  }
+
+  private delta(current: number, previous: number) {
+    return current - previous;
+  }
+
+  private ageingBucket(invoiceDueAt: Date | string | null | undefined, now: Date) {
+    if (!invoiceDueAt) return 'not_due';
+    const due = new Date(invoiceDueAt);
+    if (Number.isNaN(due.getTime()) || due >= now) return 'not_due';
+    const days = Math.floor((now.getTime() - due.getTime()) / (24 * 60 * 60 * 1000));
+    if (days <= 7) return '1_7';
+    if (days <= 30) return '8_30';
+    return '31_plus';
   }
 
   async getOverview(tenantId: string) {
@@ -66,7 +86,24 @@ export class MetricsService {
   }
 
   async getIntelligence(tenantId: string) {
-    await this.compliance.syncTenantState(tenantId);
+    const cached = this.intelligenceCache.get(tenantId);
+    if (cached && cached.expiresAt > Date.now()) return cached.value;
+
+    const running = this.intelligenceInFlight.get(tenantId);
+    if (running) return running;
+
+    const request = this.buildIntelligence(tenantId);
+    this.intelligenceInFlight.set(tenantId, request);
+    try {
+      const value = await request;
+      this.intelligenceCache.set(tenantId, { expiresAt: Date.now() + 15_000, value });
+      return value;
+    } finally {
+      this.intelligenceInFlight.delete(tenantId);
+    }
+  }
+
+  private async buildIntelligence(tenantId: string) {
     const db = this.prisma as any;
     const now = new Date();
     const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -397,6 +434,105 @@ export class MetricsService {
     const shortageRows = inventoryStockRows.filter((row: any) => Number(row.quantityOnHand || 0) - Number(row.quantityReserved || 0) <= 0).length;
     const jobPartsAwaitingStock = jobPartsPending.filter((row: any) => Number(row.quantityPlanned || 0) > Number(row.quantityReserved || 0) + Number(row.quantityUsed || 0)).length;
 
+    const operationalIssues = [
+      unassignedOpenJobs > 0
+        ? {
+            key: 'unassigned_jobs_building_up',
+            severity: 'warning',
+            count: unassignedOpenJobs,
+            issue: 'Unassigned jobs are building up',
+            happened: `${unassignedOpenJobs} active job${unassignedOpenJobs === 1 ? '' : 's'} currently have no technician assigned.`,
+            impact: 'Dispatch can still proceed, but these jobs are more likely to sit without clear ownership.',
+            suggestedAction: 'Review the unassigned queue and assign when the right technician is known.',
+            href: '/dashboard/jobs?view=unassigned',
+          }
+        : null,
+      overloadedTechnicianDays > 0
+        ? {
+            key: 'technician_overbooked',
+            severity: 'warning',
+            count: overloadedTechnicianDays,
+            issue: 'Technician capacity is overbooked',
+            happened: `${overloadedTechnicianDays} technician day${overloadedTechnicianDays === 1 ? '' : 's'} exceed configured capacity.`,
+            impact: 'Overloaded days can create late arrivals and rushed close-out records.',
+            suggestedAction: 'Open scheduling and move work only after checking capacity warnings.',
+            href: '/dashboard/scheduling',
+          }
+        : null,
+      overdueInvoices > 0
+        ? {
+            key: 'overdue_invoices_increasing',
+            severity: 'warning',
+            count: overdueInvoices,
+            issue: 'Overdue invoices need collection action',
+            happened: `${overdueInvoices} issued invoice${overdueInvoices === 1 ? '' : 's'} are past due and unpaid.`,
+            impact: 'Cash collection pressure is rising from real unpaid invoices.',
+            suggestedAction: 'Open billing readiness and follow up on overdue invoices.',
+            href: '/dashboard/billing/readiness',
+          }
+        : null,
+      agedUnlinkedBookings > 0
+        ? {
+            key: 'booking_conversion_dropping',
+            severity: 'info',
+            count: agedUnlinkedBookings,
+            issue: 'Bookings are waiting too long to become jobs',
+            happened: `${agedUnlinkedBookings} booking${agedUnlinkedBookings === 1 ? '' : 's'} older than 48 hours are still not linked to jobs.`,
+            impact: 'Customer intent is captured, but operational work has not been fully created.',
+            suggestedAction: 'Open bookings and convert or close out the stale records.',
+            href: '/dashboard/bookings',
+          }
+        : null,
+      lowStockRows > 0 || shortageRows > 0
+        ? {
+            key: 'stock_pressure',
+            severity: shortageRows > 0 ? 'warning' : 'info',
+            count: lowStockRows + shortageRows,
+            issue: 'Stock pressure exists',
+            happened: `${lowStockRows} rows are at reorder point and ${shortageRows} rows have no available stock after reservations.`,
+            impact: 'Jobs may be delayed if parts are not reserved, transferred, or purchased.',
+            suggestedAction: 'Open inventory and review low-stock and shortage rows.',
+            href: '/dashboard/inventory',
+          }
+        : null,
+      submittedExecutionAwaitingAcknowledgement > 0
+        ? {
+            key: 'incomplete_job_records',
+            severity: 'info',
+            count: submittedExecutionAwaitingAcknowledgement,
+            issue: 'Completed job records need acknowledgement',
+            happened: `${submittedExecutionAwaitingAcknowledgement} submitted completion record${submittedExecutionAwaitingAcknowledgement === 1 ? '' : 's'} are not acknowledged.`,
+            impact: 'The permanent record exists, but customer/office sign-off is incomplete.',
+            suggestedAction: 'Open Live Work and acknowledge or follow up on submitted records.',
+            href: '/dashboard/technician',
+          }
+        : null,
+      communicationsLast7Days === 0
+        ? {
+            key: 'no_reviews_or_customer_updates_generated',
+            severity: 'info',
+            count: 0,
+            issue: 'No recent customer communication was generated',
+            happened: 'No outbound email or SMS activity was recorded in the last 7 days.',
+            impact: 'Customers may not be receiving status updates, review prompts, or follow-up messages.',
+            suggestedAction: 'Open notifications and confirm communication rules and recipients.',
+            href: '/dashboard/notifications',
+          }
+        : null,
+      openComplianceExceptions > 0 || breachedSlaEvents > 0
+        ? {
+            key: 'workflow_control_pressure',
+            severity: 'warning',
+            count: openComplianceExceptions + breachedSlaEvents,
+            issue: 'Workflow controls need review',
+            happened: `${openComplianceExceptions} compliance exception${openComplianceExceptions === 1 ? '' : 's'} and ${breachedSlaEvents} breached SLA event${breachedSlaEvents === 1 ? '' : 's'} are open.`,
+            impact: 'Operational controls are signalling real evidence, approval, or timing gaps.',
+            suggestedAction: 'Open compliance and resolve the exact records.',
+            href: '/dashboard/compliance',
+          }
+        : null,
+    ].filter(Boolean);
+
     return {
       jobsByStatus: jobsByStatus.map((row: any) => ({
         status: row.status,
@@ -553,6 +689,249 @@ export class MetricsService {
           return { day: key, count };
         }),
       },
+      operationalIssues,
+    };
+  }
+
+  async getBusinessHealth(tenantId: string) {
+    const db = this.prisma as any;
+    const now = new Date();
+    const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const previous7Days = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+    const last30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const previous30Days = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+
+    const [
+      bookingsCurrent,
+      bookingsPrevious,
+      completedCurrent,
+      completedPrevious,
+      invoiceRows,
+      jobsCurrent,
+      jobsPrevious,
+      paidInvoiceRows,
+      repeatCustomers,
+      reviewNotifications,
+      businessInventoryRows,
+      shortageRows,
+      locations,
+      locationJobGroups,
+      locationBookingGroups,
+      locationInvoiceRows,
+      users,
+      technicianAssignedGroups,
+      technicianExecutionGroups,
+    ] = await Promise.all([
+      db.booking.count({ where: { companyId: tenantId, createdAt: { gte: last30Days } } }),
+      db.booking.count({ where: { companyId: tenantId, createdAt: { gte: previous30Days, lt: last30Days } } }),
+      db.job.count({ where: { companyId: tenantId, completedAt: { gte: last7Days } } }),
+      db.job.count({ where: { companyId: tenantId, completedAt: { gte: previous7Days, lt: last7Days } } }),
+      db.job.findMany({
+        where: { companyId: tenantId, invoiceIssuedAt: { not: null }, invoicePaidAt: null },
+        select: { id: true, invoiceDueAt: true, totalCents: true, locationId: true },
+        take: 1000,
+      }),
+      db.job.findMany({
+        where: { companyId: tenantId, createdAt: { gte: last30Days } },
+        select: { id: true, customerId: true, customerEmail: true, status: true, completedAt: true, locationId: true, totalCents: true },
+        take: 1000,
+      }),
+      db.job.findMany({
+        where: { companyId: tenantId, createdAt: { gte: previous30Days, lt: last30Days } },
+        select: { id: true, customerId: true, customerEmail: true, status: true, completedAt: true, locationId: true, totalCents: true },
+        take: 1000,
+      }),
+      db.job.findMany({
+        where: { companyId: tenantId, invoicePaidAt: { gte: last30Days } },
+        select: { id: true, totalCents: true, locationId: true, invoicePaidAt: true },
+        take: 1000,
+      }),
+      db.job.groupBy({
+        by: ['customerId'],
+        where: { companyId: tenantId, customerId: { not: null } },
+        _count: { customerId: true },
+      }).catch(() => []),
+      db.notification.count({
+        where: {
+          companyId: tenantId,
+          createdAt: { gte: last30Days },
+          OR: [{ type: { contains: 'review', mode: 'insensitive' } }, { title: { contains: 'review', mode: 'insensitive' } }],
+        },
+      }).catch(() => 0),
+      db.inventoryStock.findMany({ where: { tenantId }, select: { quantityOnHand: true, quantityReserved: true, reorderPoint: true } }).catch(() => []),
+      db.inventoryStock.findMany({ where: { tenantId }, select: { quantityOnHand: true, quantityReserved: true } }).then((rows: any[]) =>
+        rows.filter((row) => Number(row.quantityOnHand || 0) - Number(row.quantityReserved || 0) <= 0).length,
+      ).catch(() => 0),
+      db.location.findMany({ where: { companyId: tenantId }, select: { id: true, name: true, kind: true, isActive: true }, orderBy: { name: 'asc' }, take: 100 }),
+      db.job.groupBy({
+        by: ['locationId'],
+        where: { companyId: tenantId, createdAt: { gte: last30Days } },
+        _count: { locationId: true },
+        _sum: { totalCents: true },
+      }).catch(() => []),
+      db.booking.groupBy({
+        by: ['locationId'],
+        where: { companyId: tenantId, createdAt: { gte: last30Days } },
+        _count: { locationId: true },
+      }).catch(() => []),
+      db.job.findMany({
+        where: { companyId: tenantId, invoiceIssuedAt: { not: null }, invoicePaidAt: null },
+        select: { locationId: true, invoiceDueAt: true, totalCents: true },
+        take: 1000,
+      }),
+      db.user.findMany({ where: { companyId: tenantId }, select: { id: true, email: true, role: true, isActive: true }, take: 200 }),
+      db.job.groupBy({
+        by: ['assignedUserId'],
+        where: { companyId: tenantId, assignedUserId: { not: null }, status: { in: ['OPEN', 'SCHEDULED', 'IN_PROGRESS'] } },
+        _count: { assignedUserId: true },
+      }).catch(() => []),
+      db.jobExecutionRecord.groupBy({
+        by: ['technicianId'],
+        where: { tenantId, technicianId: { not: null }, completedAt: { gte: last30Days } },
+        _count: { technicianId: true },
+      }).catch(() => []),
+    ]);
+
+    const businessLowStockRows = businessInventoryRows.filter((row: any) => Number(row.quantityOnHand || 0) <= Number(row.reorderPoint || 0)).length;
+    const invoiceBuckets = new Map<string, { key: string; label: string; count: number; amountCents: number }>([
+      ['not_due', { key: 'not_due', label: 'Not due yet', count: 0, amountCents: 0 }],
+      ['1_7', { key: '1_7', label: '1-7 days overdue', count: 0, amountCents: 0 }],
+      ['8_30', { key: '8_30', label: '8-30 days overdue', count: 0, amountCents: 0 }],
+      ['31_plus', { key: '31_plus', label: '31+ days overdue', count: 0, amountCents: 0 }],
+    ]);
+    for (const row of invoiceRows) {
+      const bucket = invoiceBuckets.get(this.ageingBucket(row.invoiceDueAt, now))!;
+      bucket.count += 1;
+      bucket.amountCents += Number(row.totalCents || 0);
+    }
+    const unpaidValueCents = invoiceRows.reduce((sum: number, row: any) => sum + Number(row.totalCents || 0), 0);
+    const overdueInvoices = invoiceRows.filter((row: any) => this.ageingBucket(row.invoiceDueAt, now) !== 'not_due').length;
+    const completedJobs = jobsCurrent.filter((job: any) => job.completedAt).length;
+    const completedPrevious30 = jobsPrevious.filter((job: any) => job.completedAt).length;
+    const revenueCurrentCents = jobsCurrent.reduce((sum: number, job: any) => sum + Number(job.totalCents || 0), 0);
+    const revenuePreviousCents = jobsPrevious.reduce((sum: number, job: any) => sum + Number(job.totalCents || 0), 0);
+    const paidValueCents = paidInvoiceRows.reduce((sum: number, job: any) => sum + Number(job.totalCents || 0), 0);
+    const repeatCustomerCount = repeatCustomers.filter((row: any) => Number(row._count?.customerId || 0) > 1).length;
+    const activeCustomerCount = new Set(jobsCurrent.map((job: any) => job.customerId || job.customerEmail).filter(Boolean)).size;
+    const convertedJobCount = jobsCurrent.filter((job: any) => Boolean(job.completedAt) || String(job.status || '').toUpperCase() !== 'CANCELLED').length;
+    const jobGroupsByLocation = new Map<string, any>((locationJobGroups || []).map((row: any) => [row.locationId || '__none__', row]));
+    const bookingGroupsByLocation = new Map<string, any>((locationBookingGroups || []).map((row: any) => [row.locationId || '__none__', row]));
+    const invoicesByLocation = new Map<string, { count: number; amountCents: number; overdueCount: number }>();
+    for (const row of locationInvoiceRows) {
+      const key = row.locationId || '__none__';
+      const current = invoicesByLocation.get(key) || { count: 0, amountCents: 0, overdueCount: 0 };
+      current.count += 1;
+      current.amountCents += Number(row.totalCents || 0);
+      if (this.ageingBucket(row.invoiceDueAt, now) !== 'not_due') current.overdueCount += 1;
+      invoicesByLocation.set(key, current);
+    }
+    const techMap = new Map(users.map((user: any) => [user.id, user]));
+    const executionByTech = new Map((technicianExecutionGroups || []).map((row: any) => [row.technicianId, row._count?.technicianId || 0]));
+
+    const issues = [
+      overdueInvoices > 0
+        ? { key: 'revenue_collection_pressure', issue: 'Revenue collection pressure', impact: `${overdueInvoices} invoice${overdueInvoices === 1 ? '' : 's'} are overdue.`, action: 'Open billing readiness', href: '/dashboard/billing/readiness' }
+        : null,
+      shortageRows > 0
+        ? { key: 'stock_shortage_pressure', issue: 'Stock shortage pressure', impact: `${shortageRows} stock row${shortageRows === 1 ? '' : 's'} have no available quantity after reservations.`, action: 'Open inventory', href: '/dashboard/inventory' }
+        : null,
+      bookingsCurrent < bookingsPrevious
+        ? { key: 'bookings_trend_down', issue: 'Bookings trend is down', impact: `Current 30-day bookings are ${bookingsCurrent}, previous period was ${bookingsPrevious}.`, action: 'Open bookings', href: '/dashboard/bookings' }
+        : null,
+    ].filter(Boolean);
+
+    return {
+      platformDiagnosticsVisible: false,
+      source: 'tenant_business_records',
+      generatedAt: now.toISOString(),
+      summary: {
+        bookingsTrend: { current: bookingsCurrent, previous: bookingsPrevious, delta: this.delta(bookingsCurrent, bookingsPrevious) },
+        invoiceAgeing: Array.from(invoiceBuckets.values()),
+        unpaidValueCents,
+        jobCompletionVelocity: { current: completedCurrent, previous: completedPrevious, delta: this.delta(completedCurrent, completedPrevious) },
+        locationUtilisation: locations.length ? this.pct(jobsCurrent.filter((job: any) => job.locationId).length, jobsCurrent.length) : null,
+        technicianUtilisation: this.pct(technicianAssignedGroups.reduce((sum: number, row: any) => sum + Number(row._count?.assignedUserId || 0), 0), Math.max(users.filter((user: any) => user.isActive).length, 1)),
+        customerRepeatRatePct: this.pct(repeatCustomerCount, activeCustomerCount),
+        reviewGenerationStatus: { generated: reviewNotifications, eligibleCompletedJobs: completedJobs },
+        stockPressure: { lowStockRows: businessLowStockRows, shortageRows },
+        revenueCollectionPressure: { overdueInvoices, unpaidInvoices: invoiceRows.length, unpaidValueCents },
+        revenueTrend: { currentCents: revenueCurrentCents, previousCents: revenuePreviousCents, delta: this.delta(revenueCurrentCents, revenuePreviousCents) },
+        marginTrend: { available: false, reason: 'cost_data_not_configured', currentMarginCents: null, previousMarginCents: null, delta: null },
+        utilisation: {
+          locationPct: locations.length ? this.pct(jobsCurrent.filter((job: any) => job.locationId).length, jobsCurrent.length) : null,
+          technicianActiveAssignments: technicianAssignedGroups.reduce((sum: number, row: any) => sum + Number(row._count?.assignedUserId || 0), 0),
+        },
+        technicianProductivity: {
+          completedExecutionRecords: technicianExecutionGroups.reduce((sum: number, row: any) => sum + Number(row._count?.technicianId || 0), 0),
+          basis: 'completedBy/completedAt execution records',
+        },
+        locationProductivity: {
+          completedCurrent30Days: completedJobs,
+          completedPrevious30Days: completedPrevious30,
+          delta: this.delta(completedJobs, completedPrevious30),
+        },
+        bookingConversion: { bookings: bookingsCurrent, convertedJobs: convertedJobCount, conversionPct: this.pct(convertedJobCount, bookingsCurrent) },
+        reviewPerformance: { generated: reviewNotifications, eligibleCompletedJobs: completedJobs, coveragePct: this.pct(reviewNotifications, completedJobs) },
+        customerRetention: { repeatCustomers: repeatCustomerCount, activeCustomers: activeCustomerCount, repeatRatePct: this.pct(repeatCustomerCount, activeCustomerCount) },
+        collectionPerformance: {
+          paidInvoiceCount: paidInvoiceRows.length,
+          paidValueCents,
+          unpaidInvoiceCount: invoiceRows.length,
+          unpaidValueCents,
+          collectionPct: this.pct(paidInvoiceRows.length, paidInvoiceRows.length + invoiceRows.length),
+        },
+        sourceLinks: {
+          revenueTrend: '/dashboard/finance',
+          marginTrend: '/dashboard/reports',
+          invoiceAgeing: '/dashboard/billing/readiness',
+          utilisation: '/dashboard/calendar',
+          technicianProductivity: '/dashboard/technician',
+          locationProductivity: '/dashboard/calendar',
+          bookingConversion: '/dashboard/bookings',
+          reviewPerformance: '/dashboard/portal',
+          customerRetention: '/dashboard/customers',
+          collectionPerformance: '/dashboard/finance',
+        },
+      },
+      locations: locations.map((location: any) => {
+        const jobGroup = jobGroupsByLocation.get(location.id) || { _count: { locationId: 0 }, _sum: { totalCents: 0 } };
+        const bookingGroup = bookingGroupsByLocation.get(location.id) || { _count: { locationId: 0 } };
+        const invoice = invoicesByLocation.get(location.id) || { count: 0, amountCents: 0, overdueCount: 0 };
+        return {
+          locationId: location.id,
+          locationName: location.name,
+          kind: location.kind,
+          active: Boolean(location.isActive),
+          workload: Number(jobGroup._count?.locationId || 0),
+          capacity: {
+            scheduledWorkload: Number(jobGroup._count?.locationId || 0),
+            activeStaffContext: users.filter((user: any) => Boolean(user.isActive)).length,
+            basis: 'scheduled jobs and active workspace users',
+          },
+          bookings: Number(bookingGroup._count?.locationId || 0),
+          revenueCents: Number(jobGroup._sum?.totalCents || 0),
+          invoiceAgeing: invoice,
+          completionVelocity: jobsCurrent.filter((job: any) => job.locationId === location.id && job.completedAt).length,
+          completionRatePct: this.pct(jobsCurrent.filter((job: any) => job.locationId === location.id && job.completedAt).length, Number(jobGroup._count?.locationId || 0)),
+          utilisationPct: this.pct(Number(jobGroup._count?.locationId || 0), Math.max(Number(jobGroup._count?.locationId || 0) + Number(bookingGroup._count?.locationId || 0), 1)),
+          stockPressure: { lowStockRows: 0, shortageRows: 0 },
+          staffingPressure: 'absence_context_available_in_scheduling',
+        };
+      }),
+      technicians: users
+        .filter((user: any) => ['OWNER', 'ADMIN', 'STAFF', 'TECHNICIAN', 'DISPATCHER'].includes(String(user.role)))
+        .map((user: any) => {
+          const assigned = technicianAssignedGroups.find((row: any) => row.assignedUserId === user.id);
+          return {
+            technicianId: user.id,
+            technicianName: user.email,
+            active: Boolean(user.isActive),
+            activeAssignments: Number(assigned?._count?.assignedUserId || 0),
+            completedExecutionRecords: Number(executionByTech.get(user.id) || 0),
+            utilizationBasis: 'active_assignment_count_and_completed_execution_records',
+          };
+        }),
+      issues,
     };
   }
 }

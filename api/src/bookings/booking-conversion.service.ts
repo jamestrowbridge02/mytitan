@@ -1,7 +1,11 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
+import * as crypto from 'crypto';
 import { AuditService } from '../audit/audit.service';
 import { AutomationsService } from '../automations/automations.service';
+import { buildAppUrl } from '../common/public-url';
 import { isAutomationsV1Enabled, isNotificationsV1Enabled } from '../common/feature-flags';
+import { EmailService } from '../email/email.service';
+import { buildBookingConfirmedEmailTemplate } from '../email/email-templates';
 import { ActivityService } from '../events/activity.service';
 import { JobsService } from '../jobs/jobs.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -17,6 +21,7 @@ export class BookingConversionService {
     private readonly activity: ActivityService,
     private readonly audit: AuditService,
     private readonly notifications: NotificationsService,
+    private readonly email: EmailService,
   ) {}
 
   private toIso(value?: Date | string | null) {
@@ -34,6 +39,11 @@ export class BookingConversionService {
           job: true,
           service: { select: { id: true, name: true } },
           proService: { select: { id: true, name: true } },
+          serviceLines: { orderBy: { sortOrder: 'asc' } },
+          answers: {
+            include: { question: { select: { questionKey: true, label: true, type: true, required: true, optionsJson: true } } },
+            orderBy: { createdAt: 'asc' },
+          },
         },
       });
 
@@ -73,23 +83,101 @@ export class BookingConversionService {
         };
       }
 
+      const bookingServiceLines = Array.isArray(booking.serviceLines) ? booking.serviceLines : [];
+      const bookingServiceSummary = bookingServiceLines.map((line: any) => ({
+        proServiceId: line.proServiceId || null,
+        serviceName: line.serviceNameSnapshot,
+        quantity: Number(line.quantity || 1),
+        durationMinutes: Number(line.durationSnapshot || 0),
+        lineTotalCents: Number(line.lineTotalCents || 0),
+        priceSnapshot: line.priceSnapshot || null,
+      }));
+      const expectedDurationMinutes = bookingServiceSummary.length
+        ? bookingServiceSummary.reduce((sum, line) => sum + Math.max(0, Number(line.durationMinutes || 0)) * Math.max(1, Number(line.quantity || 1)), 0)
+        : booking.startsAt && booking.endsAt
+          ? Math.max(0, Math.round((new Date(booking.endsAt).getTime() - new Date(booking.startsAt).getTime()) / 60000))
+          : null;
+      const publicStatusToken = String(booking.publicStatusToken || '').trim();
+      const customerBookingDetails =
+        booking.pricingSnapshotJson?.customerBookingDetails && typeof booking.pricingSnapshotJson.customerBookingDetails === 'object'
+          ? booking.pricingSnapshotJson.customerBookingDetails
+          : {};
+      const bookingCustomerFields = (Array.isArray(booking.answers) ? booking.answers : []).map((answer: any) => {
+        const stored = answer.valueJson && typeof answer.valueJson === 'object' && !Array.isArray(answer.valueJson)
+          ? answer.valueJson
+          : {};
+        const snapshot = stored.snapshot && typeof stored.snapshot === 'object' && !Array.isArray(stored.snapshot)
+          ? stored.snapshot
+          : {};
+        return {
+          key: snapshot.key || answer.question?.questionKey || answer.questionId,
+          label: snapshot.label || answer.question?.label || 'Booking field',
+          type: snapshot.type || answer.question?.type || 'text',
+          required: snapshot.required ?? answer.question?.required === true,
+          visibility: snapshot.visibility || answer.question?.optionsJson?.visibility || 'PUBLIC',
+          value: stored.value ?? answer.valueText ?? null,
+          capturedAt: snapshot.capturedAt || this.toIso(answer.createdAt),
+        };
+      });
       const { created } = await this.jobs.createCoreJobRecord(tx, companyId, userId, {
         locationId: booking.locationId || undefined,
         customerName: String(booking.customerName || '').trim() || 'Booking customer',
         customerEmail: String(booking.customerEmail || '').trim() || undefined,
         customerPhone: String(booking.customerPhone || '').trim() || undefined,
-        serviceName: booking.proService?.name || booking.service?.name || undefined,
+        vehicleReg: String(customerBookingDetails.vehicleRegistration || '').trim() || undefined,
+        serviceName: bookingServiceSummary[0]?.serviceName || booking.proService?.name || booking.service?.name || undefined,
         scheduledAt: this.toIso(booking.startsAt) || undefined,
         formData: {
+          autoPopulatedFromBooking: true,
+          autoPopulationVersion: 'phase_4c_booking_to_job_v1',
           sourceBookingId: booking.id,
           bookingSource: booking.source,
           bookingStatus: booking.status,
           scheduledAt: this.toIso(booking.startsAt),
+          appointmentWindow: {
+            startsAt: this.toIso(booking.startsAt),
+            endsAt: this.toIso(booking.endsAt),
+          },
+          expectedDurationMinutes,
           customerName: booking.customerName || null,
           customerEmail: booking.customerEmail || null,
           customerPhone: booking.customerPhone || null,
+          registration: customerBookingDetails.vehicleRegistration || null,
+          vehicleReg: customerBookingDetails.vehicleRegistration || null,
+          lockingWheelNutAvailable: customerBookingDetails.lockingWheelNutAvailable === true,
+          bookingServiceCategory: customerBookingDetails.serviceCategory || null,
+          bookingCustomerFields,
+          bookingPricingSnapshot: booking.pricingSnapshotJson || null,
+          bookingPaymentState: booking.paymentStateJson || null,
+          bookingServiceLines: bookingServiceSummary,
+          estimatePaymentDepositContext: {
+            pricingSnapshot: booking.pricingSnapshotJson || null,
+            paymentState: booking.paymentStateJson || null,
+          },
+          customerPortalStatus: {
+            publicStatusToken: publicStatusToken ? `${publicStatusToken.slice(0, 8)}...` : null,
+            statusUrl: publicStatusToken ? buildAppUrl(`/portal/booking/status/${publicStatusToken}`) : null,
+          },
+          bookingAttachments: [],
         },
       } as any);
+
+      if (bookingServiceLines.length > 0) {
+        await tx.jobLineItem.createMany({
+          data: bookingServiceLines.map((line: any) => {
+            const quantity = Math.max(1, Number(line.quantity || 1));
+            const lineTotal = Math.max(0, Number(line.lineTotalCents || 0)) / 100;
+            return {
+              companyId,
+              jobId: created.id,
+              description: String(line.serviceNameSnapshot || 'Booked service'),
+              qty: quantity,
+              unitPrice: quantity > 0 ? lineTotal / quantity : lineTotal,
+              total: lineTotal,
+            };
+          }),
+        });
+      }
 
       await tx.jobActivity.create({
         data: {
@@ -100,6 +188,23 @@ export class BookingConversionService {
           message: `Job ${created.jobRef || created.id} created from booking conversion`,
           payloadJson: {
             sourceBookingId: booking.id,
+          },
+        },
+      });
+
+      await tx.jobActivity.create({
+        data: {
+          companyId,
+          jobId: created.id,
+          actorUserId: userId,
+          eventType: 'booking.job_sheet.autopopulated',
+          message: 'Job sheet auto-populated from booking data',
+          payloadJson: {
+            sourceBookingId: booking.id,
+            serviceLineCount: bookingServiceSummary.length,
+            expectedDurationMinutes,
+            locationId: booking.locationId || null,
+            technicianAssigned: Boolean(booking.assignedUserId),
           },
         },
       });
@@ -290,7 +395,18 @@ export class BookingConversionService {
       };
     });
 
+    let publicStatusToken = String((result.booking as any)?.publicStatusToken || '').trim();
     if (!result.alreadyLinked) {
+      publicStatusToken = publicStatusToken
+        || String(
+          (
+            await (this.prisma as any).booking.update({
+              where: { id: result.booking.id },
+              data: { publicStatusToken: crypto.randomBytes(24).toString('base64url') },
+              select: { publicStatusToken: true },
+            })
+          )?.publicStatusToken || '',
+        ).trim();
       await this.activity.push({
         tenantId: companyId,
         type: 'booking.converted',
@@ -335,8 +451,62 @@ export class BookingConversionService {
       }
 
       await this.audit.log(companyId, 'booking.convert', `Converted booking ${result.booking.id} into ${result.job?.jobRef || result.job?.id}`, userId);
+      await this.audit.log(companyId, 'booking.job_sheet.autopopulate', `Auto-populated job sheet from booking ${result.booking.id}`, userId);
+
+      await this.notifications.sendEntityUpdate(companyId, userId, {
+        entityType: 'booking',
+        entityId: result.booking.id,
+        templateKey: 'booking.converted_to_job',
+        channel: 'in_app',
+        note: `Linked to ${result.job?.jobRef || result.job?.id}`,
+        context: {
+          jobId: result.job?.id || null,
+          jobRef: result.job?.jobRef || null,
+          startsAt: result.booking?.startsAt ? new Date(result.booking.startsAt).toISOString() : null,
+        },
+      });
     } else if (result.conversion.duplicatePrevented) {
       await this.audit.log(companyId, 'booking.convert.duplicate', `Prevented duplicate conversion for booking ${result.booking.id}`, userId);
+    }
+
+    if (!result.alreadyLinked && result.booking?.source === 'PUBLIC' && result.booking?.customerEmail) {
+      const branding = await this.email.getBranding(companyId, { ownership: 'workspace' });
+      const pricingSnapshot = result.booking?.pricingSnapshotJson && typeof result.booking.pricingSnapshotJson === 'object'
+        ? result.booking.pricingSnapshotJson
+        : {};
+      const template = buildBookingConfirmedEmailTemplate(branding, {
+        serviceName: String((pricingSnapshot as any)?.serviceName || result.job?.serviceName || 'Service'),
+        startsAtLabel: this.toIso(result.booking?.startsAt)
+          ? new Date(String(result.booking.startsAt)).toLocaleString('en-GB', {
+              weekday: 'short',
+              day: '2-digit',
+              month: 'short',
+              hour: '2-digit',
+              minute: '2-digit',
+              timeZone: 'UTC',
+            })
+          : 'Scheduled soon',
+        depositLabel:
+          Number((pricingSnapshot as any)?.depositDueCents || 0) > 0
+            ? `Deposit due: £${(Number((pricingSnapshot as any)?.depositDueCents || 0) / 100).toFixed(2)}`
+            : 'No deposit due before the visit',
+        balanceLabel:
+          Number((pricingSnapshot as any)?.remainingBalanceCents || 0) > 0
+            ? `Remaining balance: £${(Number((pricingSnapshot as any)?.remainingBalanceCents || 0) / 100).toFixed(2)}`
+            : 'No remaining balance recorded',
+        statusUrl: publicStatusToken ? buildAppUrl(`/portal/booking/status/${publicStatusToken}`) : undefined,
+      });
+      await this.email.sendOperationalEmail(
+        companyId,
+        {
+          to: result.booking.customerEmail,
+          subject: template.subject,
+          text: template.text,
+          html: template.html,
+          fromName: branding.senderName,
+          replyToEmail: branding.replyToEmail,
+        },
+      );
     }
 
     return result;

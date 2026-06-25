@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, ForbiddenException, Get, HttpException, HttpStatus, Param, Patch, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, ForbiddenException, Get, HttpCode, HttpException, HttpStatus, Param, Patch, Post, Put, Query, Req, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
 import { JwtAuthGuard } from '../auth/auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -7,8 +7,10 @@ import { assertPermission } from '../common/permissions';
 import { Roles } from '../common/roles.decorator';
 import { RolesGuard } from '../common/roles.guard';
 import { isAuthSecurityV1Enabled, isMarketplaceEnabled, requireMarketplaceEnabled } from '../common/feature-flags';
+import { buildAppUrl } from '../common/public-url';
 import { PrismaService } from '../prisma/prisma.service';
 import { ApiTokenAuthGuard } from './api-token-auth.guard';
+import { IntegrationOrchestrationService } from './integration-orchestration.service';
 import { IntegrationPlatformService } from './integration-platform.service';
 import { IntegrationsService } from './integrations.service';
 
@@ -18,6 +20,7 @@ export class IntegrationsController {
   constructor(
     private readonly integrations: IntegrationsService,
     private readonly platform: IntegrationPlatformService,
+    private readonly orchestration: IntegrationOrchestrationService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -55,10 +58,17 @@ export class IntegrationsController {
     return this.integrations.disconnect(user.companyId, 'XERO');
   }
 
+  @Post('xero/check')
+  @Roles('OWNER', 'ADMIN')
+  checkXero(@CurrentUser() user: JwtPayload) {
+    requireMarketplaceEnabled();
+    return this.integrations.checkConnectionHealth(user.companyId, 'XERO', user.sub);
+  }
+
   @Post('xero/sync')
   @Roles('OWNER', 'ADMIN')
-  syncXero() {
-    throw new HttpException('Xero sync not implemented yet.', HttpStatus.NOT_IMPLEMENTED);
+  syncXero(@CurrentUser() user: JwtPayload) {
+    return this.integrations.queueAccountingSyncCheck(user.companyId, user.sub, 'XERO');
   }
 
   @Get('qbo/status')
@@ -85,10 +95,17 @@ export class IntegrationsController {
     return this.integrations.disconnect(user.companyId, 'QBO');
   }
 
+  @Post('qbo/check')
+  @Roles('OWNER', 'ADMIN')
+  checkQbo(@CurrentUser() user: JwtPayload) {
+    requireMarketplaceEnabled();
+    return this.integrations.checkConnectionHealth(user.companyId, 'QBO', user.sub);
+  }
+
   @Post('qbo/sync')
   @Roles('OWNER', 'ADMIN')
-  syncQbo() {
-    throw new HttpException('QuickBooks sync not implemented yet.', HttpStatus.NOT_IMPLEMENTED);
+  syncQbo(@CurrentUser() user: JwtPayload) {
+    return this.integrations.queueAccountingSyncCheck(user.companyId, user.sub, 'QUICKBOOKS');
   }
 
   @Get('google/status')
@@ -97,7 +114,7 @@ export class IntegrationsController {
     if (!isMarketplaceEnabled()) {
       return { provider: 'GOOGLE_CALENDAR', connected: false, allowed: false, enabled: false };
     }
-    return this.integrations.getStatus(user.companyId, 'GOOGLE_CALENDAR');
+    return this.integrations.getStatus(user.companyId, 'GOOGLE_CALENDAR', user.sub);
   }
 
   @Get('ops')
@@ -109,19 +126,44 @@ export class IntegrationsController {
     return this.integrations.getOpsOverview(user.companyId);
   }
 
+  @Get('rollout-monitoring')
+  @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
+  rolloutMonitoring(@CurrentUser() user: JwtPayload) {
+    if (!isMarketplaceEnabled()) {
+      return {
+        windowDays: 7,
+        counts: {
+          personalIntegrationSaveFailures: 0,
+          workspaceIntegrationSaveFailures: 0,
+          encryptionReadinessFailures: 0,
+          crossScopeAccessAttempts: 0,
+          providerSetupErrors: 0,
+        },
+        latestAt: null,
+      };
+    }
+    return this.integrations.getRolloutMonitoring(user.companyId);
+  }
+
+  @Get('health')
+  @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
+  async health(@CurrentUser() user: JwtPayload) {
+    return this.platform.getAdminHealth(user.companyId);
+  }
+
   @Post('google/connect')
-  @Roles('OWNER', 'ADMIN')
+  @Roles('OWNER', 'ADMIN', 'STAFF')
   async connectGoogle(@CurrentUser() user: JwtPayload) {
     requireMarketplaceEnabled();
     await this.assertEmailVerified(user);
-    return this.integrations.createAuthUrl(user.companyId, 'GOOGLE_CALENDAR');
+    return this.integrations.createAuthUrl(user.companyId, 'GOOGLE_CALENDAR', user.sub);
   }
 
   @Post('google/disconnect')
-  @Roles('OWNER', 'ADMIN')
+  @Roles('OWNER', 'ADMIN', 'STAFF')
   disconnectGoogle(@CurrentUser() user: JwtPayload) {
     requireMarketplaceEnabled();
-    return this.integrations.disconnect(user.companyId, 'GOOGLE_CALENDAR');
+    return this.integrations.disconnect(user.companyId, 'GOOGLE_CALENDAR', user.sub);
   }
 
   @Post('google/sync')
@@ -134,6 +176,112 @@ export class IntegrationsController {
   @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
   async listWorkspaceModules(@CurrentUser() user: JwtPayload) {
     return this.platform.listWorkspaceModules(user.companyId);
+  }
+
+  @Get('personal')
+  @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
+  async listPersonalModules(@CurrentUser() user: JwtPayload) {
+    return this.platform.listPersonalModules(user.companyId, user.sub);
+  }
+
+  @Get('byog')
+  @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
+  async listByog(@CurrentUser() user: JwtPayload) {
+    return this.integrations.listByogConnections(user.companyId, user.sub, user.role);
+  }
+
+  @Get('orchestration-map')
+  @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
+  async orchestrationMap(@CurrentUser() user: JwtPayload) {
+    await assertPermission({ user, permission: 'dashboard.view_intelligence', action: 'integrations.orchestration_map.view' });
+    return this.orchestration.getOrchestrationMap(user.companyId, user.sub, user.role);
+  }
+
+  @Post('orchestration/:provider/verify')
+  @Roles('OWNER', 'ADMIN', 'STAFF')
+  async verifyOrchestrationConnection(
+    @CurrentUser() user: JwtPayload,
+    @Param('provider') provider: string,
+    @Query('scope') scope?: string,
+  ) {
+    await assertPermission({ user, permission: 'settings.manage', action: 'integrations.orchestration.verify' });
+    return this.orchestration.verifyConnection(user.companyId, user.sub, provider, scope);
+  }
+
+  @Post('orchestration/:provider/test-webhook')
+  @Roles('OWNER', 'ADMIN', 'STAFF')
+  async testOrchestrationWebhook(
+    @CurrentUser() user: JwtPayload,
+    @Param('provider') provider: string,
+    @Query('scope') scope?: string,
+  ) {
+    await assertPermission({ user, permission: 'settings.manage', action: 'integrations.orchestration.test_webhook' });
+    return this.orchestration.testWebhookSafely(user.companyId, user.sub, provider, scope);
+  }
+
+  @Get('orchestration/:provider/failed-events')
+  @Roles('OWNER', 'ADMIN', 'STAFF')
+  async reviewOrchestrationFailedEvents(
+    @CurrentUser() user: JwtPayload,
+    @Param('provider') provider: string,
+    @Query('scope') scope?: string,
+  ) {
+    await assertPermission({ user, permission: 'settings.manage', action: 'integrations.orchestration.failed_events' });
+    return this.orchestration.listFailedEvents(user.companyId, user.sub, provider, scope);
+  }
+
+  @Get('orchestration/:provider/last-successful-update')
+  @Roles('OWNER', 'ADMIN', 'STAFF')
+  async orchestrationLastSuccessfulUpdate(
+    @CurrentUser() user: JwtPayload,
+    @Param('provider') provider: string,
+    @Query('scope') scope?: string,
+  ) {
+    await assertPermission({ user, permission: 'settings.manage', action: 'integrations.orchestration.last_successful_update' });
+    return this.orchestration.getLastSuccessfulUpdate(user.companyId, user.sub, provider, scope);
+  }
+
+  @Get('byog/:provider')
+  @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
+  async getByog(
+    @CurrentUser() user: JwtPayload,
+    @Param('provider') provider: string,
+    @Query('scope') scope?: string,
+  ) {
+    return this.integrations.getByogConnection(user.companyId, user.sub, user.role, provider, scope);
+  }
+
+  @Put('byog/:provider')
+  @Roles('OWNER', 'ADMIN', 'STAFF')
+  async saveByog(
+    @CurrentUser() user: JwtPayload,
+    @Param('provider') provider: string,
+    @Body() body: Record<string, any>,
+  ) {
+    await assertPermission({ user, permission: 'settings.manage', action: 'integrations.byog.save' });
+    return this.integrations.upsertByogConnection(user.companyId, user.sub, user.role, provider, body || {});
+  }
+
+  @Post('byog/:provider/check')
+  @Roles('OWNER', 'ADMIN', 'STAFF')
+  async checkByog(
+    @CurrentUser() user: JwtPayload,
+    @Param('provider') provider: string,
+    @Query('scope') scope?: string,
+  ) {
+    await assertPermission({ user, permission: 'settings.manage', action: 'integrations.byog.check' });
+    return this.integrations.checkByogConnection(user.companyId, user.sub, user.role, provider, scope);
+  }
+
+  @Delete('byog/:provider')
+  @Roles('OWNER', 'ADMIN', 'STAFF')
+  async disconnectByog(
+    @CurrentUser() user: JwtPayload,
+    @Param('provider') provider: string,
+    @Query('scope') scope?: string,
+  ) {
+    await assertPermission({ user, permission: 'settings.manage', action: 'integrations.byog.disconnect' });
+    return this.integrations.disconnectByogConnection(user.companyId, user.sub, user.role, provider, scope);
   }
 
   @Patch()
@@ -230,6 +378,13 @@ export class IntegrationsController {
       limit: Number(limit || 25),
     });
   }
+
+  @Post('webhook-deliveries/:id/retry')
+  @Roles('OWNER', 'ADMIN', 'STAFF')
+  async retryWebhookDelivery(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    await assertPermission({ user, permission: 'settings.manage', action: 'integrations.webhook_deliveries.retry' });
+    return this.platform.retryWebhookDelivery(user.companyId, user.sub, id);
+  }
 }
 
 @Controller('integrations')
@@ -240,24 +395,21 @@ export class IntegrationsCallbackController {
   async xeroCallback(@Query('code') code: string, @Query('state') state: string, @Res() res: Response) {
     requireMarketplaceEnabled();
     await this.integrations.handleCallback('XERO', code, state);
-    const appUrl = process.env.APP_PUBLIC_URL || 'https://app.mytitan.co.uk';
-    res.redirect(`${appUrl}/dashboard/integrations?connected=xero`);
+    res.redirect(buildAppUrl('/dashboard/integrations?connected=xero'));
   }
 
   @Get('qbo/callback')
   async qboCallback(@Query('code') code: string, @Query('state') state: string, @Query('realmId') realmId: string, @Res() res: Response) {
     requireMarketplaceEnabled();
     await this.integrations.handleCallback('QBO', code, state, realmId);
-    const appUrl = process.env.APP_PUBLIC_URL || 'https://app.mytitan.co.uk';
-    res.redirect(`${appUrl}/dashboard/integrations?connected=qbo`);
+    res.redirect(buildAppUrl('/dashboard/integrations?connected=qbo'));
   }
 
   @Get('google/callback')
   async googleCallback(@Query('code') code: string, @Query('state') state: string, @Res() res: Response) {
     requireMarketplaceEnabled();
     await this.integrations.handleCallback('GOOGLE_CALENDAR', code, state);
-    const appUrl = process.env.APP_PUBLIC_URL || 'https://app.mytitan.co.uk';
-    res.redirect(`${appUrl}/dashboard/integrations?connected=google`);
+    res.redirect(buildAppUrl('/dashboard/integrations?connected=google'));
   }
 }
 
@@ -269,5 +421,23 @@ export class IntegrationsPlatformController {
   @Get('activity/recent')
   async recentActivity(@Req() req: any, @Query('limit') limit?: string) {
     return this.platform.listRecentPlatformActivity(req.apiToken.tenantId, Number(limit || 20));
+  }
+}
+
+@Controller('integrations')
+export class IntegrationsInboundWebhookController {
+  constructor(private readonly integrations: IntegrationsService) {}
+
+  @Post('webhooks/:provider/:routeId')
+  @HttpCode(202)
+  async receiveWebhook(
+    @Param('provider') provider: string,
+    @Param('routeId') routeId: string,
+    @Req() req: any,
+  ) {
+    const payload = Buffer.isBuffer(req.body)
+      ? req.body
+      : req.rawBody ?? Buffer.from(JSON.stringify(req.body || {}), 'utf8');
+    return this.integrations.handleInboundWebhook(provider, routeId, payload, req.headers || {});
   }
 }

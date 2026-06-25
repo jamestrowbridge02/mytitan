@@ -1,9 +1,12 @@
 import { Module } from '@nestjs/common';
 import { AuditModule } from '../audit/audit.module';
 import { AutomationsModule } from '../automations/automations.module';
+import { BillingModule } from '../billing/billing.module';
 import { ComplianceModule } from '../compliance/compliance.module';
+import { EmailModule } from '../email/email.module';
 import { FeatureGuard } from '../common/feature.guard';
 import { EventsModule } from '../events/events.module';
+import { EnterpriseModule } from '../enterprise/enterprise.module';
 import { JobsModule } from '../jobs/jobs.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { TenantModule } from '../tenant/tenant.module';
@@ -13,7 +16,7 @@ import { BookingsController } from './bookings.controller';
 import { BookingsService } from './bookings.service';
 
 @Module({
-  imports: [AuditModule, TenantModule, NotificationsModule, AutomationsModule, EventsModule, JobsModule, ComplianceModule],
+  imports: [AuditModule, TenantModule, NotificationsModule, AutomationsModule, EventsModule, JobsModule, ComplianceModule, EmailModule, BillingModule, EnterpriseModule],
   controllers: [BookingsController, BookingProController],
   providers: [BookingsService, BookingConversionService, FeatureGuard],
   exports: [BookingsService],

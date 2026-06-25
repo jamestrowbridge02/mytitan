@@ -56,7 +56,7 @@ export class UsersController {
   }
 
   @Patch(':id/role')
-  @Roles('OWNER')
+  @Roles('OWNER', 'ADMIN')
   async updateRole(
     @CurrentUser() user: JwtPayload,
     @Param('id') id: string,
@@ -71,7 +71,7 @@ export class UsersController {
       requestId,
       action: 'users.updateRole',
     });
-    return this.users.updateRole(user.companyId, user.sub, id, dto);
+    return this.users.updateRole(user.companyId, user.sub, user.role, id, dto);
   }
 }
 

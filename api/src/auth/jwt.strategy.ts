@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PrismaService } from '../prisma/prisma.service';
+import { isPlatformAdminUser } from '../common/platform-admin';
 import { JwtPayload } from './auth.types';
 
 @Injectable()
@@ -31,6 +32,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       ...payload,
       email: user.email,
       role: user.role,
+      platformAdmin: isPlatformAdminUser({ email: user.email }),
       emailVerified: Boolean(user.emailVerified),
       tokenVersion: Number(user.tokenVersion ?? 0),
       demoUser: payload.demoUser || user.email === '@mytitan.co.uk',

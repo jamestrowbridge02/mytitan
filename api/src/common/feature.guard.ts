@@ -7,6 +7,13 @@ import { isBillingEnforced } from './billing-mode';
 import { isBillingAllowlisted } from './billing-allowlist';
 import { FEATURE_KEY } from './feature.decorator';
 
+const FEATURE_DISABLED_MESSAGES: Record<string, string> = {
+  accounting_enabled: 'Accounting is not turned on for this workspace yet.',
+  payments_enabled: 'Payments are not turned on for this workspace yet.',
+  social_enabled: 'Social tools are not turned on for this workspace yet.',
+  ai_enabled: 'AI help is not turned on for this workspace yet.',
+};
+
 @Injectable()
 export class FeatureGuard implements CanActivate {
   constructor(
@@ -31,16 +38,15 @@ export class FeatureGuard implements CanActivate {
     const settings = await this.tenantService.ensureTenantSettings(tenantId);
 
     const flagMap: Record<string, boolean | undefined> = {
-      bookings_enabled: settings.bookingsEnabled,
-      accounting_enabled: settings.accountingEnabled,
-      payments_enabled: settings.paymentsEnabled,
-      social_enabled: settings.socialEnabled,
-      ai_enabled: settings.aiEnabled,
+      accounting_enabled: settings.featureAccounting ?? settings.accountingEnabled,
+      payments_enabled: settings.featurePayments ?? settings.paymentsEnabled,
+      social_enabled: settings.featureSocial ?? settings.socialEnabled,
+      ai_enabled: settings.featureAI ?? settings.aiEnabled,
     };
 
     const featureFlag = flagMap[feature];
     if (featureFlag === false) {
-      throw new ForbiddenException(`Feature '${feature}' is disabled for this tenant`);
+      throw new ForbiddenException(FEATURE_DISABLED_MESSAGES[feature] || 'This area is not turned on for this workspace yet.');
     }
 
     const db = this.prisma as any;

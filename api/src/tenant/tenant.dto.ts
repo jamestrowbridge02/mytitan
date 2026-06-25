@@ -16,10 +16,64 @@ import { WHEEL_PRICING_MODES } from '../common/constants';
 
 export class UpdateTenantSettingsDto {
   // Primary trade (feature-flagged)
+  @IsOptional()
+  @IsString()
   primaryTrade?: string;
   @IsOptional()
   @IsString()
   companyName?: string;
+
+  @IsOptional()
+  @IsString()
+  registeredBusinessName?: string;
+
+  @IsOptional()
+  @IsString()
+  tradingName?: string;
+
+  @IsOptional()
+  @IsString()
+  companyNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  taxRegistrationNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  businessAddressLine1?: string;
+
+  @IsOptional()
+  @IsString()
+  businessAddressLine2?: string;
+
+  @IsOptional()
+  @IsString()
+  businessCity?: string;
+
+  @IsOptional()
+  @IsString()
+  businessPostcode?: string;
+
+  @IsOptional()
+  @IsString()
+  businessCountry?: string;
+
+  @IsOptional()
+  @IsString()
+  contactPhone?: string;
+
+  @IsOptional()
+  @IsEmail()
+  contactEmail?: string;
+
+  @IsOptional()
+  @IsUrl({ require_tld: false })
+  websiteUrl?: string;
+
+  @IsOptional()
+  @IsObject()
+  businessDisplayJson?: Record<string, any>;
 
   @IsOptional()
   @IsUrl({ require_tld: false })
@@ -42,8 +96,8 @@ export class UpdateTenantSettingsDto {
   brandDefaultMode?: 'light' | 'dark';
 
   @IsOptional()
-  @IsIn(['light', 'dark'])
-  themeMode?: 'light' | 'dark';
+  @IsIn(['light', 'dark', 'system'])
+  themeMode?: 'light' | 'dark' | 'system';
 
   @IsOptional()
   @IsString()
@@ -57,24 +111,6 @@ export class UpdateTenantSettingsDto {
   @IsArray()
   @IsEmail({}, { each: true })
   emailNotificationRecipients?: string[];
-
-  @IsOptional()
-  @IsString()
-  smtpHost?: string;
-
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  @Max(65535)
-  smtpPort?: number;
-
-  @IsOptional()
-  @IsString()
-  smtpUsername?: string;
-
-  @IsOptional()
-  @IsString()
-  smtpPasswordEncrypted?: string;
 
   @IsOptional()
   @IsString()
@@ -113,6 +149,30 @@ export class UpdateTenantSettingsDto {
   @IsOptional()
   @IsString()
   defaultTimezone?: string;
+
+  @IsOptional()
+  @IsString()
+  tenantCountry?: string;
+
+  @IsOptional()
+  @IsString()
+  invoiceCurrency?: string;
+
+  @IsOptional()
+  @IsString()
+  publicBookingLocale?: string;
+
+  @IsOptional()
+  @IsString()
+  phoneCountryCode?: string;
+
+  @IsOptional()
+  @IsString()
+  taxLabel?: string;
+
+  @IsOptional()
+  @IsString()
+  invoiceLegalFooter?: string;
 
   @IsOptional()
   @IsArray()
@@ -191,6 +251,10 @@ export class UpdateTenantSettingsDto {
   @IsOptional()
   @IsBoolean()
   bookingPublicEnabled?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  autoConfirmPublicBookings?: boolean;
 
   @IsOptional()
   @IsInt()

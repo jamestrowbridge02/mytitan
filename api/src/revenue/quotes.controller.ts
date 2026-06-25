@@ -5,7 +5,7 @@ import { JwtPayload } from "../auth/auth.types";
 import { assertPermission } from "../common/permissions";
 import { Roles } from "../common/roles.decorator";
 import { RolesGuard } from "../common/roles.guard";
-import { PatchQuoteDto, UpsertQuoteDto } from "./dto";
+import { JobEstimateDto, PatchQuoteDto, QuoteInventoryLineItemDto, UpsertQuoteDto } from "./dto";
 import { RevenueService } from "./revenue.service";
 
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -34,6 +34,27 @@ export class QuotesController {
     return this.revenue.createQuote(user.companyId, user.sub, dto);
   }
 
+  @Get("job/:jobId/estimates")
+  @Roles("OWNER", "ADMIN", "FINANCE", "STAFF")
+  async listJobEstimates(@CurrentUser() user: JwtPayload, @Param("jobId") jobId: string) {
+    await assertPermission({ user, permission: "billing.manage", action: "quotes.job_estimates.list" });
+    return this.revenue.listJobEstimates(user.companyId, user.sub, jobId);
+  }
+
+  @Post("job/:jobId/estimates")
+  @Roles("OWNER", "ADMIN", "FINANCE", "STAFF")
+  async createJobEstimate(@CurrentUser() user: JwtPayload, @Param("jobId") jobId: string, @Body() dto: JobEstimateDto) {
+    await assertPermission({ user, permission: "billing.manage", action: "quotes.job_estimates.create" });
+    return this.revenue.createJobEstimate(user.companyId, user.sub, jobId, dto);
+  }
+
+  @Post("job/:jobId/estimates/:quoteId/convert")
+  @Roles("OWNER", "ADMIN", "FINANCE", "STAFF")
+  async convertJobEstimate(@CurrentUser() user: JwtPayload, @Param("jobId") jobId: string, @Param("quoteId") quoteId: string) {
+    await assertPermission({ user, permission: "billing.manage", action: "quotes.job_estimates.convert" });
+    return this.revenue.convertJobEstimate(user.companyId, user.sub, jobId, quoteId);
+  }
+
   @Get(":id")
   @Roles("OWNER", "ADMIN", "FINANCE", "STAFF")
   async detail(@CurrentUser() user: JwtPayload, @Param("id") id: string) {
@@ -47,6 +68,13 @@ export class QuotesController {
     await assertPermission({ user, permission: "billing.manage", action: "quotes.line_items" });
     const quote = await this.revenue.getQuote(user.companyId, id);
     return quote.lineItems || [];
+  }
+
+  @Post(":id/line-items/from-inventory")
+  @Roles("OWNER", "ADMIN", "FINANCE", "STAFF")
+  async addInventoryLineItem(@CurrentUser() user: JwtPayload, @Param("id") id: string, @Body() dto: QuoteInventoryLineItemDto) {
+    await assertPermission({ user, permission: "billing.manage", action: "quotes.inventory_line.add" });
+    return this.revenue.addInventoryLineItem(user.companyId, user.sub, id, dto);
   }
 
   @Patch(":id")

@@ -66,6 +66,14 @@ export class AnalyticsController {
     return this.analytics.getCapacityAnalytics(user.companyId, this.getWindowDays(windowDays, 7), locationId);
   }
 
+  @Get('productivity')
+  @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
+  async getProductivity(@CurrentUser() user: JwtPayload, @Query('windowDays') windowDays?: string, @Query('locationId') locationId?: string) {
+    requireAnalyticsV1Enabled();
+    await assertPermission({ user, permission: 'dashboard.view_intelligence', action: 'analytics.productivity' });
+    return this.analytics.getProductivity(user.companyId, this.getWindowDays(windowDays), locationId);
+  }
+
   @Get('benchmarks')
   @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
   async getBenchmarks(@CurrentUser() user: JwtPayload, @Query('windowDays') windowDays?: string, @Query('locationId') locationId?: string) {

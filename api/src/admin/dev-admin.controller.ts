@@ -3,6 +3,7 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/auth.guard';
 import type { JwtPayload } from '../auth/auth.types';
 import { isBillingAllowlisted } from '../common/billing-allowlist';
+import { buildAppUrl } from '../common/public-url';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 
@@ -206,11 +207,10 @@ export class DevAdminController {
     });
 
     // Audit log link: keep as a link string, don’t dump logs here
-    const appUrl = (process.env.APP_PUBLIC_URL || 'https://app.mytitan.co.uk').replace(/\/+$/, '');
     const links = {
-      audit: `${appUrl}/dashboard/admin/audit?tenantId=${encodeURIComponent(tenantId)}`,
-      billing: `${appUrl}/dashboard/billing`,
-      settings: `${appUrl}/dashboard/settings`,
+      audit: buildAppUrl(`/dashboard/admin/audit?tenantId=${encodeURIComponent(tenantId)}`),
+      billing: buildAppUrl('/dashboard/billing'),
+      settings: buildAppUrl('/dashboard/settings'),
     };
 
     return { ok: true, company, settings, subscription, owner, links };

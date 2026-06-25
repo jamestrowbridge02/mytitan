@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtPayload } from '../auth/auth.types';
@@ -8,6 +9,7 @@ import { Roles } from '../common/roles.decorator';
 import { RolesGuard } from '../common/roles.guard';
 import { PatchLocationMembershipDto, UpsertLocationDto, UpsertLocationMembershipDto } from './dto';
 import { LocationsService } from './locations.service';
+import { bookingMediaUploadOptions, validateBookingMediaFile } from '../common/tenant-booking-media';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('locations')
@@ -66,11 +68,27 @@ export class LocationsController {
     return this.locationsService.update(user.companyId, user.sub, id, dto);
   }
 
+  @Post(':id/image')
+  @Roles('OWNER', 'ADMIN')
+  @UseInterceptors(FileInterceptor('file', bookingMediaUploadOptions('location')))
+  async uploadImage(@CurrentUser() user: JwtPayload, @Param('id') id: string, @UploadedFile() file: any) {
+    featureGate({ enabled: isLocationsV1Enabled(), feature: 'LOCATIONS_V1', mode: 'mutation' });
+    await validateBookingMediaFile(file);
+    return this.locationsService.savePublicImage(user.companyId, user.sub, id, file.filename);
+  }
+
   @Post(':id/archive')
   @Roles('OWNER', 'ADMIN')
   archive(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     featureGate({ enabled: isLocationsV1Enabled(), feature: 'LOCATIONS_V1', mode: 'mutation' });
     return this.locationsService.archive(user.companyId, user.sub, id);
+  }
+
+  @Post(':id/hours/apply-all')
+  @Roles('OWNER', 'ADMIN')
+  applyHoursToAll(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    featureGate({ enabled: isLocationsAdvancedV1Enabled(), feature: 'LOCATIONS_ADVANCED_V1', mode: 'mutation' });
+    return this.locationsService.applyHoursToAll(user.companyId, user.sub, id);
   }
 
   @Post('staff-restriction')

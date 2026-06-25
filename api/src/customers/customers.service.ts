@@ -1,9 +1,13 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
+import { AuditService } from "../audit/audit.service";
 
 @Injectable()
 export class CustomersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+  ) {}
 
   async list(companyId: string, params?: { search?: string; limit?: number; locationId?: string }) {
     const take = Math.max(1, Math.min(Number(params?.limit || 50), 200));
@@ -41,6 +45,7 @@ export class CustomersService {
       name: row.name,
       email: row.email,
       phone: row.phone,
+      paymentTermsDays: (row as any).paymentTermsDays ?? null,
       homeLocationId: (row as any).homeLocationId || null,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
@@ -74,10 +79,33 @@ export class CustomersService {
       name: row.name,
       email: row.email,
       phone: row.phone,
+      paymentTermsDays: (row as any).paymentTermsDays ?? null,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
       jobCount: row._count.jobs,
       activityCount: row._count.activityEvents,
     };
+  }
+
+  async updatePaymentTerms(companyId: string, userId: string, idOrSlug: string, value?: number | null) {
+    const key = String(idOrSlug || "").trim();
+    const customer = await this.prisma.customer.findFirst({
+      where: { companyId, OR: [{ id: key }, { slug: key }] },
+      select: { id: true, name: true },
+    });
+    if (!customer) throw new NotFoundException("Customer not found");
+    const paymentTermsDays = value == null || String(value).trim() === ""
+      ? null
+      : Math.max(0, Math.min(365, Number(value)));
+    if (paymentTermsDays != null && !Number.isFinite(paymentTermsDays)) {
+      throw new BadRequestException("Choose valid payment terms");
+    }
+    const updated = await this.prisma.customer.update({
+      where: { id: customer.id },
+      data: { paymentTermsDays },
+      select: { id: true, paymentTermsDays: true, updatedAt: true },
+    });
+    await this.audit.log(companyId, "customer.payment_terms.update", `Payment terms updated for ${customer.name}`, userId);
+    return updated;
   }
 }

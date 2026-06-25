@@ -4,6 +4,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { isNotificationsV1Enabled, isSchedulingIntelligenceV1Enabled } from '../common/feature-flags';
 import { acquireTechnicianLock } from '../common/advisory-lock';
 import { withCompanyId } from '../common/tenant-scope';
+import { AuditService } from '../audit/audit.service';
 
 type ListCalendarBookingsInput = {
   from?: string;
@@ -40,6 +41,11 @@ type SuggestionResult = {
 type WeeklyScheduleSlot = {
   start?: string | null;
   end?: string | null;
+  role?: string | null;
+  venue?: string | null;
+  breakMinutes?: number | null;
+  notes?: string | null;
+  absence?: boolean;
 };
 
 type WeeklyScheduleJson = Record<string, WeeklyScheduleSlot[]>;
@@ -135,6 +141,7 @@ export class CalendarService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly audit: AuditService,
   ) {}
   private readonly logger = new Logger(CalendarService.name);
 
@@ -155,7 +162,7 @@ export class CalendarService {
         where: withCompanyId(tenantId, {
           role: { in: ['OWNER', 'ADMIN', 'STAFF', 'TECHNICIAN'] },
         }),
-        select: { id: true, email: true },
+        select: { id: true, email: true, color: true },
         orderBy: { email: 'asc' },
       }),
       db.booking.findMany({
@@ -166,8 +173,9 @@ export class CalendarService {
           endsAt: { gt: from },
         }),
         include: {
-          assignedUser: { select: { id: true, email: true } },
-          location: { select: { id: true, name: true } },
+          assignedUser: { select: { id: true, email: true, color: true } },
+          location: { select: { id: true, name: true, color: true } },
+          proService: { select: { id: true, name: true, color: true } },
           job: {
             select: {
               id: true,
@@ -199,14 +207,24 @@ export class CalendarService {
             id: booking.assignedUser.id,
             name: booking.assignedUser.email,
             email: booking.assignedUser.email,
+            color: booking.assignedUser.color,
           }
         : null,
       location: booking.location
         ? {
             id: booking.location.id,
             name: booking.location.name,
+            color: booking.location.color,
           }
         : null,
+      service: booking.proService
+        ? {
+            id: booking.proService.id,
+            name: booking.proService.name,
+            color: booking.proService.color,
+          }
+        : null,
+      displayColor: booking.proService?.color || booking.assignedUser?.color || booking.location?.color || null,
       jobSummary: booking.job
         ? {
             id: booking.job.id,
@@ -228,6 +246,7 @@ export class CalendarService {
         id: tech.id,
         name: tech.email,
         email: tech.email,
+        color: tech.color,
       })),
       blocks,
     };
@@ -250,7 +269,7 @@ export class CalendarService {
       orderBy: { email: 'asc' },
     });
     const technicianIds = technicians.map((tech: any) => tech.id);
-    const [settings, exceptions] = await Promise.all([
+    const [settings, exceptions, tenantSettings] = await Promise.all([
       db.techScheduleSetting.findMany({
         where: withCompanyId(tenantId, {
           technicianId: { in: technicianIds },
@@ -276,6 +295,10 @@ export class CalendarService {
           reason: true,
         },
         orderBy: { startsAt: 'asc' },
+      }),
+      db.tenantSetting.findUnique({
+        where: { tenantId },
+        select: { businessConfigJson: true },
       }),
     ]);
 
@@ -317,6 +340,10 @@ export class CalendarService {
       schedules,
       availabilityMinutesByDay,
       exceptions: this.normalizeExceptions(exceptions as TechScheduleExceptionRecord[]),
+      rota: {
+        publishedAt: tenantSettings?.businessConfigJson?.rota?.publishedAt || null,
+        publishedWeekStart: tenantSettings?.businessConfigJson?.rota?.publishedWeekStart || null,
+      },
     };
   }
 
@@ -689,6 +716,7 @@ export class CalendarService {
     tenantId: string,
     technicianId: string,
     weeklyJson: unknown,
+    actorUserId?: string | null,
   ): Promise<TechScheduleUpdateResult> {
     const db = this.prisma as any;
     const technician = await db.user.findFirst({
@@ -715,12 +743,42 @@ export class CalendarService {
         weeklyJson: normalized,
       },
     });
+    await this.audit.log(tenantId, 'rota.shift.update', `Updated rota shifts for ${technician.email || technicianId}`, actorUserId || null);
 
     return {
       technicianId: updated.technicianId,
       timezone: updated.timezone ?? null,
       weeklyJson: this.normalizeWeeklyJson(updated.weeklyJson),
     };
+  }
+
+  async publishRota(tenantId: string, actorUserId: string, weekStart?: string | null) {
+    const db = this.prisma as any;
+    const settings = await db.tenantSetting.findUnique({ where: { tenantId } });
+    const businessConfig =
+      settings?.businessConfigJson && typeof settings.businessConfigJson === 'object' && !Array.isArray(settings.businessConfigJson)
+        ? settings.businessConfigJson
+        : {};
+    const publishedAt = new Date().toISOString();
+    const publishedWeekStart = String(weekStart || '').trim() || null;
+    await db.tenantSetting.upsert({
+      where: { tenantId },
+      create: {
+        tenantId,
+        businessConfigJson: {
+          ...businessConfig,
+          rota: { publishedAt, publishedWeekStart },
+        },
+      },
+      update: {
+        businessConfigJson: {
+          ...businessConfig,
+          rota: { ...(businessConfig.rota || {}), publishedAt, publishedWeekStart },
+        },
+      },
+    });
+    await this.audit.log(tenantId, 'rota.publish', 'Published the staff rota', actorUserId);
+    return { publishedAt, publishedWeekStart };
   }
 
   async createScheduleException(
@@ -789,6 +847,7 @@ export class CalendarService {
       tenantId,
       requestId: requestId || null,
     });
+    let targetTechnicianId: string | null = dto.technicianId ?? null;
 
     const { existing, updated, overlapping } = await db.$transaction(async (tx: any) => {
       const existing = await tx.booking.findFirst({ where: withCompanyId(tenantId, { id: bookingId }) });
@@ -796,7 +855,7 @@ export class CalendarService {
         throw new NotFoundException('Booking not found.');
       }
 
-      const targetTechnicianId = dto.technicianId ?? existing.assignedUserId ?? null;
+      targetTechnicianId = dto.technicianId ?? existing.assignedUserId ?? null;
       const lockTargets = this.collectTechnicianIds(existing.assignedUserId, targetTechnicianId);
       for (const techId of lockTargets) {
         await acquireTechnicianLock(tx, tenantId, techId);
@@ -835,7 +894,7 @@ export class CalendarService {
         data: {
           startsAt: parsedStart,
           endsAt: parsedEnd,
-          assignedUserId: dto.technicianId ?? null,
+          assignedUserId: targetTechnicianId,
         },
         include: {
           assignedUser: { select: { id: true, email: true } },
@@ -872,14 +931,13 @@ export class CalendarService {
 
     if (isNotificationsV1Enabled()) {
       const prevTechnicianId = existing.assignedUserId ?? null;
-      const nextTechnicianId = dto.technicianId ?? null;
       const context = {
         previousStartsAt: existing.startsAt.toISOString(),
         previousEndsAt: existing.endsAt.toISOString(),
         previousTechnicianId: prevTechnicianId,
         newStartsAt: parsedStart.toISOString(),
         newEndsAt: parsedEnd.toISOString(),
-        newTechnicianId: nextTechnicianId,
+        newTechnicianId: targetTechnicianId,
       };
       try {
         await this.notifications.sendEntityUpdate(tenantId, actorUserId, {
@@ -1014,6 +1072,11 @@ export class CalendarService {
       normalized[normalizedKey] = slotArray.map((slot: any) => ({
         start: typeof slot?.start === 'string' ? slot.start : null,
         end: typeof slot?.end === 'string' ? slot.end : null,
+        role: typeof slot?.role === 'string' ? slot.role : null,
+        venue: typeof slot?.venue === 'string' ? slot.venue : null,
+        breakMinutes: Number.isFinite(Number(slot?.breakMinutes)) ? Math.max(0, Number(slot.breakMinutes)) : 0,
+        notes: typeof slot?.notes === 'string' ? slot.notes : null,
+        absence: slot?.absence === true,
       }));
     }
     return normalized;
@@ -1058,7 +1121,15 @@ export class CalendarService {
         if (endMin <= startMin) {
           throw new BadRequestException(`Slot end must be after start for ${dayKey}`);
         }
-        processed.push({ start: rawStart, end: rawEnd });
+        processed.push({
+          start: rawStart,
+          end: rawEnd,
+          role: typeof slot.role === 'string' ? slot.role.trim().slice(0, 80) || null : null,
+          venue: typeof slot.venue === 'string' ? slot.venue.trim().slice(0, 120) || null : null,
+          breakMinutes: Math.min(240, Math.max(0, Math.round(Number(slot.breakMinutes || 0)))),
+          notes: typeof slot.notes === 'string' ? slot.notes.trim().slice(0, 500) || null : null,
+          absence: slot.absence === true,
+        });
       }
 
       processed.sort((a, b) => {

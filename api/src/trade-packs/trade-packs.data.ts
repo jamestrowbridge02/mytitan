@@ -1,4 +1,4 @@
-export type TradePackCode = 'WHEELS' | 'BODYSHOP' | 'GARAGE' | 'MOBILE_TECH';
+export type TradePackCode = 'WHEELS' | 'BODYSHOP' | 'GARAGE' | 'MOBILE_TECH' | 'RESTAURANT';
 
 export type TradePackDefinition = {
   code: TradePackCode;
@@ -139,6 +139,37 @@ export const TRADE_PACKS: TradePackDefinition[] = [
     portalCopy: {
       intro: 'Review your mobile service request and approve work before we travel.',
       paymentNote: 'Pay securely online to confirm your mobile appointment.',
+    },
+  },
+  {
+    code: 'RESTAURANT',
+    name: 'Restaurant & Diner',
+    description: 'Reservation, guest-detail, rota, and no-show deposit foundations without POS or kitchen-system claims.',
+    tags: ['restaurant', 'diner', 'reservations', 'rota'],
+    includes: ['Reservation starter services', 'Guest detail fields', 'Staff rota readiness', 'No-show deposit controls'],
+    catalogItems: [
+      { name: 'Table Reservation', description: 'Customer table reservation request.', unitPrice: 0, defaultQty: 1, durationMinutes: 90, capacity: 1 },
+      { name: 'Private Dining Enquiry', description: 'Private dining or group booking enquiry.', unitPrice: 0, defaultQty: 1, durationMinutes: 120, capacity: 1 },
+      { name: 'Takeaway Collection Slot', description: 'Collection time request without POS or delivery integration.', unitPrice: 0, defaultQty: 1, durationMinutes: 15, capacity: 4 },
+    ],
+    pricingPresets: [
+      { key: 'restaurant_no_show_deposit', label: 'Optional no-show deposit', marginPct: 0, vatRateBps: 0 },
+    ],
+    checklist: [
+      { key: 'configure_table_capacity', title: 'Set reservation capacity', description: 'Set realistic booking capacity and seating duration.' },
+      { key: 'review_allergy_process', title: 'Review allergy handling', description: 'Choose how staff review dietary and allergy notes before service.' },
+      { key: 'configure_no_show_policy', title: 'Configure no-show terms', description: 'Set deposit and cancellation wording before enabling collection.' },
+    ],
+    emailTemplates: [
+      { key: 'restaurant_reservation', subject: 'Your reservation is confirmed', bodyText: 'Your reservation is confirmed. Review the booking details and contact us if anything changes.' },
+    ],
+    pdfTemplates: [
+      { key: 'restaurant_reservation_summary', title: 'Reservation Summary', blocks: ['Guest details', 'Reservation time', 'Dietary notes', 'Deposit status'] },
+    ],
+    bookingDefaults: { slotMinutes: 15, leadTimeHours: 2, windowDays: 60 },
+    portalCopy: {
+      intro: 'Review your reservation details and contact the venue if anything changes.',
+      paymentNote: 'A deposit is only requested when the venue has enabled it for this booking.',
     },
   },
 ];

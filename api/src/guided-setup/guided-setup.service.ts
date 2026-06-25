@@ -1,14 +1,16 @@
 import { Injectable } from "@nestjs/common";
 import { AuditService } from "../audit/audit.service";
 import { BillingService } from "../billing/billing.service";
+import { getWorkspaceJobForms } from "../common/business-config";
 import { Role } from "../common/constants";
 import { PrismaService } from "../prisma/prisma.service";
 import { TenantService } from "../tenant/tenant.service";
+import { TemplatesService } from "../templates/templates.service";
 import { TradePacksService } from "../trade-packs/trade-packs.service";
 
 const DEFAULT_PRIMARY_COLOR = "#4fd1c5";
 const DEFAULT_SECONDARY_COLOR = "#1a1f36";
-const GUIDED_SETUP_STEPS = ["trade", "branding", "services", "operations", "payments", "ready"] as const;
+const GUIDED_SETUP_STEPS = ["template", "branding", "services", "operations", "payments", "ready"] as const;
 
 const WHEELS_DEFAULT_SERVICES = [
   { key: "diamond_cut", name: "Diamond Cut", unitPrice: 140, vatEligible: true },
@@ -40,12 +42,13 @@ export class GuidedSetupService {
     private readonly tenantService: TenantService,
     private readonly tradePacksService: TradePacksService,
     private readonly billingService: BillingService,
+    private readonly templatesService: TemplatesService,
   ) {}
 
   async getStatus(tenantId: string) {
     const db = this.prisma as any;
     const settings = await this.tenantService.getSettings(tenantId);
-    const [services, bookingBusinessHours] = await Promise.all([
+    const [services, bookingBusinessHours, templateLibrary] = await Promise.all([
       db.serviceCatalogItem.findMany({
         where: { tenantId },
         orderBy: [{ active: "desc" }, { name: "asc" }],
@@ -54,6 +57,7 @@ export class GuidedSetupService {
         where: { tenantId },
         orderBy: [{ dayOfWeek: "asc" }, { startMinute: "asc" }],
       }),
+      this.templatesService.getTemplateLibrary(tenantId),
     ]);
 
     const completedSteps = normalizeStepList(settings.guidedSetupCompletedSteps);
@@ -64,6 +68,10 @@ export class GuidedSetupService {
 
     return {
       primaryTrade: settings.primaryTrade ?? null,
+      activeJobSheetTemplateId: settings.activeJobSheetTemplateId ?? null,
+      activeJobSheetTemplateName: settings.activeJobSheetTemplateName ?? null,
+      activeJobSheetTemplateTrade: settings.activeJobSheetTemplateTrade ?? null,
+      activeJobSheetTemplateVersion: settings.activeJobSheetTemplateVersion ?? null,
       currentStep,
       completedSteps,
       skippedSteps,
@@ -103,6 +111,7 @@ export class GuidedSetupService {
       })),
       stripeConfigured: this.billingService.isStripeConfigured(),
       paymentsEnabled: Boolean(settings.paymentsEnabled || settings.featurePayments),
+      templateLibrary,
     };
   }
 
@@ -138,9 +147,41 @@ export class GuidedSetupService {
     });
   }
 
+  private async applySelectedTemplate(tenantId: string, userId: string, templateId?: string | null) {
+    const normalizedTemplateId = String(templateId || "").trim();
+    if (normalizedTemplateId) {
+      const applied = await this.templatesService.applyTemplateToWorkspace(tenantId, userId, normalizedTemplateId);
+      if (String(applied?.appliedTemplate?.tradeCategory || "").toUpperCase() === "WHEELS") {
+        await this.ensureWheelsPack(tenantId, userId);
+      }
+      return applied;
+    }
+    await this.ensureWheelsPack(tenantId, userId);
+    return this.templatesService.applyTemplateToWorkspace(tenantId, userId, "blank");
+  }
+
   private async seedDefaultServices(tenantId: string, userId: string) {
     const db = this.prisma as any;
-    for (const service of WHEELS_DEFAULT_SERVICES) {
+    const settings = await db.tenantSetting.findUnique({
+      where: { tenantId },
+      select: {
+        businessConfigJson: true,
+        primaryTrade: true,
+        defaultServiceNamePresets: true,
+      },
+    });
+    const configuredServiceTypes = getWorkspaceJobForms(settings).serviceTypes || [];
+    const serviceSeedRows =
+      configuredServiceTypes.length > 0
+        ? configuredServiceTypes.map((serviceType: any) => ({
+            key: slugKey(serviceType.id || serviceType.name),
+            name: serviceType.name,
+            unitPrice: 0,
+            vatEligible: true,
+          }))
+        : WHEELS_DEFAULT_SERVICES;
+
+    for (const service of serviceSeedRows) {
       const existing = await db.serviceCatalogItem.findFirst({
         where: {
           tenantId,
@@ -231,7 +272,7 @@ export class GuidedSetupService {
     const stepKey = GUIDED_SETUP_STEPS[Math.max(0, Math.min(step, GUIDED_SETUP_STEPS.length - 1))] || `step_${step}`;
 
     if (step === 0) {
-      await this.ensureWheelsPack(tenantId, userId);
+      await this.applySelectedTemplate(tenantId, userId, String(data.templateId || "").trim() || null);
     }
 
     if (step === 1) {

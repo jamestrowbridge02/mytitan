@@ -1,10 +1,10 @@
 import {
   Body,
-  BadRequestException,
   Controller,
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   Res,
   UploadedFile,
@@ -22,15 +22,9 @@ import { JwtPayload } from "../auth/auth.types";
 import { Roles } from "../common/roles.decorator";
 import { RolesGuard } from "../common/roles.guard";
 import { ArtifactsService } from "./artifacts.service";
+import { UPLOAD_LIMITS } from "../common/upload-policy";
 
-const ARTIFACT_MAX_BYTES = Number(process.env.ARTIFACT_MAX_BYTES ?? 10 * 1024 * 1024);
-const ALLOWED_ARTIFACT_MIME = new Set([
-  "application/pdf",
-  "image/png",
-  "image/jpeg",
-  "image/webp",
-  "text/plain",
-]);
+const ARTIFACT_MAX_BYTES = Number(process.env.ARTIFACT_MAX_BYTES ?? UPLOAD_LIMITS.video);
 
 function safePathSegment(value: string) {
   return value.replace(/[^a-zA-Z0-9._-]/g, "_");
@@ -41,8 +35,14 @@ function safePathSegment(value: string) {
 export class ArtifactsController {
   constructor(private readonly artifacts: ArtifactsService) {}
 
+  @Get("governance")
+  @Roles("OWNER", "ADMIN")
+  mediaGovernance(@CurrentUser() user: JwtPayload) {
+    return this.artifacts.getMediaGovernance(user.companyId);
+  }
+
   @Get("entities/:entityType/:entityId")
-  @Roles("OWNER", "ADMIN", "STAFF", "READ_ONLY")
+  @Roles("OWNER", "ADMIN", "FINANCE", "STAFF", "READ_ONLY")
   listByEntity(
     @CurrentUser() user: JwtPayload,
     @Param("entityType") entityType: string,
@@ -51,8 +51,18 @@ export class ArtifactsController {
     return this.artifacts.listForEntity(user.companyId, entityType, entityId);
   }
 
+  @Get("entities/:entityType/:entityId/folders")
+  @Roles("OWNER", "ADMIN", "FINANCE", "STAFF", "READ_ONLY")
+  listFoldersByEntity(
+    @CurrentUser() user: JwtPayload,
+    @Param("entityType") entityType: string,
+    @Param("entityId") entityId: string,
+  ) {
+    return this.artifacts.listFoldersForEntity(user.companyId, entityType, entityId);
+  }
+
   @Post("entities/:entityType/:entityId/upload")
-  @Roles("OWNER", "ADMIN", "STAFF")
+  @Roles("OWNER", "ADMIN", "FINANCE", "STAFF")
   @UseInterceptors(
     FileInterceptor("file", {
       storage: diskStorage({
@@ -73,12 +83,6 @@ export class ArtifactsController {
           cb(null, safePathSegment(suffix));
         },
       }),
-      fileFilter: (_req, file, cb) => {
-        if (!ALLOWED_ARTIFACT_MIME.has(file.mimetype)) {
-          return cb(new BadRequestException("Unsupported artifact file type"), false);
-        }
-        cb(null, true);
-      },
       limits: { fileSize: ARTIFACT_MAX_BYTES },
     }),
   )
@@ -102,13 +106,31 @@ export class ArtifactsController {
   }
 
   @Delete(":id")
-  @Roles("OWNER", "ADMIN", "STAFF")
+  @Roles("OWNER", "ADMIN", "FINANCE", "STAFF")
   deleteArtifact(@CurrentUser() user: JwtPayload, @Param("id") id: string) {
     return this.artifacts.deleteArtifact(user.companyId, user.sub, id);
   }
 
+  @Patch(":id/move")
+  @Roles("OWNER", "ADMIN", "FINANCE", "STAFF")
+  moveArtifact(@CurrentUser() user: JwtPayload, @Param("id") id: string, @Body() body: Record<string, any>) {
+    return this.artifacts.moveArtifact(user.companyId, user.sub, id, String(body?.kind || ""));
+  }
+
+  @Patch(":id/visibility")
+  @Roles("OWNER", "ADMIN", "FINANCE", "STAFF")
+  updateVisibility(@CurrentUser() user: JwtPayload, @Param("id") id: string, @Body() body: Record<string, any>) {
+    return this.artifacts.updatePortalVisibility(user.companyId, user.sub, id, body?.portalVisible);
+  }
+
+  @Patch("bulk")
+  @Roles("OWNER", "ADMIN", "FINANCE", "STAFF")
+  bulkUpdate(@CurrentUser() user: JwtPayload, @Body() body: Record<string, any>) {
+    return this.artifacts.bulkUpdate(user.companyId, user.sub, body || {});
+  }
+
   @Get("file/:id")
-  @Roles("OWNER", "ADMIN", "STAFF", "READ_ONLY")
+  @Roles("OWNER", "ADMIN", "FINANCE", "STAFF", "READ_ONLY")
   async downloadArtifact(
     @CurrentUser() user: JwtPayload,
     @Param("id") id: string,

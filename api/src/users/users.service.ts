@@ -1,7 +1,11 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
-import { randomBytes } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 import { AuditService } from '../audit/audit.service';
+import { buildAppUrl } from '../common/public-url';
+import { EmailService } from '../email/email.service';
+import { buildTeamInviteEmailTemplate } from '../email/email-templates';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AcceptInviteDto, InviteUserDto, UpdateUserRoleDto } from './users.dto';
 
@@ -10,7 +14,13 @@ export class UsersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly email: EmailService,
+    private readonly notifications: NotificationsService,
   ) {}
+
+  private tokenHash(token: string) {
+    return createHash('sha256').update(token).digest('hex');
+  }
 
   async list(tenantId: string, role: string) {
     const db = this.prisma as any;
@@ -21,6 +31,7 @@ export class UsersService {
         id: true,
         email: true,
         role: true,
+        color: true,
         emailVerified: true,
         createdAt: true,
         lastActiveAt: true,
@@ -39,26 +50,81 @@ export class UsersService {
       throw new BadRequestException('User already exists for this tenant');
     }
 
-    const token = randomBytes(24).toString('hex');
+    const rawToken = `invite_${randomBytes(24).toString('hex')}`;
+    const tokenHash = this.tokenHash(rawToken);
     const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7);
+    const activationUrl = buildAppUrl(`/accept-invite?token=${encodeURIComponent(rawToken)}`);
     const invite = await db.inviteToken.create({
       data: {
         tenantId,
         email,
         role: dto.role,
-        token,
+        token: tokenHash,
         expiresAt,
       },
     });
 
+    const tracking = await this.notifications.prepareTrackedEmailNotification({
+      companyId: tenantId,
+      userId: inviterId,
+      type: 'team_invite_email',
+      title: 'Team invite email pending',
+      body: 'Team invite email is being prepared for delivery.',
+      entityType: 'tenant',
+      entityId: tenantId,
+      reasonKey: 'team_invite',
+      to: email,
+      summary: `Workspace invite was prepared for role ${dto.role}.`,
+      ctaHref: activationUrl,
+      trackingExpiresAt: expiresAt,
+    });
+    const template = buildTeamInviteEmailTemplate(await this.email.getBranding(tenantId, { ownership: 'workspace' }), {
+      role: dto.role,
+      acceptUrl: activationUrl,
+      htmlAcceptUrl: tracking.trackedHref || activationUrl,
+    });
+    const delivery = await this.email.sendTransactionalEmail(null, {
+      to: email,
+      subject: template.subject,
+      text: template.text,
+      html: template.html,
+    }, {
+      ownership: 'system',
+      category: 'team_invite',
+      templateKey: 'team_invite_email',
+      actorUserId: inviterId,
+      dedupeWindowMinutes: 60,
+    });
+    await this.notifications.finalizeTrackedEmailNotification(tracking.id, delivery, {
+      title: delivery.delivered ? 'Team invite email sent' : 'Team invite email pending',
+      body: delivery.delivered ? `Invite email sent for role ${dto.role}.` : 'Team invite email was not delivered in this environment.',
+    });
+
+    if (!delivery.delivered) {
+      await db.inviteToken.delete({ where: { id: invite.id } });
+      return {
+        ok: true,
+        status: delivery.status === 'failed' ? 'delivery_failed' : 'delivery_unavailable',
+        message:
+          delivery.status === 'failed'
+            ? 'We could not send the team invite email just now. Please try again shortly.'
+            : delivery.reason || 'MyTitan email is not set up yet. Please contact support.',
+      };
+    }
+
     await this.audit.log(tenantId, 'user.invite', `Invited ${email} as ${dto.role}`, inviterId);
 
-    return { token: invite.token, expiresAt: invite.expiresAt };
+    return {
+      ok: true,
+      status: 'sent',
+      message: `Invite email sent to ${email}.`,
+      expiresAt: invite.expiresAt,
+    };
   }
 
   async acceptInvite(dto: AcceptInviteDto) {
     const db = this.prisma as any;
-    const invite = await db.inviteToken.findUnique({ where: { token: dto.token } });
+    const invite = await db.inviteToken.findUnique({ where: { token: this.tokenHash(dto.token) } });
     if (!invite) {
       throw new NotFoundException('Invite not found');
     }
@@ -94,11 +160,15 @@ export class UsersService {
     return { accepted: true };
   }
 
-  async updateRole(tenantId: string, actorId: string, userId: string, dto: UpdateUserRoleDto) {
+  async updateRole(tenantId: string, actorId: string, actorRole: string, userId: string, dto: UpdateUserRoleDto) {
     const db = this.prisma as any;
     const user = await db.user.findFirst({ where: { id: userId, companyId: tenantId } });
     if (!user) {
       throw new NotFoundException('User not found');
+    }
+
+    if (dto.role === 'OWNER' && actorRole !== 'OWNER') {
+      throw new ForbiddenException('Only an owner can assign the owner role');
     }
 
     if (user.role === 'OWNER' && dto.role !== 'OWNER') {

@@ -1,17 +1,62 @@
-import { BadRequestException, Body, Controller, Get, Headers, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Headers, HttpException, HttpStatus, Param, Patch, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
+import * as crypto from 'crypto';
+import type { Request } from 'express';
+import type { Response } from 'express';
 import { JwtAuthGuard } from '../auth/auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtPayload } from '../auth/auth.types';
 import { requireNotificationsV1Enabled } from '../common/feature-flags';
 import { Roles } from '../common/roles.decorator';
 import { RolesGuard } from '../common/roles.guard';
-import { MarkNotificationReadDto, UpdateNotificationPreferenceDto } from './dto';
+import {
+  DispatchSummaryEmailsDto,
+  MarkAllNotificationsReadDto,
+  MarkNotificationReadDto,
+  SubmitWorkspaceSupportRequestDto,
+  UpdateNotificationPreferenceDto,
+} from './dto';
 import { NotificationsService } from './notifications.service';
+
+@Controller('t')
+export class NotificationTrackingController {
+  constructor(private readonly notifications: NotificationsService) {}
+
+  @Get('c/:id')
+  async click(@Param('id') id: string, @Res() res: Response) {
+    const destination = await this.notifications.trackEmailClick(id);
+    return res.redirect(destination);
+  }
+}
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('notifications')
 export class NotificationsController {
+  private readonly supportRequestBuckets = new Map<string, { count: number; resetAt: number }>();
+
   constructor(private readonly notifications: NotificationsService) {}
+
+  private hashSegment(value: string) {
+    return crypto.createHash('sha256').update(value).digest('hex').slice(0, 16);
+  }
+
+  private supportBucketKey(req: Request, userId: string) {
+    return `support:${this.hashSegment(String(req.ip || 'unknown'))}:${this.hashSegment(userId)}`;
+  }
+
+  private enforceSupportRateLimit(req: Request, userId: string, limit: number, windowMs: number) {
+    const key = this.supportBucketKey(req, userId);
+    const now = Date.now();
+    const current = this.supportRequestBuckets.get(key);
+    if (!current || current.resetAt <= now) {
+      this.supportRequestBuckets.set(key, { count: 1, resetAt: now + windowMs });
+      return;
+    }
+    if (current.count >= limit) {
+      throw new HttpException('Too many attempts. Please wait a moment and try again.', HttpStatus.TOO_MANY_REQUESTS);
+    }
+    current.count += 1;
+    this.supportRequestBuckets.set(key, current);
+  }
 
   @Get()
   @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
@@ -159,10 +204,74 @@ export class NotificationsController {
     return this.notifications.updatePreferences(user.companyId, user.sub, dto);
   }
 
+  @Get('summaries/readiness')
+  @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
+  summaryReadiness(@CurrentUser() user: JwtPayload) {
+    return this.notifications.getSummaryEmailReadiness(user.companyId);
+  }
+
+  @Get('ops-alerts/status')
+  @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
+  opsAlertStatus(@CurrentUser() user: JwtPayload) {
+    return this.notifications.getOperationalAlertStatus(user.companyId);
+  }
+
+  @Post('ops-alerts/smoke')
+  @Roles('OWNER', 'ADMIN')
+  opsAlertSmoke(@CurrentUser() user: JwtPayload) {
+    return this.notifications.sendOperationalAlertSmokeTest(user.companyId);
+  }
+
+  @Post('summaries/dispatch')
+  @Roles('OWNER', 'ADMIN')
+  dispatchSummary(@CurrentUser() user: JwtPayload, @Body() dto: DispatchSummaryEmailsDto) {
+    return this.notifications.dispatchWorkspaceSummary({
+      companyId: user.companyId,
+      actorUserId: user.sub,
+      cadence: dto.cadence,
+      dryRun: dto.dryRun === true,
+      asOf: dto.asOf ? new Date(dto.asOf) : undefined,
+    });
+  }
+
   @Patch(':id/read')
   @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
   markRead(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Body() dto: MarkNotificationReadDto) {
     requireNotificationsV1Enabled();
     return this.notifications.markRead(user.companyId, user.sub, id, dto.read ?? true);
+  }
+
+  @Patch('read-all')
+  @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
+  markAllRead(@CurrentUser() user: JwtPayload, @Body() dto: MarkAllNotificationsReadDto) {
+    requireNotificationsV1Enabled();
+    return this.notifications.markAllRead(user.companyId, user.sub, dto.read ?? true);
+  }
+
+  @Patch(':id/dismiss')
+  @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
+  dismiss(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    requireNotificationsV1Enabled();
+    return this.notifications.dismiss(user.companyId, user.sub, id);
+  }
+
+  @Post('support-request')
+  @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
+  submitSupportRequest(
+    @Req() req: Request,
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: SubmitWorkspaceSupportRequestDto,
+  ) {
+    this.enforceSupportRateLimit(req, user.sub, 6, 15 * 60 * 1000);
+    return this.notifications.submitSupportRequest({
+      category: dto.category,
+      subject: dto.subject,
+      message: dto.message,
+      requesterEmail: dto.callbackEmail || user.email,
+      requesterName: user.email,
+      companyId: user.companyId,
+      userId: user.sub,
+      route: 'workspace',
+    });
   }
 }

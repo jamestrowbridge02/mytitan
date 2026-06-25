@@ -5,7 +5,7 @@ const LOCK_NAMESPACE = 'mytitan.tenant';
 const computeAdvisoryLockKeys = (...parts: string[]) => {
   const value = [LOCK_NAMESPACE, ...parts].join('|');
   const hash = createHash('sha256').update(value).digest();
-  return [hash.readUInt32BE(0), hash.readUInt32BE(4)] as [number, number];
+  return [hash.readInt32BE(0), hash.readInt32BE(4)] as [number, number];
 };
 
 export const computeTechnicianLockKeys = (tenantId: string, technicianId: string) =>

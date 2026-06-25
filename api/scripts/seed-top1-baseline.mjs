@@ -3,6 +3,34 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
+function normalizeHost(value) {
+  try {
+    return new URL(String(value || "")).hostname.trim().toLowerCase();
+  } catch {
+    return String(value || "").trim().toLowerCase().replace(/:\d+$/, "");
+  }
+}
+
+function isPublicMyTitanHost(host) {
+  return host === "mytitan.co.uk" || host.endsWith(".mytitan.co.uk");
+}
+
+function assertSafeSeedTarget() {
+  if (process.env.MYTITAN_ACKNOWLEDGE_PUBLIC_SEED_TARGET === "1") {
+    return;
+  }
+  const publicHosts = [process.env.APP_PUBLIC_URL, process.env.API_PUBLIC_URL]
+    .map((value) => normalizeHost(value))
+    .filter((host) => host && isPublicMyTitanHost(host));
+  if (!publicHosts.length) {
+    return;
+  }
+  throw new Error(
+    `seed-top1-baseline refused because public MyTitan URLs are configured (${publicHosts.join(", ")}). ` +
+      "Run this only against a confirmed non-production environment or set MYTITAN_ACKNOWLEDGE_PUBLIC_SEED_TARGET=1 after review.",
+  );
+}
+
 function env(name, fallback = "") {
   return (process.env[name] || fallback).toString();
 }
@@ -61,6 +89,7 @@ async function ensureOwnerUser(email, companyId, password) {
 }
 
 async function main() {
+  assertSafeSeedTarget();
   const password = env("TOP1_OWNER_PASSWORD");
   if (!password) throw new Error("TOP1_OWNER_PASSWORD env required for seed script");
 

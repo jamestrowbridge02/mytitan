@@ -4,7 +4,7 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtPayload } from '../auth/auth.types';
 import { Roles } from '../common/roles.decorator';
 import { RolesGuard } from '../common/roles.guard';
-import { AddTradeAccountNoteDto, TradeAccountsQueryDto, UpdateNextActionDto, UpsertTradeAccountDto } from './dto';
+import { AddTradeAccountNoteDto, TradeAccountsQueryDto, TradePortalInviteDto, UpdateNextActionDto, UpsertTradeAccountDto } from './dto';
 import { TradeAccountsService } from './trade-accounts.service';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -52,4 +52,23 @@ export class TradeAccountsController {
   updateNextAction(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Body() dto: UpdateNextActionDto) {
     return this.tradeAccountsService.updateNextAction(user.companyId, user.sub, id, dto);
   }
+
+  @Get(':id/portal-access')
+  @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
+  portalAccess(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.tradeAccountsService.listPortalAccess(user.companyId, id);
+  }
+
+  @Post(':id/portal-invite')
+  @Roles('OWNER', 'ADMIN')
+  portalInvite(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Body() dto: TradePortalInviteDto) {
+    return this.tradeAccountsService.invitePortalContact(user.companyId, user.sub, id, dto);
+  }
+
+  @Post(':id/portal-access/:accessId/revoke')
+  @Roles('OWNER', 'ADMIN')
+  revokePortal(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Param('accessId') accessId: string) {
+    return this.tradeAccountsService.revokePortalAccess(user.companyId, user.sub, id, accessId);
+  }
+
 }

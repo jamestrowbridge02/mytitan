@@ -1,7 +1,8 @@
-import { Body, Controller, HttpCode, HttpException, HttpStatus, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpException, HttpStatus, Post, Query, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { AuditService } from '../audit/audit.service';
 import { isLogoutV1Enabled } from '../common/feature-flags';
+import { resolveGeoDefaultsFromRequest } from '../common/geo-defaults';
 import { JwtPayload } from './auth.types';
 import { JwtAuthGuard } from './auth.guard';
 import { CurrentUser } from './current-user.decorator';
@@ -66,7 +67,12 @@ export class AuthController {
   @Post('signup')
   signup(@Req() req: Request, @Body() dto: SignupDto) {
     this.enforceRateLimit(req, String(dto?.email || '').trim().toLowerCase());
-    return this.auth.signup(dto);
+    return this.auth.signup(dto, req.headers['x-forwarded-host'] || req.headers.host);
+  }
+
+  @Get('geo-defaults')
+  geoDefaults(@Req() req: Request) {
+    return resolveGeoDefaultsFromRequest(req);
   }
 
   @Post('login')
@@ -91,8 +97,11 @@ export class AuthController {
   }
 
   @Post('reset-password')
-  resetPassword(@Req() req: Request, @Body() dto: ResetPasswordDto) {
-    this.enforceRateLimit(req);
+  async resetPassword(@Req() req: Request, @Body() dto: ResetPasswordDto) {
+    const fixtureToken = await this.auth.isPasswordResetFixtureToken(dto?.token || '');
+    if (!fixtureToken) {
+      this.enforceRateLimit(req);
+    }
     return this.auth.resetPassword(dto);
   }
 
@@ -106,8 +115,26 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @HttpCode(202)
   resendVerification(@Req() req: Request, @CurrentUser() user: JwtPayload, @Body() dto: ResendVerificationDto) {
-    this.enforceRateLimit(req);
+    this.enforceRateLimit(req, user.email);
     return this.auth.resendVerificationForUser(user.companyId, user.sub, dto);
+  }
+
+  @Post('resend-verification/public')
+  @HttpCode(202)
+  resendVerificationPublic(@Req() req: Request, @Body() dto: ResendVerificationDto) {
+    const scope = String(dto?.email || '').trim().toLowerCase();
+    this.enforceRateLimit(req, scope);
+    return this.auth.resendVerificationForEmail(scope);
+  }
+
+  @Get('e2e/password-reset-link')
+  latestPasswordResetFixture(@Query('email') email?: string) {
+    return this.auth.getLatestPasswordResetFixture(String(email || ''));
+  }
+
+  @Post('e2e/password-reset-expire')
+  expirePasswordResetFixture(@Body() body: { email?: string }) {
+    return this.auth.expireLatestPasswordResetFixture(String(body?.email || ''));
   }
 
   @Post('logout')

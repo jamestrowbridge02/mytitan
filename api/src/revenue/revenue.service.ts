@@ -1,10 +1,13 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { AuditService } from "../audit/audit.service";
+import { DocumentControlService } from "../document-control/document-control.service";
 import { AutomationsService } from "../automations/automations.service";
 import { ComplianceService } from "../compliance/compliance.service";
+import { EnterpriseFeatureFlagsService } from "../enterprise/enterprise-feature-flags.service";
 import { ActivityService } from "../events/activity.service";
 import { JobsService } from "../jobs/jobs.service";
 import { PrismaService } from "../prisma/prisma.service";
-import { PatchQuoteDto, UpsertQuoteDto } from "./dto";
+import { JobEstimateDto, PatchQuoteDto, QuoteInventoryLineItemDto, UpsertQuoteDto } from "./dto";
 
 type QuoteListFilters = {
   customerId?: string;
@@ -42,6 +45,9 @@ export class RevenueService {
     private readonly activity: ActivityService,
     private readonly automations: AutomationsService,
     private readonly compliance: ComplianceService,
+    private readonly enterpriseFlags: EnterpriseFeatureFlagsService,
+    private readonly audit: AuditService,
+    private readonly documents: DocumentControlService,
   ) {}
 
   private moneyDecimal(cents: number) {
@@ -153,17 +159,7 @@ export class RevenueService {
   }
 
   private async nextQuoteNumber(tenantId: string) {
-    const year = new Date().getUTCFullYear();
-    const count = await this.prisma.quote.count({
-      where: {
-        tenantId,
-        createdAt: {
-          gte: new Date(Date.UTC(year, 0, 1)),
-          lt: new Date(Date.UTC(year + 1, 0, 1)),
-        },
-      },
-    });
-    return `Q-${year}-${String(count + 1).padStart(5, "0")}`;
+    return this.prisma.$transaction((tx) => this.documents.allocate(tx, tenantId, "QUOTE"));
   }
 
   private serializeLineItem(row: any) {
@@ -300,6 +296,51 @@ export class RevenueService {
       orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
     });
     return rows.map((row: any) => this.serializeQuote(row));
+  }
+
+  async listJobEstimates(tenantId: string, userId: string, jobId: string) {
+    await this.enterpriseFlags.assertEnabled({ tenantId, userId, key: "enterprise_estimates_v1" });
+    const job = await this.prisma.job.findFirst({
+      where: { id: jobId, companyId: tenantId },
+      select: { id: true },
+    });
+    if (!job) throw new NotFoundException("Job not found");
+    return this.listQuotes(tenantId, { jobId });
+  }
+
+  async createJobEstimate(tenantId: string, userId: string, jobId: string, dto: JobEstimateDto) {
+    await this.enterpriseFlags.assertEnabled({ tenantId, userId, key: "enterprise_estimates_v1" });
+    const job = await this.prisma.job.findFirst({
+      where: { id: jobId, companyId: tenantId },
+      select: {
+        id: true,
+        jobRef: true,
+        customerId: true,
+        customerName: true,
+        customerEmail: true,
+        customerPhone: true,
+      },
+    });
+    if (!job) throw new NotFoundException("Job not found");
+    if (!job.customerId) {
+      throw new BadRequestException("This job needs a linked customer before an estimate can be created");
+    }
+    const quote = await this.createQuote(tenantId, userId, {
+      ...dto,
+      customerId: job.customerId,
+      jobId: job.id,
+      notesJson: {
+        ...(dto.notesJson || {}),
+        enterpriseWorkflow: "job_estimate",
+      },
+    });
+    await this.audit.log(
+      tenantId,
+      "enterprise_estimate.created",
+      `enterprise_estimate.created quote=${quote.quoteNumber} job=${job.jobRef || job.id} total=${quote.totalCents}`,
+      userId,
+    );
+    return quote;
   }
 
   async getQuote(tenantId: string, quoteId: string) {
@@ -487,6 +528,76 @@ export class RevenueService {
       label: updated.quoteNumber,
     });
 
+    return this.serializeQuote(updated);
+  }
+
+  async addInventoryLineItem(tenantId: string, userId: string, quoteId: string, dto: QuoteInventoryLineItemDto) {
+    await this.enterpriseFlags.assertEnabled({ tenantId, userId, key: "truck_stock_v1" });
+    const [quote, item] = await Promise.all([
+      this.prisma.quote.findFirst({
+        where: { tenantId, id: quoteId },
+        include: { lineItems: true },
+      }),
+      (this.prisma as any).stockItem.findFirst({
+        where: { tenantId, id: dto.stockItemId, isActive: true },
+      }),
+    ]);
+    if (!quote) throw new NotFoundException("Quote not found");
+    if (!["DRAFT", "SENT"].includes(String(quote.status))) {
+      throw new BadRequestException("Inventory items can only be added to editable quotes");
+    }
+    if (!item) throw new BadRequestException("Inventory item not found");
+
+    const quantity = Number(dto.quantity || 0);
+    const unitPriceCents = Math.trunc(Number(dto.unitPriceCents ?? item.unitPriceCents ?? 0));
+    const line = {
+      sortOrder: quote.lineItems.length,
+      type: "PART" as const,
+      title: `${item.sku} - ${item.name}`,
+      description: dto.description?.trim() || item.description || null,
+      quantity,
+      unitPriceCents,
+      totalPriceCents: Math.round(quantity * unitPriceCents),
+      metadataJson: {
+        inventorySnapshot: {
+          stockItemId: item.id,
+          sku: item.sku,
+          name: item.name,
+          category: item.category || null,
+          unit: item.unit,
+          unitPriceCents,
+          avgUnitCostCents: Math.round(Number(item.avgUnitCost || 0) * 100),
+          capturedAt: new Date().toISOString(),
+        },
+      },
+    };
+    const existing = quote.lineItems.map((row: any) => ({
+      sortOrder: row.sortOrder,
+      type: row.type,
+      title: row.title,
+      description: row.description || null,
+      quantity: Number(row.quantity),
+      unitPriceCents: row.unitPriceCents,
+      totalPriceCents: row.totalPriceCents,
+      metadataJson: row.metadataJson || null,
+    }));
+    const totals = this.computeTotals([...existing, line], quote.taxCents);
+    const updated = await this.prisma.quote.update({
+      where: { id: quote.id },
+      data: {
+        ...totals,
+        lineItems: {
+          create: line,
+        },
+      },
+      include: {
+        customer: { select: { id: true, name: true } },
+        job: { select: { id: true, jobRef: true, status: true, locationId: true, assignedUserId: true } },
+        booking: { select: { id: true, status: true } },
+        lineItems: { orderBy: { sortOrder: "asc" } },
+      },
+    });
+    await this.audit.log(tenantId, "quote.inventory_line.add", `Added inventory item ${item.sku} to ${quote.quoteNumber}`, userId);
     return this.serializeQuote(updated);
   }
 
@@ -785,6 +896,7 @@ export class RevenueService {
         data: quote.lineItems.map((item: any) => ({
           companyId: tenantId,
           jobId: job.id,
+          stockItemId: item.metadataJson?.inventorySnapshot?.stockItemId || null,
           description: [item.title, item.description].filter(Boolean).join(" - "),
           qty: item.quantity,
           unitPrice: this.moneyDecimal(item.type === "DISCOUNT" ? -Math.abs(item.unitPriceCents) : item.unitPriceCents),
@@ -866,6 +978,23 @@ export class RevenueService {
         status: result.job.status || null,
       },
     };
+  }
+
+  async convertJobEstimate(tenantId: string, userId: string, jobId: string, quoteId: string) {
+    await this.enterpriseFlags.assertEnabled({ tenantId, userId, key: "enterprise_estimates_v1" });
+    const quote = await this.prisma.quote.findFirst({
+      where: { tenantId, id: quoteId, jobId },
+      select: { id: true, quoteNumber: true },
+    });
+    if (!quote) throw new NotFoundException("Estimate not found for this job");
+    const result = await this.convertQuote(tenantId, userId, quoteId);
+    await this.audit.log(
+      tenantId,
+      "enterprise_estimate.converted",
+      `enterprise_estimate.converted quote=${quote.quoteNumber} job=${result.job.jobRef || result.job.id}`,
+      userId,
+    );
+    return result;
   }
 
   private async ensureTask(candidate: RevenueTaskCandidate) {

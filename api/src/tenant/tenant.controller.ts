@@ -10,6 +10,7 @@ import {
   Post,
   Put,
   Res,
+  Query,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -23,12 +24,16 @@ import { JwtAuthGuard } from '../auth/auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtPayload } from '../auth/auth.types';
 import { assertPermission } from '../common/permissions';
+import { EmailService } from '../email/email.service';
+import { type InternalMonitoringAction } from '../common/internal-monitoring';
 import { Roles } from '../common/roles.decorator';
 import { RolesGuard } from '../common/roles.guard';
 import { SetLogoUrlDto, UpdateTenantSettingsDto } from './tenant.dto';
 import { TenantService } from './tenant.service';
+import { assertUploadAllowed, UPLOAD_LIMITS } from '../common/upload-policy';
+import { bookingMediaPath, safeBookingMediaSegment } from '../common/tenant-booking-media';
 
-const LOGO_MAX_BYTES = Number(process.env.TENANT_LOGO_MAX_BYTES ?? 2 * 1024 * 1024);
+const LOGO_MAX_BYTES = Number(process.env.TENANT_LOGO_MAX_BYTES ?? UPLOAD_LIMITS.logo);
 const ALLOWED_MIME = new Set(['image/png', 'image/jpeg', 'image/webp']);
 
 function safeFileName(name: string) {
@@ -53,17 +58,103 @@ export class TenantPublicAssetsController {
     }
     return res.sendFile(filePath);
   }
+
+  @Get('public-booking-media/:tenantId/:fileName')
+  async getPublicBookingMedia(
+    @Param('tenantId') tenantId: string,
+    @Param('fileName') fileName: string,
+    @Res() res: Response,
+  ) {
+    const filePath = bookingMediaPath(safeBookingMediaSegment(tenantId), safeBookingMediaSegment(fileName));
+    try {
+      await fs.access(filePath);
+    } catch {
+      throw new NotFoundException('Booking image not found');
+    }
+    return res.sendFile(filePath);
+  }
 }
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('tenant')
 export class TenantController {
-  constructor(private readonly tenantService: TenantService) {}
+  constructor(
+    private readonly tenantService: TenantService,
+    private readonly emailService: EmailService,
+  ) {}
+
+  private assertMonitoringAccess(user: JwtPayload) {
+    if (user?.platformAdmin || user?.role === 'OWNER' || user?.role === 'ADMIN') {
+      return;
+    }
+    throw new ForbiddenException('Only owners, admins, and platform admins can view monitoring.');
+  }
+
+  private assertPlatformMonitoringAccess(user: JwtPayload) {
+    if (user?.platformAdmin) return;
+    throw new ForbiddenException('Platform admin access required');
+  }
 
   @Get('settings')
   @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
   getSettings(@CurrentUser() user: JwtPayload) {
     return this.tenantService.getSettings(user.companyId);
+  }
+
+  @Get('settings/email-readiness')
+  @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
+  getEmailReadiness(@CurrentUser() user: JwtPayload, @Query('ownership') ownership?: string) {
+    const scope = ownership === 'system' ? 'system' : 'workspace';
+    if (scope === 'system') {
+      return this.emailService.getReadiness(null, { probe: true, ownership: 'system' });
+    }
+    return this.emailService.getOperationalReadiness(user.companyId, { probe: true });
+  }
+
+  @Get('settings/operations-readiness')
+  @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
+  getOperationsReadiness(@CurrentUser() user: JwtPayload) {
+    this.assertMonitoringAccess(user);
+    return this.tenantService.getOperationsReadiness(user.companyId);
+  }
+
+  @Get('account-health')
+  @Roles('OWNER', 'ADMIN')
+  async getAccountHealth(@CurrentUser() user: JwtPayload) {
+    await assertPermission({ user, permission: 'settings.manage', action: 'tenant.account_health.read' });
+    return this.tenantService.getAccountHealth(user.companyId);
+  }
+
+  @Post('account-health/:key/fix')
+  @Roles('OWNER', 'ADMIN')
+  async fixAccountHealth(@CurrentUser() user: JwtPayload, @Param('key') key: string) {
+    await assertPermission({ user, permission: 'settings.manage', action: 'tenant.account_health.fix' });
+    return this.tenantService.applyAccountHealthFix(user.companyId, user.sub, key);
+  }
+
+  @Get('settings/internal-monitoring')
+  @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
+  getInternalMonitoring(@CurrentUser() user: JwtPayload) {
+    this.assertPlatformMonitoringAccess(user);
+    return this.tenantService.getInternalMonitoring(user.companyId);
+  }
+
+  @Post('settings/internal-monitoring/actions')
+  @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
+  async runInternalMonitoringAction(@CurrentUser() user: JwtPayload, @Body('action') action?: string) {
+    this.assertPlatformMonitoringAccess(user);
+    const normalizedAction = String(action || '').trim() as InternalMonitoringAction;
+    const allowedActions = new Set<InternalMonitoringAction>([
+      'refresh_snapshot',
+      'run_health_check',
+      'verify_notification_routing',
+      'check_billing_readiness',
+      'validate_backups',
+    ]);
+    if (!allowedActions.has(normalizedAction)) {
+      throw new BadRequestException('Unsupported monitoring action');
+    }
+    return this.tenantService.runInternalMonitoringAction(user.companyId, normalizedAction);
   }
 
   @Put('settings')
@@ -117,6 +208,11 @@ export class TenantController {
     @Body() dto: SetLogoUrlDto,
   ) {
     if (file) {
+      const policy = assertUploadAllowed(file);
+      if (policy.category !== 'image' || file.size > LOGO_MAX_BYTES) {
+        await fs.unlink(file.path).catch(() => undefined);
+        throw new BadRequestException(`This file is too large. Maximum allowed is ${Math.round(LOGO_MAX_BYTES / 1024 / 1024)} MB for a logo.`);
+      }
       return this.tenantService.saveUploadedLogo(user.companyId, user.sub, file.filename);
     }
 

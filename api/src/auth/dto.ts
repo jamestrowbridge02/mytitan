@@ -6,6 +6,15 @@ export class SignupDto {
   companyName!: string;
 
   @IsString()
+  @Length(2, 2)
+  @IsOptional()
+  countryCode?: string;
+
+  @IsString()
+  @IsOptional()
+  defaultLocale?: string;
+
+  @IsString()
   @IsOptional()
   timezone?: string;
 

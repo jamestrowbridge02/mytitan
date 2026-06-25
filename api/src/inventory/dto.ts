@@ -67,6 +67,104 @@ export class UpsertInventoryLocationDto {
   businessLocationId?: string;
 }
 
+export class TransferStockDto {
+  @IsString()
+  stockItemId!: string;
+
+  @IsString()
+  fromInventoryLocationId!: string;
+
+  @IsString()
+  toInventoryLocationId!: string;
+
+  @IsNumber()
+  @Min(0.01)
+  quantity!: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string;
+}
+
+export class ReceiveStockDto {
+  @IsString()
+  stockItemId!: string;
+
+  @IsString()
+  inventoryLocationId!: string;
+
+  @IsNumber()
+  @Min(0.01)
+  quantity!: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string;
+}
+
+export class AssignTechnicianStockDto {
+  @IsString()
+  technicianId!: string;
+
+  @IsString()
+  inventoryLocationId!: string;
+
+  @IsOptional()
+  @IsBoolean()
+  active?: boolean;
+
+  @IsOptional()
+  @IsObject()
+  notesJson?: Record<string, any>;
+}
+
+export class UpsertInventoryCategoryDto {
+  @IsString()
+  name!: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  active?: boolean;
+}
+
+export class UpsertSupplierItemMappingDto {
+  @IsString()
+  stockItemId!: string;
+
+  @IsOptional()
+  @IsString()
+  supplierId?: string;
+
+  @IsOptional()
+  @IsString()
+  supplierName?: string;
+
+  @IsString()
+  supplierSku!: string;
+
+  @IsOptional()
+  @IsString()
+  supplierReference?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  preferred?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  active?: boolean;
+
+  @IsOptional()
+  @IsObject()
+  metadataJson?: Record<string, any>;
+}
+
 export class CreateStockMovementDto {
   @IsString()
   stockItemId!: string;
@@ -79,8 +177,8 @@ export class CreateStockMovementDto {
   @IsString()
   inventoryLocationId?: string;
 
-  @IsIn(['IN', 'OUT', 'ADJUST', 'RESERVE', 'RELEASE', 'USE'])
-  type!: 'IN' | 'OUT' | 'ADJUST' | 'RESERVE' | 'RELEASE' | 'USE';
+  @IsIn(['IN', 'OUT', 'ADJUST', 'RESERVE', 'RELEASE', 'USE', 'TRANSFER', 'RETURN'])
+  type!: 'IN' | 'OUT' | 'ADJUST' | 'RESERVE' | 'RELEASE' | 'USE' | 'TRANSFER' | 'RETURN';
 
   @IsNumber()
   qty!: number;
@@ -118,6 +216,10 @@ export class CreatePoLineDto {
   @IsString()
   stockItemId!: string;
 
+  @IsOptional()
+  @IsString()
+  sourceJobId?: string;
+
   @IsNumber()
   @Min(0.01)
   qtyOrdered!: number;
@@ -131,6 +233,18 @@ export class CreatePoLineDto {
   @IsNumber()
   @Min(0)
   unitCost?: number;
+
+  @IsOptional()
+  @IsString()
+  supplierSku?: string;
+
+  @IsOptional()
+  @IsString()
+  supplierReference?: string;
+
+  @IsOptional()
+  @IsObject()
+  notesJson?: Record<string, any>;
 }
 
 export class UpsertPurchaseOrderDto {
@@ -151,8 +265,8 @@ export class UpsertPurchaseOrderDto {
   supplierName?: string;
 
   @IsOptional()
-  @IsIn(['DRAFT', 'ORDERED', 'PARTIALLY_RECEIVED', 'RECEIVED', 'CANCELLED'])
-  status?: 'DRAFT' | 'ORDERED' | 'PARTIALLY_RECEIVED' | 'RECEIVED' | 'CANCELLED';
+  @IsIn(['DRAFT', 'SUBMITTED_INTERNAL', 'APPROVED', 'ORDERED', 'PARTIALLY_RECEIVED', 'RECEIVED', 'CANCELLED'])
+  status?: 'DRAFT' | 'SUBMITTED_INTERNAL' | 'APPROVED' | 'ORDERED' | 'PARTIALLY_RECEIVED' | 'RECEIVED' | 'CANCELLED';
 
   @IsOptional()
   @IsObject()
@@ -163,6 +277,30 @@ export class UpsertPurchaseOrderDto {
   @ValidateNested({ each: true })
   @Type(() => CreatePoLineDto)
   lines?: CreatePoLineDto[];
+}
+
+export class CreatePurchaseOrderFromJobDto {
+  @IsString()
+  jobId!: string;
+
+  @IsOptional()
+  @IsString()
+  inventoryLocationId?: string;
+
+  @IsOptional()
+  @IsString()
+  supplierId?: string;
+
+  @IsOptional()
+  @IsString()
+  supplierName?: string;
+}
+
+export class PurchaseOrderTransitionDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  note?: string;
 }
 
 export class ReceivePurchaseOrderLineDto {

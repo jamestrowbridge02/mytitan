@@ -70,4 +70,30 @@ export class MetricsController {
     }
     return this.metrics.getIntelligence(user.companyId);
   }
+
+  @Get('business-health')
+  @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
+  async businessHealth(@CurrentUser() user: JwtPayload) {
+    await assertPermission({ user, permission: 'dashboard.view_intelligence', action: 'metrics.business_health' });
+    if (!isMarketplaceEnabled()) {
+      return {
+        platformDiagnosticsVisible: false,
+        source: 'tenant_business_records',
+        summary: {
+          bookingsTrend: { current: 0, previous: 0, delta: 0 },
+          invoiceAgeing: [],
+          unpaidValueCents: 0,
+          jobCompletionVelocity: { current: 0, previous: 0, delta: 0 },
+          customerRepeatRatePct: null,
+          reviewGenerationStatus: { generated: 0, eligibleCompletedJobs: 0 },
+          stockPressure: { lowStockRows: 0, shortageRows: 0 },
+          revenueCollectionPressure: { overdueInvoices: 0, unpaidInvoices: 0 },
+        },
+        locations: [],
+        technicians: [],
+        issues: [],
+      };
+    }
+    return this.metrics.getBusinessHealth(user.companyId);
+  }
 }

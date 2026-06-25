@@ -4,6 +4,7 @@ import { DEFAULT_PLAN_CODE } from '../billing/billing.constants';
 import { isBillingEnforced } from '../common/billing-mode';
 import { isTenantOwnerAllowlisted } from '../common/billing-entitlement';
 import { isBillingAllowlisted } from '../common/billing-allowlist';
+import { resolveBookingsEnabled } from '../common/workspace-features';
 import { PrismaService } from '../prisma/prisma.service';
 import { TRADE_PACKS, TradePackCode, type TradePackDefinition } from './trade-packs.data';
 
@@ -240,7 +241,7 @@ export class TradePacksService {
   private async seedBookingDefaults(tenantId: string, userId: string, pack: TradePackDefinition) {
     const db = this.prisma as any;
     const settings = await db.tenantSetting.findUnique({ where: { tenantId } });
-    const bookingsEnabled = Boolean(settings?.featureBookings ?? settings?.bookingsEnabled);
+    const bookingsEnabled = resolveBookingsEnabled(settings);
     if (!bookingsEnabled) {
       return;
     }
@@ -254,6 +255,39 @@ export class TradePacksService {
       });
       await this.audit.log(tenantId, 'booking.settings.update', `Trade pack seeded booking defaults (${pack.code})`, userId);
     }
+  }
+
+  private async seedRestaurantBookingFields(tenantId: string, userId: string, pack: TradePackDefinition) {
+    if (pack.code !== 'RESTAURANT') return;
+    const db = this.prisma as any;
+    const fields = [
+      { questionKey: 'party_size', label: 'Party size', type: 'number', required: true, placeholder: 'Number of guests' },
+      { questionKey: 'seating_duration', label: 'Expected seating duration', type: 'dropdown', required: false, options: ['60 minutes', '90 minutes', '120 minutes'] },
+      { questionKey: 'dietary_requirements', label: 'Dietary requirements', type: 'textarea', required: false, placeholder: 'Tell us about dietary requirements' },
+      { questionKey: 'allergy_notes', label: 'Allergy information', type: 'textarea', required: false, placeholder: 'Tell us about any allergies' },
+      { questionKey: 'reservation_notes', label: 'Reservation notes', type: 'textarea', required: false, placeholder: 'Anything else the venue should know?' },
+    ];
+    for (const [index, field] of fields.entries()) {
+      await db.bookingQuestion.upsert({
+        where: { companyId_questionKey: { companyId: tenantId, questionKey: field.questionKey } },
+        create: {
+          companyId: tenantId,
+          label: field.label,
+          questionKey: field.questionKey,
+          type: field.type,
+          required: field.required,
+          optionsJson: {
+            placeholder: field.placeholder || null,
+            options: field.options || [],
+            visibility: 'PUBLIC',
+            scope: { allBookings: true },
+            sortOrder: 20 + index,
+          },
+        },
+        update: { isActive: true },
+      });
+    }
+    await this.audit.log(tenantId, 'booking.fields.restaurant_seed', 'Added restaurant reservation customer fields', userId);
   }
 
   private async updateTenantDefaults(tenantId: string, pack: TradePackDefinition) {
@@ -299,6 +333,7 @@ export class TradePacksService {
     await this.seedTemplatePresets(tenantId, pack);
     await this.seedEmailTemplates(tenantId, userId, pack);
     await this.seedBookingDefaults(tenantId, userId, pack);
+    await this.seedRestaurantBookingFields(tenantId, userId, pack);
     await this.updateTenantDefaults(tenantId, pack);
 
     await this.audit.log(tenantId, 'trade-pack.install', `Installed trade pack ${pack.code}`, userId);

@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Query, UseGuards } from "@nestjs/common";
 import { CurrentUser } from "../auth/current-user.decorator";
 import { JwtPayload } from "../auth/auth.types";
 import { JwtAuthGuard } from "../auth/auth.guard";
@@ -30,5 +30,15 @@ export class CustomersController {
   @Roles("OWNER", "ADMIN", "STAFF", "READ_ONLY")
   detail(@CurrentUser() user: JwtPayload, @Param("idOrSlug") idOrSlug: string) {
     return this.customers.getByIdOrSlug(user.companyId, idOrSlug);
+  }
+
+  @Patch(":idOrSlug/payment-terms")
+  @Roles("OWNER", "ADMIN", "STAFF")
+  updatePaymentTerms(
+    @CurrentUser() user: JwtPayload,
+    @Param("idOrSlug") idOrSlug: string,
+    @Body() body: { paymentTermsDays?: number | null },
+  ) {
+    return this.customers.updatePaymentTerms(user.companyId, user.sub, idOrSlug, body.paymentTermsDays);
   }
 }

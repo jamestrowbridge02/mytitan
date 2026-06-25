@@ -5,6 +5,7 @@ import { requestIdMiddleware } from './common/request-id.middleware';
 import { NestFactory } from '@nestjs/core';
 import { json, raw } from 'express';
 import { AppModule } from './app.module';
+import { UploadExceptionFilter } from './common/upload-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bodyParser: false });
@@ -25,9 +26,21 @@ async function bootstrap() {
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);
+  const productionFallbackOrigins = [
+    process.env.APP_PUBLIC_URL,
+    process.env.MARKETING_PUBLIC_URL,
+    process.env.NEXT_PUBLIC_APP_URL,
+  ]
+    .map((origin) => String(origin || '').trim().replace(/\/+$/, ''))
+    .filter(Boolean);
+  const allowedOrigins = origins.length > 0
+    ? origins
+    : process.env.NODE_ENV === 'production'
+      ? productionFallbackOrigins
+      : [];
 
   app.enableCors({
-    origin: origins.length > 0 ? origins : true,
+    origin: allowedOrigins.length > 0 ? allowedOrigins : process.env.NODE_ENV !== 'production',
     credentials: true,
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
@@ -39,7 +52,11 @@ async function bootstrap() {
 
   // Stripe signature verification requires the exact raw body bytes.
   app.use(['/stripe/webhook', '/billing/webhook'], raw({ type: 'application/json' }));
-  app.use(json());
+  app.use(/^\/integrations\/webhooks\/[^/]+\/[^/]+$/, raw({ type: '*/*' }));
+  app.use('/billing/customer-payments/stripe-connect/webhook', raw({ type: 'application/json' }));
+  app.use(/^\/billing\/customer-payments\/webhook\/[^/]+\/[^/]+$/, raw({ type: '*/*' }));
+  app.use(json({ limit: process.env.JSON_BODY_LIMIT || '40mb' }));
+  app.useGlobalFilters(new UploadExceptionFilter());
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

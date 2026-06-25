@@ -3,9 +3,29 @@ import { PrismaService } from "../prisma/prisma.service";
 import { ActivityService } from "../events/activity.service";
 import { promises as fs } from "fs";
 import { dirname, join, resolve } from "path";
+import { AuditService } from "../audit/audit.service";
+import { assertUploadAllowed, UPLOAD_LIMITS } from "../common/upload-policy";
 
 type ArtifactEntityType = "JOB" | "CUSTOMER";
-type ArtifactKind = "INVOICE" | "RECEIPT" | "JOB_ATTACHMENT" | "CUSTOMER_ATTACHMENT" | "PORTAL_DOCUMENT";
+type ArtifactKind =
+  | "INVOICE"
+  | "RECEIPT"
+  | "ESTIMATE"
+  | "PAYMENT"
+  | "COMPLIANCE"
+  | "COMPLIANCE_DOC"
+  | "BEFORE_PHOTO"
+  | "AFTER_PHOTO"
+  | "DAMAGE_PHOTO"
+  | "TORQUE_EVIDENCE"
+  | "PAYMENT_EVIDENCE"
+  | "SUPPLIER_DOC"
+  | "VIDEO"
+  | "EVIDENCE"
+  | "EXPORT"
+  | "JOB_ATTACHMENT"
+  | "CUSTOMER_ATTACHMENT"
+  | "PORTAL_DOCUMENT";
 
 type ArtifactRecord = {
   id: string;
@@ -24,6 +44,19 @@ type ArtifactRecord = {
   createdAt: Date;
 };
 
+const MEDIA_GOVERNANCE_FOLDERS = [
+  "before-photos",
+  "after-photos",
+  "videos",
+  "signatures",
+  "compliance",
+  "invoices",
+  "payment-evidence",
+  "torque-evidence",
+  "supplier-documents",
+  "warranty-documents",
+] as const;
+
 function normalizeEntityType(value: string): ArtifactEntityType {
   const normalized = String(value || "").trim().toUpperCase();
   if (normalized === "JOB" || normalized === "CUSTOMER") return normalized;
@@ -33,8 +66,26 @@ function normalizeEntityType(value: string): ArtifactEntityType {
 function normalizeArtifactKind(entityType: ArtifactEntityType, value: string): ArtifactKind {
   const normalized = String(value || "").trim().toUpperCase();
   const allowed: Record<ArtifactEntityType, ArtifactKind[]> = {
-    JOB: ["INVOICE", "RECEIPT", "JOB_ATTACHMENT", "PORTAL_DOCUMENT"],
-    CUSTOMER: ["CUSTOMER_ATTACHMENT"],
+    JOB: [
+      "INVOICE",
+      "RECEIPT",
+      "ESTIMATE",
+      "PAYMENT",
+      "COMPLIANCE",
+      "COMPLIANCE_DOC",
+      "BEFORE_PHOTO",
+      "AFTER_PHOTO",
+      "DAMAGE_PHOTO",
+      "TORQUE_EVIDENCE",
+      "PAYMENT_EVIDENCE",
+      "SUPPLIER_DOC",
+      "VIDEO",
+      "EVIDENCE",
+      "EXPORT",
+      "JOB_ATTACHMENT",
+      "PORTAL_DOCUMENT",
+    ],
+    CUSTOMER: ["CUSTOMER_ATTACHMENT", "COMPLIANCE", "EXPORT"],
   };
   if (allowed[entityType].includes(normalized as ArtifactKind)) {
     return normalized as ArtifactKind;
@@ -49,6 +100,7 @@ export class ArtifactsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly activity: ActivityService,
+    private readonly audit: AuditService,
   ) {}
 
   private rootDir() {
@@ -88,6 +140,25 @@ export class ArtifactsService {
     return `/artifacts/file/${id}`;
   }
 
+  private folderFor(record: Pick<ArtifactRecord, "entityType" | "kind" | "portalVisible">) {
+    const kind = String(record.kind || "");
+    if (record.entityType === "CUSTOMER") return record.portalVisible ? "customer/shared" : "customer/private";
+    if (kind === "ESTIMATE") return "estimate";
+    if (kind === "INVOICE") return "invoices";
+    if (kind === "PAYMENT" || kind === "RECEIPT") return "invoice-payment";
+    if (kind === "COMPLIANCE" || kind === "COMPLIANCE_DOC") return "compliance";
+    if (kind === "BEFORE_PHOTO") return "before-photos";
+    if (kind === "AFTER_PHOTO") return "after-photos";
+    if (kind === "DAMAGE_PHOTO") return "damage-photos";
+    if (kind === "TORQUE_EVIDENCE") return "torque-evidence";
+    if (kind === "PAYMENT_EVIDENCE") return "payment-evidence";
+    if (kind === "SUPPLIER_DOC") return "supplier-documents";
+    if (kind === "VIDEO") return "videos";
+    if (kind === "EVIDENCE" || kind === "PORTAL_DOCUMENT") return "evidence";
+    if (kind === "EXPORT") return "exports";
+    return "job";
+  }
+
   private buildPublicDownloadPath(jobToken: string, artifactId: string) {
     return `/public/job/${jobToken}/artifacts/${artifactId}`;
   }
@@ -113,6 +184,8 @@ export class ArtifactsService {
       sizeBytes: record.sizeBytes ?? null,
       sizeLabel: this.formatBytes(record.sizeBytes),
       portalVisible: Boolean(record.portalVisible),
+      folder: this.folderFor(record),
+      tags: [record.kind.toLowerCase().replaceAll("_", "-"), this.folderFor(record), record.portalVisible ? "customer-visible" : "private"].filter(Boolean),
       createdAt: record.createdAt,
       source: "managed",
       managed: isManaged,
@@ -143,6 +216,8 @@ export class ArtifactsService {
       sizeBytes: null,
       sizeLabel: null,
       portalVisible: Boolean(params.portalVisible),
+      folder: this.folderFor({ entityType: params.entityType, kind: params.kind, portalVisible: Boolean(params.portalVisible) }),
+      tags: [params.kind.toLowerCase().replaceAll("_", "-"), this.folderFor({ entityType: params.entityType, kind: params.kind, portalVisible: Boolean(params.portalVisible) })],
       createdAt: params.createdAt || null,
       source: "legacy",
       managed: false,
@@ -266,6 +341,184 @@ export class ArtifactsService {
     });
   }
 
+  async listFoldersForEntity(tenantId: string, entityTypeInput: string, entityId: string) {
+    const items = await this.listForEntity(tenantId, entityTypeInput, entityId);
+    const folders = new Map<string, any>();
+    for (const item of items) {
+      const folder = item.folder || "job";
+      const current = folders.get(folder) || { key: folder, count: 0, portalVisibleCount: 0, totalBytes: 0, items: [] };
+      current.count += 1;
+      current.portalVisibleCount += item.portalVisible ? 1 : 0;
+      current.totalBytes += Number(item.sizeBytes || 0);
+      current.items.push(item);
+      folders.set(folder, current);
+    }
+    return {
+      entityType: String(entityTypeInput || "").toLowerCase(),
+      entityId,
+      folders: Array.from(folders.values()).sort((a, b) => String(a.key).localeCompare(String(b.key))),
+      supportedFolders: [
+        "customer",
+        "job",
+        "estimate",
+        "invoice-payment",
+        "compliance",
+        "before-photos",
+        "after-photos",
+        "videos",
+        "signatures",
+        "damage-photos",
+        "torque-evidence",
+        "payment-evidence",
+        "supplier-documents",
+        "warranty-documents",
+        "evidence",
+        "exports",
+      ],
+    };
+  }
+
+  async getMediaGovernance(tenantId: string) {
+    const db = this.prisma as any;
+    const [settings, grouped, visibleCount, jobsMissingEvidence] = await Promise.all([
+      db.tenantSetting.findUnique({ where: { tenantId }, select: { businessConfigJson: true } }).catch(() => null),
+      db.documentArtifact.groupBy({
+        by: ["entityType", "kind", "portalVisible"],
+        where: { tenantId },
+        _count: { _all: true },
+        _sum: { sizeBytes: true },
+      }).catch(() => []),
+      db.documentArtifact.count({ where: { tenantId, portalVisible: true } }).catch(() => 0),
+      db.job.findMany({
+        where: { companyId: tenantId, status: "COMPLETED" },
+        select: {
+          id: true,
+          jobRef: true,
+          assets: { select: { id: true, kind: true }, take: 20 },
+          signatures: { select: { id: true }, take: 5 },
+        },
+        take: 50,
+      }).catch(() => []),
+    ]);
+    const config = settings?.businessConfigJson && typeof settings.businessConfigJson === "object" ? settings.businessConfigJson : {};
+    const mediaGovernance = config.mediaGovernance && typeof config.mediaGovernance === "object" ? config.mediaGovernance : {};
+    const rows = grouped.map((row: any) => ({
+      entityType: row.entityType,
+      kind: row.kind,
+      portalVisible: Boolean(row.portalVisible),
+      count: row._count?._all || 0,
+      totalBytes: Number(row._sum?.sizeBytes || 0),
+      folder: this.folderFor({ entityType: row.entityType, kind: row.kind, portalVisible: Boolean(row.portalVisible) } as any),
+    }));
+    const totalBytes = rows.reduce((sum: number, row: any) => sum + Number(row.totalBytes || 0), 0);
+    const folderMap = new Map<string, any>();
+    for (const row of rows) {
+      const current = folderMap.get(row.folder) || { folder: row.folder, count: 0, totalBytes: 0, portalVisibleCount: 0 };
+      current.count += row.count;
+      current.totalBytes += row.totalBytes;
+      current.portalVisibleCount += row.portalVisible ? row.count : 0;
+      folderMap.set(row.folder, current);
+    }
+    for (const folder of MEDIA_GOVERNANCE_FOLDERS) {
+      if (!folderMap.has(folder)) folderMap.set(folder, { folder, count: 0, totalBytes: 0, portalVisibleCount: 0 });
+    }
+    const completedJobsMissingRequiredEvidence = jobsMissingEvidence
+      .filter((job: any) => {
+        const hasPhoto = Array.isArray(job.assets) && job.assets.some((asset: any) => ["BEFORE", "AFTER"].includes(asset.kind));
+        const hasSignature = Array.isArray(job.signatures) && job.signatures.length > 0;
+        return !hasPhoto || !hasSignature;
+      })
+      .map((job: any) => ({
+        id: job.id,
+        jobRef: job.jobRef,
+        missing: [
+          Array.isArray(job.assets) && job.assets.some((asset: any) => ["BEFORE", "AFTER"].includes(asset.kind)) ? null : "photo evidence",
+          Array.isArray(job.signatures) && job.signatures.length > 0 ? null : "signature",
+        ].filter(Boolean),
+        href: `/dashboard/jobs/${job.id}`,
+      }));
+    const storageLimitBytes = Number(mediaGovernance.storageLimitBytes || process.env.ARTIFACT_STORAGE_WARNING_BYTES || 2 * 1024 * 1024 * 1024);
+    const nearLimit = storageLimitBytes > 0 && totalBytes >= storageLimitBytes * 0.8;
+    return {
+      generatedAt: new Date().toISOString(),
+      scope: "tenant_media_governance",
+      platformDiagnosticsVisible: false,
+      storage: {
+        totalBytes,
+        totalLabel: this.formatBytes(totalBytes) || "0 B",
+        storageLimitBytes,
+        storageLimitLabel: this.formatBytes(storageLimitBytes),
+        nearLimit,
+        oversizedWarningBytes: UPLOAD_LIMITS.video,
+      },
+      counts: {
+        beforePhotos: rows.filter((row: any) => row.kind === "BEFORE_PHOTO").reduce((sum: number, row: any) => sum + row.count, 0),
+        afterPhotos: rows.filter((row: any) => row.kind === "AFTER_PHOTO").reduce((sum: number, row: any) => sum + row.count, 0),
+        videos: rows.filter((row: any) => row.kind === "VIDEO").reduce((sum: number, row: any) => sum + row.count, 0),
+        evidence: rows.filter((row: any) => ["EVIDENCE", "DAMAGE_PHOTO", "TORQUE_EVIDENCE", "PAYMENT_EVIDENCE", "COMPLIANCE_DOC"].includes(row.kind)).reduce((sum: number, row: any) => sum + row.count, 0),
+        customerVisible: visibleCount,
+      },
+      byFolder: Array.from(folderMap.values()).sort((a, b) => String(a.folder).localeCompare(String(b.folder))),
+      byType: rows,
+      folderTaxonomy: MEDIA_GOVERNANCE_FOLDERS.map((folder) => ({
+        folder,
+        searchable: true,
+        filterable: true,
+        taggable: true,
+        retentionReady: true,
+        exportReady: true,
+      })),
+      search: {
+        enabled: true,
+        fields: ["label", "kind", "fileName", "folder", "tags"],
+      },
+      tagging: {
+        enabled: true,
+        tagsDerivedFromKindFolderAndVisibility: true,
+        customTagStorageReady: false,
+      },
+      retentionPolicy: {
+        configured: Boolean(mediaGovernance.retentionDays || mediaGovernance.archiveAfterDays || mediaGovernance.exportPolicy),
+        retentionDays: mediaGovernance.retentionDays || null,
+        archiveAfterDays: mediaGovernance.archiveAfterDays || null,
+        exportPolicy: mediaGovernance.exportPolicy || "manual_export_before_archive",
+        archivePolicyReadiness: mediaGovernance.archiveAfterDays ? "configured_no_automatic_delete" : "needs_owner_review",
+      },
+      customerVisibilityReview: {
+        customerVisibleCount: visibleCount,
+        privateByDefault: true,
+        reviewHref: "/dashboard/portal#portal-controls",
+      },
+      warnings: [
+        nearLimit ? { key: "media_storage_near_limit", impact: "Uploads may need review before field evidence grows further.", action: "Review media retention policy", href: "/dashboard/settings/operations#media-governance" } : null,
+        completedJobsMissingRequiredEvidence.length ? { key: "completed_job_missing_required_evidence", impact: "Some completed records may be weaker for audit or customer handoff.", action: "Review completed job evidence", href: completedJobsMissingRequiredEvidence[0].href } : null,
+      ].filter(Boolean),
+      completedJobsMissingRequiredEvidence,
+      destructiveActions: {
+        deleteWithoutExplicitAction: false,
+        archiveWithoutExplicitAction: false,
+        exportWithoutExplicitAction: false,
+        auditRequired: true,
+      },
+      uploadPolicy: {
+        imageMaxBytes: UPLOAD_LIMITS.image,
+        videoMaxBytes: UPLOAD_LIMITS.video,
+        documentMaxBytes: UPLOAD_LIMITS.document,
+        textMaxBytes: UPLOAD_LIMITS.text,
+        virusScanning: {
+          configured: false,
+          status: "not_configured",
+          detail: "File type, extension, size, tenant scope, and storage path are validated. Malware scanning is not configured.",
+        },
+        resumableUploads: {
+          supported: false,
+          readiness: "client_queue_and_retry_ready",
+          detail: "Client queue, compression, and retry states exist; server-side chunk assembly is not enabled.",
+        },
+      },
+    };
+  }
+
   async createFromUpload(params: {
     tenantId: string;
     userId: string;
@@ -278,6 +531,20 @@ export class ArtifactsService {
   }) {
     if (!params.file) {
       throw new BadRequestException("Artifact file is required");
+    }
+    try {
+      assertUploadAllowed(params.file);
+    } catch (error) {
+      if (params.file?.path) {
+        await fs.unlink(params.file.path).catch(() => undefined);
+      }
+      await this.audit.log(
+        params.tenantId,
+        "artifact.upload.rejected",
+        `Rejected artifact upload name=${String(params.file?.originalname || "unknown").slice(0, 120)} mime=${String(params.file?.mimetype || "unknown")} bytes=${Number(params.file?.size || 0)}`,
+        params.userId,
+      );
+      throw error;
     }
     const entityType = normalizeEntityType(params.entityType);
     const kind = normalizeArtifactKind(entityType, params.kind);
@@ -312,6 +579,12 @@ export class ArtifactsService {
         createdByUserId: params.userId,
       },
     });
+    await this.audit.log(
+      params.tenantId,
+      "artifact.upload.accepted",
+      `Accepted artifact upload id=${record.id} mime=${record.mimeType || "unknown"} bytes=${record.sizeBytes || 0}`,
+      params.userId,
+    );
 
     await this.maybePushArtifactActivity({
       tenantId: params.tenantId,
@@ -363,6 +636,74 @@ export class ArtifactsService {
     return { ok: true };
   }
 
+  async moveArtifact(tenantId: string, userId: string, artifactId: string, kindInput: string) {
+    const artifact = await this.prisma.documentArtifact.findFirst({
+      where: { id: artifactId, tenantId },
+    });
+    if (!artifact) throw new NotFoundException("Artifact not found");
+    const kind = normalizeArtifactKind(artifact.entityType as ArtifactEntityType, kindInput);
+    const updated = await this.prisma.documentArtifact.update({
+      where: { id: artifact.id },
+      data: { kind },
+    });
+    await this.maybePushArtifactActivity({
+      tenantId,
+      userId,
+      entityType: artifact.entityType as ArtifactEntityType,
+      entityId: artifact.entityId,
+      kind,
+      label: artifact.label,
+      action: "created",
+    });
+    return this.toArtifactView(updated as unknown as ArtifactRecord);
+  }
+
+  async updatePortalVisibility(tenantId: string, userId: string, artifactId: string, portalVisibleInput: any) {
+    const artifact = await this.prisma.documentArtifact.findFirst({
+      where: { id: artifactId, tenantId },
+    });
+    if (!artifact) throw new NotFoundException("Artifact not found");
+    const portalVisible = artifact.entityType === "JOB" && this.asBoolean(portalVisibleInput);
+    const updated = await this.prisma.documentArtifact.update({
+      where: { id: artifact.id },
+      data: { portalVisible },
+    });
+    await this.maybePushArtifactActivity({
+      tenantId,
+      userId,
+      entityType: artifact.entityType as ArtifactEntityType,
+      entityId: artifact.entityId,
+      kind: artifact.kind as ArtifactKind,
+      label: `${artifact.label} visibility ${portalVisible ? "enabled" : "disabled"}`,
+      action: "created",
+    });
+    return this.toArtifactView(updated as unknown as ArtifactRecord);
+  }
+
+  async bulkUpdate(tenantId: string, userId: string, body: Record<string, any>) {
+    const ids = Array.isArray(body?.ids) ? body.ids.map((id) => String(id || "").trim()).filter(Boolean).slice(0, 100) : [];
+    if (!ids.length) throw new BadRequestException("At least one artifact id is required");
+    const rows = await this.prisma.documentArtifact.findMany({ where: { tenantId, id: { in: ids } } });
+    const foundIds = rows.map((row) => row.id);
+    const data: any = {};
+    if (typeof body?.portalVisible !== "undefined") {
+      data.portalVisible = this.asBoolean(body.portalVisible);
+    }
+    if (typeof body?.kind === "string") {
+      const first = rows[0];
+      data.kind = normalizeArtifactKind(first?.entityType as ArtifactEntityType, body.kind);
+    }
+    if (!Object.keys(data).length) throw new BadRequestException("No supported bulk update was requested");
+    await this.prisma.documentArtifact.updateMany({ where: { tenantId, id: { in: foundIds } }, data });
+    await this.activity.push({
+      tenantId,
+      type: "artifact.bulk_update",
+      label: `Bulk updated ${foundIds.length} artifact${foundIds.length === 1 ? "" : "s"}`,
+      payloadJson: { ids: foundIds, fields: Object.keys(data), actorUserId: userId },
+    });
+    return { ok: true, updated: foundIds.length };
+  }
+
   async getManagedArtifactForTenant(tenantId: string, artifactId: string) {
     const artifact = await this.prisma.documentArtifact.findFirst({
       where: { id: artifactId, tenantId },
@@ -395,7 +736,7 @@ export class ArtifactsService {
         entityType: "JOB",
         entityId: jobId,
         kind: "INVOICE",
-        label: "Issued invoice PDF",
+        label: "Service record PDF",
         url: legacy.invoicePdfUrl,
         portalVisible: true,
         createdAt: legacy.createdAt || null,

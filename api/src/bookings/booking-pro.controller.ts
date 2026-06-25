@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtPayload } from '../auth/auth.types';
@@ -7,6 +8,7 @@ import { Roles } from '../common/roles.decorator';
 import { RolesGuard } from '../common/roles.guard';
 import { BookingsService } from './bookings.service';
 import { BookingAvailabilityQueryDto, CreateBookingProDto, UpdateBookingProSettingsDto, UpsertBookingServiceDto } from './dto';
+import { bookingMediaUploadOptions, validateBookingMediaFile } from '../common/tenant-booking-media';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('booking')
@@ -25,6 +27,26 @@ export class BookingProController {
   createService(@CurrentUser() user: JwtPayload, @Body() dto: UpsertBookingServiceDto) {
     requireBookingProV1Enabled();
     return this.bookingsService.createProService(user.companyId, user.sub, dto);
+  }
+
+  @Patch('services/:id')
+  @Roles('OWNER', 'ADMIN')
+  updateService(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Body() dto: UpsertBookingServiceDto) {
+    requireBookingProV1Enabled();
+    return this.bookingsService.updateProService(user.companyId, user.sub, id, dto);
+  }
+
+  @Post('folders/image')
+  @Roles('OWNER', 'ADMIN')
+  @UseInterceptors(FileInterceptor('file', bookingMediaUploadOptions('folder')))
+  async uploadFolderImage(
+    @CurrentUser() user: JwtPayload,
+    @UploadedFile() file: any,
+    @Body('category') category?: string,
+  ) {
+    requireBookingProV1Enabled();
+    await validateBookingMediaFile(file);
+    return this.bookingsService.savePublicFolderImage(user.companyId, user.sub, String(category || ''), file.filename);
   }
 
   @Get('availability')

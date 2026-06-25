@@ -13,35 +13,42 @@ export class TechController {
   constructor(private readonly tech: TechService) {}
 
   @Get('queue')
-  @Roles('OWNER', 'ADMIN', 'STAFF')
+  @Roles('OWNER', 'ADMIN', 'STAFF', 'EXTERNAL_OPERATOR')
   async queue(@CurrentUser() user: JwtPayload) {
     await assertPermission({ user, permission: 'technician.execute', action: 'technician.queue' });
     return this.tech.getMyQueue(user.companyId, user.sub);
   }
 
   @Post('jobs/:id/start')
-  @Roles('OWNER', 'ADMIN', 'STAFF')
+  @Roles('OWNER', 'ADMIN', 'STAFF', 'EXTERNAL_OPERATOR')
   async start(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Body() body: { note?: string }) {
     await assertPermission({ user, permission: 'technician.execute', action: 'technician.start' });
     return this.tech.advanceAssignedJob(user.companyId, user.sub, id, 'start', body?.note);
   }
 
   @Post('jobs/:id/complete')
-  @Roles('OWNER', 'ADMIN', 'STAFF')
+  @Roles('OWNER', 'ADMIN', 'STAFF', 'EXTERNAL_OPERATOR')
   async complete(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Body() body: { note?: string }) {
     await assertPermission({ user, permission: 'technician.execute', action: 'technician.complete' });
     return this.tech.advanceAssignedJob(user.companyId, user.sub, id, 'complete', body?.note);
   }
 
   @Post('jobs/:id/arrive')
-  @Roles('OWNER', 'ADMIN', 'STAFF')
+  @Roles('OWNER', 'ADMIN', 'STAFF', 'EXTERNAL_OPERATOR')
   async arrive(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Body() body: { note?: string }) {
     await assertPermission({ user, permission: 'technician.execute', action: 'technician.arrive' });
     return this.tech.arriveAssignedJob(user.companyId, user.sub, id, body?.note);
   }
 
+  @Post('jobs/:id/customer-eta')
+  @Roles('OWNER', 'ADMIN', 'STAFF', 'EXTERNAL_OPERATOR')
+  async customerEta(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Body() body: any) {
+    await assertPermission({ user, permission: 'technician.execute', action: 'technician.customer_eta' });
+    return this.tech.updateCustomerEta(user.companyId, user, id, body);
+  }
+
   @Post('jobs/:id/note')
-  @Roles('OWNER', 'ADMIN', 'STAFF')
+  @Roles('OWNER', 'ADMIN', 'STAFF', 'EXTERNAL_OPERATOR')
   async note(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Body() body: { note?: string }) {
     await assertPermission({ user, permission: 'technician.execute', action: 'technician.note' });
     return this.tech.addJobNote(user.companyId, user.sub, id, body?.note || '');

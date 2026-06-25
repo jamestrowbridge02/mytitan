@@ -1,18 +1,28 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { JwtPayload } from '../auth/auth.types';
 import { AuditService } from '../audit/audit.service';
+import { EnterpriseFeatureFlagsService } from '../enterprise/enterprise-feature-flags.service';
 import { ActivityService } from '../events/activity.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { InternalOnlySupplierPurchasingProvider } from './supplier-purchasing.provider';
 import {
   AdjustInventoryStockDto,
+  AssignTechnicianStockDto,
   AllocateToJobDto,
+  CreatePurchaseOrderFromJobDto,
   CreateStockMovementDto,
   JobPartQuantityActionDto,
   PatchJobPartDto,
+  PurchaseOrderTransitionDto,
+  ReceiveStockDto,
   ReceivePurchaseOrderDto,
+  TransferStockDto,
+  UpsertInventoryCategoryDto,
   UpsertInventoryLocationDto,
   UpsertJobPartDto,
   UpsertPurchaseOrderDto,
+  UpsertSupplierItemMappingDto,
   UpsertStockItemDto,
 } from './dto';
 
@@ -22,6 +32,8 @@ export class InventoryService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly activity: ActivityService,
+    private readonly enterpriseFlags: EnterpriseFeatureFlagsService,
+    private readonly supplierPurchasingProvider: InternalOnlySupplierPurchasingProvider,
   ) {}
 
   private db() {
@@ -34,6 +46,18 @@ export class InventoryService {
 
   private toNumber(value: Prisma.Decimal | number | string | null | undefined) {
     return Number(value || 0);
+  }
+
+  private jsonObject(value: unknown) {
+    return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, any> : {};
+  }
+
+  async assertTruckStockEnabled(tenantId: string, actor?: string | JwtPayload | null) {
+    if (actor && typeof actor === 'object' && actor.platformAdmin) {
+      throw new ForbiddenException('Platform admins cannot operate tenant stock');
+    }
+    const userId = typeof actor === 'string' ? actor : actor?.sub;
+    return this.enterpriseFlags.assertEnabled({ tenantId, userId: userId || null, key: 'truck_stock_v1' });
   }
 
   private async resolvePart(tenantId: string, partId: string) {
@@ -50,6 +74,176 @@ export class InventoryService {
     });
     if (!location) throw new NotFoundException('Inventory location not found');
     return location;
+  }
+
+  private async ensureTechnicianLocationScope(tenantId: string, actor: Pick<JwtPayload, 'sub' | 'role'> | null | undefined, inventoryLocationId?: string | null) {
+    if (!actor || actor.role !== 'TECHNICIAN' || !inventoryLocationId) return;
+    const assignment = await this.db().technicianStockAssignment.findFirst({
+      where: {
+        tenantId,
+        technicianId: actor.sub,
+        inventoryLocationId,
+        active: true,
+      },
+      select: { id: true },
+    });
+    if (!assignment) {
+      throw new BadRequestException('Technicians can only operate stock assigned to them');
+    }
+  }
+
+  private async ensureTechnicianJobScope(tenantId: string, actor: Pick<JwtPayload, 'sub' | 'role'> | null | undefined, jobId: string) {
+    if (!actor || actor.role !== 'TECHNICIAN') return;
+    const job = await this.db().job.findFirst({
+      where: { id: jobId, companyId: tenantId, assignedUserId: actor.sub },
+      select: { id: true },
+    });
+    if (!job) {
+      throw new BadRequestException('Technicians can only manage parts for assigned jobs');
+    }
+  }
+
+  private async createInventoryNotification(tenantId: string, actorUserId: string, payload: { type: string; title: string; body: string; entityId: string; idempotencyKey: string; metaJson?: Record<string, any> }) {
+    const recipients = await this.db().user.findMany({
+      where: {
+        companyId: tenantId,
+        isActive: true,
+        role: { in: ['OWNER', 'ADMIN', 'DISPATCHER'] },
+      },
+      select: { id: true },
+      take: 20,
+    });
+    const rows = recipients.map((recipient: any) => ({
+      companyId: tenantId,
+      userId: recipient.id,
+      type: payload.type,
+      title: payload.title,
+      body: payload.body,
+      entityType: 'inventory',
+      entityId: payload.entityId,
+      idempotencyKey: `${payload.idempotencyKey}:${recipient.id}`,
+      metaJson: payload.metaJson || null,
+    }));
+    if (!rows.length) {
+      rows.push({
+        companyId: tenantId,
+        userId: actorUserId,
+        type: payload.type,
+        title: payload.title,
+        body: payload.body,
+        entityType: 'inventory',
+        entityId: payload.entityId,
+        idempotencyKey: `${payload.idempotencyKey}:${actorUserId}`,
+        metaJson: payload.metaJson || null,
+      });
+    }
+    await this.db().notification.createMany({ data: rows, skipDuplicates: true });
+  }
+
+  private async createPurchaseNotification(tenantId: string, actorUserId: string, payload: { type: string; title: string; body: string; purchaseOrderId: string; status?: string; idempotencyKey: string }) {
+    await this.createInventoryNotification(tenantId, actorUserId, {
+      type: payload.type,
+      title: payload.title,
+      body: payload.body,
+      entityId: payload.purchaseOrderId,
+      idempotencyKey: payload.idempotencyKey,
+      metaJson: {
+        href: '/dashboard/purchase-orders',
+        purchaseOrderId: payload.purchaseOrderId,
+        status: payload.status || null,
+        internalOnly: true,
+      },
+    });
+  }
+
+  private async resolveSupplier(tenantId: string, supplierId?: string | null) {
+    if (!supplierId) return null;
+    const supplier = await this.db().stockSupplier.findFirst({
+      where: { id: supplierId, tenantId },
+      select: { id: true, name: true, email: true, phone: true, capabilityMetadataJson: true, internalOnly: true },
+    });
+    if (!supplier) throw new BadRequestException('Supplier not found');
+    return supplier;
+  }
+
+  private sanitizeSupplierSnapshot(supplier: any, fallbackName?: string | null) {
+    if (!supplier && !fallbackName) return null;
+    return {
+      supplierId: supplier?.id || null,
+      name: supplier?.name || fallbackName || null,
+      capabilityMetadata: supplier?.capabilityMetadataJson || { internalPoOnly: true, liveOrdering: false },
+      internalOnly: true,
+      liveOrdering: false,
+    };
+  }
+
+  supplierBridgeReadiness() {
+    return {
+      label: 'Internal PO only',
+      provider: this.supplierPurchasingProvider.capabilities(),
+      liveSupplierOrdering: false,
+      dryRunOnly: true,
+      credentialsExposed: false,
+    };
+  }
+
+  private async resolveSupplierMappingSnapshot(tenantId: string, stockItemId: string, supplierId?: string | null, supplied?: { supplierSku?: string | null; supplierReference?: string | null }) {
+    if (supplied?.supplierSku || supplied?.supplierReference) {
+      return {
+        supplierSku: supplied.supplierSku || null,
+        supplierReference: supplied.supplierReference || null,
+      };
+    }
+    const mapping = await this.db().supplierItemMapping.findFirst({
+      where: {
+        tenantId,
+        stockItemId,
+        active: true,
+        ...(supplierId ? { supplierId } : {}),
+      },
+      orderBy: [{ preferred: 'desc' }, { updatedAt: 'desc' }],
+      select: { supplierSku: true, supplierReference: true, supplierId: true, supplierName: true, preferred: true },
+    });
+    return {
+      supplierSku: mapping?.supplierSku || null,
+      supplierReference: mapping?.supplierReference || null,
+      mappingPreferred: Boolean(mapping?.preferred),
+      mappingSupplierId: mapping?.supplierId || null,
+      mappingSupplierName: mapping?.supplierName || null,
+    };
+  }
+
+  private async notifyIfLowStock(tenantId: string, actorUserId: string, stockItemId: string, inventoryLocationId: string) {
+    const stock = await this.db().inventoryStock.findFirst({
+      where: { tenantId, stockItemId, inventoryLocationId },
+      include: { stockItem: true, inventoryLocation: true },
+    });
+    if (!stock) return;
+    const quantityOnHand = this.toNumber(stock.quantityOnHand);
+    const quantityReserved = this.toNumber(stock.quantityReserved);
+    const reorderPoint = this.toNumber(stock.reorderPoint);
+    const available = quantityOnHand - quantityReserved;
+    const isCritical = available <= 0;
+    const isLow = quantityOnHand <= reorderPoint || available <= reorderPoint;
+    const isTruckLow = stock.inventoryLocation?.kind === 'VAN' && isLow;
+    if (!isLow && !isCritical) return;
+    const severity = isCritical ? 'critical' : 'low';
+    await this.createInventoryNotification(tenantId, actorUserId, {
+      type: isTruckLow ? 'inventory.truck_stock.low' : `inventory.stock.${severity}`,
+      title: isCritical ? 'Critical stock attention needed' : isTruckLow ? 'Truck stock below threshold' : 'Low stock attention needed',
+      body: `${stock.stockItem?.sku || 'Stock item'} at ${stock.inventoryLocation?.name || 'location'} has ${available.toFixed(2)} available.`,
+      entityId: stock.id,
+      idempotencyKey: `inventory:${severity}:${stock.id}:${Math.floor(Date.now() / 86_400_000)}`,
+      metaJson: {
+        href: '/dashboard/inventory',
+        stockItemId,
+        inventoryLocationId,
+        quantityOnHand,
+        quantityReserved,
+        reorderPoint,
+        availableQuantity: available,
+      },
+    });
   }
 
   private async resolveJob(tenantId: string, jobId: string) {
@@ -409,6 +603,177 @@ export class InventoryService {
     });
   }
 
+  async dashboard(tenantId: string) {
+    const [stock, movements, jobParts, valuation, purchaseOrders, supplierMappings] = await Promise.all([
+      this.listStock(tenantId, { inventoryLocationId: 'all' }),
+      this.listMovements(tenantId),
+      this.db().jobPart.findMany({
+        where: { tenantId, status: { in: ['PLANNED', 'RESERVED', 'USED'] } },
+        include: {
+          stockItem: true,
+          sourceLocation: true,
+          job: { select: { id: true, jobRef: true, status: true, assignedUserId: true } },
+        },
+        orderBy: { updatedAt: 'desc' },
+        take: 25,
+      }),
+      this.valuation(tenantId),
+      this.listPurchaseOrders(tenantId),
+      this.listSupplierMappings(tenantId),
+    ]);
+    const truckStock = stock.filter((row: any) => row.locationKind === 'VAN');
+    const warehouseStock = stock.filter((row: any) => row.locationKind === 'WAREHOUSE');
+    const used = await this.db().stockMovement.groupBy({
+      by: ['stockItemId'],
+      where: { tenantId, type: 'USE' },
+      _sum: { qty: true },
+      orderBy: { _sum: { qty: 'desc' } },
+      take: 10,
+    });
+    const usedItems = used.length
+      ? await this.db().stockItem.findMany({
+          where: { tenantId, id: { in: used.map((row: any) => row.stockItemId) } },
+          select: { id: true, sku: true, name: true },
+        })
+      : [];
+    const itemMap = new Map<string, any>(usedItems.map((item: any) => [item.id, item]));
+    return {
+      stockOnHand: stock.reduce((sum: number, row: any) => sum + Number(row.quantityOnHand || 0), 0),
+      lowStock: stock.filter((row: any) => row.lowStock),
+      criticalStock: stock.filter((row: any) => row.shortage || Number(row.availableQuantity || 0) <= 0),
+      truckStock,
+      warehouseStock,
+      recentMovements: movements.slice(0, 20),
+      topUsedItems: used.map((row: any) => ({
+        stockItemId: row.stockItemId,
+        sku: itemMap.get(row.stockItemId)?.sku || null,
+        name: itemMap.get(row.stockItemId)?.name || null,
+        quantityUsed: this.toNumber(row._sum?.qty),
+      })),
+      stockAssignedToJobs: jobParts.map((row: any) => this.serializeJobPart(row)),
+      purchaseOrders: {
+        open: purchaseOrders.filter((po: any) => !['RECEIVED', 'CANCELLED'].includes(String(po.status || ''))),
+        pendingApproval: purchaseOrders.filter((po: any) => po.status === 'SUBMITTED_INTERNAL'),
+        approvedAwaitingReceipt: purchaseOrders.filter((po: any) => ['APPROVED', 'ORDERED'].includes(String(po.status || ''))),
+        partialReceipts: purchaseOrders.filter((po: any) => po.status === 'PARTIALLY_RECEIVED'),
+      },
+      supplierMappingStatus: {
+        mappedItems: new Set(supplierMappings.map((row: any) => row.stockItemId)).size,
+        missingLowStock: stock.filter((row: any) => row.lowStock && !supplierMappings.some((mapping: any) => mapping.stockItemId === row.partId)),
+      },
+      valuation,
+    };
+  }
+
+  async listCategories(tenantId: string) {
+    return this.db().inventoryCategory.findMany({
+      where: { tenantId },
+      orderBy: [{ active: 'desc' }, { name: 'asc' }],
+    });
+  }
+
+  async upsertCategory(tenantId: string, userId: string, dto: UpsertInventoryCategoryDto) {
+    const name = dto.name.trim();
+    const row = await this.db().inventoryCategory.upsert({
+      where: { tenantId_name: { tenantId, name } },
+      create: {
+        tenantId,
+        name,
+        description: dto.description?.trim() || null,
+        active: dto.active ?? true,
+      },
+      update: {
+        description: dto.description !== undefined ? dto.description?.trim() || null : undefined,
+        active: dto.active !== undefined ? Boolean(dto.active) : undefined,
+      },
+    });
+    await this.audit.log(tenantId, 'inventory.category.upsert', `Upserted inventory category ${name}`, userId);
+    return row;
+  }
+
+  async listSupplierMappings(tenantId: string, stockItemId?: string) {
+    return this.db().supplierItemMapping.findMany({
+      where: { tenantId, ...(stockItemId ? { stockItemId } : {}) },
+      include: { stockItem: { select: { id: true, sku: true, name: true } }, supplier: { select: { id: true, name: true } } },
+      orderBy: [{ preferred: 'desc' }, { updatedAt: 'desc' }],
+    });
+  }
+
+  async upsertSupplierMapping(tenantId: string, userId: string, dto: UpsertSupplierItemMappingDto) {
+    await this.resolvePart(tenantId, dto.stockItemId);
+    if (dto.supplierId) {
+      const supplier = await this.db().stockSupplier.findFirst({ where: { tenantId, id: dto.supplierId }, select: { id: true } });
+      if (!supplier) throw new BadRequestException('Supplier not found');
+    }
+    const supplierSku = dto.supplierSku.trim();
+    const row = await this.db().supplierItemMapping.upsert({
+      where: { tenantId_stockItemId_supplierSku: { tenantId, stockItemId: dto.stockItemId, supplierSku } },
+      create: {
+        tenantId,
+        stockItemId: dto.stockItemId,
+        supplierId: dto.supplierId || null,
+        supplierName: dto.supplierName?.trim() || null,
+        supplierSku,
+        supplierReference: dto.supplierReference?.trim() || null,
+        preferred: Boolean(dto.preferred),
+        active: dto.active ?? true,
+        metadataJson: dto.metadataJson ?? null,
+      },
+      update: {
+        supplierId: dto.supplierId !== undefined ? dto.supplierId || null : undefined,
+        supplierName: dto.supplierName !== undefined ? dto.supplierName?.trim() || null : undefined,
+        supplierReference: dto.supplierReference !== undefined ? dto.supplierReference?.trim() || null : undefined,
+        preferred: dto.preferred !== undefined ? Boolean(dto.preferred) : undefined,
+        active: dto.active !== undefined ? Boolean(dto.active) : undefined,
+        metadataJson: dto.metadataJson !== undefined ? dto.metadataJson ?? null : undefined,
+      },
+    });
+    await this.audit.log(tenantId, 'inventory.supplier_mapping.upsert', `Updated supplier mapping for ${supplierSku}`, userId);
+    return row;
+  }
+
+  async listTechnicianAssignments(tenantId: string) {
+    return this.db().technicianStockAssignment.findMany({
+      where: { tenantId },
+      include: {
+        technician: { select: { id: true, email: true, role: true, isActive: true } },
+        inventoryLocation: true,
+      },
+      orderBy: [{ active: 'desc' }, { assignedAt: 'desc' }],
+    });
+  }
+
+  async assignTechnicianStock(tenantId: string, userId: string, dto: AssignTechnicianStockDto) {
+    const [technician] = await Promise.all([
+      this.db().user.findFirst({ where: { id: dto.technicianId, companyId: tenantId, role: 'TECHNICIAN', isActive: true }, select: { id: true } }),
+      this.resolveInventoryLocation(tenantId, dto.inventoryLocationId),
+    ]);
+    if (!technician) throw new BadRequestException('Technician not found');
+    const row = await this.db().technicianStockAssignment.upsert({
+      where: {
+        tenantId_technicianId_inventoryLocationId: {
+          tenantId,
+          technicianId: dto.technicianId,
+          inventoryLocationId: dto.inventoryLocationId,
+        },
+      },
+      create: {
+        tenantId,
+        technicianId: dto.technicianId,
+        inventoryLocationId: dto.inventoryLocationId,
+        active: dto.active ?? true,
+        notesJson: dto.notesJson ?? null,
+      },
+      update: {
+        active: dto.active ?? true,
+        releasedAt: dto.active === false ? new Date() : null,
+        notesJson: dto.notesJson !== undefined ? dto.notesJson ?? null : undefined,
+      },
+    });
+    await this.audit.log(tenantId, 'inventory.truck_stock.assign', `Assigned technician stock location ${dto.inventoryLocationId}`, userId);
+    return row;
+  }
+
   async adjustStock(tenantId: string, userId: string, dto: AdjustInventoryStockDto) {
     const item = await this.resolvePart(tenantId, dto.stockItemId);
     const inventoryLocation = await this.resolveInventoryLocation(tenantId, dto.inventoryLocationId);
@@ -451,7 +816,85 @@ export class InventoryService {
       quantityDelta: dto.quantityDelta,
       movementId: result.movement.id,
     });
+    await this.notifyIfLowStock(tenantId, userId, item.id, inventoryLocation.id);
     return result.updatedStock;
+  }
+
+  async receiveStock(tenantId: string, userId: string, dto: ReceiveStockDto) {
+    return this.adjustStock(tenantId, userId, {
+      stockItemId: dto.stockItemId,
+      inventoryLocationId: dto.inventoryLocationId,
+      quantityDelta: dto.quantity,
+      reason: dto.reason || 'Manual stock receipt',
+    });
+  }
+
+  async returnStock(tenantId: string, userId: string, dto: ReceiveStockDto, actor?: Pick<JwtPayload, 'sub' | 'role'>) {
+    await this.ensureTechnicianLocationScope(tenantId, actor, dto.inventoryLocationId);
+    const result = await this.adjustStock(tenantId, userId, {
+      stockItemId: dto.stockItemId,
+      inventoryLocationId: dto.inventoryLocationId,
+      quantityDelta: dto.quantity,
+      reason: dto.reason || 'Returned unused stock',
+    });
+    await this.audit.log(tenantId, 'inventory.stock.return', `Returned stock ${dto.stockItemId}`, userId);
+    return result;
+  }
+
+  async transferStock(tenantId: string, userId: string, dto: TransferStockDto, actor?: Pick<JwtPayload, 'sub' | 'role'>) {
+    if (dto.fromInventoryLocationId === dto.toInventoryLocationId) {
+      throw new BadRequestException('Transfer source and destination must be different');
+    }
+    await this.ensureTechnicianLocationScope(tenantId, actor, dto.fromInventoryLocationId);
+    const [item, fromLocation, toLocation] = await Promise.all([
+      this.resolvePart(tenantId, dto.stockItemId),
+      this.resolveInventoryLocation(tenantId, dto.fromInventoryLocationId),
+      this.resolveInventoryLocation(tenantId, dto.toInventoryLocationId),
+    ]);
+    const quantity = Number(dto.quantity || 0);
+    if (quantity <= 0) throw new BadRequestException('Transfer quantity must be greater than zero');
+
+    const result = await this.db().$transaction(async (tx: any) => {
+      const fromStock = await this.ensureInventoryStock(tenantId, item.id, fromLocation.id, tx);
+      const toStock = await this.ensureInventoryStock(tenantId, item.id, toLocation.id, tx);
+      const available = this.toNumber(fromStock.quantityOnHand) - this.toNumber(fromStock.quantityReserved);
+      if (available < quantity) throw new BadRequestException('Not enough available stock to transfer');
+      const updatedFrom = await tx.inventoryStock.update({
+        where: { id: fromStock.id },
+        data: { quantityOnHand: this.decimal(this.toNumber(fromStock.quantityOnHand) - quantity) },
+      });
+      const updatedTo = await tx.inventoryStock.update({
+        where: { id: toStock.id },
+        data: { quantityOnHand: this.decimal(this.toNumber(toStock.quantityOnHand) + quantity) },
+      });
+      const movement = await tx.stockMovement.create({
+        data: {
+          tenantId,
+          stockItemId: item.id,
+          inventoryLocationId: toLocation.id,
+          fromInventoryLocationId: fromLocation.id,
+          toInventoryLocationId: toLocation.id,
+          type: 'TRANSFER',
+          qty: this.decimal(quantity),
+          reason: dto.reason || `Transferred from ${fromLocation.name} to ${toLocation.name}`,
+        },
+      });
+      return { updatedFrom, updatedTo, movement };
+    });
+
+    await this.audit.log(tenantId, 'inventory.stock.transfer', `Transferred ${quantity} of ${item.sku}`, userId);
+    await this.pushInventoryActivity(tenantId, 'inventory.stock.transferred', `Transferred ${item.sku}`, {
+      partId: item.id,
+      fromInventoryLocationId: fromLocation.id,
+      toInventoryLocationId: toLocation.id,
+      quantity,
+      movementId: result.movement.id,
+    });
+    await Promise.all([
+      this.notifyIfLowStock(tenantId, userId, item.id, fromLocation.id),
+      this.notifyIfLowStock(tenantId, userId, item.id, toLocation.id),
+    ]);
+    return result;
   }
 
   async listJobParts(tenantId: string, jobId: string) {
@@ -467,7 +910,9 @@ export class InventoryService {
     return rows.map((row: any) => this.serializeJobPart(row));
   }
 
-  async createJobPart(tenantId: string, userId: string, jobId: string, dto: UpsertJobPartDto) {
+  async createJobPart(tenantId: string, userId: string, jobId: string, dto: UpsertJobPartDto, actor?: Pick<JwtPayload, 'sub' | 'role'>) {
+    await this.ensureTechnicianJobScope(tenantId, actor, jobId);
+    await this.ensureTechnicianLocationScope(tenantId, actor, dto.sourceLocationId);
     const [job, item] = await Promise.all([this.resolveJob(tenantId, jobId), this.resolvePart(tenantId, dto.stockItemId)]);
     if (dto.sourceLocationId) {
       await this.resolveInventoryLocation(tenantId, dto.sourceLocationId);
@@ -499,7 +944,9 @@ export class InventoryService {
     return this.serializeJobPart(row);
   }
 
-  async patchJobPart(tenantId: string, userId: string, jobId: string, jobPartId: string, dto: PatchJobPartDto) {
+  async patchJobPart(tenantId: string, userId: string, jobId: string, jobPartId: string, dto: PatchJobPartDto, actor?: Pick<JwtPayload, 'sub' | 'role'>) {
+    await this.ensureTechnicianJobScope(tenantId, actor, jobId);
+    await this.ensureTechnicianLocationScope(tenantId, actor, dto.sourceLocationId);
     const row = await this.resolveJobPart(tenantId, jobId, jobPartId);
     if (dto.sourceLocationId) {
       await this.resolveInventoryLocation(tenantId, dto.sourceLocationId);
@@ -523,8 +970,10 @@ export class InventoryService {
     return this.serializeJobPart(updated);
   }
 
-  async reserveJobPart(tenantId: string, userId: string, jobId: string, jobPartId: string, dto: JobPartQuantityActionDto) {
+  async reserveJobPart(tenantId: string, userId: string, jobId: string, jobPartId: string, dto: JobPartQuantityActionDto, actor?: Pick<JwtPayload, 'sub' | 'role'>) {
+    await this.ensureTechnicianJobScope(tenantId, actor, jobId);
     const row = await this.resolveJobPart(tenantId, jobId, jobPartId);
+    await this.ensureTechnicianLocationScope(tenantId, actor, row.sourceLocationId);
     if (!row.sourceLocationId) {
       throw new BadRequestException('A source inventory location is required before reservation');
     }
@@ -579,8 +1028,10 @@ export class InventoryService {
     return this.serializeJobPart(result.updated);
   }
 
-  async useJobPart(tenantId: string, userId: string, jobId: string, jobPartId: string, dto: JobPartQuantityActionDto) {
+  async useJobPart(tenantId: string, userId: string, jobId: string, jobPartId: string, dto: JobPartQuantityActionDto, actor?: Pick<JwtPayload, 'sub' | 'role'>) {
+    await this.ensureTechnicianJobScope(tenantId, actor, jobId);
     const row = await this.resolveJobPart(tenantId, jobId, jobPartId);
+    await this.ensureTechnicianLocationScope(tenantId, actor, row.sourceLocationId);
     if (!row.sourceLocationId) {
       throw new BadRequestException('A source inventory location is required before parts can be used');
     }
@@ -654,11 +1105,14 @@ export class InventoryService {
       quantity,
       movementId: result.movement.id,
     }, row.job);
+    await this.notifyIfLowStock(tenantId, userId, row.stockItemId, row.sourceLocationId);
     return this.serializeJobPart(result.updated);
   }
 
-  async releaseJobPart(tenantId: string, userId: string, jobId: string, jobPartId: string, dto: JobPartQuantityActionDto) {
+  async releaseJobPart(tenantId: string, userId: string, jobId: string, jobPartId: string, dto: JobPartQuantityActionDto, actor?: Pick<JwtPayload, 'sub' | 'role'>) {
+    await this.ensureTechnicianJobScope(tenantId, actor, jobId);
     const row = await this.resolveJobPart(tenantId, jobId, jobPartId);
+    await this.ensureTechnicianLocationScope(tenantId, actor, row.sourceLocationId);
     if (!row.sourceLocationId) {
       throw new BadRequestException('A source inventory location is required before release');
     }
@@ -734,22 +1188,36 @@ export class InventoryService {
     return rows.map((row: any) => ({
       id: row.id,
       status: row.status,
+      internalOnly: row.internalOnly !== false,
       supplierName: row.supplierName || row.supplier?.name || null,
+      supplierId: row.supplierId || null,
+      supplierSnapshotJson: row.supplierSnapshotJson || null,
       locationId: row.locationId || null,
       inventoryLocationId: row.inventoryLocationId || null,
       inventoryLocationName: row.inventoryLocation?.name || null,
       businessLocationId: row.inventoryLocation?.businessLocationId || row.locationId || null,
+      createdByUserId: row.createdByUserId || null,
+      approvedByUserId: row.approvedByUserId || null,
+      receivedByUserId: row.receivedByUserId || null,
+      submittedAt: row.submittedAt || null,
+      approvedAt: row.approvedAt || null,
+      cancelledAt: row.cancelledAt || null,
       orderedAt: row.orderedAt,
       receivedAt: row.receivedAt,
       notesJson: row.notesJson ?? null,
       lines: (row.lines || []).map((line: any) => ({
         id: line.id,
         partId: line.stockItemId,
+        sourceJobId: line.sourceJobId || null,
         sku: line.stockItem?.sku || null,
         name: line.stockItem?.name || null,
         quantityOrdered: this.toNumber(line.qtyOrdered),
         quantityReceived: this.toNumber(line.qtyReceived),
         unitCostCents: Math.round(this.toNumber(line.unitCost) * 100),
+        supplierSku: line.supplierSku || null,
+        supplierReference: line.supplierReference || null,
+        pricingSnapshotJson: line.pricingSnapshotJson || null,
+        notesJson: line.notesJson || null,
       })),
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
@@ -760,11 +1228,37 @@ export class InventoryService {
     if (dto.inventoryLocationId) {
       await this.resolveInventoryLocation(tenantId, dto.inventoryLocationId);
     }
+    const supplier = await this.resolveSupplier(tenantId, dto.supplierId);
     const lines = Array.isArray(dto.lines) ? dto.lines : [];
-    await Promise.all(lines.map((line) => this.resolvePart(tenantId, line.stockItemId)));
+    const parts = await Promise.all(lines.map((line) => this.resolvePart(tenantId, line.stockItemId)));
     if (lines.some((line) => Number(line.qtyOrdered || 0) <= 0)) {
       throw new BadRequestException('Purchase order lines must have a positive quantity');
     }
+    const status = dto.status || 'DRAFT';
+    const lineSnapshots = await Promise.all(lines.map(async (line, index) => {
+      const part = parts[index];
+      const mapping = await this.resolveSupplierMappingSnapshot(tenantId, line.stockItemId, dto.supplierId, line);
+      return {
+        stockItemId: line.stockItemId,
+        sourceJobId: line.sourceJobId || null,
+        qtyOrdered: this.decimal(line.qtyOrdered),
+        qtyReceived: this.decimal(line.qtyReceived ?? 0),
+        unitCost: this.decimal(line.unitCost ?? this.toNumber(part.avgUnitCost)),
+        supplierSku: mapping.supplierSku || null,
+        supplierReference: mapping.supplierReference || null,
+        notesJson: line.notesJson ?? null,
+        pricingSnapshotJson: {
+          stockItemId: part.id,
+          sku: part.sku,
+          name: part.name,
+          unit: part.unit,
+          expectedUnitCost: Number(line.unitCost ?? this.toNumber(part.avgUnitCost)),
+          supplierSku: mapping.supplierSku || null,
+          supplierReference: mapping.supplierReference || null,
+          internalPoOnly: true,
+        },
+      };
+    }));
 
     const po = await this.db().stockPurchaseOrder.create({
       data: {
@@ -773,17 +1267,17 @@ export class InventoryService {
         inventoryLocationId: dto.inventoryLocationId || null,
         supplierId: dto.supplierId || null,
         supplierName: dto.supplierName?.trim() || null,
-        status: dto.status || 'DRAFT',
-        orderedAt: dto.status === 'ORDERED' ? new Date() : null,
+        status,
+        createdByUserId: userId,
+        submittedAt: status === 'SUBMITTED_INTERNAL' ? new Date() : null,
+        approvedAt: ['APPROVED', 'ORDERED'].includes(status) ? new Date() : null,
+        orderedAt: ['APPROVED', 'ORDERED'].includes(status) ? new Date() : null,
         notesJson: dto.notesJson ?? null,
+        supplierSnapshotJson: this.sanitizeSupplierSnapshot(supplier, dto.supplierName?.trim() || null),
+        internalOnly: true,
         lines: lines.length
           ? {
-              create: lines.map((line) => ({
-                stockItemId: line.stockItemId,
-                qtyOrdered: this.decimal(line.qtyOrdered),
-                qtyReceived: this.decimal(line.qtyReceived ?? 0),
-                unitCost: this.decimal(line.unitCost ?? 0),
-              })),
+              create: lineSnapshots,
             }
           : undefined,
       },
@@ -797,7 +1291,18 @@ export class InventoryService {
     await this.pushInventoryActivity(tenantId, 'inventory.purchase_order.created', `Created purchase order ${po.id.slice(0, 12)}`, {
       purchaseOrderId: po.id,
       status: po.status,
+      internalOnly: true,
     });
+    if (!lineSnapshots.every((line) => line.supplierSku || line.supplierReference)) {
+      await this.createPurchaseNotification(tenantId, userId, {
+        type: 'inventory.purchase_order.supplier_mapping_missing',
+        title: 'Supplier mapping missing',
+        body: 'One or more internal PO lines do not have a supplier SKU mapping yet.',
+        purchaseOrderId: po.id,
+        status: po.status,
+        idempotencyKey: `inventory:po:${po.id}:mapping-missing`,
+      });
+    }
     return (await this.listPurchaseOrders(tenantId)).find((row: any) => row.id === po.id);
   }
 
@@ -810,8 +1315,35 @@ export class InventoryService {
     if (dto.inventoryLocationId) {
       await this.resolveInventoryLocation(tenantId, dto.inventoryLocationId);
     }
+    const supplier = dto.supplierId !== undefined ? await this.resolveSupplier(tenantId, dto.supplierId) : undefined;
+    let nextLineData: any[] | undefined;
     if (Array.isArray(dto.lines)) {
-      await Promise.all(dto.lines.map((line) => this.resolvePart(tenantId, line.stockItemId)));
+      const parts = await Promise.all(dto.lines.map((line) => this.resolvePart(tenantId, line.stockItemId)));
+      nextLineData = await Promise.all(dto.lines.map(async (line, index) => {
+        const part = parts[index];
+        const mapping = await this.resolveSupplierMappingSnapshot(tenantId, line.stockItemId, dto.supplierId ?? existing.supplierId, line);
+        return {
+          poId: id,
+          stockItemId: line.stockItemId,
+          sourceJobId: line.sourceJobId || null,
+          qtyOrdered: this.decimal(line.qtyOrdered),
+          qtyReceived: this.decimal(line.qtyReceived ?? 0),
+          unitCost: this.decimal(line.unitCost ?? this.toNumber(part.avgUnitCost)),
+          supplierSku: mapping.supplierSku || null,
+          supplierReference: mapping.supplierReference || null,
+          notesJson: line.notesJson ?? null,
+          pricingSnapshotJson: {
+            stockItemId: part.id,
+            sku: part.sku,
+            name: part.name,
+            unit: part.unit,
+            expectedUnitCost: Number(line.unitCost ?? this.toNumber(part.avgUnitCost)),
+            supplierSku: mapping.supplierSku || null,
+            supplierReference: mapping.supplierReference || null,
+            internalPoOnly: true,
+          },
+        };
+      }));
     }
 
     await this.db().$transaction(async (tx: any) => {
@@ -823,26 +1355,102 @@ export class InventoryService {
           supplierId: dto.supplierId !== undefined ? dto.supplierId || null : undefined,
           supplierName: dto.supplierName !== undefined ? dto.supplierName?.trim() || null : undefined,
           status: dto.status,
-          orderedAt: dto.status === 'ORDERED' && !existing.orderedAt ? new Date() : existing.orderedAt,
+          submittedAt: dto.status === 'SUBMITTED_INTERNAL' && !existing.submittedAt ? new Date() : existing.submittedAt,
+          approvedAt: dto.status && ['APPROVED', 'ORDERED'].includes(dto.status) && !existing.approvedAt ? new Date() : existing.approvedAt,
+          orderedAt: dto.status && ['APPROVED', 'ORDERED'].includes(dto.status) && !existing.orderedAt ? new Date() : existing.orderedAt,
+          cancelledAt: dto.status === 'CANCELLED' && !existing.cancelledAt ? new Date() : existing.cancelledAt,
           notesJson: dto.notesJson !== undefined ? dto.notesJson ?? null : undefined,
+          supplierSnapshotJson: dto.supplierId !== undefined || dto.supplierName !== undefined
+            ? this.sanitizeSupplierSnapshot(supplier, dto.supplierName?.trim() || existing.supplierName || null)
+            : undefined,
         },
       });
       if (Array.isArray(dto.lines)) {
         await tx.stockPOLine.deleteMany({ where: { poId: id } });
-        if (dto.lines.length) {
+        if (nextLineData?.length) {
           await tx.stockPOLine.createMany({
-            data: dto.lines.map((line) => ({
-              poId: id,
-              stockItemId: line.stockItemId,
-              qtyOrdered: this.decimal(line.qtyOrdered),
-              qtyReceived: this.decimal(line.qtyReceived ?? 0),
-              unitCost: this.decimal(line.unitCost ?? 0),
-            })),
+            data: nextLineData,
           });
         }
       }
     });
     await this.audit.log(tenantId, 'inventory.po.update', `Updated purchase order ${id}`, userId);
+    return (await this.listPurchaseOrders(tenantId)).find((row: any) => row.id === id);
+  }
+
+  async submitPurchaseOrder(tenantId: string, userId: string, id: string, dto?: PurchaseOrderTransitionDto) {
+    const existing = await this.db().stockPurchaseOrder.findFirst({ where: { id, tenantId }, include: { lines: true } });
+    if (!existing) throw new NotFoundException('Purchase order not found');
+    if (['RECEIVED', 'CANCELLED'].includes(existing.status)) throw new BadRequestException('This purchase order cannot be submitted');
+    if (!existing.lines.length) throw new BadRequestException('Purchase order must include at least one line before submission');
+    const updated = await this.db().stockPurchaseOrder.update({
+      where: { id },
+      data: {
+        status: 'SUBMITTED_INTERNAL',
+        submittedAt: existing.submittedAt || new Date(),
+        notesJson: dto?.note ? { ...this.jsonObject(existing.notesJson), submitNote: dto.note } : existing.notesJson,
+      },
+    });
+    await this.audit.log(tenantId, 'inventory.po.submit', `Submitted purchase order ${id} for internal approval`, userId);
+    await this.createPurchaseNotification(tenantId, userId, {
+      type: 'inventory.purchase_order.submitted',
+      title: 'Purchase order submitted',
+      body: `Internal PO ${id.slice(0, 12)} is ready for approval.`,
+      purchaseOrderId: id,
+      status: updated.status,
+      idempotencyKey: `inventory:po:${id}:submitted:${updated.updatedAt?.getTime?.() || Date.now()}`,
+    });
+    return (await this.listPurchaseOrders(tenantId)).find((row: any) => row.id === id);
+  }
+
+  async approvePurchaseOrder(tenantId: string, userId: string, id: string, dto?: PurchaseOrderTransitionDto) {
+    const existing = await this.db().stockPurchaseOrder.findFirst({ where: { id, tenantId }, include: { lines: true } });
+    if (!existing) throw new NotFoundException('Purchase order not found');
+    if (['RECEIVED', 'CANCELLED'].includes(existing.status)) throw new BadRequestException('This purchase order cannot be approved');
+    if (!existing.lines.length) throw new BadRequestException('Purchase order must include at least one line before approval');
+    const updated = await this.db().stockPurchaseOrder.update({
+      where: { id },
+      data: {
+        status: 'APPROVED',
+        approvedByUserId: userId,
+        approvedAt: existing.approvedAt || new Date(),
+        orderedAt: existing.orderedAt || new Date(),
+        notesJson: dto?.note ? { ...this.jsonObject(existing.notesJson), approvalNote: dto.note } : existing.notesJson,
+      },
+    });
+    await this.audit.log(tenantId, 'inventory.po.approve', `Approved internal purchase order ${id}`, userId);
+    await this.createPurchaseNotification(tenantId, userId, {
+      type: 'inventory.purchase_order.approved',
+      title: 'Purchase order approved',
+      body: `Internal PO ${id.slice(0, 12)} is approved and awaiting receipt.`,
+      purchaseOrderId: id,
+      status: updated.status,
+      idempotencyKey: `inventory:po:${id}:approved:${updated.updatedAt?.getTime?.() || Date.now()}`,
+    });
+    return (await this.listPurchaseOrders(tenantId)).find((row: any) => row.id === id);
+  }
+
+  async cancelPurchaseOrder(tenantId: string, userId: string, id: string, dto?: PurchaseOrderTransitionDto) {
+    const existing = await this.db().stockPurchaseOrder.findFirst({ where: { id, tenantId } });
+    if (!existing) throw new NotFoundException('Purchase order not found');
+    if (existing.status === 'RECEIVED') throw new BadRequestException('Received purchase orders cannot be cancelled');
+    const updated = await this.db().stockPurchaseOrder.update({
+      where: { id },
+      data: {
+        status: 'CANCELLED',
+        cancelledAt: existing.cancelledAt || new Date(),
+        notesJson: dto?.note ? { ...this.jsonObject(existing.notesJson), cancellationNote: dto.note } : existing.notesJson,
+      },
+    });
+    await this.audit.log(tenantId, 'inventory.po.cancel', `Cancelled internal purchase order ${id}`, userId);
+    await this.createPurchaseNotification(tenantId, userId, {
+      type: 'inventory.purchase_order.cancelled',
+      title: 'Purchase order cancelled',
+      body: `Internal PO ${id.slice(0, 12)} has been cancelled.`,
+      purchaseOrderId: id,
+      status: updated.status,
+      idempotencyKey: `inventory:po:${id}:cancelled:${updated.updatedAt?.getTime?.() || Date.now()}`,
+    });
     return (await this.listPurchaseOrders(tenantId)).find((row: any) => row.id === id);
   }
 
@@ -857,8 +1465,18 @@ export class InventoryService {
     if (!po.inventoryLocationId) {
       throw new BadRequestException('Purchase order must target an inventory location before receiving');
     }
+    if (po.status === 'CANCELLED') {
+      throw new BadRequestException('Cancelled purchase orders cannot be received');
+    }
+    if (!['APPROVED', 'ORDERED', 'PARTIALLY_RECEIVED'].includes(po.status)) {
+      throw new BadRequestException('Purchase order must be approved before receiving stock');
+    }
+    if (po.lines.every((line: any) => this.toNumber(line.qtyReceived) >= this.toNumber(line.qtyOrdered))) {
+      throw new BadRequestException('Purchase order has already been fully received');
+    }
 
     const lineReceipts = new Map((dto?.lines || []).map((line) => [line.lineId, Number(line.quantityReceived || 0)]));
+    let totalReceivedNow = 0;
 
     await this.db().$transaction(async (tx: any) => {
       for (const line of po.lines) {
@@ -868,6 +1486,7 @@ export class InventoryService {
           throw new BadRequestException('Received quantity exceeds remaining ordered quantity');
         }
         if (receiveQty === 0) continue;
+        totalReceivedNow += receiveQty;
         const stock = await this.ensureInventoryStock(tenantId, line.stockItemId, po.inventoryLocationId as string, tx);
         await tx.stockPOLine.update({
           where: { id: line.id },
@@ -901,16 +1520,35 @@ export class InventoryService {
         data: {
           status: allReceived ? 'RECEIVED' : anyReceived ? 'PARTIALLY_RECEIVED' : po.status,
           orderedAt: po.orderedAt || new Date(),
-          receivedAt: anyReceived ? new Date() : po.receivedAt,
+          receivedByUserId: userId,
+          receivedAt: allReceived ? new Date() : po.receivedAt,
         },
       });
     });
+    if (totalReceivedNow <= 0) {
+      throw new BadRequestException('No stock was received');
+    }
 
     await this.audit.log(tenantId, 'inventory.po.receive', `Received purchase order ${id}`, userId);
-    await this.pushInventoryActivity(tenantId, 'inventory.purchase_order.received', `Received purchase order ${id.slice(0, 12)}`, {
+    const refreshed = (await this.listPurchaseOrders(tenantId)).find((row: any) => row.id === id);
+    const partial = refreshed?.status === 'PARTIALLY_RECEIVED';
+    await this.pushInventoryActivity(tenantId, partial ? 'inventory.purchase_order.partial_received' : 'inventory.purchase_order.received', `Received purchase order ${id.slice(0, 12)}`, {
       purchaseOrderId: id,
+      quantityReceived: totalReceivedNow,
+      status: refreshed?.status,
     });
-    return (await this.listPurchaseOrders(tenantId)).find((row: any) => row.id === id);
+    await this.createPurchaseNotification(tenantId, userId, {
+      type: partial ? 'inventory.purchase_order.partial_received' : 'inventory.purchase_order.received',
+      title: partial ? 'Purchase order partially received' : 'Purchase order received',
+      body: `Internal PO ${id.slice(0, 12)} receipt posted ${totalReceivedNow.toFixed(2)} units to stock.`,
+      purchaseOrderId: id,
+      status: refreshed?.status,
+      idempotencyKey: `inventory:po:${id}:received:${Date.now()}`,
+    });
+    await Promise.all(
+      po.lines.map((line: any) => this.notifyIfLowStock(tenantId, userId, line.stockItemId, po.inventoryLocationId as string)),
+    );
+    return refreshed;
   }
 
   async listMovements(tenantId: string) {
@@ -920,6 +1558,8 @@ export class InventoryService {
         stockItem: true,
         location: true,
         inventoryLocation: true,
+        fromInventoryLocation: true,
+        toInventoryLocation: true,
         job: { select: { id: true, jobRef: true } },
       },
       orderBy: { createdAt: 'desc' },
@@ -941,6 +1581,18 @@ export class InventoryService {
         ? {
             id: row.inventoryLocation.id,
             name: row.inventoryLocation.name,
+          }
+        : null,
+      fromInventoryLocation: row.fromInventoryLocation
+        ? {
+            id: row.fromInventoryLocation.id,
+            name: row.fromInventoryLocation.name,
+          }
+        : null,
+      toInventoryLocation: row.toInventoryLocation
+        ? {
+            id: row.toInventoryLocation.id,
+            name: row.toInventoryLocation.name,
           }
         : null,
       job: row.job || null,
@@ -995,10 +1647,11 @@ export class InventoryService {
     if (!chosenLocationId) {
       throw new BadRequestException('Create an inventory location before generating a reorder draft');
     }
-    return this.createPurchaseOrder(tenantId, userId, {
+    const draft = await this.createPurchaseOrder(tenantId, userId, {
       inventoryLocationId: chosenLocationId,
       supplierId: item.supplierId || undefined,
       status: 'DRAFT',
+      notesJson: { source: 'low_stock_reorder', internalPoOnly: true },
       lines: [
         {
           stockItemId: item.id,
@@ -1006,6 +1659,65 @@ export class InventoryService {
           unitCost: this.toNumber(item.avgUnitCost),
         },
       ],
+    });
+    await this.createPurchaseNotification(tenantId, userId, {
+      type: 'inventory.purchase_order.low_stock_ready',
+      title: 'Low stock ready for PO',
+      body: `${item.sku} has an internal purchase draft ready for review.`,
+      purchaseOrderId: draft.id,
+      status: draft.status,
+      idempotencyKey: `inventory:po:${draft.id}:low-stock-ready`,
+    });
+    return draft;
+  }
+
+  async createPurchaseOrderFromJobNeed(tenantId: string, userId: string, dto: CreatePurchaseOrderFromJobDto, actor?: Pick<JwtPayload, 'sub' | 'role'> | null) {
+    const job = await this.resolveJob(tenantId, dto.jobId);
+    await this.ensureTechnicianJobScope(tenantId, actor, job.id);
+    const parts = await this.db().jobPart.findMany({
+      where: {
+        tenantId,
+        jobId: job.id,
+        status: { in: ['PLANNED', 'RESERVED'] },
+      },
+      include: { stockItem: true, sourceLocation: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    const shortageLines: any[] = [];
+    for (const part of parts) {
+      const planned = this.toNumber(part.quantityPlanned);
+      const used = this.toNumber(part.quantityUsed);
+      const reserved = this.toNumber(part.quantityReserved);
+      const needed = Math.max(0, planned - used - reserved);
+      if (needed <= 0) continue;
+      const stockRows = await this.db().inventoryStock.findMany({
+        where: { tenantId, stockItemId: part.stockItemId },
+      });
+      const available = stockRows.reduce((sum: number, row: any) => sum + this.toNumber(row.quantityOnHand) - this.toNumber(row.quantityReserved), 0);
+      const shortage = Math.max(0, needed - available);
+      if (shortage <= 0) continue;
+      shortageLines.push({
+        stockItemId: part.stockItemId,
+        sourceJobId: job.id,
+        qtyOrdered: shortage,
+        unitCost: this.toNumber(part.stockItem?.avgUnitCost),
+        notesJson: { source: 'job_material_shortage', jobId: job.id, jobRef: job.jobRef || null },
+      });
+    }
+    if (!shortageLines.length) {
+      throw new BadRequestException('No job material shortage found for this job');
+    }
+    const targetLocation = dto.inventoryLocationId || parts.find((part: any) => part.sourceLocationId)?.sourceLocationId;
+    if (!targetLocation) {
+      throw new BadRequestException('Choose a receiving inventory location for the job material purchase order');
+    }
+    return this.createPurchaseOrder(tenantId, userId, {
+      inventoryLocationId: targetLocation,
+      supplierId: dto.supplierId,
+      supplierName: dto.supplierName,
+      status: 'DRAFT',
+      notesJson: { source: 'job_material_shortage', jobId: job.id, jobRef: job.jobRef || null, internalPoOnly: true },
+      lines: shortageLines,
     });
   }
 
@@ -1040,6 +1752,17 @@ export class InventoryService {
   }
 
   async addMovement(companyId: string, userId: string, dto: CreateStockMovementDto) {
+    if (dto.type === 'RETURN') {
+      if (!dto.inventoryLocationId) {
+        throw new BadRequestException('inventoryLocationId is required for stock return');
+      }
+      return this.returnStock(companyId, userId, {
+        stockItemId: dto.stockItemId,
+        inventoryLocationId: dto.inventoryLocationId,
+        quantity: dto.qty,
+        reason: dto.reason,
+      });
+    }
     if (dto.type === 'ADJUST') {
       if (!dto.inventoryLocationId) {
         throw new BadRequestException('inventoryLocationId is required for stock adjustment');
@@ -1097,6 +1820,7 @@ export class InventoryService {
   }
 
   async allocateToJob(companyId: string, userId: string, itemId: string, dto: AllocateToJobDto) {
+    await this.assertTruckStockEnabled(companyId, userId);
     const [job, item] = await Promise.all([
       this.resolveJob(companyId, dto.jobId),
       this.resolvePart(companyId, itemId),

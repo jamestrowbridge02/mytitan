@@ -3,6 +3,9 @@ import { randomBytes } from 'crypto';
 import { AutomationsService } from '../automations/automations.service';
 import { AuditService } from '../audit/audit.service';
 import { BillingService } from '../billing/billing.service';
+import { getPortalControlSettings } from '../common/business-config';
+import { summarizeCustomerCollectionReadiness } from '../billing/payment-collection';
+import { buildAppUrl } from '../common/public-url';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -15,13 +18,18 @@ export class PortalService {
   ) {}
 
   private buildPortalUrl(token: string) {
-    const appUrl = process.env.APP_PUBLIC_URL || 'https://app.mytitan.co.uk';
-    return `${appUrl}/portal/job/${token}`;
+    return buildAppUrl(`/portal/job/${token}`);
   }
 
   async overview(companyId: string) {
     const db = this.prisma as any;
     const settings = await db.tenantSetting.findUnique({ where: { tenantId: companyId } });
+    const portalControls = getPortalControlSettings(settings);
+    const collectionReadiness = summarizeCustomerCollectionReadiness({
+      paymentsEnabled: Boolean(settings?.paymentsEnabled || settings?.featurePayments),
+      stripeConfigured: this.billing.isStripeConfigured(),
+      settings,
+    });
     const now = new Date();
     const [jobs, recentActivity] = await Promise.all([
       db.job.findMany({
@@ -84,14 +92,19 @@ export class PortalService {
         portalExpiresAt: token?.expiresAt || null,
         portalUrl: token?.token && portalState === 'active' ? this.buildPortalUrl(token.token) : null,
         invoiceOverdue: Boolean(job.invoiceDueAt && !job.invoicePaidAt && new Date(job.invoiceDueAt).getTime() < now.getTime()),
-        paymentReady: Boolean(settings?.paymentsEnabled && this.billing.isStripeConfigured() && (job.totalCents || 0) > 0),
+        paymentReady: Boolean((job.totalCents || 0) > 0 && collectionReadiness.ready),
+        paymentSetupLabel: collectionReadiness.label,
+        paymentSetupDetail: collectionReadiness.detail,
       };
     });
 
     return {
       enabled: Boolean(settings?.featureCustomerPortal || settings?.paymentsEnabled),
+      controls: portalControls,
       paymentsEnabled: Boolean(settings?.paymentsEnabled),
       stripeConfigured: this.billing.isStripeConfigured(),
+      paymentSetupLabel: collectionReadiness.label,
+      paymentSetupDetail: collectionReadiness.detail,
       summary: {
         activeLinks: rows.filter((row) => row.portalTokenActive).length,
         expiredLinks: rows.filter((row) => row.portalState === 'expired').length,

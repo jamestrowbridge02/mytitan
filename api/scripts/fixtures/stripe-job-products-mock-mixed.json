@@ -1,0 +1,122 @@
+{
+  "prices": [
+    {
+      "id": "price_mock_pack_1",
+      "lookup_key": "job_completion_pack_1",
+      "currency": "gbp",
+      "active": true,
+      "unit_amount": 500,
+      "metadata": {
+        "job_completion_pack_code": "job_completion_pack_1",
+        "job_count": "10"
+      },
+      "product": {
+        "id": "prod_mock_pack_1",
+        "name": "Job completion pack 1",
+        "active": true,
+        "metadata": {
+          "job_completion_pack_code": "job_completion_pack_1",
+          "job_count": "10"
+        }
+      }
+    },
+    {
+      "id": "price_mock_pack_2",
+      "lookup_key": null,
+      "currency": "gbp",
+      "active": true,
+      "unit_amount": 1250,
+      "metadata": {
+        "job_completion_pack_code": "job_completion_pack_2",
+        "job_count": "24"
+      },
+      "product": {
+        "id": "prod_mock_pack_2",
+        "name": "Job completion pack 2",
+        "active": true,
+        "metadata": {
+          "job_completion_pack_code": "job_completion_pack_2",
+          "job_count": "24"
+        }
+      }
+    },
+    {
+      "id": "price_mock_pack_3",
+      "lookup_key": "job_completion_pack_3",
+      "currency": "gbp",
+      "active": false,
+      "unit_amount": 2500,
+      "metadata": {
+        "job_completion_pack_code": "job_completion_pack_3",
+        "job_count": "50"
+      },
+      "product": {
+        "id": "prod_mock_pack_3",
+        "name": "Job completion pack 3",
+        "active": true,
+        "metadata": {
+          "job_completion_pack_code": "job_completion_pack_3",
+          "job_count": "50"
+        }
+      }
+    },
+    {
+      "id": "price_mock_pack_4",
+      "lookup_key": "job_completion_pack_4",
+      "currency": "usd",
+      "active": true,
+      "unit_amount": 5000,
+      "metadata": {
+        "job_completion_pack_code": "job_completion_pack_4",
+        "job_count": "100"
+      },
+      "product": {
+        "id": "prod_mock_pack_4",
+        "name": "Job completion pack 4",
+        "active": true,
+        "metadata": {
+          "job_completion_pack_code": "job_completion_pack_4",
+          "job_count": "100"
+        }
+      }
+    }
+  ],
+  "products": [
+    {
+      "id": "prod_mock_pack_1",
+      "name": "Job completion pack 1",
+      "active": true,
+      "metadata": {
+        "job_completion_pack_code": "job_completion_pack_1",
+        "job_count": "10"
+      }
+    },
+    {
+      "id": "prod_mock_pack_2",
+      "name": "Job completion pack 2",
+      "active": true,
+      "metadata": {
+        "job_completion_pack_code": "job_completion_pack_2",
+        "job_count": "24"
+      }
+    },
+    {
+      "id": "prod_mock_pack_3",
+      "name": "Job completion pack 3",
+      "active": true,
+      "metadata": {
+        "job_completion_pack_code": "job_completion_pack_3",
+        "job_count": "50"
+      }
+    },
+    {
+      "id": "prod_mock_pack_4",
+      "name": "Job completion pack 4",
+      "active": true,
+      "metadata": {
+        "job_completion_pack_code": "job_completion_pack_4",
+        "job_count": "100"
+      }
+    }
+  ]
+}

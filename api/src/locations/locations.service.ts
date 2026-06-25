@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PatchLocationMembershipDto, UpsertLocationDto, UpsertLocationMembershipDto } from './dto';
+import { buildApiUrl } from '../common/public-url';
 
 @Injectable()
 export class LocationsService {
@@ -19,6 +20,32 @@ export class LocationsService {
       endMinute: weekday === 0 || weekday === 6 ? null : 17 * 60,
       isClosed: weekday === 0 || weekday === 6,
     }));
+  }
+
+  private normalizeHours(hours: UpsertLocationDto['hours']) {
+    if (!Array.isArray(hours) || hours.length === 0) return null;
+    const seen = new Set<number>();
+    return hours.map((hour) => {
+      if (seen.has(hour.weekday)) {
+        throw new BadRequestException('Each weekday can only appear once');
+      }
+      seen.add(hour.weekday);
+      if (hour.isClosed) {
+        return { weekday: hour.weekday, startMinute: null, endMinute: null, isClosed: true };
+      }
+      const startMinute = hour.startMinute;
+      const endMinute = hour.endMinute;
+      if (!Number.isInteger(startMinute) || !Number.isInteger(endMinute)) {
+        throw new BadRequestException('Add both an opening and closing time, or mark the day closed');
+      }
+      if (startMinute! < 0 || startMinute! >= 24 * 60 || endMinute! <= 0 || endMinute! > 24 * 60) {
+        throw new BadRequestException('Opening hours must be valid times within one day');
+      }
+      if (endMinute! <= startMinute!) {
+        throw new BadRequestException('Closing time must be later than opening time');
+      }
+      return { weekday: hour.weekday, startMinute, endMinute, isClosed: false };
+    });
   }
 
   async getAccessibleLocations(companyId: string, userId: string, role?: string) {
@@ -74,6 +101,7 @@ export class LocationsService {
 
   async create(companyId: string, userId: string, dto: UpsertLocationDto) {
     const db = this.prisma as any;
+    const normalizedHours = this.normalizeHours(dto.hours);
     const created = await db.location.create({
       data: {
         companyId,
@@ -85,7 +113,7 @@ export class LocationsService {
         city: dto.city || '-',
         state: dto.state || null,
         postalCode: dto.postalCode || null,
-        country: dto.country || 'UK',
+        country: dto.country || 'United Kingdom',
         phone: dto.phone || null,
         email: dto.email || null,
         isActive: dto.isActive ?? true,
@@ -114,16 +142,16 @@ export class LocationsService {
       });
     }
 
-    if (Array.isArray(dto.hours) && dto.hours.length > 0) {
+    if (normalizedHours) {
       await db.locationBusinessHour.deleteMany({ where: { companyId, locationId: created.id } });
       await db.locationBusinessHour.createMany({
-        data: dto.hours.map((hour) => ({
+        data: normalizedHours.map((hour) => ({
           companyId,
           locationId: created.id,
           weekday: hour.weekday,
-          startMinute: hour.isClosed ? null : hour.startMinute ?? 9 * 60,
-          endMinute: hour.isClosed ? null : hour.endMinute ?? 17 * 60,
-          isClosed: Boolean(hour.isClosed),
+          startMinute: hour.startMinute,
+          endMinute: hour.endMinute,
+          isClosed: hour.isClosed,
         })),
       });
     }
@@ -136,6 +164,7 @@ export class LocationsService {
     const db = this.prisma as any;
     const location = await db.location.findFirst({ where: { id, companyId } });
     if (!location) throw new NotFoundException('Location not found');
+    const normalizedHours = this.normalizeHours(dto.hours);
     const updated = await db.location.update({
       where: { id },
       data: {
@@ -191,16 +220,16 @@ export class LocationsService {
       }
     }
 
-    if (Array.isArray(dto.hours) && dto.hours.length > 0) {
+    if (normalizedHours) {
       await db.locationBusinessHour.deleteMany({ where: { companyId, locationId: id } });
       await db.locationBusinessHour.createMany({
-        data: dto.hours.map((hour) => ({
+        data: normalizedHours.map((hour) => ({
           companyId,
           locationId: id,
           weekday: hour.weekday,
-          startMinute: hour.isClosed ? null : hour.startMinute ?? 9 * 60,
-          endMinute: hour.isClosed ? null : hour.endMinute ?? 17 * 60,
-          isClosed: Boolean(hour.isClosed),
+          startMinute: hour.startMinute,
+          endMinute: hour.endMinute,
+          isClosed: hour.isClosed,
         })),
       });
     }
@@ -220,6 +249,59 @@ export class LocationsService {
         defaultAssignee: { select: { id: true, email: true } },
       },
     });
+  }
+
+  async savePublicImage(companyId: string, userId: string, id: string, fileName: string) {
+    const db = this.prisma as any;
+    const location = await db.location.findFirst({ where: { id, companyId } });
+    if (!location) throw new NotFoundException('Location not found');
+    const metadata = location.metadataJson && typeof location.metadataJson === 'object' && !Array.isArray(location.metadataJson)
+      ? location.metadataJson
+      : {};
+    const imageUrl = buildApiUrl(`/tenant/public-booking-media/${companyId}/${encodeURIComponent(fileName)}`);
+    await db.location.update({
+      where: { id },
+      data: { metadataJson: { ...metadata, imageUrl } },
+    });
+    await this.audit.log(companyId, 'location.image.upload', `Updated public image for ${location.name}`, userId);
+    return { imageUrl };
+  }
+
+  async applyHoursToAll(companyId: string, userId: string, sourceLocationId: string) {
+    const db = this.prisma as any;
+    const source = await db.location.findFirst({
+      where: { id: sourceLocationId, companyId, isActive: true },
+      include: { businessHours: { orderBy: { weekday: 'asc' } } },
+    });
+    if (!source) throw new NotFoundException('Source location not found');
+    const normalizedHours = this.normalizeHours(source.businessHours);
+    if (!normalizedHours) throw new BadRequestException('The source location has no opening hours to copy');
+    const locations = await db.location.findMany({
+      where: { companyId, isActive: true, id: { not: sourceLocationId } },
+      select: { id: true },
+    });
+    await db.$transaction(
+      locations.flatMap((location: { id: string }) => [
+        db.locationBusinessHour.deleteMany({ where: { companyId, locationId: location.id } }),
+        db.locationBusinessHour.createMany({
+          data: normalizedHours.map((hour) => ({
+            companyId,
+            locationId: location.id,
+            weekday: hour.weekday,
+            startMinute: hour.startMinute,
+            endMinute: hour.endMinute,
+            isClosed: hour.isClosed,
+          })),
+        }),
+      ]),
+    );
+    await this.audit.log(
+      companyId,
+      'location.hours.apply_all',
+      `Applied opening hours from ${source.name} to ${locations.length} active locations`,
+      userId,
+    );
+    return { ok: true, updatedLocations: locations.length };
   }
 
   async archive(companyId: string, userId: string, id: string) {

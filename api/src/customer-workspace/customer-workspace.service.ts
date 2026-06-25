@@ -7,11 +7,15 @@ import {
 import { JwtService } from "@nestjs/jwt";
 import * as bcrypt from "bcryptjs";
 import * as crypto from "crypto";
+import { EmailService } from "../email/email.service";
+import { buildCustomerInviteEmailTemplate } from "../email/email-templates";
 import { ActivityService } from "../events/activity.service";
 import { JobExecutionService } from "../jobs/job-execution.service";
+import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { RevenueService } from "../revenue/revenue.service";
 import { ServicePlansService } from "../service-plans/service-plans.service";
+import { buildAppUrl } from "../common/public-url";
 import { CustomerJwtPayload } from "./customer-auth.types";
 import type { CreateCustomerApprovalDto, CustomerServicePlanChangeRequestDto } from "./dto";
 
@@ -25,6 +29,8 @@ export class CustomerWorkspaceService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly activity: ActivityService,
+    private readonly email: EmailService,
+    private readonly notifications: NotificationsService,
     private readonly jobExecution: JobExecutionService,
     private readonly servicePlans: ServicePlansService,
     private readonly revenue: RevenueService,
@@ -47,10 +53,6 @@ export class CustomerWorkspaceService {
       scope: "customer",
     };
     return this.jwt.sign(payload);
-  }
-
-  private appBaseUrl() {
-    return String(process.env.APP_PUBLIC_URL || process.env.NEXT_PUBLIC_APP_BASE_URL || "http://127.0.0.1:3001").replace(/\/$/, "");
   }
 
   private async resolveCustomer(tenantId: string, customerId: string) {
@@ -325,7 +327,61 @@ export class CustomerWorkspaceService {
       },
     });
 
-    const activationUrl = `${this.appBaseUrl()}/customer/activate?token=${encodeURIComponent(rawToken)}`;
+    const activationUrl = buildAppUrl(`/customer/activate?token=${encodeURIComponent(rawToken)}`);
+    const tracking = await this.notifications.prepareTrackedEmailNotification({
+      companyId: tenantId,
+      userId: actorUserId,
+      type: "customer_account_invite",
+      title: "Customer invite email pending",
+      body: "Customer invite email is being prepared for delivery.",
+      entityType: "customer",
+      entityId: customer.id,
+      reasonKey: "customer_account_invite",
+      to: email,
+      summary: `Customer portal invite prepared for ${customer.name}.`,
+      ctaHref: activationUrl,
+      trackingExpiresAt: inviteTokenExpiresAt,
+    });
+    const template = buildCustomerInviteEmailTemplate(await this.email.getBranding(tenantId, { ownership: 'workspace' }), {
+      customerName: customer.name,
+      activationUrl,
+      htmlActivationUrl: tracking.trackedHref || activationUrl,
+    });
+    const delivery = await this.email.sendOperationalEmail(tenantId, {
+      to: email,
+      subject: template.subject,
+      text: template.text,
+      html: template.html,
+    }, {
+      category: 'customer_invite',
+      templateKey: 'customer_account_invite',
+      actorUserId,
+      dedupeWindowMinutes: 60,
+    });
+    await this.notifications.finalizeTrackedEmailNotification(tracking.id, delivery, {
+      title: delivery.delivered ? "Customer invite email sent" : "Customer invite email pending",
+      body: delivery.delivered ? `Customer invite email sent for ${customer.name}.` : "Customer invite email was not delivered in this environment.",
+    });
+
+    if (!delivery.delivered) {
+      await this.prisma.customerAccount.update({
+        where: { customerId: customer.id },
+        data: {
+          inviteTokenHash: null,
+          inviteTokenExpiresAt: null,
+        },
+      });
+      return {
+        ...account,
+        status: delivery.status === "failed" ? "delivery_failed" : "delivery_unavailable",
+        message:
+          delivery.status === "failed"
+            ? "We could not send the customer invite email just now. Check outbound email readiness and try again."
+            : delivery.reason || "Customer email is not set up yet. Add your sending email in Settings.",
+        actionHref: delivery.actionHref || "/dashboard/settings?tab=messages",
+      };
+    }
+
     await this.activity.push({
       type: "customer.account.invited",
       label: `Invited customer account for ${customer.name}`,
@@ -341,7 +397,10 @@ export class CustomerWorkspaceService {
 
     return {
       ...account,
-      activationUrl,
+      status: "sent",
+      message: delivery.usedFallback
+        ? `Customer invite email sent to ${email} by MyTitan because your workspace sending email is not set up.`
+        : `Customer invite email sent to ${email}.`,
     };
   }
 
@@ -907,8 +966,21 @@ export class CustomerWorkspaceService {
       })),
     );
     const executionByJobId = new Map(executionEntries.filter((entry) => entry.record).map((entry) => [entry.jobId, entry.record]));
+    const tenantSettings = await this.prisma.tenantSetting.findUnique({ where: { tenantId } });
+    const businessDisplay = tenantSettings?.businessDisplayJson && typeof tenantSettings.businessDisplayJson === "object"
+      ? tenantSettings.businessDisplayJson as Record<string, any>
+      : {};
+    const showBusinessDetails = businessDisplay.customerPortal !== false;
 
     return {
+      business: showBusinessDetails ? {
+        name: tenantSettings?.tradingName || tenantSettings?.registeredBusinessName || tenantSettings?.companyName || null,
+        companyNumber: tenantSettings?.companyNumber || null,
+        taxRegistrationNumber: tenantSettings?.taxRegistrationNumber || null,
+        contactEmail: tenantSettings?.contactEmail || null,
+        contactPhone: tenantSettings?.contactPhone || null,
+        websiteUrl: tenantSettings?.websiteUrl || null,
+      } : null,
       customer: {
         id: customer.id,
         name: customer.name,

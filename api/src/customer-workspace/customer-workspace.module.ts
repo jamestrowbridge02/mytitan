@@ -1,7 +1,9 @@
 import { Module } from "@nestjs/common";
 import { PassportModule } from "@nestjs/passport";
+import { EmailModule } from "../email/email.module";
 import { EventsModule } from "../events/events.module";
 import { JobsModule } from "../jobs/jobs.module";
+import { NotificationsModule } from "../notifications/notifications.module";
 import { RevenueModule } from "../revenue/revenue.module";
 import { ServicePlansModule } from "../service-plans/service-plans.module";
 import { CustomerAccountsController } from "./customer-accounts.controller";
@@ -14,7 +16,7 @@ import { CustomerJwtAuthGuard } from "./customer-auth.guard";
 import { CustomerWorkspaceService } from "./customer-workspace.service";
 
 @Module({
-  imports: [PassportModule, EventsModule, ServicePlansModule, RevenueModule, JobsModule],
+  imports: [PassportModule, EventsModule, ServicePlansModule, RevenueModule, JobsModule, EmailModule, NotificationsModule],
   controllers: [
     CustomerAuthController,
     CustomerAccountsController,

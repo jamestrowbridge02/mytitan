@@ -402,24 +402,14 @@ export class ScheduleService {
     };
   }
 
-  async getTechnicianCapacityForDay(tenantId: string, technicianId: string, dateInput: string | Date) {
-    const date = dateInput instanceof Date ? this.startOfDay(dateInput) : this.parseDateOnly(String(dateInput));
-    const { weeklySettings, dailyAvailability, capacityExceptions, legacyExceptions } = await this.loadCapacityContext(
-      tenantId,
-      date,
-      this.endOfDay(date),
-    );
-    const base = this.buildBaseCapacityForDay(date, technicianId, weeklySettings, dailyAvailability);
-    return this.applyCapacityExceptionsForDay(date, technicianId, base, capacityExceptions, legacyExceptions);
-  }
-
-  async getTechnicianLoadForDay(tenantId: string, technicianId: string, dateInput: string | Date) {
-    const date = dateInput instanceof Date ? this.startOfDay(dateInput) : this.parseDateOnly(String(dateInput));
-    const rangeEnd = this.endOfDay(date);
-    const { bookings, jobs } = await this.loadCapacityContext(tenantId, date, rangeEnd);
+  private buildTechnicianLoadForDayFromContext(
+    context: Awaited<ReturnType<ScheduleService["loadCapacityContext"]>>,
+    technicianId: string,
+    date: Date,
+  ) {
     const items: LoadItem[] = [];
 
-    for (const booking of bookings.filter((row: any) => row.assignedUserId === technicianId)) {
+    for (const booking of context.bookings.filter((row: any) => row.assignedUserId === technicianId)) {
       items.push({
         entityType: "booking",
         entityId: booking.id,
@@ -432,7 +422,7 @@ export class ScheduleService {
       });
     }
 
-    for (const job of jobs.filter((row: any) => row.assignedUserId === technicianId)) {
+    for (const job of context.jobs.filter((row: any) => row.assignedUserId === technicianId)) {
       items.push({
         entityType: "job",
         entityId: job.id,
@@ -447,9 +437,28 @@ export class ScheduleService {
 
     items.sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
     return {
+      date: this.startOfDay(date).toISOString(),
       scheduledMinutes: items.reduce((sum, item) => sum + item.minutes, 0),
       items,
     };
+  }
+
+  async getTechnicianCapacityForDay(tenantId: string, technicianId: string, dateInput: string | Date) {
+    const date = dateInput instanceof Date ? this.startOfDay(dateInput) : this.parseDateOnly(String(dateInput));
+    const { weeklySettings, dailyAvailability, capacityExceptions, legacyExceptions } = await this.loadCapacityContext(
+      tenantId,
+      date,
+      this.endOfDay(date),
+    );
+    const base = this.buildBaseCapacityForDay(date, technicianId, weeklySettings, dailyAvailability);
+    return this.applyCapacityExceptionsForDay(date, technicianId, base, capacityExceptions, legacyExceptions);
+  }
+
+  async getTechnicianLoadForDay(tenantId: string, technicianId: string, dateInput: string | Date) {
+    const date = dateInput instanceof Date ? this.startOfDay(dateInput) : this.parseDateOnly(String(dateInput));
+    const rangeEnd = this.endOfDay(date);
+    const context = await this.loadCapacityContext(tenantId, date, rangeEnd);
+    return this.buildTechnicianLoadForDayFromContext(context, technicianId, date);
   }
 
   async getTechnicianSchedulePressure(tenantId: string, query: SchedulePressureQuery) {
@@ -469,7 +478,7 @@ export class ScheduleService {
           context.capacityExceptions,
           context.legacyExceptions,
         );
-        const load = await this.getTechnicianLoadForDay(tenantId, technician.id, date);
+        const load = this.buildTechnicianLoadForDayFromContext(context, technician.id, date);
         const remainingMinutes = capacity.availableMinutes - load.scheduledMinutes;
         return {
           technicianId: technician.id,
@@ -598,7 +607,7 @@ export class ScheduleService {
           context.capacityExceptions,
           context.legacyExceptions,
         );
-        const load = await this.getTechnicianLoadForDay(tenantId, technician.id, scheduledDay);
+        const load = this.buildTechnicianLoadForDayFromContext(context, technician.id, scheduledDay);
         const hasBookingConflict = bookingIntervals.some((interval) =>
           interval.technicianId === technician.id &&
           scheduledAt! < interval.end &&
@@ -726,7 +735,7 @@ export class ScheduleService {
               context.capacityExceptions,
               context.legacyExceptions,
             );
-            const load = await this.getTechnicianLoadForDay(tenantId, technician.id, day);
+            const load = this.buildTechnicianLoadForDayFromContext(context, technician.id, day);
             const remainingMinutes = capacity.availableMinutes - load.scheduledMinutes;
             return {
               date: day.toISOString(),

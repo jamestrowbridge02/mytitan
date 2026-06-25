@@ -1,0 +1,35 @@
+{
+  "prices": [
+    {
+      "id": "price_mock_pack_mismatch_1",
+      "lookup_key": "job_completion_pack_1",
+      "currency": "gbp",
+      "active": true,
+      "unit_amount": 600,
+      "metadata": {
+        "job_completion_pack_code": "job_completion_pack_1",
+        "job_count": "10"
+      },
+      "product": {
+        "id": "prod_mock_pack_mismatch_1",
+        "name": "Job completion pack 1",
+        "active": true,
+        "metadata": {
+          "job_completion_pack_code": "job_completion_pack_1",
+          "job_count": "10"
+        }
+      }
+    }
+  ],
+  "products": [
+    {
+      "id": "prod_mock_pack_mismatch_1",
+      "name": "Job completion pack 1",
+      "active": true,
+      "metadata": {
+        "job_completion_pack_code": "job_completion_pack_1",
+        "job_count": "10"
+      }
+    }
+  ]
+}

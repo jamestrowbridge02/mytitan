@@ -9,11 +9,13 @@ import { CustomerWorkspaceModule } from '../customer-workspace/customer-workspac
 import { JobsModule } from '../jobs/jobs.module';
 import { ServicePlansModule } from '../service-plans/service-plans.module';
 import { PrismaModule } from '../prisma/prisma.module';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { EnterpriseModule } from '../enterprise/enterprise.module';
 import { PublicBookingController } from './public-booking.controller';
 import { PublicController } from './public.controller';
 
 @Module({
-  imports: [PrismaModule, AuditModule, BillingModule, BookingsModule, AutomationsModule, EventsModule, ArtifactsModule, ServicePlansModule, CustomerWorkspaceModule, JobsModule],
+  imports: [PrismaModule, AuditModule, BillingModule, BookingsModule, AutomationsModule, EventsModule, EnterpriseModule, ArtifactsModule, ServicePlansModule, CustomerWorkspaceModule, JobsModule, NotificationsModule],
   controllers: [PublicController, PublicBookingController],
 })
 export class PublicModule {}

@@ -36,10 +36,33 @@ const FIXTURE = {
     role: "OWNER",
   },
   workspaceUsers: {
+    admin: { id: "e2e-user-admin", email: "e2e.admin@mytitan.local", password: "MyTitanE2EAdmin!2026", role: "ADMIN" },
     dispatcher: { id: "e2e-user-dispatcher", email: "e2e.dispatcher@mytitan.local", password: "MyTitanE2EDispatch!2026", role: "DISPATCHER" },
     finance: { id: "e2e-user-finance", email: "e2e.finance@mytitan.local", password: "MyTitanE2EFinance!2026", role: "FINANCE" },
     technician: { id: "e2e-user-technician", email: "e2e.technician@mytitan.local", password: "MyTitanE2ETech!2026", role: "TECHNICIAN" },
+    externalOperator: { id: "e2e-user-external-operator", email: "e2e.external@mytitan.local", password: "MyTitanE2EExternal!2026", role: "EXTERNAL_OPERATOR" },
     viewer: { id: "e2e-user-viewer", email: "e2e.viewer@mytitan.local", password: "MyTitanE2EViewer!2026", role: "VIEWER" },
+    passwordReset: { id: "e2e-user-password-reset", email: "e2e.password.reset@mytitan.example", password: "MyTitanReset!2026", role: "ADMIN" },
+  },
+  platformAdmin: {
+    id: "e2e-user-platform-admin",
+    email: "e2e.platform@mytitan.co.uk",
+    password: "MyTitanE2EPlatform!2026",
+    role: "OWNER",
+  },
+  supportAccount: {
+    company: {
+      id: "e2e-support-company",
+      name: "__E2E MyTitan Support Workspace",
+      timezone: "UTC",
+      currency: "GBP",
+    },
+    user: {
+      id: "e2e-user-support",
+      email: "support@mytitan.co.uk",
+      password: "MyTitanSupport!2026",
+      role: "OWNER",
+    },
   },
   boardView: {
     id: "e2e-board-view-default",
@@ -113,6 +136,15 @@ const FIXTURE = {
     expired: "e2e-expired-portal-token",
   },
   integrations: {
+    googleCalendar: {
+      id: "e2e-integration-google-operator",
+    },
+    tenantCredentials: {
+      stripe: { id: "e2e-byog-stripe-workspace", routeId: "e2estripecustomerroute001" },
+      quickbooks: { id: "e2e-byog-quickbooks-workspace", routeId: "e2eqbohookroute001" },
+      personalGoogle: { id: "e2e-byog-google-personal", routeId: "e2egooglepersonal001" },
+      supportGenericWebhook: { id: "e2e-byog-support-webhook", routeId: "e2esupportroute001" },
+    },
     apiToken: {
       id: "e2e-api-token-primary",
       name: "E2E Primary Token",
@@ -458,8 +490,10 @@ async function ensureTenantSettings(companyId, defaultLocationId, planId) {
       bookingsEnabled: true,
       paymentsEnabled: true,
       featureBookings: true,
+      featureAccounting: true,
       featureCustomerPortal: true,
       featurePayments: true,
+      accountingEnabled: true,
       bookingPublicEnabled: true,
       bookingPublicToken: token,
       bookingIcsToken: icsToken,
@@ -517,8 +551,10 @@ async function ensureTenantSettings(companyId, defaultLocationId, planId) {
       bookingsEnabled: true,
       paymentsEnabled: true,
       featureBookings: true,
+      featureAccounting: true,
       featureCustomerPortal: true,
       featurePayments: true,
+      accountingEnabled: true,
       bookingPublicEnabled: true,
       bookingPublicToken: token,
       bookingIcsToken: icsToken,
@@ -566,6 +602,302 @@ async function ensureTenantSettings(companyId, defaultLocationId, planId) {
           ],
         },
       },
+    },
+  });
+}
+
+async function ensureTenantSubscription(companyId, planId) {
+  const now = new Date();
+  const trialEndsAt = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+  await prisma.tenantSubscription.upsert({
+    where: { tenantId: companyId },
+    create: {
+      tenantId: companyId,
+      planId,
+      status: "trialing",
+      trialStartedAt: now,
+      trialEndsAt,
+      currentPeriodEnd: trialEndsAt,
+      cancelAtPeriodEnd: false,
+    },
+    update: {
+      planId,
+      status: "trialing",
+      trialStartedAt: now,
+      trialEndsAt,
+      currentPeriodEnd: trialEndsAt,
+      cancelAtPeriodEnd: false,
+      stripeCustomerId: null,
+      stripeSubscriptionId: null,
+    },
+  });
+}
+
+async function ensurePlatformBillingCatalogFixtures(platformAdminUserId) {
+  const overrideKey = "job_pack:job_completion_pack_3:none";
+  const pack3ProductId = process.env.STRIPE_JOB_COMPLETION_PACK_3_PRODUCT_ID || "prod_e2e_job_pack_50";
+  const pack3PriceId = process.env.STRIPE_JOB_COMPLETION_PACK_3_PRICE_ID || "price_e2e_job_pack_50";
+  await prisma.billingCatalogOverride.upsert({
+    where: { key: overrideKey },
+    create: {
+      key: overrideKey,
+      kind: "job_pack",
+      code: "job_completion_pack_3",
+      lookupKey: "job_completion_pack_3",
+      stripeProductId: pack3ProductId,
+      stripePriceId: pack3PriceId,
+      expectedAmountCents: 2500,
+      currency: "GBP",
+      active: true,
+      state: "active",
+      verificationStatus: "ready",
+      verificationMessage: "Validated against the configured Stripe mapping without enabling checkout.",
+      changeNotes: "Seeded ready mapping for internal platform review coverage.",
+      createdByUserId: platformAdminUserId,
+      updatedByUserId: platformAdminUserId,
+      metadataJson: {
+        verification: {
+          status: "ready",
+          message: "Validated against the configured Stripe mapping without enabling checkout.",
+          observed: {
+            observedAmountCents: 2500,
+            observedCurrency: "GBP",
+            observedLookupKey: "job_completion_pack_3",
+          },
+        },
+      },
+    },
+    update: {
+      lookupKey: "job_completion_pack_3",
+      stripeProductId: pack3ProductId,
+      stripePriceId: pack3PriceId,
+      expectedAmountCents: 2500,
+      currency: "GBP",
+      active: true,
+      state: "active",
+      verificationStatus: "ready",
+      verificationMessage: "Validated against the configured Stripe mapping without enabling checkout.",
+      changeNotes: "Seeded ready mapping for internal platform review coverage.",
+      updatedByUserId: platformAdminUserId,
+      metadataJson: {
+        verification: {
+          status: "ready",
+          message: "Validated against the configured Stripe mapping without enabling checkout.",
+        },
+      },
+    },
+  });
+
+  await prisma.billingCatalogOverrideHistory.createMany({
+    data: [
+      {
+        id: "e2e-billing-catalog-history-created",
+        overrideKey,
+        kind: "job_pack",
+        code: "job_completion_pack_3",
+        interval: null,
+        action: "created",
+        changeNotes: "Seeded baseline catalog mapping.",
+        nextValuesJson: {
+          lookupKey: "job_completion_pack_3",
+          stripeProductIdMasked: "prod_e••••_50",
+          stripePriceIdMasked: "price_••••_50",
+          expectedAmountCents: 2500,
+          currency: "GBP",
+          active: true,
+          verificationStatus: "ready",
+        },
+        metadataJson: {
+          verification: {
+            status: "ready",
+            message: "Validated against Stripe safely before saving.",
+          },
+        },
+        createdByUserId: platformAdminUserId,
+      },
+      {
+        id: "e2e-billing-catalog-history-updated",
+        overrideKey,
+        kind: "job_pack",
+        code: "job_completion_pack_3",
+        interval: null,
+        action: "updated",
+        changeNotes: "Seeded ready mapping for platform review coverage.",
+        previousValuesJson: {
+          expectedAmountCents: 2500,
+          currency: "GBP",
+          verificationStatus: "ready",
+        },
+        nextValuesJson: {
+          expectedAmountCents: 2500,
+          currency: "GBP",
+          verificationStatus: "ready",
+        },
+        metadataJson: {
+          verification: {
+            status: "ready",
+            message: "Validated against the configured Stripe mapping without enabling checkout.",
+          },
+        },
+        createdByUserId: platformAdminUserId,
+      },
+    ],
+    skipDuplicates: true,
+  });
+}
+
+async function ensurePlatformSafeErrorLogs(platformAdminUserId) {
+  const rows = [
+    {
+      id: "e2e-safe-log-validation-open",
+      category: "validation",
+      area: "stable validator",
+      summary: "Validation-only retry noise was recorded during stable-suite rehearsal.",
+      severity: "warning",
+      status: "open",
+      occurrenceCount: 2,
+      clearable: true,
+      validationOnly: true,
+      auditProtected: false,
+      sanitizedDetailsJson: {
+        affectedArea: "e2e validator",
+        safeCategory: "validation",
+        firstSeenReason: "seeded rehearsal failure",
+      },
+    },
+    {
+      id: "e2e-safe-log-billing-reviewed",
+      category: "billing catalog",
+      area: "product mapping",
+      summary: "Job completion pack mapping mismatch was reviewed and is safe to clear after sign-off.",
+      severity: "warning",
+      status: "reviewed",
+      occurrenceCount: 1,
+      clearable: true,
+      validationOnly: false,
+      auditProtected: false,
+      reviewedAt: new Date(),
+      reviewedByUserId: platformAdminUserId,
+      sanitizedDetailsJson: {
+        affectedArea: "job completion pack 50",
+        safeCategory: "billing catalog",
+      },
+    },
+    {
+      id: "e2e-safe-log-webhook-protected",
+      category: "webhook",
+      area: "idempotency ledger",
+      summary: "Protected webhook receipt retained for audit and duplicate-protection review.",
+      severity: "critical",
+      status: "open",
+      occurrenceCount: 1,
+      clearable: false,
+      validationOnly: false,
+      auditProtected: true,
+      sanitizedDetailsJson: {
+        affectedArea: "webhook idempotency",
+        safeCategory: "webhook",
+        retention: "protected",
+      },
+    },
+  ];
+
+  for (const row of rows) {
+    await prisma.platformSafeErrorLog.upsert({
+      where: { id: row.id },
+      create: row,
+      update: row,
+    });
+  }
+}
+
+async function ensureInternalSupportWorkspace(planId) {
+  const supportEmail = FIXTURE.supportAccount.user.email;
+  const passwordHash = await bcrypt.hash(FIXTURE.supportAccount.user.password, 10);
+
+  await prisma.user.deleteMany({
+    where: {
+      email: supportEmail,
+      id: { not: FIXTURE.supportAccount.user.id },
+    },
+  });
+
+  const company = await prisma.company.upsert({
+    where: { id: FIXTURE.supportAccount.company.id },
+    create: {
+      id: FIXTURE.supportAccount.company.id,
+      name: FIXTURE.supportAccount.company.name,
+      timezone: FIXTURE.supportAccount.company.timezone,
+      currency: FIXTURE.supportAccount.company.currency,
+    },
+    update: {
+      name: FIXTURE.supportAccount.company.name,
+      timezone: FIXTURE.supportAccount.company.timezone,
+      currency: FIXTURE.supportAccount.company.currency,
+    },
+  });
+
+  await prisma.user.upsert({
+    where: { id: FIXTURE.supportAccount.user.id },
+    create: {
+      id: FIXTURE.supportAccount.user.id,
+      companyId: company.id,
+      email: supportEmail,
+      emailVerified: true,
+      passwordHash,
+      role: FIXTURE.supportAccount.user.role,
+      lastActiveAt: new Date(),
+      lastLoginAt: new Date(),
+    },
+    update: {
+      companyId: company.id,
+      email: supportEmail,
+      emailVerified: true,
+      passwordHash,
+      role: FIXTURE.supportAccount.user.role,
+      lastActiveAt: new Date(),
+    },
+  });
+
+  await prisma.tenantSetting.upsert({
+    where: { tenantId: company.id },
+    create: {
+      tenantId: company.id,
+      planId,
+      companyName: company.name,
+      defaultCurrency: company.currency,
+      defaultTimezone: company.timezone,
+      onboardingCompleted: true,
+    },
+    update: {
+      planId,
+      companyName: company.name,
+      defaultCurrency: company.currency,
+      defaultTimezone: company.timezone,
+      onboardingCompleted: true,
+    },
+  });
+
+  await prisma.tenantSubscription.upsert({
+    where: { tenantId: company.id },
+    create: {
+      tenantId: company.id,
+      planId,
+      status: "active",
+      trialStartedAt: null,
+      trialEndsAt: null,
+      currentPeriodEnd: null,
+      cancelAtPeriodEnd: false,
+    },
+    update: {
+      planId,
+      status: "active",
+      trialStartedAt: null,
+      trialEndsAt: null,
+      currentPeriodEnd: null,
+      cancelAtPeriodEnd: false,
+      stripeCustomerId: null,
+      stripeSubscriptionId: null,
     },
   });
 }
@@ -741,7 +1073,7 @@ async function ensureCustomers(companyId, locationIds) {
   return customers;
 }
 
-async function ensureJob({ companyId, locationId, userId, customerId, jobId, jobRef, status, customerName, customerEmail, customerPhone, totalCents, scheduledAt, completedAt, invoiceIssuedAt, invoiceDueAt, invoicePaidAt, approvedAt, approvedByName, signedAt, signatureName, signatureDataUrl, paymentLinkUrl, paymentReceiptUrl, invoicePdfUrl, paymentCheckoutSessionId, serviceName, vehicleMake, vehicleModel, vehicleReg, formData, whatsappCompletionLink, assignedUserId }) {
+async function ensureJob({ companyId, locationId, userId, customerId, jobId, jobRef, status, customerName, customerEmail, customerPhone, totalCents, scheduledAt, completedAt, invoiceIssuedAt, invoiceDueAt, invoicePaidAt, approvedAt, approvedByName, signedAt, signatureName, signatureDataUrl, paymentLinkUrl, paymentReceiptUrl, invoicePdfUrl, paymentCheckoutSessionId, serviceName, vehicleMake, vehicleModel, vehicleReg, formData, whatsappCompletionLink, assignedUserId, customerJourneyStage, customerFacingStatus, customerFacingStatusUpdatedAt, customerEtaWindowStart, customerEtaWindowEnd, customerEtaDurationMinutes, customerEtaConfidence, customerEtaStatus, customerEtaNote, customerEtaUpdatedAt, customerEtaUpdatedByUserId, customerTechnicianNameVisible }) {
   return prisma.job.upsert({
     where: { companyId_jobRef: { companyId, jobRef } },
     create: {
@@ -783,6 +1115,18 @@ async function ensureJob({ companyId, locationId, userId, customerId, jobId, job
       formData,
       whatsappCompletionLink,
       assignedUserId: assignedUserId || null,
+      customerJourneyStage: customerJourneyStage || null,
+      customerFacingStatus: customerFacingStatus || null,
+      customerFacingStatusUpdatedAt: customerFacingStatusUpdatedAt || null,
+      customerEtaWindowStart: customerEtaWindowStart || null,
+      customerEtaWindowEnd: customerEtaWindowEnd || null,
+      customerEtaDurationMinutes: customerEtaDurationMinutes || null,
+      customerEtaConfidence: customerEtaConfidence || null,
+      customerEtaStatus: customerEtaStatus || null,
+      customerEtaNote: customerEtaNote || null,
+      customerEtaUpdatedAt: customerEtaUpdatedAt || null,
+      customerEtaUpdatedByUserId: customerEtaUpdatedByUserId || null,
+      customerTechnicianNameVisible: Boolean(customerTechnicianNameVisible),
       createdByUserId: userId,
       createdAt: addMinutes(new Date(), -240),
     },
@@ -822,6 +1166,18 @@ async function ensureJob({ companyId, locationId, userId, customerId, jobId, job
       formData,
       whatsappCompletionLink,
       assignedUserId: assignedUserId || null,
+      customerJourneyStage: customerJourneyStage || null,
+      customerFacingStatus: customerFacingStatus || null,
+      customerFacingStatusUpdatedAt: customerFacingStatusUpdatedAt || null,
+      customerEtaWindowStart: customerEtaWindowStart || null,
+      customerEtaWindowEnd: customerEtaWindowEnd || null,
+      customerEtaDurationMinutes: customerEtaDurationMinutes || null,
+      customerEtaConfidence: customerEtaConfidence || null,
+      customerEtaStatus: customerEtaStatus || null,
+      customerEtaNote: customerEtaNote || null,
+      customerEtaUpdatedAt: customerEtaUpdatedAt || null,
+      customerEtaUpdatedByUserId: customerEtaUpdatedByUserId || null,
+      customerTechnicianNameVisible: Boolean(customerTechnicianNameVisible),
       createdByUserId: userId,
     },
   });
@@ -917,6 +1273,61 @@ async function ensureApiToken(companyId, userId) {
       revokedAt: null,
       lastUsedAt: addMinutes(new Date(), -20),
     },
+  });
+}
+
+async function ensurePersonalGoogleConnection(companyId, userId) {
+  const encryptedAccess = encryptSeedText("google-access-seeded-token");
+  const encryptedRefresh = encryptSeedText("google-refresh-seeded-token");
+  return prisma.integrationConnection.upsert({
+    where: {
+      tenantId_provider_scope_scopeOwnerKey: {
+        tenantId: companyId,
+        provider: "GOOGLE_CALENDAR",
+        scope: "USER",
+        scopeOwnerKey: userId,
+      },
+    },
+    create: {
+      id: FIXTURE.integrations.googleCalendar.id,
+      tenantId: companyId,
+      provider: "GOOGLE_CALENDAR",
+      scope: "USER",
+      scopeOwnerKey: userId,
+      ownerUserId: userId,
+      status: "connected",
+      accessTokenEncrypted: encryptedAccess,
+      refreshTokenEncrypted: encryptedRefresh,
+      scopes: "https://www.googleapis.com/auth/calendar.events",
+      connectedAt: addMinutes(new Date(), -45),
+    },
+    update: {
+      tenantId: companyId,
+      provider: "GOOGLE_CALENDAR",
+      scope: "USER",
+      scopeOwnerKey: userId,
+      ownerUserId: userId,
+      status: "connected",
+      accessTokenEncrypted: encryptedAccess,
+      refreshTokenEncrypted: encryptedRefresh,
+      scopes: "https://www.googleapis.com/auth/calendar.events",
+      connectedAt: addMinutes(new Date(), -45),
+    },
+  });
+}
+
+async function ensureByogCredential(input) {
+  return prisma.integrationCredential.upsert({
+    where: {
+      tenantId_provider_scope_scopeOwnerKey: {
+        tenantId: input.tenantId,
+        provider: input.provider,
+        scope: input.scope,
+        scopeOwnerKey: input.scopeOwnerKey,
+      },
+    },
+    create: input,
+    update: input,
   });
 }
 
@@ -1158,6 +1569,22 @@ async function ensureInventoryStock(id, payload) {
   });
 }
 
+async function ensureTechnicianStockAssignment(id, payload) {
+  await prisma.technicianStockAssignment.upsert({
+    where: { id },
+    create: { id, ...payload },
+    update: payload,
+  });
+}
+
+async function ensureEnterpriseFeatureFlag(id, payload) {
+  await prisma.enterpriseFeatureFlag.upsert({
+    where: { key_tenantId_environment: { key: payload.key, tenantId: payload.tenantId || null, environment: payload.environment || "all" } },
+    create: { id, ...payload },
+    update: payload,
+  });
+}
+
 async function ensureJobPart(id, payload) {
   await prisma.jobPart.upsert({
     where: { id },
@@ -1300,6 +1727,98 @@ async function resetCustomFields(companyId) {
   });
 }
 
+async function resetJobs(companyId) {
+  const baselineJobIds = Object.values(FIXTURE.jobs).map((job) => job.id);
+  await prisma.job.deleteMany({
+    where: {
+      companyId,
+      id: { notIn: baselineJobIds },
+    },
+  });
+}
+
+async function resetBookings(companyId) {
+  const baselineBookingIds = Object.values(FIXTURE.bookings).map((booking) => booking.id);
+  await prisma.booking.deleteMany({
+    where: {
+      companyId,
+      id: { notIn: baselineBookingIds },
+    },
+  });
+}
+
+async function resetBookingServices(companyId) {
+  await prisma.service.deleteMany({
+    where: { companyId },
+  });
+}
+
+async function resetLocations(companyId) {
+  const baselineLocationIds = Object.values(FIXTURE.locations).map((location) => location.id);
+  await prisma.location.deleteMany({
+    where: {
+      companyId,
+      id: { notIn: baselineLocationIds },
+    },
+  });
+}
+
+async function resetInventory(companyId) {
+  const baselineStockItemIds = Object.values(FIXTURE.inventory.parts).map((item) => item.id);
+  const baselineInventoryLocationIds = Object.values(FIXTURE.inventory.locations).map((location) => location.id);
+  const baselineInventoryStockIds = Object.values(FIXTURE.inventory.stocks).map((stock) => stock.id);
+  const baselineJobPartIds = Object.values(FIXTURE.inventory.jobParts).map((jobPart) => jobPart.id);
+  const baselinePurchaseOrderIds = Object.values(FIXTURE.inventory.purchaseOrders).map((po) => po.id);
+  const baselinePurchaseOrderLineIds = Object.values(FIXTURE.inventory.purchaseOrderLines).map((line) => line.id);
+  const baselineMovementIds = [
+    FIXTURE.inventory.movements.reservePortal.id,
+    FIXTURE.inventory.movements.useInvoice.id,
+  ];
+
+  await prisma.stockPOLine.deleteMany({
+    where: {
+      po: { tenantId: companyId },
+      id: { notIn: baselinePurchaseOrderLineIds },
+    },
+  });
+  await prisma.stockPurchaseOrder.deleteMany({
+    where: {
+      tenantId: companyId,
+      id: { notIn: baselinePurchaseOrderIds },
+    },
+  });
+  await prisma.stockMovement.deleteMany({
+    where: {
+      tenantId: companyId,
+      id: { notIn: baselineMovementIds },
+    },
+  });
+  await prisma.jobPart.deleteMany({
+    where: {
+      tenantId: companyId,
+      id: { notIn: baselineJobPartIds },
+    },
+  });
+  await prisma.inventoryStock.deleteMany({
+    where: {
+      tenantId: companyId,
+      id: { notIn: baselineInventoryStockIds },
+    },
+  });
+  await prisma.inventoryLocation.deleteMany({
+    where: {
+      tenantId: companyId,
+      id: { notIn: baselineInventoryLocationIds },
+    },
+  });
+  await prisma.stockItem.deleteMany({
+    where: {
+      tenantId: companyId,
+      id: { notIn: baselineStockItemIds },
+    },
+  });
+}
+
 async function main() {
   if (process.env.MYTITAN_ENABLE_E2E_FIXTURES !== "1") {
     console.log("E2E fixture seed skipped. Set MYTITAN_ENABLE_E2E_FIXTURES=1 to run.");
@@ -1312,10 +1831,62 @@ async function main() {
   const locations = await ensureLocations(company.id);
   const location = locations.hq;
   const operator = await ensureOperator(company.id, location.id);
+  const platformAdminUser = await ensureWorkspaceUser(company.id, location.id, FIXTURE.platformAdmin);
+  await ensureWorkspaceUser(company.id, location.id, FIXTURE.workspaceUsers.admin);
   const dispatcherUser = await ensureWorkspaceUser(company.id, location.id, FIXTURE.workspaceUsers.dispatcher);
   const financeUser = await ensureWorkspaceUser(company.id, location.id, FIXTURE.workspaceUsers.finance);
   const technicianUser = await ensureWorkspaceUser(company.id, location.id, FIXTURE.workspaceUsers.technician);
+  await ensureWorkspaceUser(company.id, location.id, FIXTURE.workspaceUsers.externalOperator);
   const viewerUser = await ensureWorkspaceUser(company.id, location.id, FIXTURE.workspaceUsers.viewer);
+  await ensureWorkspaceUser(company.id, location.id, FIXTURE.workspaceUsers.passwordReset);
+  await ensureEnterpriseFeatureFlag("e2e-flag-truck-stock-v1", {
+    key: "truck_stock_v1",
+    tenantId: company.id,
+    environment: "all",
+    enabled: true,
+    rolloutPercentage: 100,
+    overrideSource: "tenant",
+    reason: "E2E enterprise inventory and truck stock baseline",
+    metadataJson: { seed: true },
+    createdByUserId: operator.id,
+    updatedByUserId: operator.id,
+  });
+  await ensureEnterpriseFeatureFlag("e2e-flag-customer-eta-v1", {
+    key: "customer_eta_v1",
+    tenantId: company.id,
+    environment: "all",
+    enabled: true,
+    rolloutPercentage: 100,
+    overrideSource: "tenant",
+    reason: "E2E customer ETA and portal journey baseline",
+    metadataJson: { seed: true },
+    createdByUserId: operator.id,
+    updatedByUserId: operator.id,
+  });
+  await ensureEnterpriseFeatureFlag("e2e-flag-route-preview-v1", {
+    key: "route_preview_v1",
+    tenantId: company.id,
+    environment: "all",
+    enabled: true,
+    rolloutPercentage: 100,
+    overrideSource: "tenant",
+    reason: "E2E route preview informational baseline",
+    metadataJson: { seed: true },
+    createdByUserId: operator.id,
+    updatedByUserId: operator.id,
+  });
+  await ensureEnterpriseFeatureFlag("e2e-flag-public-booking-bundles-v1", {
+    key: "public_booking_bundles_v1",
+    tenantId: company.id,
+    environment: "all",
+    enabled: false,
+    rolloutPercentage: 0,
+    overrideSource: "tenant",
+    reason: "E2E public booking bundle tests start from the disabled baseline",
+    metadataJson: { seed: true },
+    createdByUserId: operator.id,
+    updatedByUserId: operator.id,
+  });
   await ensureLocationMembership(company.id, locations.north.id, operator.id);
   await ensureLocationMembership(company.id, locations.north.id, dispatcherUser.id);
   await prisma.locationStaffAssignment.upsert({
@@ -1332,9 +1903,16 @@ async function main() {
 
   await ensureInvoiceCounter(company.id);
   await ensureTenantSettings(company.id, location.id, planId);
+  await ensureTenantSubscription(company.id, planId);
+  await ensureInternalSupportWorkspace(planId);
   await ensureBookingBusinessHours(company.id);
   await ensureAutomations(company.id);
   await resetCustomFields(company.id);
+  await resetJobs(company.id);
+  await resetBookings(company.id);
+  await resetBookingServices(company.id);
+  await resetLocations(company.id);
+  await resetInventory(company.id);
   const service = await ensureService(company.id);
   const customers = await ensureCustomers(company.id, { hq: locations.hq.id, north: locations.north.id });
 
@@ -1374,7 +1952,19 @@ async function main() {
     vehicleReg: "E2E001",
     formData: { selectedWheels: ["Front left", "Front right"], services: ["Diamond Cut"] },
     whatsappCompletionLink: null,
-    assignedUserId: null,
+    assignedUserId: technicianUser.id,
+    customerJourneyStage: "COMPLETED",
+    customerFacingStatus: "Your service record is ready and the invoice is available.",
+    customerFacingStatusUpdatedAt: addMinutes(now, -80),
+    customerEtaWindowStart: addMinutes(today, 10 * 60),
+    customerEtaWindowEnd: addMinutes(today, 12 * 60),
+    customerEtaDurationMinutes: 120,
+    customerEtaConfidence: "confirmed",
+    customerEtaStatus: "ARRIVED",
+    customerEtaNote: "Technician arrived within the scheduled visit window.",
+    customerEtaUpdatedAt: addMinutes(now, -125),
+    customerEtaUpdatedByUserId: technicianUser.id,
+    customerTechnicianNameVisible: true,
   });
 
   const issuedJob = await ensureJob({
@@ -1732,6 +2322,15 @@ async function main() {
     active: true,
     businessLocationId: locations.north.id,
   });
+  await ensureTechnicianStockAssignment("e2e-technician-van-assignment", {
+    tenantId: company.id,
+    technicianId: technicianUser.id,
+    inventoryLocationId: FIXTURE.inventory.locations.van.id,
+    active: true,
+    assignedAt: addMinutes(now, -180),
+    releasedAt: null,
+    notesJson: { seed: true, label: "Primary technician van" },
+  });
 
   await ensureInventoryStock(FIXTURE.inventory.stocks.alloyWarehouse.id, {
     tenantId: company.id,
@@ -2020,6 +2619,95 @@ async function main() {
   await ensureCustomFieldValue(company.id, certificationField.id, "TECHNICIAN", operator.id, "EV Specialist");
   await ensureCustomFieldValue(company.id, certificationField.id, "TECHNICIAN", technicianUser.id, "E2E Mobile Certified");
   await ensureApiToken(company.id, operator.id);
+  await ensurePersonalGoogleConnection(company.id, operator.id);
+  await ensureByogCredential({
+    id: FIXTURE.integrations.tenantCredentials.stripe.id,
+    tenantId: company.id,
+    provider: "STRIPE_CUSTOMER_PAYMENTS",
+    credentialType: "MERCHANT_PAYMENT_GATEWAY_CONFIG",
+    scope: "WORKSPACE",
+    scopeOwnerKey: "workspace",
+    userId: null,
+    displayName: "E2E Business Stripe",
+    status: "DISABLED",
+    encryptedPayload: encryptSeedText(JSON.stringify({ accountLabel: "Disabled seed", mode: "test" })),
+    encryptedSecretMaterial: encryptSeedText("whsec_e2e_disabled_stripe_customer"),
+    metadataJson: { accountLabel: "Disabled seed", environment: "test", paymentsOwner: "tenant" },
+    routeId: FIXTURE.integrations.tenantCredentials.stripe.routeId,
+    lastVerifiedAt: null,
+    lastWebhookReceivedAt: null,
+    lastErrorCategory: "disabled",
+    createdByUserId: operator.id,
+    updatedByUserId: operator.id,
+  });
+  await ensureByogCredential({
+    id: FIXTURE.integrations.tenantCredentials.quickbooks.id,
+    tenantId: company.id,
+    provider: "QUICKBOOKS",
+    credentialType: "ACCOUNTING_CONFIG",
+    scope: "WORKSPACE",
+    scopeOwnerKey: "workspace",
+    userId: null,
+    displayName: "E2E Books",
+    status: "CONNECTED",
+    encryptedPayload: encryptSeedText(JSON.stringify({ realmId: "e2e-realm", accountLabel: "E2E Finance" })),
+    encryptedSecretMaterial: encryptSeedText("qbo_e2e_webhook_secret"),
+    metadataJson: {
+      accountLabel: "E2E Finance",
+      environment: "sandbox",
+      permissions: ["accounting.access", "customers.read", "webhooks.verify"],
+    },
+    routeId: FIXTURE.integrations.tenantCredentials.quickbooks.routeId,
+    lastVerifiedAt: addMinutes(new Date(), -35),
+    lastWebhookReceivedAt: addMinutes(new Date(), -15),
+    lastErrorCategory: null,
+    createdByUserId: operator.id,
+    updatedByUserId: operator.id,
+  });
+  await ensureByogCredential({
+    id: FIXTURE.integrations.tenantCredentials.personalGoogle.id,
+    tenantId: company.id,
+    provider: "GOOGLE_CALENDAR",
+    credentialType: "CALENDAR_CONFIG",
+    scope: "USER",
+    scopeOwnerKey: operator.id,
+    userId: operator.id,
+    displayName: "E2E Personal Calendar",
+    status: "CONNECTED",
+    encryptedPayload: encryptSeedText(JSON.stringify({ calendarId: "primary", accountLabel: "Operator calendar" })),
+    encryptedSecretMaterial: encryptSeedText("google_e2e_personal_refresh"),
+    metadataJson: {
+      accountLabel: "Operator calendar",
+      syncMode: "bookings",
+      permissions: ["calendar.events"],
+    },
+    routeId: FIXTURE.integrations.tenantCredentials.personalGoogle.routeId,
+    lastVerifiedAt: addMinutes(new Date(), -30),
+    lastWebhookReceivedAt: null,
+    lastErrorCategory: null,
+    createdByUserId: operator.id,
+    updatedByUserId: operator.id,
+  });
+  await ensureByogCredential({
+    id: FIXTURE.integrations.tenantCredentials.supportGenericWebhook.id,
+    tenantId: FIXTURE.supportAccount.company.id,
+    provider: "GENERIC_WEBHOOK",
+    credentialType: "WEBHOOK_SECRET",
+    scope: "WORKSPACE",
+    scopeOwnerKey: "workspace",
+    userId: null,
+    displayName: "Support tenant webhook",
+    status: "CONNECTED",
+    encryptedPayload: encryptSeedText(JSON.stringify({ routeLabel: "support" })),
+    encryptedSecretMaterial: encryptSeedText("support_webhook_secret"),
+    metadataJson: { routeLabel: "support", permissions: ["webhooks.verify"] },
+    routeId: FIXTURE.integrations.tenantCredentials.supportGenericWebhook.routeId,
+    lastVerifiedAt: addMinutes(new Date(), -20),
+    lastWebhookReceivedAt: null,
+    lastErrorCategory: null,
+    createdByUserId: FIXTURE.supportAccount.user.id,
+    updatedByUserId: FIXTURE.supportAccount.user.id,
+  });
   const seededWebhook = await ensureWebhookEndpoint(company.id, operator.id);
 
   await ensureSavedViews(company.id, operator.id);
@@ -2150,6 +2838,9 @@ async function main() {
     attemptedAt: addMinutes(now, -10),
     deliveredAt: null,
   });
+
+  await prisma.documentArtifact.deleteMany({ where: { tenantId: company.id } });
+  await fs.rm(path.join(artifactRoot(), company.id), { recursive: true, force: true });
 
   const seededInvoiceStoragePath = await writeSeedArtifact(
     company.id,
@@ -3479,24 +4170,26 @@ async function main() {
     },
   });
 
+  await ensurePlatformBillingCatalogFixtures(platformAdminUser.id);
+  await ensurePlatformSafeErrorLogs(platformAdminUser.id);
+
   console.log(`tenant=${company.id} (${company.name})`);
   console.log(`operator_email=${FIXTURE.operator.email}`);
-  console.log(`operator_password=${FIXTURE.operator.password}`);
   console.log(`dispatcher_email=${FIXTURE.workspaceUsers.dispatcher.email}`);
-  console.log(`dispatcher_password=${FIXTURE.workspaceUsers.dispatcher.password}`);
+  console.log(`workspace_admin_email=${FIXTURE.workspaceUsers.admin.email}`);
   console.log(`finance_email=${FIXTURE.workspaceUsers.finance.email}`);
-  console.log(`finance_password=${FIXTURE.workspaceUsers.finance.password}`);
   console.log(`technician_email=${FIXTURE.workspaceUsers.technician.email}`);
-  console.log(`technician_password=${FIXTURE.workspaceUsers.technician.password}`);
+  console.log(`external_operator_email=${FIXTURE.workspaceUsers.externalOperator.email}`);
   console.log(`viewer_email=${FIXTURE.workspaceUsers.viewer.email}`);
-  console.log(`viewer_password=${FIXTURE.workspaceUsers.viewer.password}`);
+  console.log(`password_reset_email=${FIXTURE.workspaceUsers.passwordReset.email}`);
+  console.log(`platform_admin_email=${FIXTURE.platformAdmin.email}`);
+  console.log(`support_email=${FIXTURE.supportAccount.user.email}`);
   console.log(`convertible_booking=${FIXTURE.bookings.convertible.id}`);
   console.log(`blocked_booking=${FIXTURE.bookings.blocked.id}`);
   console.log(`invoice_ready_job=${invoiceReadyJob.jobRef}`);
   console.log(`issued_job=${issuedJob.jobRef}`);
   console.log(`finance_ready_job=${financeReadyJob.jobRef}`);
   console.log(`portal_active_job=${portalActiveJob.jobRef}`);
-  console.log(`portal_token=${FIXTURE.tokens.active}`);
   console.log(`customer_workspace_email=${FIXTURE.customerWorkspace.activeAccount.email}`);
   console.log(`technician_job=${technicianJob.jobRef}`);
   console.log(`technician_role_job=${technicianRoleJob.jobRef}`);

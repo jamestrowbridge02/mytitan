@@ -8,7 +8,7 @@ import { Roles } from '../common/roles.decorator';
 import { RolesGuard } from '../common/roles.guard';
 import { requireMarketplaceEnabled } from '../common/feature-flags';
 import { BookingsService } from './bookings.service';
-import { CreateBookingDto, UpdateBookingSettingsDto } from './dto';
+import { CancelBookingDto, ConfirmBookingDto, CreateBookingDto, RescheduleBookingDto, UpdateBookingSettingsDto } from './dto';
 
 @UseGuards(JwtAuthGuard, RolesGuard, FeatureGuard)
 @Controller('bookings')
@@ -34,13 +34,6 @@ export class BookingsController {
     return this.bookingsService.list(user.companyId, from, to, locationId);
   }
 
-  @Post(':id/convert')
-  @Feature('bookings_enabled')
-  @Roles('OWNER', 'ADMIN', 'STAFF')
-  convert(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
-    return this.bookingsService.convertToJob(user.companyId, user.sub, id);
-  }
-
   @Get('settings')
   @Feature('bookings_enabled')
   @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
@@ -55,6 +48,48 @@ export class BookingsController {
   updateSettings(@CurrentUser() user: JwtPayload, @Body() dto: UpdateBookingSettingsDto) {
     requireMarketplaceEnabled();
     return this.bookingsService.updateSettings(user.companyId, user.sub, dto);
+  }
+
+  @Get(':id')
+  @Feature('bookings_enabled')
+  @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
+  detail(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.bookingsService.getDetail(user.companyId, id);
+  }
+
+  @Post(':id/convert')
+  @Feature('bookings_enabled')
+  @Roles('OWNER', 'ADMIN', 'STAFF')
+  convert(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.bookingsService.convertToJob(user.companyId, user.sub, id);
+  }
+
+  @Get(':id/availability')
+  @Feature('bookings_enabled')
+  @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
+  availability(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Query('date') date?: string) {
+    return this.bookingsService.getBookingAvailability(user.companyId, id, date);
+  }
+
+  @Post(':id/confirm')
+  @Feature('bookings_enabled')
+  @Roles('OWNER', 'ADMIN', 'STAFF')
+  confirm(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Body() dto: ConfirmBookingDto) {
+    return this.bookingsService.confirmBooking(user.companyId, user.sub, id, dto);
+  }
+
+  @Post(':id/reschedule')
+  @Feature('bookings_enabled')
+  @Roles('OWNER', 'ADMIN', 'STAFF')
+  reschedule(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Body() dto: RescheduleBookingDto) {
+    return this.bookingsService.rescheduleBooking(user.companyId, user.sub, id, dto);
+  }
+
+  @Post(':id/cancel')
+  @Feature('bookings_enabled')
+  @Roles('OWNER', 'ADMIN', 'STAFF')
+  cancel(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Body() dto: CancelBookingDto) {
+    return this.bookingsService.cancelBooking(user.companyId, user.sub, id, dto);
   }
 
 }

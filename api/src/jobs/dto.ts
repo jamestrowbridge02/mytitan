@@ -36,6 +36,39 @@ export class JobExecutionChecklistItemDto {
   note?: string;
 }
 
+export class CreateArchivePeriodDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(120)
+  name!: string;
+
+  @IsDateString()
+  fromDate!: string;
+
+  @IsDateString()
+  toDate!: string;
+
+  @IsOptional()
+  @IsIn(['JOBS', 'INVOICES', 'JOBS_AND_INVOICES'])
+  scope?: 'JOBS' | 'INVOICES' | 'JOBS_AND_INVOICES';
+}
+
+export class ArchiveJobsDto {
+  @IsArray()
+  @IsString({ each: true })
+  jobIds!: string[];
+
+  @IsString()
+  @IsNotEmpty()
+  archivePeriodId!: string;
+}
+
+export class ArchiveByDateDto {
+  @IsString()
+  @IsNotEmpty()
+  archivePeriodId!: string;
+}
+
 export class StartJobExecutionDto {
   @IsOptional()
   @IsString()
@@ -80,6 +113,33 @@ export class AddJobExecutionEvidenceDto {
   payloadJson?: Record<string, any>;
 }
 
+export class ShareJobSheetDto {
+  @IsEmail()
+  recipientEmail!: string;
+
+  @IsOptional()
+  @IsString()
+  recipientName?: string;
+
+  @IsOptional()
+  @IsString()
+  message?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  includePdf?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  documentArtifactIds?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  jobAssetIds?: string[];
+}
+
 export class CreateJobAssetDto {
   @IsIn(JOB_ASSET_KINDS)
   kind!: (typeof JOB_ASSET_KINDS)[number];
@@ -111,6 +171,24 @@ export class CreateJobMediaPayloadDto {
 
   @IsString()
   mimeType!: string;
+}
+
+export class CreateJobPartAllocationDto {
+  @IsString()
+  @IsNotEmpty()
+  stockItemId!: string;
+
+  @IsOptional()
+  @IsString()
+  locationId?: string;
+
+  @IsInt()
+  @Min(0)
+  quantity!: number;
+
+  @IsOptional()
+  @IsString()
+  reason?: string;
 }
 
 export class CreateJobDto {
@@ -190,6 +268,10 @@ export class CreateJobDto {
   jobType?: string;
 
   @IsOptional()
+  @IsString()
+  tradeAccountId?: string;
+
+  @IsOptional()
   @IsObject()
   formData?: Record<string, any>;
 
@@ -215,12 +297,91 @@ export class CreateJobDto {
   @ValidateNested({ each: true })
   @Type(() => CreateJobAssetDto)
   assets?: CreateJobAssetDto[];
+
+  @IsOptional()
+  @IsBoolean()
+  completeAfterCreate?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateJobPartAllocationDto)
+  partAllocations?: CreateJobPartAllocationDto[];
 }
 
 export class UpdateJobStatusDto {
   @IsString()
   @IsNotEmpty()
   status!: string;
+}
+
+export class UpdateCustomerJourneyDto {
+  @IsOptional()
+  @IsIn(['BOOKING_RECEIVED', 'AWAITING_CONFIRMATION', 'SCHEDULED', 'TECHNICIAN_ASSIGNED', 'PREPARING_FOR_VISIT', 'ON_ROUTE', 'WORK_IN_PROGRESS', 'AWAITING_APPROVAL', 'COMPLETED', 'INVOICED', 'PAID'])
+  stage?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(240)
+  customerFacingStatus?: string;
+
+  @IsOptional()
+  @IsDateString()
+  etaWindowStart?: string;
+
+  @IsOptional()
+  @IsDateString()
+  etaWindowEnd?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  durationMinutes?: number;
+
+  @IsOptional()
+  @IsIn(['scheduled', 'confirmed', 'delayed', 'rescheduled', 'manual_update', 'not_available'])
+  confidence?: string;
+
+  @IsOptional()
+  @IsIn(['ON_TIME', 'DELAYED', 'RESCHEDULED', 'ON_ROUTE', 'ARRIVED'])
+  etaStatus?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  note?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  showTechnicianName?: boolean;
+}
+
+export class RoutePreviewQueryDto {
+  @IsOptional()
+  @IsDateString()
+  date?: string;
+
+  @IsOptional()
+  @IsString()
+  technicianId?: string;
+}
+
+export class JobListQueryDto {
+  @IsOptional()
+  @IsString()
+  locationId?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  @Type(() => Boolean)
+  includeArchived?: boolean;
+}
+
+export class JobLifecycleActionDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string;
 }
 
 export class JobsBoardQueryDto {

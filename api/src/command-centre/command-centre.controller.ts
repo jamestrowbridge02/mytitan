@@ -33,13 +33,15 @@ export class CommandCentreController {
       db.job.findMany({
         where: {
           companyId: user.companyId,
+          archivedAt: null,
+          deletedAt: null,
           OR: [{ invoiceDueAt: { lt: now }, invoicePaidAt: null }, { status: { in: ['OPEN', 'SCHEDULED'] } }],
         },
         orderBy: { updatedAt: 'desc' },
         take: 20,
       }),
       db.job.findMany({
-        where: { companyId: user.companyId, invoiceIssuedAt: { not: null }, invoicePaidAt: null },
+        where: { companyId: user.companyId, archivedAt: null, deletedAt: null, invoiceIssuedAt: { not: null }, invoicePaidAt: null },
         orderBy: { invoiceIssuedAt: 'desc' },
         take: 20,
       }),
@@ -51,7 +53,8 @@ export class CommandCentreController {
 
     return {
       quickActions: [
-        { key: 'new_job', label: 'New Job', href: '/dashboard/jobs/new' },
+        { key: 'start_work', label: 'Start Work', href: '/dashboard/work' },
+        { key: 'new_job', label: 'New Job', href: '/dashboard/jobs/new?guided=1&entry=work' },
         { key: 'new_booking', label: 'New Booking', href: '/dashboard/bookings' },
         { key: 'new_customer', label: 'New Customer / Trade Account', href: '/dashboard/trade-accounts' },
       ],

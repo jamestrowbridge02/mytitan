@@ -48,6 +48,10 @@ import { RevenueModule } from './revenue/revenue.module';
 import { ComplianceModule } from './compliance/compliance.module';
 import { PerformanceModule } from './performance/performance.module';
 import { CompensationModule } from './compensation/compensation.module';
+import { EnterpriseModule } from './enterprise/enterprise.module';
+import { Phase6BModule } from './phase6b/phase6b.module';
+import { CommercialReadinessModule } from './commercial-readiness/commercial-readiness.module';
+import { DocumentControlModule } from './document-control/document-control.module';
 
 @Module({
   imports: [
@@ -107,6 +111,10 @@ import { CompensationModule } from './compensation/compensation.module';
     ComplianceModule,
     PerformanceModule,
     CompensationModule,
+    EnterpriseModule,
+    Phase6BModule,
+    CommercialReadinessModule,
+    DocumentControlModule,
   ],
 })
 export class AppModule {}

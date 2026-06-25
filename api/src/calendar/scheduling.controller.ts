@@ -11,6 +11,11 @@ import { CalendarService } from './calendar.service';
 type WeeklyScheduleSlot = {
   start?: string | null;
   end?: string | null;
+  role?: string | null;
+  venue?: string | null;
+  breakMinutes?: number | null;
+  notes?: string | null;
+  absence?: boolean;
 };
 
 type WeeklyScheduleJson = Record<string, WeeklyScheduleSlot[]>;
@@ -123,7 +128,22 @@ export class SchedulingController {
       user.companyId,
       technicianId,
       weeklyJson ?? {},
+      user.sub,
     );
+  }
+
+  @Post('rota/publish')
+  @Roles('OWNER', 'ADMIN')
+  publishRota(
+    @CurrentUser() user: JwtPayload,
+    @Body('weekStart') weekStart?: string,
+  ) {
+    featureGate({
+      enabled: isSchedulingIntelligenceV1Enabled(),
+      feature: 'SCHEDULING_INTELLIGENCE_V1',
+      mode: 'mutation',
+    });
+    return this.calendarService.publishRota(user.companyId, user.sub, weekStart);
   }
 
   @Post('schedules/:technicianId/exceptions')

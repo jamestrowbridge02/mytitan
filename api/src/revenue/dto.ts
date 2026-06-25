@@ -88,6 +88,37 @@ export class UpsertQuoteDto {
   lineItems!: QuoteLineItemDto[];
 }
 
+export class JobEstimateDto {
+  @IsString()
+  title!: string;
+
+  @IsOptional()
+  @IsString()
+  summary?: string;
+
+  @IsOptional()
+  @IsString()
+  currency?: string;
+
+  @Type(() => Number)
+  @IsOptional()
+  @IsInt()
+  taxCents?: number;
+
+  @IsOptional()
+  @IsDateString()
+  expiresAt?: string;
+
+  @IsOptional()
+  @IsObject()
+  notesJson?: Record<string, any>;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => QuoteLineItemDto)
+  lineItems!: QuoteLineItemDto[];
+}
+
 export class PatchQuoteDto {
   @IsOptional()
   @IsString()
@@ -135,4 +166,24 @@ export class PatchQuoteDto {
   @ValidateNested({ each: true })
   @Type(() => QuoteLineItemDto)
   lineItems?: QuoteLineItemDto[];
+}
+
+export class QuoteInventoryLineItemDto {
+  @IsString()
+  stockItemId!: string;
+
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0.01)
+  quantity!: number;
+
+  @Type(() => Number)
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  unitPriceCents?: number;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
 }

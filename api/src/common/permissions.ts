@@ -26,6 +26,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   DISPATCHER: ['portal.manage', 'jobs.transition', 'dashboard.view_intelligence'],
   FINANCE: ['billing.manage', 'dashboard.view_intelligence'],
   TECHNICIAN: ['technician.execute'],
+  EXTERNAL_OPERATOR: ['technician.execute'],
   VIEWER: [],
   // Legacy roles remain supported to avoid breaking existing tenants.
   STAFF: [
@@ -45,6 +46,7 @@ const ROLE_FAMILY: Record<Role, Role[]> = {
   DISPATCHER: ['DISPATCHER'],
   FINANCE: ['FINANCE'],
   TECHNICIAN: ['TECHNICIAN'],
+  EXTERNAL_OPERATOR: ['EXTERNAL_OPERATOR'],
   VIEWER: ['VIEWER'],
   // Legacy controller decorators often refer to STAFF/READ_ONLY.
   STAFF: ['STAFF', 'DISPATCHER', 'FINANCE', 'TECHNICIAN'],

@@ -10,7 +10,7 @@ export class LocationHourDto {
   @IsOptional()
   @IsInt()
   @Min(0)
-  @Max(24 * 60)
+  @Max(24 * 60 - 1)
   startMinute?: number;
 
   @IsOptional()
