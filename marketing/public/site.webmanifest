@@ -2,21 +2,10 @@
   "name": "MyTitan",
   "short_name": "MyTitan",
   "description": "MyTitan helps service businesses run bookings, jobs, customers, approvals, scheduling, and billing in one place.",
+  "id": "/",
   "start_url": "/",
   "scope": "/",
   "icons": [
-    {
-      "src": "/favicon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any"
-    },
-    {
-      "src": "/apple-touch-icon.png",
-      "sizes": "180x180",
-      "type": "image/png",
-      "purpose": "any"
-    },
     {
       "src": "/android-chrome-192x192.png",
       "sizes": "192x192",
@@ -28,9 +17,25 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
     }
   ],
   "theme_color": "#2563EB",
   "background_color": "#F3F6FB",
-  "display": "standalone"
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "browser"],
+  "orientation": "portrait-primary",
+  "prefer_related_applications": false,
+  "categories": ["business", "productivity"]
 }

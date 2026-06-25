@@ -8,6 +8,7 @@ export function MarketingPageHero({
   actions,
   aside,
   brand = false,
+  meta,
 }: {
   eyebrow: string;
   title: string;
@@ -15,9 +16,12 @@ export function MarketingPageHero({
   actions?: ReactNode;
   aside?: ReactNode;
   brand?: boolean;
+  meta?: ReactNode;
 }) {
   return (
     <section className="mkt-hero">
+      <div className="mkt-hero__ambient mkt-hero__ambient--one" aria-hidden="true" />
+      <div className="mkt-hero__ambient mkt-hero__ambient--two" aria-hidden="true" />
       <div className="mkt-hero__copy">
         {brand ? (
           <div className="mkt-hero__brand mkt-brand-glimmer">
@@ -28,6 +32,7 @@ export function MarketingPageHero({
         <h1 className="mkt-hero__title mkt-hero__title--wide">{title}</h1>
         <p className="mkt-hero__lead">{lead}</p>
         {actions ? <div className="mkt-actions mkt-actions--hero">{actions}</div> : null}
+        {meta ? <div className="mkt-hero__meta">{meta}</div> : null}
       </div>
       {aside ? <aside className="mkt-hero__aside">{aside}</aside> : null}
     </section>
@@ -56,13 +61,17 @@ export function MarketingCapabilityCard({
   title,
   description,
   bullets,
+  href,
+  actionLabel = "Learn more",
 }: {
   title: string;
   description: string;
   bullets?: string[];
+  href?: string;
+  actionLabel?: string;
 }) {
-  return (
-    <article className="mkt-card">
+  const body = (
+    <>
       <h3>{title}</h3>
       <p>{description}</p>
       {bullets?.length ? (
@@ -72,6 +81,35 @@ export function MarketingCapabilityCard({
           ))}
         </ul>
       ) : null}
+      {href ? <span className="mkt-inlineLink">{actionLabel}</span> : null}
+    </>
+  );
+
+  if (href) {
+    return (
+      <Link href={href} className="mkt-card mkt-linkCard">
+        {body}
+      </Link>
+    );
+  }
+
+  return <article className="mkt-card">{body}</article>;
+}
+
+export function MarketingStatCard({
+  value,
+  label,
+  detail,
+}: {
+  value: string;
+  label: string;
+  detail: string;
+}) {
+  return (
+    <article className="mkt-stat">
+      <div className="mkt-stat__value">{value}</div>
+      <div className="mkt-stat__label">{label}</div>
+      <p>{detail}</p>
     </article>
   );
 }

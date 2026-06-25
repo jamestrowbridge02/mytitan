@@ -7,10 +7,10 @@ import {
   MarketingPageHero,
   MarketingSectionHeading,
 } from "../components/marketing/Sections";
-import { SALES_EMAIL } from "../lib/site-content";
+import { SALES_EMAIL, SIGN_UP_URL } from "../lib/site-content";
 
 function buildMailto(name: string, company: string, email: string, focus: string, notes: string) {
-  const subject = encodeURIComponent(`MyTitan demo request${company ? ` - ${company}` : ""}`);
+  const subject = encodeURIComponent(`MyTitan rollout request${company ? ` - ${company}` : ""}`);
   const body = encodeURIComponent(
     [
       `Name: ${name || "-"}`,
@@ -40,20 +40,18 @@ export default function DemoPage() {
   return (
     <MarketingShell>
       <MarketingSeo
-        title="Request a Demo"
-        description="Request a MyTitan demo and walk through jobs, customers, billing, team control, and rollout fit."
+        title="Set Up Booking Link"
+        description="Use this page to request rollout help for bookings, jobs, billing follow-through, and workspace setup."
         path="/demo"
       />
 
       <MarketingPageHero
-        eyebrow="Request a demo"
-        title="Walk the product against your real workflow."
-        lead="Use the demo path to review the jobs, customer journeys, billing steps, team controls, and rollout shape that matter to your business."
+        eyebrow="Rollout help"
+        title="Set up the product against your real workflow."
+        lead="Use this path when you want help shaping bookings, customer journeys, billing steps, team controls, and rollout order around your business."
         actions={
           <>
-            <Link className="mkt-btn mkt-btn--primary" href="/demo">
-              Book demo
-            </Link>
+            <a className="mkt-btn mkt-btn--primary" href={SIGN_UP_URL}>Create your workspace</a>
             <Link className="mkt-btn" href="/platform">
               See product
             </Link>
@@ -64,8 +62,8 @@ export default function DemoPage() {
       <section className="mkt-section">
         <div className="mkt-grid--2">
           <article className="mkt-proof">
-            <div className="mkt-eyebrow">What the demo covers</div>
-            <h2 className="mkt-sectionTitle">A practical walkthrough, not a feature recital.</h2>
+            <div className="mkt-eyebrow">What this covers</div>
+            <h2 className="mkt-sectionTitle">A practical rollout conversation, not a feature recital.</h2>
             <p>
               We can focus the conversation around daily operations, repeat work, customer updates,
               billing follow-through, controls, or rollout shape depending on where the pressure is highest.
@@ -73,8 +71,8 @@ export default function DemoPage() {
           </article>
           <article className="mkt-panel mkt-demoPanel">
             <MarketingSectionHeading
-              eyebrow="Demo request"
-              title="Tell us what you need to see."
+              eyebrow="Rollout request"
+              title="Tell us what you need to set up."
               lead="This opens a structured email to the MyTitan team. We keep it simple instead of pretending there is a live marketing form backend."
             />
             <form className="mkt-demoForm" onSubmit={handleSubmit}>

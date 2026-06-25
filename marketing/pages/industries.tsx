@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 import MarketingSeo from "../components/MarketingSeo";
 import MarketingShell from "../components/layout/MarketingShell";
 import {
@@ -7,7 +5,7 @@ import {
   MarketingPageHero,
   MarketingSectionHeading,
 } from "../components/marketing/Sections";
-import { industries } from "../lib/site-content";
+import { industries, SIGN_IN_URL, SIGN_UP_URL } from "../lib/site-content";
 
 export default function IndustriesPage() {
   return (
@@ -22,7 +20,14 @@ export default function IndustriesPage() {
         eyebrow="Industries"
         title="See where MyTitan is the strongest fit."
         lead="This page is for businesses deciding whether their service model matches the way MyTitan is built."
-        actions={<Link className="mkt-btn mkt-btn--primary" href="/demo">Book demo</Link>}
+        actions={<a className="mkt-btn mkt-btn--primary" href={SIGN_UP_URL}>Start now</a>}
+        meta={
+          <>
+            <span className="mkt-chip">Busy service teams</span>
+            <span className="mkt-chip">Recurring and multi-site ready</span>
+            <span className="mkt-chip">Customer follow-through built in</span>
+          </>
+        }
       />
 
       <section className="mkt-section">
@@ -33,10 +38,11 @@ export default function IndustriesPage() {
         />
         <div className="mkt-grid--2">
           {industries.map((industry) => (
-            <article key={industry.title} className="mkt-card">
+            <a key={industry.title} className="mkt-card mkt-linkCard" href={industry.href}>
               <h3>{industry.title}</h3>
               <p>{industry.description}</p>
-            </article>
+              <span className="mkt-inlineLink">{industry.action}</span>
+            </a>
           ))}
         </div>
       </section>
@@ -53,11 +59,11 @@ export default function IndustriesPage() {
 
       <MarketingCtaBand
         title="Map MyTitan to your service model."
-        copy="Use a demo to walk through the workflow that matters most in your industry, then review whether the rest of the product matches your business shape."
-        primaryLabel="Book demo"
-        primaryHref="/demo"
+        copy="Review the workflow that matters most in your industry, then create the workspace when the fit is right."
+        primaryLabel="Create your workspace"
+        primaryHref={SIGN_UP_URL}
         secondaryLabel="Sign in"
-        secondaryHref="https://app.mytitan.co.uk/login"
+        secondaryHref={SIGN_IN_URL}
       />
     </MarketingShell>
   );

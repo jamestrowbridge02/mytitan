@@ -1,29 +1,23 @@
 <svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
   <title id="title">MyTitan social card</title>
-  <desc id="desc">MyTitan brand card with the Titan helmet mark and wordmark.</desc>
+  <desc id="desc">MyTitan brand card with the Titan tile mark and tightened wordmark.</desc>
   <defs>
     <linearGradient id="bg" x1="120" y1="40" x2="1080" y2="590" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#F8FBFF"/>
-      <stop offset="0.5" stop-color="#EEF5FF"/>
-      <stop offset="1" stop-color="#E7F0FB"/>
+      <stop stop-color="#0F172A"/>
+      <stop offset="1" stop-color="#132A49"/>
     </linearGradient>
-    <radialGradient id="glowA" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(226 88) rotate(34.324) scale(438.888 282.118)">
-      <stop stop-color="#60A5FA" stop-opacity="0.24"/>
-      <stop offset="1" stop-color="#60A5FA" stop-opacity="0"/>
-    </radialGradient>
-    <radialGradient id="glowB" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(980 70) rotate(131.186) scale(395.786 266.378)">
-      <stop stop-color="#14B8A6" stop-opacity="0.2"/>
-      <stop offset="1" stop-color="#14B8A6" stop-opacity="0"/>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(942 88) rotate(132) scale(430 270)">
+      <stop stop-color="#38BDF8" stop-opacity="0.36"/>
+      <stop offset="1" stop-color="#38BDF8" stop-opacity="0"/>
     </radialGradient>
   </defs>
   <rect width="1200" height="630" rx="36" fill="url(#bg)"/>
-  <rect x="28" y="28" width="1144" height="574" rx="28" fill="white" fill-opacity="0.62" stroke="#D7E3F2"/>
-  <ellipse cx="226" cy="88" rx="372" ry="210" fill="url(#glowA)"/>
-  <ellipse cx="980" cy="70" rx="340" ry="212" fill="url(#glowB)"/>
-  <g transform="translate(120 145)">
-    <image href="/brand/mytitan-mark.svg" x="0" y="0" width="196" height="196"/>
-    <text x="244" y="104" fill="#0F172A" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="82" font-weight="700" letter-spacing="-0.06em">MyTitan</text>
-    <text x="0" y="308" fill="#0F172A" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="54" font-weight="700" letter-spacing="-0.04em">Run jobs, customers, and billing from one clear workspace.</text>
-    <text x="0" y="372" fill="#526071" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="28">Built for service businesses that have outgrown disconnected tools.</text>
+  <rect x="28" y="28" width="1144" height="574" rx="28" fill="rgba(255,255,255,0.03)" stroke="rgba(226,232,240,0.12)"/>
+  <ellipse cx="920" cy="80" rx="360" ry="220" fill="url(#glow)"/>
+  <g transform="translate(116 148)">
+    <image href="/brand/mytitan-mark.svg" x="0" y="0" width="192" height="192"/>
+    <text x="224" y="102" fill="#F8FAFC" font-family="Sora, ui-sans-serif, system-ui, sans-serif" font-size="82" font-weight="700" letter-spacing="-0.06em">MyTitan</text>
+    <text x="0" y="306" fill="#F8FAFC" font-family="Sora, ui-sans-serif, system-ui, sans-serif" font-size="54" font-weight="700" letter-spacing="-0.04em">Clear operations for serious service teams.</text>
+    <text x="0" y="372" fill="#CBD5E1" font-family="Sora, ui-sans-serif, system-ui, sans-serif" font-size="28">Bookings, jobs, customers, approvals, and billing in one premium operating flow.</text>
   </g>
 </svg>

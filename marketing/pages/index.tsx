@@ -2,160 +2,213 @@ import Link from "next/link";
 
 import MarketingSeo from "../components/MarketingSeo";
 import MarketingShell from "../components/layout/MarketingShell";
-import {
-  MarketingCapabilityCard,
-  MarketingPageHero,
-  MarketingSectionHeading,
-} from "../components/marketing/Sections";
-import { homepageOutcomes, homepageProblems, platformPillars, securityPoints } from "../lib/site-content";
+import { ApprovedReviews } from "../components/marketing/ApprovedReviews";
+import { BESPOKE_ACCOUNT_URL, pricingTiers, SIGN_IN_URL, SIGN_UP_URL } from "../lib/site-content";
+
+const OPERATING_SECTIONS = [
+  {
+    title: "Operational command centre",
+    copy: "See the work that needs attention, the jobs moving today, and the commercial follow-through that cannot wait.",
+    proof: ["Live work priorities", "Location-aware pressure", "Source-linked reporting"],
+  },
+  {
+    title: "Booking and calendar flow",
+    copy: "Publish real services and availability, receive booking requests, schedule the work, and keep customers on a clear status path.",
+    proof: ["Public booking controls", "Day, week, and month planning", "Service, team, and location colours"],
+  },
+  {
+    title: "Job sheets and proof-of-work",
+    copy: "Keep notes, configured fields, photos, signatures, parts, and completion evidence on the authoritative job record.",
+    proof: ["Configurable job sheets", "Media and signatures", "Customer-ready completion output"],
+  },
+  {
+    title: "Customer portal and payments",
+    copy: "Give customers a safe view of progress, approvals, completion records, invoices, and the payment route the business actually uses.",
+    proof: ["Customer-safe portal", "Approval workflows", "Truthful payment state"],
+  },
+  {
+    title: "Inventory, suppliers, and media records",
+    copy: "Track parts, stock locations, supplier references, purchase orders, and job media without losing the link to live work.",
+    proof: ["Stock pressure", "Internal purchasing", "Job-linked evidence"],
+  },
+  {
+    title: "Offline field workflow",
+    copy: "Technicians can carry assigned job context, queue supported field updates, and return work through controlled sync paths.",
+    proof: ["Assigned-work scope", "Conflict-aware sync", "Dedicated mobile workflow"],
+  },
+];
+
+const INTEGRATIONS = [
+  ["Xero", "Accounting connection and onboarding are readiness-gated until the workspace completes provider setup."],
+  ["QuickBooks", "Accounting connection and onboarding are readiness-gated until the workspace completes provider setup."],
+  ["Google Calendar", "Calendar connection surfaces are available with tenant-owned setup and controlled export paths."],
+  ["Microsoft Calendar", "Calendar readiness is available through the governed integration setup."],
+  ["Apple iCal", "Standards-based calendar feed support is available for configured workspaces."],
+  ["Gmail", "Workspace-owned email setup is supported without exposing credentials in the product."],
+  ["Outlook", "Workspace-owned email setup is supported without presenting gated delivery as live."],
+];
+
+const TRUST_CONTROLS = [
+  "Tenant-scoped data access",
+  "Role-based permissions",
+  "Audited operational changes",
+  "Timed and reason-gated support mode",
+  "Billing boundaries that keep MyTitan subscriptions separate from customer money",
+  "Backup and restore readiness evidence",
+];
 
 export default function MarketingHome() {
   return (
     <MarketingShell>
-      <MarketingSeo />
-
-      <MarketingPageHero
-        brand
-        eyebrow="Service business software"
-        title="The system that keeps jobs, customers, and billing in sync."
-        lead="MyTitan gives service businesses one clear place to run bookings, jobs, scheduling, customer updates, approvals, and billing."
-        actions={
-          <Link className="mkt-btn mkt-btn--primary" href="/demo">
-            Book demo
-          </Link>
-        }
-        aside={
-          <div className="mkt-stack-lg">
-            <div>
-              <div className="mkt-hero__asideLabel">Best for teams that feel stretched</div>
-              <h2 className="mkt-hero__asideTitle">If the work is moving but the follow-through is messy, this is the gap MyTitan closes.</h2>
-            </div>
-            <div className="mkt-card">
-              <h3>Stop switching tools</h3>
-              <p>Run the job, the customer communication, and the billing follow-through in one system.</p>
-            </div>
-            <div className="mkt-card">
-              <h3>See the day clearly</h3>
-              <p>Know what is booked, blocked, overdue, or waiting for approval without chasing updates.</p>
-            </div>
-            <div className="mkt-card">
-              <h3>Protect revenue</h3>
-              <p>Keep quotes, approvals, repeat work, and billing tied to the job that created them.</p>
-            </div>
-          </div>
-        }
+      <MarketingSeo
+        title="Field Service Operating System"
+        description="MyTitan connects booking, scheduling, job sheets, proof-of-work, customer portals, inventory, reporting, and payment follow-through for field-service teams."
       />
 
-      <section className="mkt-section">
-        <MarketingSectionHeading
-          eyebrow="What goes wrong without one system"
-          title="Most service businesses are not short on work. They are short on clarity."
-          lead="MyTitan is built for the problems that show up when jobs, customer communication, and billing are managed in separate places."
-        />
-        <div className="mkt-grid--2">
-          {homepageProblems.map((item) => (
-            <article key={item.title} className="mkt-proof">
-              <h3>{item.title}</h3>
-              <p>{item.description}</p>
-              <p><strong>With MyTitan:</strong> {item.outcome}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="mkt-section">
-        <MarketingSectionHeading
-          eyebrow="What changes after rollout"
-          title="The team gets one clear flow instead of constant handoffs."
-          lead="MyTitan is designed so the work, the customer, and the money stay connected from start to finish."
-        />
-        <div className="mkt-grid--2">
-          {homepageOutcomes.map((item) => (
-            <article key={item} className="mkt-card">
-              <h3>{item}</h3>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="mkt-section">
-        <MarketingSectionHeading
-          eyebrow="How it holds together"
-          title="One workflow from booking to billing."
-          lead="MyTitan keeps the key stages of the service journey inside one connected product."
-        />
-        <div className="mkt-grid--2">
-          {platformPillars.slice(0, 3).map((pillar) => (
-            <MarketingCapabilityCard
-              key={pillar.title}
-              title={pillar.title}
-              description={pillar.description}
-              bullets={pillar.bullets}
-            />
-          ))}
-        </div>
-      </section>
-
-      <section className="mkt-section">
-        <MarketingSectionHeading
-          eyebrow="Why teams trust it"
-          title="Built to stay usable as the business gets more complex."
-          lead="MyTitan already includes the controls service businesses need once more people, sites, and billing complexity are in play."
-        />
-        <div className="mkt-grid--2">
-          <article className="mkt-proof">
-            <h3>Built-in control</h3>
-            <p>Permissions, tenant boundaries, and customer-safe access are part of the live product from the start.</p>
-          </article>
-          <article className="mkt-proof">
-            <h3>Real operational depth</h3>
-            <p>Jobs, repeat work, approvals, billing follow-through, and reporting all live in the same system.</p>
-          </article>
-        </div>
-      </section>
-
-      <section className="mkt-section">
-        <MarketingSectionHeading
-          eyebrow="Security"
-          title="Control is built in."
-          lead="Tenant boundaries, permissions, audit history, and customer-safe access are part of the product from the start."
-        />
-        <div className="mkt-grid--2">
-          <article className="mkt-proof">
-            <h3 style={{ marginTop: 0 }}>Control at every layer</h3>
-            <p>
-              Workspace permissions, tenant scope, compliance controls, and integration visibility are already part of the live product.
-            </p>
-            <div className="mkt-actions" style={{ marginTop: 18 }}>
-              <Link className="mkt-btn mkt-btn--primary" href="/demo">
-                Book demo
-              </Link>
-            </div>
-          </article>
-          <div className="mkt-card" style={{ padding: 24 }}>
-            <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 10, color: "var(--muted)" }}>
-              {securityPoints.slice(0, 5).map((point) => (
-                <li key={point}>{point}</li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      </section>
-
-      <section className="mkt-section">
-        <div className="mkt-final">
-          <div className="mkt-eyebrow">Final step</div>
-          <h2 className="mkt-sectionTitle" style={{ marginTop: 14 }}>
-            See how MyTitan would fit the way your business actually runs.
-          </h2>
-          <p>
-            Use a live demo to review your workflow, team handoffs, customer communication, approvals, and billing follow-through in one pass.
+      <section className="mkt-billionHero">
+        <div className="mkt-billionHero__copy">
+          <img src="/brand/mytitan-logo-dark.svg" alt="MyTitan" className="mkt-billionHero__logo" />
+          <h1>Run field service from one clear system.</h1>
+          <p className="mkt-billionHero__lead">
+            Connect bookings, jobs, customer updates, invoices, and payment follow-through without losing the work between teams.
           </p>
-          <div className="mkt-actions" style={{ marginTop: 18 }}>
-            <Link className="mkt-btn mkt-btn--primary" href="/demo">
-              Book demo
-            </Link>
+          <div className="mkt-billionHero__actions">
+            <a className="mkt-btn mkt-btn--primary" href={SIGN_UP_URL}>Start 14-day trial</a>
           </div>
+        </div>
+
+        <div className="mkt-productSurface" data-testid="marketing-command-centre-preview" aria-label="MyTitan operational command centre preview">
+          <div className="mkt-productSurface__top">
+            <div>
+              <strong>Operational command centre</strong>
+            </div>
+            <span>Sample preview</span>
+          </div>
+          <div className="mkt-productSurface__metrics">
+            <div><small>Bookings</small><strong>24</strong></div>
+            <div><small>Active jobs</small><strong>17</strong></div>
+            <div><small>Awaiting approval</small><strong>3</strong></div>
+            <div><small>Outstanding invoices</small><strong>5</strong></div>
+          </div>
+          <div className="mkt-productSurface__timeline">
+            <div><i className="is-blue" /><span><strong>Booking confirmed</strong><small>09:20</small></span></div>
+            <div><i className="is-orange" /><span><strong>Job in progress</strong><small>10:05</small></span></div>
+            <div><i className="is-green" /><span><strong>Completion ready</strong><small>11:40</small></span></div>
+            <div><i className="is-violet" /><span><strong>Invoice sent</strong><small>12:15</small></span></div>
+          </div>
+          <div className="mkt-productSurface__status">
+            <span>Today</span>
+            <strong>Work and follow-up in one view</strong>
+          </div>
+        </div>
+      </section>
+
+      <section className="mkt-workflowStrip" aria-label="MyTitan workflow">
+        {["Book work", "Complete jobs", "Get paid", "Grow"].map((step) => (
+          <div key={step}>
+            <span aria-hidden="true" />
+            <strong>{step}</strong>
+          </div>
+        ))}
+      </section>
+
+      <section className="mkt-proofStrip" aria-label="Core product truths">
+        <div><strong>One record</strong><span>from booking through completion</span></div>
+        <div><strong>One customer path</strong><span>for status, proof, approvals, and payment</span></div>
+        <div><strong>Clear boundaries</strong><span>for tenants, roles, billing, and support</span></div>
+      </section>
+
+      <section className="mkt-editorialSection" id="features">
+        <div className="mkt-editorialSection__intro">
+          <p>Run the whole operation</p>
+          <h2>Every stage of field service should strengthen the next.</h2>
+          <span>MyTitan keeps operational detail attached to the work instead of scattering it across disconnected tools.</span>
+        </div>
+        <div className="mkt-operatingGrid">
+          {OPERATING_SECTIONS.map((item) => (
+            <details className="mkt-operatingCard" key={item.title}>
+              <summary>
+                <h3>{item.title}</h3>
+                <p>{item.copy}</p>
+                <span>View details</span>
+              </summary>
+              <ul>{item.proof.map((proof) => <li key={proof}>{proof}</li>)}</ul>
+            </details>
+          ))}
+        </div>
+      </section>
+
+      <section className="mkt-darkSection">
+        <div>
+          <p className="mkt-darkSection__eyebrow">Business intelligence</p>
+          <h2>See the pressure behind the numbers, then open the source record.</h2>
+          <p>Operational reporting, capacity, revenue follow-through, stock demand, and completion velocity stay grounded in retained workspace data.</p>
+          <Link className="mkt-btn mkt-btn--dark" href="/platform">Explore the platform</Link>
+        </div>
+        <div className="mkt-intelligencePanel">
+          <div><span>Workload</span><strong>Source-linked</strong></div>
+          <div><span>Revenue</span><strong>Evidence-led</strong></div>
+          <div><span>Capacity</span><strong>Location-aware</strong></div>
+          <div><span>Risk</span><strong>Explainable</strong></div>
+        </div>
+      </section>
+
+      <section className="mkt-editorialSection" id="integrations">
+        <div className="mkt-editorialSection__intro">
+          <p>Integration readiness</p>
+          <h2>Connect the tools you own, with setup state shown truthfully.</h2>
+          <span>Provider credentials remain tenant-owned. Readiness-gated connections are never described as live before their safety gates pass.</span>
+        </div>
+        <div className="mkt-integrationGrid">
+          {INTEGRATIONS.map(([name, description]) => (
+            <article key={name}>
+              <div><h3>{name}</h3><p>{description}</p></div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="mkt-trustSection">
+        <div>
+          <p>Security and operational trust</p>
+          <h2>Controls designed around real workspace boundaries.</h2>
+          <span>Review the controls and operational evidence available in MyTitan today.</span>
+        </div>
+        <ul>{TRUST_CONTROLS.map((control) => <li key={control}>{control}</li>)}</ul>
+        <Link className="mkt-btn" href="/security">Review security</Link>
+      </section>
+
+      <ApprovedReviews />
+
+      <section className="mkt-editorialSection mkt-editorialSection--pricing">
+        <div className="mkt-editorialSection__intro">
+          <p>Pricing clarity</p>
+          <h2>Monthly completed-job allowances are clear from the start.</h2>
+          <span>Choose the operating capacity that fits now. Standard job packs remain available, while larger operations can request a controlled bespoke allowance review.</span>
+        </div>
+        <div className="mkt-planGrid">
+          {pricingTiers.map((tier) => (
+            <Link key={tier.name} href="/pricing" className="mkt-planCard" data-testid={`marketing-home-plan-${tier.name.toLowerCase().replace(/\s+/g, "-")}`}>
+              <span>{tier.name}</span>
+              <strong>{tier.priceMonthly}</strong>
+              <p>{tier.completedJobsLabel}</p>
+              <small>{tier.summary}</small>
+            </Link>
+          ))}
+        </div>
+        <div className="mkt-actions">
+          <Link className="mkt-btn" href="/pricing">Compare plans</Link>
+          <Link className="mkt-btn mkt-btn--ghost" href={BESPOKE_ACCOUNT_URL}>Discuss bespoke account</Link>
+        </div>
+      </section>
+
+      <section className="mkt-billionFinal">
+        <p>Build the operating rhythm once.</p>
+        <h2>Book the work. Prove the result. Keep revenue moving.</h2>
+        <div>
+          <a className="mkt-btn mkt-btn--primary" href={SIGN_UP_URL}>Start 14-day trial</a>
+          <Link className="mkt-btn" href="/contact">Contact Us</Link>
+          <a className="mkt-btn mkt-btn--ghost" href={SIGN_IN_URL}>Sign In</a>
         </div>
       </section>
     </MarketingShell>

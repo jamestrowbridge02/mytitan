@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 import MarketingSeo from "../components/MarketingSeo";
 import MarketingShell from "../components/layout/MarketingShell";
 import {
@@ -7,7 +5,7 @@ import {
   MarketingPageHero,
   MarketingSectionHeading,
 } from "../components/marketing/Sections";
-import { solutionGroups } from "../lib/site-content";
+import { solutionGroups, SIGN_IN_URL, SIGN_UP_URL } from "../lib/site-content";
 
 export default function SolutionsPage() {
   return (
@@ -22,7 +20,14 @@ export default function SolutionsPage() {
         eyebrow="Solutions"
         title="See who gets value from MyTitan first."
         lead="This page is for teams deciding whether MyTitan solves the day-to-day problems they are dealing with right now."
-        actions={<Link className="mkt-btn mkt-btn--primary" href="/demo">Book demo</Link>}
+        actions={<a className="mkt-btn mkt-btn--primary" href={SIGN_UP_URL}>Create your workspace</a>}
+        meta={
+          <>
+            <span className="mkt-chip">Owners see pressure clearly</span>
+            <span className="mkt-chip">Service teams keep one operating record</span>
+            <span className="mkt-chip">Finance stays tied to real work</span>
+          </>
+        }
       />
 
       <section className="mkt-section">
@@ -33,7 +38,7 @@ export default function SolutionsPage() {
         />
         <div className="mkt-solutionGrid">
           {solutionGroups.map((group) => (
-            <article key={group.title} className="mkt-proof">
+            <a key={group.title} className="mkt-proof mkt-linkCard" href={group.href}>
               <h3>{group.title}</h3>
               <p>{group.description}</p>
               <ul>
@@ -41,33 +46,36 @@ export default function SolutionsPage() {
                   <li key={point}>{point}</li>
                 ))}
               </ul>
-            </article>
+              <span className="mkt-inlineLink">{group.action}</span>
+            </a>
           ))}
         </div>
       </section>
 
       <section className="mkt-section">
         <div className="mkt-grid--2">
-          <article className="mkt-card">
+          <a className="mkt-card mkt-linkCard" href="/platform">
             <div className="mkt-eyebrow">What it solves</div>
             <h2 className="mkt-sectionTitle">The main gain is shared clarity.</h2>
             <p>Everyone works from the same customer, job, schedule, and follow-through record instead of keeping side notes in different tools.</p>
-          </article>
-          <article className="mkt-card">
+            <span className="mkt-inlineLink">See the connected workflow</span>
+          </a>
+          <a className="mkt-card mkt-linkCard" href="/pricing">
             <div className="mkt-eyebrow">What changes</div>
             <h2 className="mkt-sectionTitle">Teams spend less time chasing status and more time moving work forward.</h2>
             <p>That is where MyTitan earns trust fastest: clearer handoffs, cleaner customer follow-up, and better billing discipline after the job.</p>
-          </article>
+            <span className="mkt-inlineLink">See plan fit</span>
+          </a>
         </div>
       </section>
 
       <MarketingCtaBand
         title="See how MyTitan would fit your team setup."
-        copy="Use a demo to walk through the part of the workflow that is creating the most pressure today, then review how the rest connects around it."
-        primaryLabel="Book demo"
-        primaryHref="/demo"
+        copy="Start the workspace, then shape the part of the workflow that is creating the most pressure today."
+        primaryLabel="Create your workspace"
+        primaryHref={SIGN_UP_URL}
         secondaryLabel="Sign in"
-        secondaryHref="https://app.mytitan.co.uk/login"
+        secondaryHref={SIGN_IN_URL}
       />
     </MarketingShell>
   );
