@@ -131,7 +131,12 @@ export function EntityArtifactsCard({
         form.append("portalVisible", portalVisible ? "true" : "false");
       }
       form.append("file", file);
-      const created = await apiFetch(`/artifacts/entities/${entityType}/${entityId}/upload`, {
+      const uploadParams = new URLSearchParams();
+      if (currentLabel) uploadParams.set("label", currentLabel);
+      uploadParams.set("kind", kind);
+      if (entityType === "job") uploadParams.set("portalVisible", portalVisible ? "true" : "false");
+      const uploadPath = `/artifacts/entities/${entityType}/${entityId}/upload${uploadParams.toString() ? `?${uploadParams.toString()}` : ""}`;
+      const created = await apiFetch(uploadPath, {
         method: "POST",
         body: form,
       });

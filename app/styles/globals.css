@@ -9735,6 +9735,230 @@ select:focus-visible {
   transform: translateY(0);
 }
 
+/* Phase 15 craftsmanship layer: shared hierarchy, accessibility, and action clarity. */
+[data-shell="app"] .mt-pageShellHeader {
+  border-bottom: 1px solid rgba(96, 115, 148, 0.12);
+  background:
+    linear-gradient(180deg, rgba(248, 251, 255, 0.94), rgba(248, 251, 255, 0.78));
+  backdrop-filter: blur(18px);
+}
+
+[data-shell="app"] .mt-pageShellHeader__inner {
+  min-height: 58px;
+  align-items: center;
+}
+
+[data-shell="app"] .mt-pageShellHeader__title {
+  color: var(--mt-navy);
+  letter-spacing: 0;
+}
+
+[data-shell="app"] .mt-pageShellHeader__subtitle {
+  max-width: 72ch;
+  color: var(--mt-text-muted);
+}
+
+[data-shell="app"] .card,
+[data-shell="app"] .integration-card,
+[data-shell="app"] .operator-section,
+[data-shell="app"] .platform-admin-card-stack,
+.customer-workspace .card {
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease, background-color 160ms ease;
+}
+
+[data-shell="app"] .button,
+[data-shell="app"] .button.secondary,
+.customer-workspace .button,
+.customer-workspace .button.secondary {
+  min-height: 42px;
+  letter-spacing: 0;
+  transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease, transform 150ms ease, filter 150ms ease;
+}
+
+[data-shell="app"] .button:disabled,
+[data-shell="app"] .button.secondary:disabled,
+.customer-workspace .button:disabled,
+.customer-workspace .button.secondary:disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.16);
+  opacity: 0.62;
+  box-shadow: none;
+}
+
+[data-shell="app"] .button:not(:disabled):active,
+[data-shell="app"] .button.secondary:not(:disabled):active,
+.customer-workspace .button:not(:disabled):active,
+.customer-workspace .button.secondary:not(:disabled):active {
+  transform: translateY(1px);
+}
+
+[data-shell="app"] .input,
+[data-shell="app"] textarea,
+[data-shell="app"] select,
+.customer-workspace input,
+.customer-workspace textarea,
+.customer-workspace select {
+  min-height: 42px;
+  border-radius: 12px;
+}
+
+[data-shell="app"] label {
+  color: var(--mt-navy);
+  font-weight: 700;
+}
+
+[data-shell="app"] label .input,
+[data-shell="app"] label textarea,
+[data-shell="app"] label select {
+  margin-top: 6px;
+}
+
+[data-shell="app"] .alert {
+  border-radius: 14px;
+  line-height: 1.55;
+}
+
+[data-shell="app"] .operator-page,
+[data-shell="app"] .operator-section,
+[data-shell="app"] .platform-admin-section.card {
+  scroll-margin-top: 92px;
+}
+
+[data-shell="app"] .operator-page__actions,
+[data-shell="app"] .operator-filterbar__actions,
+[data-shell="app"] .button-row {
+  align-items: center;
+}
+
+[data-shell="app"] .operator-page__actions > *,
+[data-shell="app"] .operator-filterbar__actions > *,
+[data-shell="app"] .button-row > * {
+  min-width: fit-content;
+}
+
+[data-shell="app"] .operator-page__stat,
+[data-shell="app"] .dashboard-metric-card,
+[data-shell="app"] .platform-admin-kpi-card,
+[data-shell="app"] .platform-admin-signal-card,
+[data-shell="app"] .platform-admin-readiness-card {
+  min-width: 0;
+}
+
+[data-shell="app"] .operator-page__statValue,
+[data-shell="app"] .platform-admin-kpi-card__value,
+[data-shell="app"] .platform-admin-signal-card__value {
+  overflow-wrap: anywhere;
+}
+
+[data-shell="app"] .operator-table,
+[data-shell="app"] .platform-admin-list,
+[data-shell="app"] .customer-workspace__list {
+  overflow-wrap: anywhere;
+}
+
+[data-shell="app"] .platform-admin-section.card {
+  border-radius: 24px;
+}
+
+[data-shell="app"] .platform-admin-filter-grid {
+  align-items: stretch;
+}
+
+[data-shell="app"] .platform-admin-filter-grid .button,
+[data-shell="app"] .platform-admin-filter-grid .button.secondary {
+  justify-content: flex-start;
+  min-height: 46px;
+  text-align: left;
+}
+
+[data-shell="app"] .platform-admin-card-stack__header {
+  align-items: flex-start;
+  gap: 14px;
+}
+
+[data-shell="app"] .phase15-commercial-panel {
+  display: grid;
+  gap: 18px;
+  border-color: rgba(37, 99, 255, 0.16);
+  background:
+    radial-gradient(420px 180px at 100% 0%, rgba(37, 99, 255, 0.10), transparent 72%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(243, 248, 255, 0.96));
+}
+
+[data-shell="app"] .phase15-action-guide {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+[data-shell="app"] .phase15-action-guide > div {
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+  border: 1px solid rgba(96, 115, 148, 0.16);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+[data-shell="app"] .phase15-action-guide span {
+  color: #2550c8;
+  font-size: 0.72rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+[data-shell="app"] .phase15-action-guide strong {
+  color: var(--mt-navy);
+}
+
+[data-shell="app"] .phase15-action-guide p {
+  margin: 0;
+  color: var(--mt-text-muted);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+@media (max-width: 900px) {
+  [data-shell="app"] .phase15-action-guide {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  [data-shell="app"] .mt-pageShellHeader__actions,
+  [data-shell="app"] .button-row {
+    width: 100%;
+  }
+
+  [data-shell="app"] .mt-pageShellHeader__actions > *,
+  [data-shell="app"] .button-row > *,
+  [data-shell="app"] .operator-page__actions > *,
+  [data-shell="app"] .operator-filterbar__actions > * {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-shell="app"] .card,
+  [data-shell="app"] .integration-card,
+  [data-shell="app"] .operator-section,
+  [data-shell="app"] .platform-admin-card-stack,
+  [data-shell="app"] .button,
+  [data-shell="app"] .button.secondary,
+  .customer-workspace .button,
+  .customer-workspace .button.secondary {
+    transition: none;
+  }
+
+  [data-shell="app"] .button:not(:disabled):active,
+  [data-shell="app"] .button.secondary:not(:disabled):active,
+  .customer-workspace .button:not(:disabled):active,
+  .customer-workspace .button.secondary:not(:disabled):active {
+    transform: none;
+  }
+}
+
 /* Public booking: tenant-led, page-per-step presentation */
 .public-booking-shell {
   width: min(100% - 28px, 980px);

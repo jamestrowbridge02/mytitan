@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Res,
   UploadedFile,
   UseGuards,
@@ -91,6 +92,7 @@ export class ArtifactsController {
     @Param("entityType") entityType: string,
     @Param("entityId") entityId: string,
     @Body() body: Record<string, any>,
+    @Query() query: Record<string, any>,
     @UploadedFile() file: any,
   ) {
     return this.artifacts.createFromUpload({
@@ -98,9 +100,9 @@ export class ArtifactsController {
       userId: user.sub,
       entityType,
       entityId,
-      label: typeof body?.label === "string" ? body.label : null,
-      kind: typeof body?.kind === "string" ? body.kind : "",
-      portalVisible: body?.portalVisible,
+      label: typeof body?.label === "string" ? body.label : typeof query?.label === "string" ? query.label : null,
+      kind: typeof body?.kind === "string" ? body.kind : typeof query?.kind === "string" ? query.kind : "",
+      portalVisible: body?.portalVisible ?? query?.portalVisible,
       file,
     });
   }

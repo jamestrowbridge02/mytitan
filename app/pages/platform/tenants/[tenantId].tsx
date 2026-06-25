@@ -310,13 +310,30 @@ export default function Tenant360Page() {
                 ))}
               </div>
 
-              <div className="card platform-admin-card-stack" data-testid="tenant-360-commercial-action-panel">
+              <div className="card platform-admin-card-stack phase15-commercial-panel" data-testid="tenant-360-commercial-action-panel">
                 <div className="platform-admin-card-stack__header">
                   <div>
                     <strong>{activeMeta.label}</strong>
                     <p className="muted">{activeMeta.group} - {activeMeta.summary}</p>
                   </div>
                   <span className="platform-admin-chip">Audit required</span>
+                </div>
+                <div className="phase15-action-guide" aria-label="Commercial action save requirements">
+                  <div>
+                    <span>1. Current state</span>
+                    <strong>Review live values</strong>
+                    <p>Price, trial, and allowance values below are read from this workspace before the change.</p>
+                  </div>
+                  <div>
+                    <span>2. Proposed change</span>
+                    <strong>Enter one intent</strong>
+                    <p>The selected action changes only this tenant and never mutates Stripe products or prices.</p>
+                  </div>
+                  <div>
+                    <span>3. Audit trail</span>
+                    <strong>Reason and confirm</strong>
+                    <p>Saving requires confirmation and writes platform before/after evidence.</p>
+                  </div>
                 </div>
                 <div className="platform-admin-metric-grid">
                   <Metric label="Current trial end" value={formatDate(data.account.trial.endsAt)} />

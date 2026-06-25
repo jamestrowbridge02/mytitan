@@ -20,14 +20,14 @@ test.describe("integration platform foundation", () => {
     await installApiProxy(page, request);
     await loginAs(page, request, "e2e.operator@mytitan.local", "MyTitanE2E!2026");
 
-    await page.goto("/dashboard/integrations", { waitUntil: "networkidle" });
+    await page.goto("/dashboard/integrations", { waitUntil: "domcontentloaded" });
     const quickbooksRow = page.getByTestId("integration-workspace-row-quickbooks");
     await expect(quickbooksRow).toBeVisible();
     await quickbooksRow.getByRole("link").click();
     await expect(page).toHaveURL(/\/dashboard\/settings\/integrations\/quickbooks/);
 
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto("/dashboard/integrations", { waitUntil: "networkidle" });
+    await page.goto("/dashboard/integrations", { waitUntil: "domcontentloaded" });
     const googleRow = page.getByTestId("integration-personal-row-google");
     await expect(googleRow).toBeVisible();
     const box = await googleRow.boundingBox();

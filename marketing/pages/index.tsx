@@ -57,6 +57,29 @@ const TRUST_CONTROLS = [
   "Backup and restore readiness evidence",
 ];
 
+const LAUNCH_PROOF = [
+  {
+    label: "Payments",
+    value: "Tenant-owned",
+    detail: "Customer deposits and invoice payments use the business payment setup, not MyTitan billing Stripe.",
+  },
+  {
+    label: "Provider readiness",
+    value: "Truthful",
+    detail: "Stripe, accounting, email, calendar, and webhook surfaces show setup state before any live claim.",
+  },
+  {
+    label: "Operations",
+    value: "Audited",
+    detail: "Commercial controls, support mode, launch checks, and platform actions keep a reasoned audit trail.",
+  },
+  {
+    label: "Launch status",
+    value: "Evidence-led",
+    detail: "External uptime, canary, and backup checks are shown as configured only when real evidence exists.",
+  },
+];
+
 export default function MarketingHome() {
   return (
     <MarketingShell>
@@ -176,6 +199,27 @@ export default function MarketingHome() {
         </div>
         <ul>{TRUST_CONTROLS.map((control) => <li key={control}>{control}</li>)}</ul>
         <Link className="mkt-btn" href="/security">Review security</Link>
+      </section>
+
+      <section className="mkt-launchProof" aria-label="Launch proof and readiness">
+        <div className="mkt-launchProof__intro">
+          <p>Launch proof</p>
+          <h2>Premium should also mean honest.</h2>
+          <span>MyTitan presents the state the product can prove today. Setup-dependent providers, live payment checks, uptime monitoring, and canary evidence are never dressed up as complete before they are configured.</span>
+        </div>
+        <div className="mkt-launchProof__grid">
+          {LAUNCH_PROOF.map((item) => (
+            <article key={item.label} className="mkt-launchProof__card">
+              <span>{item.label}</span>
+              <strong>{item.value}</strong>
+              <p>{item.detail}</p>
+            </article>
+          ))}
+        </div>
+        <div className="mkt-actions">
+          <Link className="mkt-btn" href="/security">Review controls</Link>
+          <Link className="mkt-btn mkt-btn--ghost" href="/contact">Ask about launch checks</Link>
+        </div>
       </section>
 
       <ApprovedReviews />
