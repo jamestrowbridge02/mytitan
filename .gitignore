@@ -34,6 +34,7 @@ api/prisma/migrations/**/.DS_Store
 
 # Local editor/Codex backups
 *.localbak.*
+.codex
 
 .env
 .env.local
