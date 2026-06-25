@@ -4970,7 +4970,12 @@ export class BillingService {
       ok: true,
       tenant: company,
       plan: subscription?.plan
-        ? { code: subscription.plan.code, name: subscription.plan.name }
+        ? {
+            code: subscription.plan.code,
+            name: subscription.plan.name,
+            monthlyPriceCents: getPlanBasePriceCents(subscription.plan.code, 'MONTHLY'),
+            annualPriceCents: getPlanBasePriceCents(subscription.plan.code, 'ANNUAL'),
+          }
         : null,
       interval: settings?.planBillingInterval || DEFAULT_INTERVAL,
       subscription: subscription
@@ -4982,7 +4987,12 @@ export class BillingService {
           }
         : null,
       controls,
-      plans: plans.map((plan: any) => ({ code: plan.code, name: plan.name })),
+      plans: plans.map((plan: any) => ({
+        code: plan.code,
+        name: plan.name,
+        monthlyPriceCents: getPlanBasePriceCents(plan.code, 'MONTHLY'),
+        annualPriceCents: getPlanBasePriceCents(plan.code, 'ANNUAL'),
+      })),
       allowance,
       auditHistory,
     };

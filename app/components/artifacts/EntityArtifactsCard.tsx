@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { apiFetch, getApiBase } from "../../lib/api";
 import { formatUploadLimit, UPLOAD_LIMITS, validateUploadFile } from "../../lib/upload-policy";
@@ -82,6 +82,7 @@ export function EntityArtifactsCard({
   const [search, setSearch] = useState("");
   const [folderFilter, setFolderFilter] = useState("ALL");
   const [governance, setGovernance] = useState<MediaGovernance | null>(null);
+  const labelInputRef = useRef<HTMLInputElement | null>(null);
 
   async function load() {
     if (!entityId) return;
@@ -122,8 +123,9 @@ export function EntityArtifactsCard({
     setBusy(true);
     setError("");
     try {
+      const currentLabel = String(labelInputRef.current?.value || label || "").trim();
       const form = new FormData();
-      if (label.trim()) form.append("label", label.trim());
+      if (currentLabel) form.append("label", currentLabel);
       form.append("kind", kind);
       if (entityType === "job") {
         form.append("portalVisible", portalVisible ? "true" : "false");
@@ -260,6 +262,7 @@ export function EntityArtifactsCard({
       {!readOnly ? (
         <div style={{ marginTop: 16, display: "grid", gap: 10 }}>
           <input
+            ref={labelInputRef}
             className="input"
             value={label}
             onChange={(event) => setLabel(event.target.value)}

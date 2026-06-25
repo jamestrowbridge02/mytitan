@@ -1311,7 +1311,7 @@ export default function PlatformAdminPage() {
               </div>
               <div className="platform-admin-attention-list" data-testid="platform-tenant-attention-list">
                 {(overview?.support.attentionTenants || []).map((row) => (
-                  <button key={row.tenantId} type="button" className={`platform-admin-attention-card ${row.billingBlocked || !row.ownerEmailVerified ? 'platform-admin-attention-card--critical' : row.issueCount >= 4 ? 'platform-admin-attention-card--warn' : 'platform-admin-attention-card--info'}`} onClick={() => focusTenant(row.tenantId)}>
+                  <article key={row.tenantId} className={`platform-admin-attention-card ${row.billingBlocked || !row.ownerEmailVerified ? 'platform-admin-attention-card--critical' : row.issueCount >= 4 ? 'platform-admin-attention-card--warn' : 'platform-admin-attention-card--info'}`}>
                     <div className="platform-admin-attention-card__top">
                       <div>
                         <strong>{row.tenantName}</strong>
@@ -1326,7 +1326,13 @@ export default function PlatformAdminPage() {
                     <div className="platform-admin-attention-card__meta muted">
                       {humanizeEmailState(row.emailState)} • {humanizeState(row.integrationState)} • {row.cancelAtPeriodEnd ? 'Cancels at period end' : 'Continuing'}
                     </div>
-                  </button>
+                    <div className="button-row">
+                      <Link className="button" data-testid={`platform-attention-open-tenant-360-${row.tenantId}`} href={`/platform/tenants/${encodeURIComponent(row.tenantId)}`}>Open Tenant 360</Link>
+                      <Link className="button secondary" data-testid={`platform-attention-edit-commercials-${row.tenantId}`} href={`/platform/tenants/${encodeURIComponent(row.tenantId)}#commercial`}>Edit Commercials</Link>
+                      <button className="button secondary" type="button" data-testid={`platform-attention-start-support-${row.tenantId}`} onClick={() => focusTenant(row.tenantId)}>Start Support Mode</button>
+                      <Link className="button secondary" data-testid={`platform-attention-view-audit-${row.tenantId}`} href={`/platform/tenants/${encodeURIComponent(row.tenantId)}#audit`}>View Audit</Link>
+                    </div>
+                  </article>
                 ))}
                 {!(overview?.support.attentionTenants || []).length ? <p className="muted" style={{ marginBottom: 0 }}>No tenants need support action right now.</p> : null}
               </div>
@@ -2197,10 +2203,11 @@ export default function PlatformAdminPage() {
                         <th style={tableHeaderStyle}>Role</th>
                         <th style={tableHeaderStyle}>Plan</th>
                         <th style={tableHeaderStyle}>Subscription</th>
-                        <th style={tableHeaderStyle}>Trial</th>
-                        <th style={tableHeaderStyle}>Converted</th>
-                        <th style={tableHeaderStyle}>Stripe</th>
-                      </tr>
+	                        <th style={tableHeaderStyle}>Trial</th>
+	                        <th style={tableHeaderStyle}>Converted</th>
+	                        <th style={tableHeaderStyle}>Stripe</th>
+	                        <th style={tableHeaderStyle}>Actions</th>
+	                      </tr>
                     </thead>
                     <tbody>
                       {rows.map((row) => (
@@ -2236,13 +2243,24 @@ export default function PlatformAdminPage() {
                             <div>{row.convertedAt ? new Date(row.convertedAt).toLocaleDateString() : 'Not converted'}</div>
                             <div className="muted">{row.conversionSource || 'none'}</div>
                           </td>
-                          <td style={tableCellStyle}>
-                            <div className="platform-admin-inline-status-row">
-                              <StatusPill tone={row.stripeLinked ? 'success' : 'neutral'}>{row.stripeLinked ? 'Linked' : 'Not linked'}</StatusPill>
-                            </div>
-                            <div className="muted">{row.stripeCustomerLinked && row.stripeSubscriptionLinked ? 'Customer + subscription' : row.stripeCustomerLinked ? 'Customer only' : row.stripeSubscriptionLinked ? 'Subscription only' : 'No linkage'}</div>
-                          </td>
-                        </tr>
+	                          <td style={tableCellStyle}>
+	                            <div className="platform-admin-inline-status-row">
+	                              <StatusPill tone={row.stripeLinked ? 'success' : 'neutral'}>{row.stripeLinked ? 'Linked' : 'Not linked'}</StatusPill>
+	                            </div>
+	                            <div className="muted">{row.stripeCustomerLinked && row.stripeSubscriptionLinked ? 'Customer + subscription' : row.stripeCustomerLinked ? 'Customer only' : row.stripeSubscriptionLinked ? 'Subscription only' : 'No linkage'}</div>
+	                          </td>
+	                          <td style={tableCellStyle}>
+	                            {row.workspaceId ? (
+	                              <div className="button-row" data-testid={`platform-membership-actions-${row.workspaceId}`}>
+	                                <Link className="button secondary" data-testid={`platform-membership-open-tenant-360-${row.workspaceId}`} href={`/platform/tenants/${encodeURIComponent(row.workspaceId!)}`}>Open Tenant 360</Link>
+	                                <Link className="button secondary" data-testid={`platform-membership-edit-commercials-${row.workspaceId}`} href={`/platform/tenants/${encodeURIComponent(row.workspaceId!)}#commercial`}>Edit Commercials</Link>
+	                                <button className="button secondary" type="button" data-testid={`platform-membership-start-support-${row.workspaceId}`} onClick={() => focusTenant(row.workspaceId!)}>Start Support Mode</button>
+	                              </div>
+	                            ) : (
+	                              <span className="muted">No workspace action</span>
+	                            )}
+	                          </td>
+	                        </tr>
                       ))}
                     </tbody>
                   </table>
@@ -2271,12 +2289,10 @@ export default function PlatformAdminPage() {
             </div>
             <div className="platform-admin-attention-list" style={{ marginTop: 16 }}>
               {results.map((result) => (
-                <button
+                <article
                   key={result.id}
-                  type="button"
                   className="platform-admin-attention-card"
-                  data-testid={`platform-tenant-result-${result.id}`}
-                  onClick={() => selectTenantForSupport(result.id)}
+                  data-testid={`platform-tenant-result-card-${result.id}`}
                 >
                   <div className="platform-admin-attention-card__top">
                     <div>
@@ -2285,7 +2301,20 @@ export default function PlatformAdminPage() {
                     </div>
                     <StatusPill tone="neutral">{new Date(result.createdAt).toLocaleDateString()}</StatusPill>
                   </div>
-                </button>
+                  <div className="button-row">
+                    <Link className="button" data-testid={`platform-tenant-open-tenant-360-${result.id}`} href={`/platform/tenants/${encodeURIComponent(result.id)}`}>Open Tenant 360</Link>
+                    <Link className="button secondary" data-testid={`platform-tenant-edit-commercials-${result.id}`} href={`/platform/tenants/${encodeURIComponent(result.id)}#commercial`}>Edit Commercials</Link>
+                    <button
+                      className="button secondary"
+                      type="button"
+                      data-testid={`platform-tenant-result-${result.id}`}
+                      onClick={() => selectTenantForSupport(result.id)}
+                    >
+                      Start Support Mode
+                    </button>
+                    <Link className="button secondary" data-testid={`platform-tenant-view-audit-${result.id}`} href={`/platform/tenants/${encodeURIComponent(result.id)}#audit`}>View Audit</Link>
+                  </div>
+                </article>
               ))}
               {!results.length && query.trim().length >= 2 ? <p className="muted" style={{ marginBottom: 0 }}>No tenants matched.</p> : null}
             </div>
