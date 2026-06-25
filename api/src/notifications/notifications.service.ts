@@ -24,6 +24,39 @@ export class NotificationsService {
     private readonly automations: AutomationsService,
   ) {}
 
+  private sanitizeInAppMessage(value: unknown, maxLength = 220) {
+    return String(value || '')
+      .replace(/\bhttps?:\/\/\S+\b/gi, '[redacted-link]')
+      .replace(/\b(sk|rk|whsec)_[a-z0-9_]+\b/gi, '[redacted-secret]')
+      .replace(/\b(cs|pi|ch|re|evt|sub|cus|in|price)_[a-z0-9_]+\b/gi, '[redacted-reference]')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, maxLength);
+  }
+
+  private readNotificationMeta(row: any) {
+    return row?.metaJson && typeof row.metaJson === 'object' && !Array.isArray(row.metaJson) ? row.metaJson : {};
+  }
+
+  private sanitizeNotificationContext(context: Record<string, any> | null | undefined) {
+    if (!context || typeof context !== 'object') return context;
+    const { ctaCiphertext, ctaHref, ...safeContext } = context;
+    return safeContext;
+  }
+
+  private deriveNotificationBody(row: any) {
+    const meta = this.readNotificationMeta(row);
+    const current = this.sanitizeInAppMessage(row?.body || '', 220);
+    if (current) return current;
+    const note = this.sanitizeInAppMessage(meta?.note || meta?.recommendedAction || '', 220);
+    if (note) return note;
+    const context = meta?.context && typeof meta.context === 'object' ? meta.context : null;
+    if (context?.customerName) {
+      return this.sanitizeInAppMessage(`Customer: ${context.customerName}`, 220);
+    }
+    return '';
+  }
+
   private async waitLine(socket: net.Socket | tls.TLSSocket) {
     return await new Promise<string>((resolve, reject) => {
       const onData = (buf: Buffer) => {
@@ -386,11 +419,16 @@ export class NotificationsService {
 
     return rows.map((row: any) => ({
       id: row.id,
+      title: this.sanitizeInAppMessage(row.title || row.type || 'Workspace message', 120),
+      message: this.deriveNotificationBody(row),
       entityType: row.entityType,
       entityId: row.entityId,
       channel: row?.metaJson?.channel || 'in_app',
       status: row?.metaJson?.status || 'queued',
       reasonKey: row?.metaJson?.reasonKey || row.type,
+      to: row?.metaJson?.to || null,
+      context: this.sanitizeNotificationContext(row?.metaJson?.context || null),
+      isRead: Boolean(row.isRead),
       createdAt: row.createdAt,
       scheduledFor: row?.metaJson?.context?.scheduledFor || null,
     }));

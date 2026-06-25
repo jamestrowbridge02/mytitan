@@ -57,6 +57,8 @@ function SidebarIcon({ icon }: { icon?: string }) {
       return <svg {...common}><path d="M6 4h10a2 2 0 0 1 2 2v14l-7-4-7 4V6a2 2 0 0 1 2-2z" /></svg>;
     case "customers":
       return <svg {...common}><path d="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2" /><circle cx="9.5" cy="7" r="4" /><path d="M20 8v6M23 11h-6" /></svg>;
+    case "mail":
+      return <svg {...common}><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m4 7 8 6 8-6" /></svg>;
     case "plans":
       return <svg {...common}><path d="M4 6h16" /><path d="M4 12h10" /><path d="M4 18h7" /></svg>;
     case "quotes":

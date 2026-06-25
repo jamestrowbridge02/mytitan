@@ -21,6 +21,11 @@ type SendUpdatePanelProps = {
   defaultTemplateKey?: string;
   defaultChannel?: string;
   onSent?: () => void;
+  title?: string;
+  description?: string;
+  buttonLabel?: string;
+  testId?: string;
+  allowedChannels?: string[];
 };
 
 export default function SendUpdatePanel({
@@ -29,6 +34,11 @@ export default function SendUpdatePanel({
   defaultTemplateKey,
   defaultChannel,
   onSent,
+  title,
+  description,
+  buttonLabel,
+  testId,
+  allowedChannels,
 }: SendUpdatePanelProps) {
   const enabled = isNotificationsV1Enabled();
   const [templateKey, setTemplateKey] = useState(defaultTemplateKey || TEMPLATE_OPTIONS[0].key);
@@ -44,6 +54,18 @@ export default function SendUpdatePanel({
     }
     return TEMPLATE_OPTIONS.filter((opt) => opt.key.startsWith("booking."));
   }, [entityType]);
+  const channelOptions = useMemo(() => {
+    if (!allowedChannels?.length) return CHANNEL_OPTIONS;
+    const allowed = new Set(allowedChannels.map((item) => String(item).toLowerCase()));
+    return CHANNEL_OPTIONS.filter((opt) => allowed.has(opt.key));
+  }, [allowedChannels]);
+  const channelLabel = useMemo(
+    () => channelOptions.find((opt) => opt.key === channel)?.label || "Update",
+    [channel, channelOptions],
+  );
+  const sendButtonLabel = loading
+    ? `Sending ${channelLabel}...`
+    : buttonLabel || `Send ${channelLabel.toLowerCase()} update`;
 
   if (!enabled || !entityId) return null;
 
@@ -73,8 +95,11 @@ export default function SendUpdatePanel({
   }
 
   return (
-    <div className="card" style={{ marginBottom: 16 }}>
-      <h3 style={{ marginTop: 0 }}>Send update</h3>
+    <div className="card" style={{ marginBottom: 16 }} data-testid={testId}>
+      <h3 style={{ marginTop: 0 }}>{title || "Manual customer update"}</h3>
+      <p className="muted" style={{ marginTop: 0 }}>
+        {description || "Use this only when you need an extra customer touchpoint beyond the main service-record and payment handoff."}
+      </p>
       <div style={{ display: "grid", gap: 10 }}>
         <label>
           Template
@@ -87,7 +112,7 @@ export default function SendUpdatePanel({
         <label>
           Channel
           <select className="input" value={channel} onChange={(e) => setChannel(e.target.value)}>
-            {CHANNEL_OPTIONS.map((opt) => (
+            {channelOptions.map((opt) => (
               <option key={opt.key} value={opt.key}>{opt.label}</option>
             ))}
           </select>
@@ -96,8 +121,8 @@ export default function SendUpdatePanel({
           Note (optional)
           <textarea className="input" rows={3} value={note} onChange={(e) => setNote(e.target.value)} />
         </label>
-        <button className="button" type="button" onClick={sendUpdate} disabled={loading}>
-          {loading ? "Sending..." : "Send update"}
+        <button className="button secondary" type="button" onClick={sendUpdate} disabled={loading}>
+          {sendButtonLabel}
         </button>
         {error ? (
           <p className="muted" style={{ marginTop: 0 }}>

@@ -30,6 +30,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { title: "Scheduling", description: "Who is free, busy, or overloaded", href: "/dashboard/scheduling", icon: "calendar" },
       { title: "Bookings", description: "New requests and appointments", href: "/dashboard/bookings", icon: "bookings" },
       { title: "Customers", description: "Contact details, updates, and job history", href: "/dashboard/customers", icon: "customers" },
+      { title: "Communications", sidebarTitle: "Comms", description: "Customer messages, portal updates, and delivery status", href: "/dashboard/communications", icon: "mail" },
       { title: "Service Plans", description: "Repeat work and renewals", href: "/dashboard/service-plans", icon: "plans" },
     ],
   },
