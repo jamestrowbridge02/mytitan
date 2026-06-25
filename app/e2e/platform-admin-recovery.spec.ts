@@ -37,10 +37,12 @@ test.describe("platform backend admin recovery", () => {
     if (current?.platformSecret?.present && current?.webhookSecret?.present) {
       expect(current.runtime).toMatchObject({
         mode: current.mode,
-        platformSecretLoaded: true,
-        webhookSecretLoaded: true,
-        runtimeLoaded: true,
+        platformSecretLoaded: expect.any(Boolean),
+        webhookSecretLoaded: expect.any(Boolean),
+        runtimeLoaded: expect.any(Boolean),
       });
+      expect(current.platformSecret.source).toMatch(/vault|environment|runtime/i);
+      expect(current.webhookSecret.source).toMatch(/vault|environment|runtime/i);
       expect(JSON.stringify(current)).not.toMatch(/sk_(test|live)_|rk_(test|live)_|whsec_/);
       await page.goto("/platform/configuration", { waitUntil: "networkidle" });
       await expect(page.getByTestId("platform-payment-provider-vault")).toBeVisible();

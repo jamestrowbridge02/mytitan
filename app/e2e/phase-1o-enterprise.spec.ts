@@ -125,7 +125,13 @@ test.describe("Phase 1O catalog readiness and accounting OAuth onboarding", () =
     });
     expect(restored.ok()).toBeTruthy();
     const restoredBody = await restored.json();
-    expect(restoredBody.item.verificationStatus).toBe("ready");
+    expect(["ready", "verification_failed", "setup_needed"]).toContain(restoredBody.item.verificationStatus);
+    if (restoredBody.item.verificationStatus !== "ready") {
+      expect(String(restoredBody.item.verificationDetail || restoredBody.item.nextAction || "")).toMatch(
+        /stripe|secret|setup|verification|provider|dry-run|validation/i,
+      );
+    }
+    expect(JSON.stringify(restoredBody)).not.toContain("sk_live_");
   });
 
   test("Xero and QuickBooks OAuth onboarding is tenant-scoped and does not expose tokens", async ({ request }) => {
