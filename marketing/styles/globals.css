@@ -2396,6 +2396,72 @@ select:focus-visible {
   line-height: 1.58;
 }
 
+.mkt-pricingFaq {
+  display: grid;
+  grid-template-columns: minmax(0, 0.78fr) minmax(360px, 1.22fr);
+  gap: clamp(22px, 4vw, 44px);
+  align-items: start;
+}
+
+.mkt-pricingFaq > div:first-child p {
+  max-width: 52ch;
+  color: #526071;
+  line-height: 1.7;
+}
+
+.mkt-pricingFaq__items {
+  display: grid;
+  gap: 10px;
+}
+
+.mkt-pricingFaq__item {
+  border: 1px solid rgba(37, 99, 235, 0.12);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(246, 249, 255, 0.92));
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.045);
+}
+
+.mkt-pricingFaq__item summary {
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  padding: 16px 18px;
+  color: #0f172a;
+  cursor: pointer;
+  font-weight: 850;
+  line-height: 1.35;
+  list-style: none;
+}
+
+.mkt-pricingFaq__item summary::-webkit-details-marker {
+  display: none;
+}
+
+.mkt-pricingFaq__item summary::after {
+  content: "+";
+  margin-left: auto;
+  color: #2563eb;
+  font-size: 1.2rem;
+}
+
+.mkt-pricingFaq__item[open] summary::after {
+  content: "-";
+}
+
+.mkt-pricingFaq__item p {
+  margin: 0;
+  padding: 0 18px 18px;
+  color: #526071;
+  line-height: 1.62;
+}
+
+.mkt-pricingFaq__item summary:focus-visible {
+  border-radius: 14px;
+  outline: 3px solid rgba(37, 99, 255, 0.2);
+  outline-offset: 3px;
+}
+
 .mkt-planGrid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -2457,7 +2523,7 @@ select:focus-visible {
   .mkt-billionHero__copy { padding: 30px 24px; border-radius: 26px; }
   .mkt-productSurface { padding: 22px; border-radius: 26px; }
   .mkt-productSurface__metrics, .mkt-proofStrip { grid-template-columns: 1fr; display: grid; }
-  .mkt-operatingGrid, .mkt-integrationGrid, .mkt-planGrid, .mkt-darkSection, .mkt-trustSection, .mkt-launchProof { grid-template-columns: 1fr; }
+  .mkt-operatingGrid, .mkt-integrationGrid, .mkt-planGrid, .mkt-darkSection, .mkt-trustSection, .mkt-launchProof, .mkt-pricingFaq { grid-template-columns: 1fr; }
   .mkt-operatingCard { min-height: auto; }
   .mkt-editorialSection, .mkt-darkSection, .mkt-trustSection, .mkt-launchProof, .mkt-billionFinal { margin-top: 72px; }
   .mkt-darkSection, .mkt-trustSection, .mkt-launchProof, .mkt-billionFinal { padding: 28px 22px; border-radius: 26px; }

@@ -97,6 +97,65 @@ const phase6BusinessContinuityPack = [
   { key: "accreditation_folder", title: "Accreditation evidence folder", detail: "Compliance evidence links to real workspace records and exception queues.", href: "/dashboard/compliance" },
 ];
 
+const enterpriseReadinessRoadmap = [
+  {
+    key: "sso",
+    title: "SSO",
+    status: "Roadmap",
+    detail: "Enterprise identity should be provider-led with tenant-owned configuration, tested rollback, and no password-policy shortcuts.",
+    href: "/dashboard/users",
+  },
+  {
+    key: "scim",
+    title: "SCIM provisioning",
+    status: "Roadmap",
+    detail: "Automated user lifecycle management needs dedicated ownership, audit evidence, and deprovisioning tests before launch.",
+    href: "/dashboard/users",
+  },
+  {
+    key: "audit_exports",
+    title: "Audit exports",
+    status: "Available evidence",
+    detail: "Tenant audit evidence is already reviewable and export paths remain governed by role and workspace boundary.",
+    href: "/dashboard/audit",
+  },
+  {
+    key: "retention",
+    title: "Retention controls",
+    status: "Available evidence",
+    detail: "Media governance and retention readiness are visible without automatic deletion or unsafe cleanup.",
+    href: "/dashboard/settings/operations#media-governance",
+  },
+  {
+    key: "api",
+    title: "API and scoped tokens",
+    status: "Available evidence",
+    detail: "Developer Tools owns scoped API token and webhook setup, with reveal-once and secret-safe handling.",
+    href: "/dashboard/settings/developer-tools",
+  },
+  {
+    key: "rate_limits",
+    title: "Rate limits",
+    status: "Available evidence",
+    detail: "Public booking and sensitive entry points fail closed with friendly throttling and no request identity leakage.",
+    href: "/dashboard/settings/operations",
+  },
+  {
+    key: "webhook_replay",
+    title: "Webhook replay",
+    status: "Available evidence",
+    detail: "Webhook delivery, failure queues, signing readiness, and retry paths stay visible from Developer Tools.",
+    href: "/dashboard/settings/developer-tools",
+  },
+  {
+    key: "marketplace",
+    title: "Marketplace and partners",
+    status: "Roadmap",
+    detail: "Partner listings should launch only when provider readiness, scopes, review, and tenant-safe support routes are complete.",
+    href: "/dashboard/integrations",
+  },
+];
+
 function WorkflowCard({ title: heading, value, detail, href, testId }: { title: string; value: string; detail: string; href: string; testId: string }) {
   return (
     <a className="operator-mini-card mt-linkCard" href={href} data-testid={testId}>
@@ -310,6 +369,24 @@ export default function EnterprisePhase2Page() {
               </div>
               <p className="muted" style={{ marginBottom: 0 }}>
                 Tenant trust summaries stay business-safe. Platform observability and support diagnostics remain on the separate platform surface.
+              </p>
+            </Section>
+
+            <Section title="Enterprise readiness roadmap" testId="phase16-enterprise-readiness-roadmap">
+              <div className="operator-grid operator-grid--four">
+                {enterpriseReadinessRoadmap.map((item) => (
+                  <a key={item.key} className="operator-mini-card mt-linkCard phase16-roadmap-card" href={item.href} data-testid={`phase16-roadmap-${item.key}`}>
+                    <div className="operator-row">
+                      <strong>{item.title}</strong>
+                      <span className="operator-tag">{item.status}</span>
+                    </div>
+                    <p className="muted">{item.detail}</p>
+                    <span className="mt-linkCard__action">{item.status === "Roadmap" ? "Review dependency" : "Open evidence"}</span>
+                  </a>
+                ))}
+              </div>
+              <p className="muted" style={{ marginBottom: 0 }}>
+                Roadmap items are intentionally not presented as live. Enterprise readiness stays evidence-led until configuration, provider checks, and tenant-safe support paths exist.
               </p>
             </Section>
 

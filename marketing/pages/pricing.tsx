@@ -10,6 +10,25 @@ import {
 } from "../components/marketing/Sections";
 import { BESPOKE_ACCOUNT_URL, ENTERPRISE_ACCOUNT_URL, pricingTiers, SIGN_UP_URL } from "../lib/site-content";
 
+const PRICING_FAQS = [
+  {
+    question: "Are customer deposits or invoice payments processed by MyTitan billing?",
+    answer: "No. MyTitan billing is for subscriptions and job-completion packs only. Customer money stays on the business payment setup or a manual collection path.",
+  },
+  {
+    question: "Are extra job packs live automatically?",
+    answer: "No. Packs are only sold when Stripe products, webhook-backed granting, and readiness checks are configured. Until then, the product shows setup state truthfully.",
+  },
+  {
+    question: "Can larger businesses request custom allowances?",
+    answer: "Yes. Bespoke and enterprise allowances are handled through controlled MyTitan platform administration with audit evidence, not hidden checkout behavior.",
+  },
+  {
+    question: "Does annual billing change operational limits?",
+    answer: "No. Annual billing changes the subscription interval only. Completed-job allowances, provider readiness, tenant boundaries, and customer payment separation stay the same.",
+  },
+];
+
 export default function PricingPage() {
   const [annual, setAnnual] = useState(false);
 
@@ -137,6 +156,22 @@ export default function PricingPage() {
                   <p>{annual ? tier.priceAnnual : tier.priceMonthly}</p>
                 </div>
               </Link>
+            ))}
+          </div>
+        </div>
+
+        <div className="mkt-proof mkt-pricingFaq" data-testid="pricing-truthful-faq">
+          <div>
+            <div className="mkt-eyebrow">Pricing FAQ</div>
+            <h2 className="mkt-sectionTitle" style={{ marginTop: 14 }}>Clear answers before checkout.</h2>
+            <p>Short answers to the commercial questions that should never be hidden in small print.</p>
+          </div>
+          <div className="mkt-pricingFaq__items">
+            {PRICING_FAQS.map((item) => (
+              <details key={item.question} className="mkt-pricingFaq__item">
+                <summary>{item.question}</summary>
+                <p>{item.answer}</p>
+              </details>
             ))}
           </div>
         </div>

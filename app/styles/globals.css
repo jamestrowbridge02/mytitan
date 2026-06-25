@@ -9919,6 +9919,19 @@ select:focus-visible {
   line-height: 1.45;
 }
 
+[data-shell="app"] .phase16-roadmap-card {
+  min-height: 190px;
+  align-content: start;
+}
+
+[data-shell="app"] .phase16-roadmap-card .operator-tag {
+  white-space: nowrap;
+}
+
+[data-shell="app"] .phase16-roadmap-card p {
+  line-height: 1.55;
+}
+
 @media (max-width: 900px) {
   [data-shell="app"] .phase15-action-guide {
     grid-template-columns: 1fr;
