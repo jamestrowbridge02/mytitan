@@ -146,6 +146,69 @@ type InternalMonitoringSnapshot = {
   };
 };
 
+const livePaymentCanarySteps = [
+  "Tenant Stripe connected",
+  "Stripe onboarding completed",
+  "Small live deposit taken",
+  "Booking confirmed",
+  "Stripe webhook received",
+  "Payment state updated",
+  "Refund completed",
+  "Refund state updated",
+];
+
+const wheelPilotChecklist = [
+  "Public booking",
+  "Trade booking",
+  "Custom booking fields",
+  "Weekly availability",
+  "Deposit and payment state",
+  "Job conversion",
+  "Job sheet",
+  "Photos, signature, and evidence",
+  "Invoice",
+  "Customer portal",
+  "Trade portal",
+  "Numbering",
+  "Archive period",
+];
+
+const onboardingProofSteps = [
+  { label: "Business profile", href: "/dashboard/setup-wizard?step=branding" },
+  { label: "Logo and branding", href: "/dashboard/setup-wizard?step=branding" },
+  { label: "Location", href: "/dashboard/locations" },
+  { label: "Service folder and service", href: "/dashboard/setup-wizard?step=services" },
+  { label: "Availability", href: "/dashboard/setup-wizard?step=operations" },
+  { label: "Public booking link", href: "/dashboard/booking/settings" },
+  { label: "Customer fields", href: "/dashboard/settings?tab=customers" },
+  { label: "Payments", href: "/dashboard/settings/payments/stripe" },
+  { label: "Invoices", href: "/dashboard/settings?tab=finance" },
+  { label: "First booking", href: "/dashboard/bookings" },
+];
+
+const mobileFieldChecklist = [
+  { label: "Job sheet", href: "/dashboard/technician" },
+  { label: "Before and after media upload", href: "/dashboard/technician" },
+  { label: "Signature", href: "/dashboard/technician" },
+  { label: "Notes", href: "/dashboard/technician" },
+  { label: "Completion", href: "/dashboard/technician" },
+  { label: "Weak-signal recovery", href: "/dashboard/technician/offline" },
+  { label: "No horizontal overflow", href: "/dashboard/technician" },
+];
+
+const releaseChecklist = [
+  "Clean tree",
+  "Annotated release tag",
+  "Prisma migration status",
+  "Healthcheck",
+  "Production readiness",
+  "Full stable suite",
+  "Payment canary status",
+  "Uptime monitor status",
+  "Backup status",
+  "Rollback note",
+];
+
 function tone(state: LaunchState) {
   return state === "ready" ? "success" : state === "blocked" ? "critical" : "warning";
 }
@@ -167,6 +230,7 @@ export default function LaunchControlPage() {
   const [settings, setSettings] = useState<TenantSettings | null>(null);
   const [error, setError] = useState("");
   const [viewMode, setViewMode] = useState<"basic" | "advanced">("basic");
+  const [canaryConfirmed, setCanaryConfirmed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -228,6 +292,9 @@ export default function LaunchControlPage() {
     ops?.externalMonitoring?.apiStatus === "ready" &&
     ops?.externalMonitoring?.marketingStatus === "ready" &&
     Boolean(ops?.externalMonitoring?.tlsExpiry);
+  const externalMonitorStatus = ops?.externalMonitoring?.externalMonitorStatus || "not_configured";
+  const externalMonitorConfigured = externalMonitorStatus && externalMonitorStatus !== "not_configured" && externalMonitorStatus !== "unknown";
+  const releaseTag = "v1.0.0-clean";
 
   const rows = [
     {
@@ -514,6 +581,128 @@ export default function LaunchControlPage() {
                 </OperatorDataTableRow>
               ))}
             </OperatorDataTable>
+          </section>
+        ) : null}
+
+        {canViewPlatformDiagnostics ? (
+          <section className="card operator-section" data-testid="launch-proof-live-payment-canary">
+            <div className="operator-section__header">
+              <div>
+                <h2 className="operator-section__title">Live payment canary</h2>
+                <p className="operator-section__subtitle">Manual release-window proof only. This checklist never creates a charge, refund, product, price, or checkout session.</p>
+              </div>
+            </div>
+            <div className="booking-summary-grid">
+              {livePaymentCanarySteps.map((step, index) => (
+                <label className="booking-lifecycle-card" key={step}>
+                  <input type="checkbox" aria-label={step} />
+                  <strong>{index + 1}. {step}</strong>
+                  <p>Record operator evidence before marking this step complete.</p>
+                </label>
+              ))}
+            </div>
+            <label style={{ display: "flex", gap: 10, alignItems: "flex-start", marginTop: 16 }}>
+              <input type="checkbox" checked={canaryConfirmed} onChange={(event) => setCanaryConfirmed(event.target.checked)} data-testid="launch-canary-explicit-confirmation" />
+              <span>I confirm a platform admin is supervising a real tenant-owned payment path and no MyTitan billing Stripe fallback will be used.</span>
+            </label>
+            <button className="button secondary" type="button" disabled={!canaryConfirmed} style={{ marginTop: 12 }} data-testid="launch-canary-record-button">
+              Record manual canary evidence
+            </button>
+          </section>
+        ) : null}
+
+        <section className="card operator-section" data-testid="launch-proof-wheel-pilot">
+          <div className="operator-section__header">
+            <div>
+              <h2 className="operator-section__title">Wheel A&amp;R pilot acceptance</h2>
+              <p className="operator-section__subtitle">End-to-end pilot proof for the first real workflow. Each row links to the owning product surface.</p>
+            </div>
+          </div>
+          <div className="operator-grid operator-grid--five">
+            {wheelPilotChecklist.map((item) => (
+              <article className="operator-mini-card" key={item} data-testid={`wheel-pilot-${item.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`}>
+                <span className="operator-tag">Pilot</span>
+                <strong>{item}</strong>
+                <span className="mt-linkCard__action">Verify</span>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="card operator-section" data-testid="launch-proof-onboarding-mobile">
+          <div className="operator-section__header">
+            <div>
+              <h2 className="operator-section__title">First user onboarding and mobile field proof</h2>
+              <p className="operator-section__subtitle">One action per step, with clear saved or complete status from the owning page.</p>
+            </div>
+          </div>
+          <div className="booking-summary-grid">
+            <div>
+              <h3>Onboarding path</h3>
+              <div className="platform-admin-list">
+                {onboardingProofSteps.map((step) => (
+                  <Link className="mt-linkCard" href={step.href} key={step.label} data-testid={`launch-onboarding-${step.label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`}>
+                    <strong>{step.label}</strong>
+                    <span>Open</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+            <div>
+              <h3>Mobile field path</h3>
+              <div className="platform-admin-list">
+                {mobileFieldChecklist.map((step) => (
+                  <Link className="mt-linkCard" href={step.href} key={step.label} data-testid={`launch-mobile-${step.label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`}>
+                    <strong>{step.label}</strong>
+                    <span>Open</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {canViewPlatformDiagnostics ? (
+          <section className="card operator-section" data-testid="launch-proof-uptime-monitor">
+            <div className="operator-section__header">
+              <div>
+                <h2 className="operator-section__title">External uptime monitor</h2>
+                <p className="operator-section__subtitle">Truthful external monitoring state. MyTitan does not claim a monitor is configured unless provider evidence exists.</p>
+              </div>
+              <Link className="button secondary" href="/dashboard/settings/operations">Configure monitor</Link>
+            </div>
+            <OperatorDataTable columns="minmax(180px,0.7fr) minmax(220px,1fr) minmax(280px,1.3fr)">
+              <OperatorDataTableHeader>
+                <div className="operator-table__cell">Status</div>
+                <div className="operator-table__cell">Last check</div>
+                <div className="operator-table__cell">Alert recipient</div>
+              </OperatorDataTableHeader>
+              <OperatorDataTableRow>
+                <div className="operator-table__cell"><OperatorStatusBadge label={externalMonitorConfigured ? String(externalMonitorStatus).replace(/_/g, " ") : "not configured"} tone={externalMonitorConfigured ? "success" : "warning"} compact /></div>
+                <div className="operator-table__cell">{ops?.checkedAt ? new Date(ops.checkedAt).toLocaleString() : "Not checked"}</div>
+                <div className="operator-table__cell">{opsAlerts?.resolvedRecipientCount ? `${opsAlerts.resolvedRecipientCount} resolved recipient(s)` : "No alert recipient configured"}</div>
+              </OperatorDataTableRow>
+            </OperatorDataTable>
+            <p className="muted">{ops?.externalMonitoring?.externalMonitorDetail || "No external uptime monitor is configured yet."}</p>
+          </section>
+        ) : null}
+
+        {canViewPlatformDiagnostics ? (
+          <section className="card operator-section" data-testid="launch-proof-release-discipline">
+            <div className="operator-section__header">
+              <div>
+                <h2 className="operator-section__title">Release discipline</h2>
+                <p className="operator-section__subtitle">Release checklist for the clean branch and tag. Rollback remains a documented operator action.</p>
+              </div>
+            </div>
+            <div className="booking-summary-grid">
+              {releaseChecklist.map((item) => (
+                <article className="booking-lifecycle-card" key={item}>
+                  <strong>{item}</strong>
+                  <p>{item === "Annotated release tag" ? releaseTag : item === "Full stable suite" ? "446 passed, 0 failed, 0 skipped required before release." : "Required before launch handoff."}</p>
+                </article>
+              ))}
+            </div>
           </section>
         ) : null}
       </div>

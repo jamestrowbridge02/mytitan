@@ -20,6 +20,65 @@ type AutopilotCard = {
   availabilityPercentage?: number;
 };
 
+const supportPlaybooks = [
+  {
+    key: "stripe-setup-failure",
+    title: "Stripe setup failure",
+    symptoms: "Tenant cannot open onboarding, checkout is blocked, or webhook proof is missing.",
+    checks: "Confirm vault readiness, tenant onboarding state, webhook verification, and no MyTitan billing Stripe fallback.",
+    repair: "Retry onboarding or verify readiness only after platform configuration is present.",
+    escalation: "Escalate to Payments with redacted tenant id and provider state.",
+  },
+  {
+    key: "email-delivery-failure",
+    title: "Email delivery failure",
+    symptoms: "Verification, summary, invoice, or service-record email is not delivered.",
+    checks: "Check system sender readiness, workspace sender setup, recipient resolution, and notification logs.",
+    repair: "Retry safe queued delivery or route through verified MyTitan system sender where policy allows.",
+    escalation: "Escalate to Notifications with message id and tenant id only.",
+  },
+  {
+    key: "booking-not-visible",
+    title: "Booking not visible",
+    symptoms: "A public or trade booking exists but does not appear in the operator queue.",
+    checks: "Check booking status, location scope, archive state, conversion state, and tenant feature flags.",
+    repair: "Refresh booking indexes or open the booking directly from Tenant 360 before support mode.",
+    escalation: "Escalate to Product Ops with booking id and location scope.",
+  },
+  {
+    key: "calendar-not-updating",
+    title: "Calendar not updating",
+    symptoms: "Calendar V2 does not show moved, cancelled, or newly confirmed work.",
+    checks: "Check operational refresh, booking mutation event, location scope, and browser cache state.",
+    repair: "Run safe refresh and verify the booking source record before changing data.",
+    escalation: "Escalate to Scheduling with affected date, location, and booking id.",
+  },
+  {
+    key: "upload-failure",
+    title: "Upload failure",
+    symptoms: "Logo, job evidence, completion media, or document upload fails.",
+    checks: "Check file type, file size, tenant ownership, API 413 response, and storage policy.",
+    repair: "Ask operator to retry with an allowed file or use the structured upload error guidance.",
+    escalation: "Escalate to Platform Ops with sanitized file metadata only.",
+  },
+  {
+    key: "tenant-onboarding-help",
+    title: "Tenant onboarding help",
+    symptoms: "Owner is stuck before first booking, payments, invoices, or branding setup.",
+    checks: "Review guided setup step state, Launch Control rows, and tenant-safe readiness blockers.",
+    repair: "Send the exact setup link and avoid support mode unless tenant workspace inspection is needed.",
+    escalation: "Escalate to Customer Success with current setup step and blockers.",
+  },
+  {
+    key: "invoice-payment-issue",
+    title: "Invoice or payment issue",
+    symptoms: "Invoice state, manual payment, deposit, refund, or reconciliation looks wrong.",
+    checks: "Check invoice source, tenant payment provider state, webhook proof, and finance audit events.",
+    repair: "Use finance review actions only; never route tenant customer money through MyTitan billing Stripe.",
+    escalation: "Escalate to Finance Ops with invoice id and redacted provider state.",
+  },
+];
+
 export default function PlatformAutopilotPage() {
   const [allowed, setAllowed] = useState<boolean | null>(null);
   const [data, setData] = useState<any>(null);
@@ -219,6 +278,27 @@ export default function PlatformAutopilotPage() {
                 <p>{action.risk}</p>
                 <p className="muted">Owner: {action.owner} · Affected: {action.affected}</p>
                 <p>{action.nextAction}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="platform-admin-section card" data-testid="autopilot-support-playbooks">
+          <div className="platform-admin-section-copy">
+            <h2>Support playbooks</h2>
+            <p>Platform-only operating guides for common launch issues. Every repair path keeps tenant isolation, billing boundaries, and auditability intact.</p>
+          </div>
+          <div className="platform-admin-detail-grid">
+            {supportPlaybooks.map((playbook) => (
+              <article className="card platform-admin-card-stack" key={playbook.key} data-testid={`support-playbook-${playbook.key}`}>
+                <strong>{playbook.title}</strong>
+                <p><strong>Symptoms:</strong> {playbook.symptoms}</p>
+                <p><strong>Safe checks:</strong> {playbook.checks}</p>
+                <p><strong>Safe repair:</strong> {playbook.repair}</p>
+                <p className="muted"><strong>Escalation:</strong> {playbook.escalation}</p>
+                <button className="button secondary" type="button" onClick={() => setMessage(`${playbook.title} playbook audit action noted.`)}>
+                  Audit action
+                </button>
               </article>
             ))}
           </div>

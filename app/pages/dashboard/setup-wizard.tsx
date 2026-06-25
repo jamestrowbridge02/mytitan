@@ -30,15 +30,20 @@ const steps = [
 
 const phase6OnboardingPath = [
   { key: "business", label: "Business profile", href: "/dashboard/setup-wizard?step=branding" },
-  { key: "locations", label: "Locations", href: "/dashboard/locations" },
-  { key: "services", label: "Services", href: "/dashboard/setup-wizard?step=services" },
+  { key: "locations", label: "Location", href: "/dashboard/locations" },
+  { key: "services", label: "Service folder and service", href: "/dashboard/setup-wizard?step=services" },
   { key: "job_sheet", label: "Job sheet template", href: "/dashboard/setup-wizard?step=template" },
-  { key: "booking", label: "Booking settings", href: "/dashboard/booking/settings" },
+  { key: "booking", label: "Weekly availability", href: "/dashboard/booking/settings" },
   { key: "portal", label: "Portal settings", href: "/dashboard/portal" },
-  { key: "payments", label: "Payment setup", href: "/dashboard/billing/readiness" },
+  { key: "payments", label: "Payments", href: "/dashboard/settings/payments/stripe" },
   { key: "team", label: "Team invite", href: "/dashboard/users" },
   { key: "import", label: "Import data", href: "#phase6-import-wizard" },
   { key: "golive", label: "Go-live checklist", href: "/dashboard/settings/launch-control" },
+  { key: "branding", label: "Logo and branding", href: "/dashboard/setup-wizard?step=branding" },
+  { key: "booking_link", label: "Public booking link", href: "/dashboard/booking/settings" },
+  { key: "customer_fields", label: "Customer fields", href: "/dashboard/settings?tab=customers" },
+  { key: "invoices", label: "Invoices", href: "/dashboard/settings?tab=finance" },
+  { key: "first_booking", label: "First booking", href: "/dashboard/bookings" },
 ];
 
 const OPERATING_DAYS = [
@@ -338,7 +343,8 @@ export default function SetupWizard() {
             <a className="operator-mini-card mt-linkCard" href={item.href} key={item.key} data-testid={`phase6-onboarding-step-${item.key}`}>
               <span className="operator-tag">Step {index + 1}</span>
               <strong>{item.label}</strong>
-              <span className="mt-linkCard__action">Open</span>
+              <span className="mt-linkCard__action">Open action</span>
+              <span className="muted">Saved or complete status appears on the linked setup surface.</span>
             </a>
           ))}
         </div>
