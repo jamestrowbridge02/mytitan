@@ -108,7 +108,7 @@ test.describe("customer accounts and approvals", () => {
 
     await page.getByTestId("customer-account-invite").evaluate((element: HTMLButtonElement) => element.click());
     const statusCard = page.getByTestId("customer-account-status");
-    await expect(statusCard).toContainText(/customer invite email|customer email is not set up yet|outbound email is unavailable|outbound email readiness|non-routable|suppressed/i);
+    await expect(statusCard).toContainText(/customer invite email|customer email is not set up yet|customer email delivery is unavailable|outbound email is unavailable|outbound email readiness|non-routable|suppressed/i);
     await expect(statusCard).toContainText(/No customer workspace account invited yet|Invited/i);
   });
 
