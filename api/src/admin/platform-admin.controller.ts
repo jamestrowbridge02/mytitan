@@ -311,6 +311,37 @@ export class PlatformAdminController {
     return { ok: true, ...overview };
   }
 
+  @Get('company-os')
+  async companyOperatingSystem(
+    @CurrentUser() user: JwtPayload,
+    @Req() req: Request & { requestId?: string },
+  ) {
+    await this.assertAccess(user, req, 'platform.company_os.read');
+    return { ok: true, ...(await this.platformAdmin.getCompanyOperatingSystem()) };
+  }
+
+  @Post('company-os/incidents')
+  async createCompanyIncident(
+    @CurrentUser() user: JwtPayload,
+    @Body() body: Record<string, any>,
+    @Req() req: Request & { requestId?: string },
+  ) {
+    await this.assertAccess(user, req, 'platform.company_os.incident.create');
+    const result = await this.platformAdmin.createCompanyIncident({
+      severity: body?.severity,
+      affectedService: body?.affectedService,
+      affectedTenant: body?.affectedTenant,
+      owner: body?.owner,
+      summary: body?.summary,
+      customerImpact: body?.customerImpact,
+      timelineEvent: body?.timelineEvent,
+      preventionAction: body?.preventionAction,
+      actorUserId: user.sub,
+    });
+    await this.audit.log(user.companyId, 'platform.company_os.incident_created', `Company OS incident created: ${result.incident.id}`, user.sub);
+    return result;
+  }
+
   @Get('enterprise-flags')
   async enterpriseFlagsOverview(
     @CurrentUser() user: JwtPayload,

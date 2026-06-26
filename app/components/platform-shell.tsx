@@ -6,6 +6,7 @@ export function PlatformShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const navigation = [
     { label: 'Overview', icon: '◫', href: '/platform' },
+    { label: 'Company OS', icon: '▦', href: '/platform/company-os' },
     { label: 'Excellence', icon: '✓', href: '/platform#excellence' },
     { label: 'Tenants', icon: '⌂', href: '/platform#memberships' },
     { label: 'Tenant 360', icon: '◎', href: '/platform#lookup' },
