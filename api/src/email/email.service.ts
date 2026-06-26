@@ -1081,6 +1081,26 @@ export class EmailService {
 
     const readiness = await this.getReadiness(companyId, { ownership });
     if (readiness.status === 'not_configured') {
+      await this.recordEmailEvent({
+        companyId,
+        userId: options?.actorUserId || null,
+        ownership,
+        category,
+        templateKey: options?.templateKey || null,
+        recipient: input.to,
+        subject: input.subject,
+        dedupeKey: guard.dedupeKey,
+        status: 'not_configured',
+        reason:
+          ownership === 'workspace'
+            ? 'Customer email is not set up yet. Add your sending email in Settings.'
+            : 'MyTitan email is not set up yet. Please contact support.',
+        metaJson: {
+          transport: readiness.transport,
+          source: readiness.source,
+          canSend: readiness.canSend,
+        },
+      });
       return {
         delivered: false,
         status: 'not_configured',
@@ -1092,6 +1112,26 @@ export class EmailService {
       };
     }
     if (readiness.status === 'misconfigured') {
+      await this.recordEmailEvent({
+        companyId,
+        userId: options?.actorUserId || null,
+        ownership,
+        category,
+        templateKey: options?.templateKey || null,
+        recipient: input.to,
+        subject: input.subject,
+        dedupeKey: guard.dedupeKey,
+        status: 'misconfigured',
+        reason:
+          ownership === 'workspace'
+            ? 'Customer email is not set up yet. Add your sending email in Settings.'
+            : 'MyTitan email is only partially configured on the server.',
+        metaJson: {
+          transport: readiness.transport,
+          source: readiness.source,
+          canSend: readiness.canSend,
+        },
+      });
       return {
         delivered: false,
         status: 'misconfigured',

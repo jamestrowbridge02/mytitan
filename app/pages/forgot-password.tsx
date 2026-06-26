@@ -20,7 +20,7 @@ export default function ForgotPasswordPage() {
     try {
       const response = await apiFetch('/auth/forgot-password', {
         method: 'POST',
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email: email.trim().toLowerCase() }),
       });
       const baseMessage = String(response?.message || fallbackStatus);
       setStatus(`${baseMessage} Use the most recent MyTitan email if you request more than one link.`);
@@ -38,7 +38,7 @@ export default function ForgotPasswordPage() {
         <p className="muted">Enter your email and we will send a reset link.</p>
         {status ? <p style={{ color: '#5eead4' }}>{status}</p> : null}
         {error ? <p style={{ color: '#ff8a8a' }}>{error}</p> : null}
-        <form onSubmit={onSubmit}>
+        <form onSubmit={onSubmit} noValidate>
           <label htmlFor={emailInputId}>Email</label>
           <input id={emailInputId} className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
           <button className="button" type="submit">Send reset link</button>

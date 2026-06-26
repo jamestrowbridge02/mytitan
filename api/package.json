@@ -16,6 +16,8 @@
     "seed:e2e": "MYTITAN_ENABLE_E2E_FIXTURES=1 node scripts/seed-e2e.js",
     "seed:e2e:verify-platform-admin": "node scripts/verify-platform-admin-runtime.js",
     "auth:verify-platform-admin-runtime": "node scripts/verify-platform-admin-runtime.js",
+    "auth:issue-principal-admin-reset": "node scripts/issue-principal-admin-reset.js",
+    "notifications:verify-password-reset-routing": "node scripts/verify-password-reset-routing.js",
     "seed:wheel-ar-pilot": "node scripts/seed-wheel-ar-pilot.js",
     "seed:tenant-settings": "node scripts/seed-tenant-settings.js",
     "audit:top1": "node scripts/top1-audit.mjs",

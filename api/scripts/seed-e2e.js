@@ -525,7 +525,9 @@ async function ensurePlatformAdminUser(companyId, locationId) {
   const fixture = FIXTURE.platformAdmin;
   const email = String(fixture.email).trim().toLowerCase();
   const staleEmail = String(fixture.staleEmail || "").trim().toLowerCase();
-  const passwordHash = await bcrypt.hash(fixture.password, 10);
+  async function fixturePasswordHash() {
+    return bcrypt.hash(fixture.password, 10);
+  }
   async function neutralizeUser(row) {
     if (!row?.id) return;
     await prisma.user.update({
@@ -564,7 +566,6 @@ async function ensurePlatformAdminUser(companyId, locationId) {
     companyId,
     email,
     emailVerified: true,
-    passwordHash,
     role: fixture.role,
     isActive: true,
     defaultLocationId: locationId,
@@ -586,7 +587,10 @@ async function ensurePlatformAdminUser(companyId, locationId) {
   if (stale) {
     const user = await prisma.user.update({
       where: { id: stale.id },
-      data: activeData,
+      data: {
+        ...activeData,
+        passwordHash: stale.passwordHash || await fixturePasswordHash(),
+      },
     });
     await neutralizeOtherPrincipalAdmins(user.id);
     return user;
@@ -596,6 +600,7 @@ async function ensurePlatformAdminUser(companyId, locationId) {
     data: {
       id: fixture.id,
       ...activeData,
+      passwordHash: await fixturePasswordHash(),
       lastLoginAt: new Date(),
     },
   });

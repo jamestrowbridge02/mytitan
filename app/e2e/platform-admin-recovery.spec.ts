@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { execFileSync } from "child_process";
 import { cleanupGeneratedWorkspace, fixtureRefs, hasDashboardAuth, installApiProxy, loginAs, requestLocalApi } from "./utils";
 
 const tenantId = "e2e-company";
@@ -15,6 +16,82 @@ test.describe("platform backend admin recovery", () => {
     await expect(page).toHaveURL(/\/platform(?:$|[?#/])/, { timeout: 15000 });
     await expect(page.locator("body")).toContainText("Platform Admin");
     await expect(page.locator("body")).not.toContainText("Invalid credentials");
+  });
+
+  test("platform admin can recover access through forgot-password reset without token leakage", async ({ page, request }) => {
+    await installApiProxy(page, request);
+    async function requestAdminResetHref() {
+      const response = await requestLocalApi(request, "/auth/forgot-password", {
+        method: "POST",
+        data: { email: ` ${fixtureRefs.platformAdminEmail.toUpperCase()} ` },
+      });
+      expect(response.status()).toBe(202);
+      expect(JSON.stringify(await response.json())).not.toMatch(/reset_|token|passwordHash/i);
+      await expect.poll(async () => {
+        const fixtureResponse = await requestLocalApi(request, `/auth/e2e/password-reset-link?email=${encodeURIComponent(fixtureRefs.platformAdminEmail)}`);
+        const payload = await fixtureResponse.json();
+        return String(payload?.resetHref || "");
+      }, { timeout: 5000 }).toContain("/reset-password?token=");
+      const fixtureResponse = await requestLocalApi(request, `/auth/e2e/password-reset-link?email=${encodeURIComponent(fixtureRefs.platformAdminEmail)}`);
+      return String((await fixtureResponse.json())?.resetHref || "");
+    }
+
+    async function resetAdminPassword(resetHref: string, nextPassword: string) {
+      const token = String(new URL(resetHref).searchParams.get("token") || "");
+      expect(token).toMatch(/^reset_/);
+      await page.goto(resetHref);
+      await page.getByLabel("New password").fill(nextPassword);
+      await page.getByLabel("Confirm password").fill(nextPassword);
+      await page.getByRole("button", { name: "Reset password" }).click();
+      await expect(page.getByText("Your password has been updated. You can sign in with the new one now.")).toBeVisible();
+      await expect(page.locator("body")).not.toContainText(token);
+    }
+
+    const temporaryPassword = `MyTitanAdminRecovered!${Date.now()}`;
+    await resetAdminPassword(await requestAdminResetHref(), temporaryPassword);
+    const recoveredLogin = await requestLocalApi(request, "/auth/login", {
+      method: "POST",
+      data: { email: fixtureRefs.platformAdminEmail, password: temporaryPassword },
+    });
+    expect(recoveredLogin.ok()).toBeTruthy();
+    expect((await recoveredLogin.json())?.user?.platformAdmin).toBe(true);
+
+    await resetAdminPassword(await requestAdminResetHref(), fixtureRefs.platformAdminPassword);
+    const restoredLogin = await requestLocalApi(request, "/auth/login", {
+      method: "POST",
+      data: { email: fixtureRefs.platformAdminEmail, password: fixtureRefs.platformAdminPassword },
+    });
+    expect(restoredLogin.ok()).toBeTruthy();
+    expect((await restoredLogin.json())?.user?.platformAdmin).toBe(true);
+  });
+
+  test("principal admin emergency reset command is safe by default and explicit in e2e", () => {
+    const safeOutput = execFileSync("docker", ["exec", "-w", "/app", "mytitan_api", "/bin/sh", "-lc", "npm run auth:issue-principal-admin-reset"], {
+      encoding: "utf8",
+    });
+    expect(safeOutput).toContain("deliveryStatus");
+    expect(safeOutput).toContain('"localResetUrlAvailable": false');
+    expect(safeOutput).not.toContain("/reset-password?token=");
+    expect(safeOutput).not.toMatch(/passwordHash|\\$2[aby]\\$|MYTITAN_E2EPlatform/i);
+
+    const localOutput = execFileSync("docker", [
+      "exec",
+      "-w",
+      "/app",
+      "-e",
+      "MYTITAN_ENABLE_E2E_FIXTURES=1",
+      "-e",
+      "MYTITAN_ALLOW_LOCAL_RESET_URL=1",
+      "mytitan_api",
+      "/bin/sh",
+      "-lc",
+      "npm run auth:issue-principal-admin-reset",
+    ], {
+      encoding: "utf8",
+    });
+    expect(localOutput).toContain("localResetUrl");
+    expect(localOutput).toContain("/reset-password?token=");
+    expect(localOutput).not.toMatch(/passwordHash|\\$2[aby]\\$/i);
   });
 
   test("verified MyTitan staff can access Platform Admin while pending staff and tenant users cannot", async ({ request }) => {

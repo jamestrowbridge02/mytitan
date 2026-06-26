@@ -86,7 +86,7 @@ export class AuthService {
 
   private assertPasswordResetFixtureEmail(email: string) {
     const normalized = email.toLowerCase().trim();
-    if (!normalized.endsWith('@mytitan.example')) {
+    if (!normalized.endsWith('@mytitan.example') && normalized !== 'admin@mytitan.co.uk') {
       throw new BadRequestException('Password reset fixture access is not available.');
     }
     return normalized;
@@ -160,6 +160,7 @@ export class AuthService {
     auditAction: string;
     auditMessage: string;
     expiryMinutes?: number;
+    returnLocalResetUrl?: boolean;
   }) {
     const db = this.prisma as any;
     const expiresAt = new Date(Date.now() + (input.expiryMinutes || 30) * 60 * 1000);
@@ -217,7 +218,10 @@ export class AuthService {
     if (!result.delivered) {
       await this.audit.log(input.companyId, 'auth.email.delivery_unavailable', `Setup email not delivered: ${result.status}`, input.userId);
     }
-    return result;
+    return {
+      ...result,
+      localResetUrl: input.returnLocalResetUrl ? setupUrl : null,
+    };
   }
 
   private buildAuthenticatedResendResult(mail: EmailDeliveryResult): VerificationResendResult {
@@ -449,6 +453,48 @@ export class AuthService {
       ok: true,
       status: result.delivered ? 'sent' : 'accepted',
       message: PLATFORM_STAFF_SETUP_MESSAGE,
+    };
+  }
+
+  async issuePrincipalAdminReset(options?: { allowLocalResetUrl?: boolean; actor?: string }) {
+    const db = this.prisma as any;
+    const email = 'admin@mytitan.co.uk';
+    const admin = await db.user.findFirst({ where: { email } });
+    if (!admin?.id) {
+      throw new BadRequestException('Principal platform admin account does not exist.');
+    }
+    if (admin.isActive === false || !admin.emailVerified || admin.role !== 'OWNER') {
+      await db.user.update({
+        where: { id: admin.id },
+        data: {
+          email,
+          isActive: true,
+          emailVerified: true,
+          role: 'OWNER',
+        },
+      });
+    }
+    const allowLocalResetUrl =
+      Boolean(options?.allowLocalResetUrl) &&
+      (process.env.MYTITAN_ENABLE_E2E_FIXTURES === '1' || process.env.NODE_ENV !== 'production');
+    const result = await this.issuePasswordSetupToken({
+      companyId: admin.companyId,
+      userId: admin.id,
+      email,
+      type: 'password_reset_email',
+      reasonKey: 'principal_admin_emergency_reset',
+      templateKey: 'principal_admin_reset_email',
+      auditAction: 'auth.principal-admin.reset-issued',
+      auditMessage: `Principal platform admin reset issued by ${String(options?.actor || 'cli').slice(0, 80)}`,
+      expiryMinutes: 30,
+      returnLocalResetUrl: allowLocalResetUrl,
+    });
+    return {
+      ok: true,
+      email,
+      deliveryStatus: result.status,
+      delivered: Boolean(result.delivered),
+      localResetUrl: result.localResetUrl || null,
     };
   }
 
@@ -738,6 +784,9 @@ export class AuthService {
     if (!user?.id) {
       throw new BadRequestException('Password reset fixture account not found.');
     }
+    if (normalizedEmail === 'admin@mytitan.co.uk' && process.env.MYTITAN_ENABLE_E2E_FIXTURES !== '1' && user.companyId !== 'e2e-company') {
+      throw new BadRequestException('Password reset fixture access is not available.');
+    }
     const notification = await db.notification.findFirst({
       where: {
         companyId: user.companyId,
@@ -818,10 +867,13 @@ export class AuthService {
     const normalizedEmail = this.assertPasswordResetFixtureEmail(email);
     const user = await db.user.findFirst({
       where: { email: normalizedEmail },
-      select: { id: true },
+      select: { id: true, companyId: true },
     });
     if (!user?.id) {
       throw new BadRequestException('Password reset fixture account not found.');
+    }
+    if (normalizedEmail === 'admin@mytitan.co.uk' && process.env.MYTITAN_ENABLE_E2E_FIXTURES !== '1' && user.companyId !== 'e2e-company') {
+      throw new BadRequestException('Password reset fixture access is not available.');
     }
     const token = await db.passwordResetToken.findFirst({
       where: { userId: user.id, consumedAt: null },
