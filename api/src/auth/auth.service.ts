@@ -19,7 +19,16 @@ import { buildPasswordResetEmailTemplate, buildVerificationEmailTemplate } from 
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { classifyGeneratedSignupArtifact, isPublicSignupHost } from './signup-hygiene';
-import { ForgotPasswordDto, LoginDto, ResendVerificationDto, ResetPasswordDto, SignupDto, VerifyEmailDto } from './dto';
+import {
+  ForgotPasswordDto,
+  LoginDto,
+  PlatformStaffSetupCompleteDto,
+  PlatformStaffSetupRequestDto,
+  ResendVerificationDto,
+  ResetPasswordDto,
+  SignupDto,
+  VerifyEmailDto,
+} from './dto';
 import { JwtPayload } from './auth.types';
 
 type VerificationResendStatus = 'sent' | 'accepted' | 'already_verified' | 'delivery_unavailable' | 'delivery_failed';
@@ -29,6 +38,8 @@ type VerificationResendResult = {
   message?: string;
   actionHref?: string;
 };
+
+const PLATFORM_STAFF_SETUP_MESSAGE = 'If this is a MyTitan staff address, setup instructions will be sent.';
 
 @Injectable()
 export class AuthService {
@@ -48,6 +59,29 @@ export class AuthService {
 
   private makeToken(prefix: string) {
     return `${prefix}_${crypto.randomBytes(24).toString('hex')}`;
+  }
+
+  private normalizeEmail(email?: string | null) {
+    return String(email || '').trim().toLowerCase();
+  }
+
+  private isMytitanStaffEmail(email?: string | null) {
+    const normalized = this.normalizeEmail(email);
+    return normalized.endsWith('@mytitan.co.uk');
+  }
+
+  private async ensureMytitanStaffCompany() {
+    const db = this.prisma as any;
+    return db.company.upsert({
+      where: { id: 'mytitan-staff' },
+      create: {
+        id: 'mytitan-staff',
+        name: 'MyTitan Staff',
+        timezone: 'Europe/London',
+        currency: 'GBP',
+      },
+      update: {},
+    });
   }
 
   private assertPasswordResetFixtureEmail(email: string) {
@@ -112,6 +146,76 @@ export class AuthService {
     });
     if (!result.delivered) {
       await this.audit.log(companyId, 'auth.email.delivery_unavailable', `Verification email not delivered: ${result.status}`, userId);
+    }
+    return result;
+  }
+
+  private async issuePasswordSetupToken(input: {
+    companyId: string;
+    userId: string;
+    email: string;
+    type: string;
+    reasonKey: string;
+    templateKey: string;
+    auditAction: string;
+    auditMessage: string;
+    expiryMinutes?: number;
+  }) {
+    const db = this.prisma as any;
+    const expiresAt = new Date(Date.now() + (input.expiryMinutes || 30) * 60 * 1000);
+    await db.passwordResetToken.updateMany({
+      where: { userId: input.userId, consumedAt: null },
+      data: { consumedAt: new Date() },
+    });
+    const token = this.makeToken('reset');
+    await db.passwordResetToken.create({
+      data: {
+        companyId: input.companyId,
+        userId: input.userId,
+        tokenHash: this.tokenHash(token),
+        expiresAt,
+      },
+    });
+    const setupUrl = buildAppUrl(`/reset-password?token=${encodeURIComponent(token)}`);
+    const tracking = await this.notifications.prepareTrackedEmailNotification({
+      companyId: input.companyId,
+      userId: input.userId,
+      type: input.type,
+      title: 'MyTitan account setup pending',
+      body: 'Account setup email is being prepared for delivery.',
+      entityType: 'user',
+      entityId: input.userId,
+      reasonKey: input.reasonKey,
+      to: input.email,
+      summary: 'A MyTitan account setup link was requested.',
+      ctaHref: setupUrl,
+      trackingExpiresAt: expiresAt,
+    });
+    const template = buildPasswordResetEmailTemplate(
+      await this.email.getBranding(null, { ownership: 'system' }),
+      setupUrl,
+      tracking.trackedHref || setupUrl,
+    );
+    const result = await this.email.sendTransactionalEmail(null, {
+      to: input.email,
+      subject: template.subject,
+      text: template.text,
+      html: template.html,
+    }, {
+      ownership: 'system',
+      category: 'password_reset',
+      templateKey: input.templateKey,
+      actorUserId: input.userId,
+      dedupeWindowMinutes: process.env.MYTITAN_ENABLE_E2E_FIXTURES === '1' ? 1 : 5,
+      bypassDuplicateSuppression: process.env.MYTITAN_ENABLE_E2E_FIXTURES === '1',
+    });
+    await this.notifications.finalizeTrackedEmailNotification(tracking.id, result, {
+      title: result.delivered ? 'MyTitan account setup sent' : 'MyTitan account setup pending',
+      body: result.delivered ? 'Account setup email sent to the MyTitan staff user.' : 'Account setup email was not delivered in this environment.',
+    });
+    await this.audit.log(input.companyId, input.auditAction, input.auditMessage, input.userId);
+    if (!result.delivered) {
+      await this.audit.log(input.companyId, 'auth.email.delivery_unavailable', `Setup email not delivered: ${result.status}`, input.userId);
     }
     return result;
   }
@@ -300,6 +404,81 @@ export class AuthService {
     };
   }
 
+  async requestPlatformStaffSetup(dto: PlatformStaffSetupRequestDto) {
+    const db = this.prisma as any;
+    const email = this.normalizeEmail(dto.email);
+    if (!this.isMytitanStaffEmail(email)) {
+      return { ok: true, status: 'accepted', message: PLATFORM_STAFF_SETUP_MESSAGE };
+    }
+
+    const company = await this.ensureMytitanStaffCompany();
+    const user = await db.user.findFirst({ where: { email } });
+    const target = user?.id
+      ? await db.user.update({
+          where: { id: user.id },
+          data: {
+            companyId: user.companyId || company.id,
+            email,
+            role: user.role || 'STAFF',
+            isActive: true,
+          },
+        })
+      : await db.user.create({
+          data: {
+            companyId: company.id,
+            email,
+            role: email === 'admin@mytitan.co.uk' ? 'OWNER' : 'STAFF',
+            emailVerified: false,
+            isActive: true,
+            passwordHash: await bcrypt.hash(crypto.randomBytes(32).toString('base64url'), 10),
+          },
+        });
+
+    const result = await this.issuePasswordSetupToken({
+      companyId: target.companyId,
+      userId: target.id,
+      email: target.email,
+      type: 'platform_staff_setup_email',
+      reasonKey: 'platform_staff_setup',
+      templateKey: 'platform_staff_setup_email',
+      auditAction: 'auth.platform-staff.setup-requested',
+      auditMessage: 'Platform staff password setup requested',
+      expiryMinutes: 30,
+    });
+    return {
+      ok: true,
+      status: result.delivered ? 'sent' : 'accepted',
+      message: PLATFORM_STAFF_SETUP_MESSAGE,
+    };
+  }
+
+  async completePlatformStaffSetup(dto: PlatformStaffSetupCompleteDto) {
+    const db = this.prisma as any;
+    const tokenHash = this.tokenHash(dto.token);
+    const token = await db.passwordResetToken.findFirst({
+      where: { tokenHash, consumedAt: null, expiresAt: { gt: new Date() } },
+      include: { user: true },
+    });
+    if (!token || !this.isMytitanStaffEmail(token.user?.email)) {
+      throw new BadRequestException('This setup link is no longer valid. Request a new link to keep going.');
+    }
+    const passwordHash = await bcrypt.hash(dto.newPassword, 10);
+    await db.$transaction([
+      db.user.update({
+        where: { id: token.userId },
+        data: {
+          passwordHash,
+          emailVerified: true,
+          isActive: true,
+          tokenVersion: { increment: 1 },
+        },
+      }),
+      db.passwordResetToken.update({ where: { id: token.id }, data: { consumedAt: new Date() } }),
+    ]);
+    await this.audit.log(token.companyId, 'auth.platform-staff.setup-completed', 'Platform staff password setup completed', token.userId);
+    return { ok: true };
+  }
+
   async login(dto: LoginDto) {
     const db = this.prisma as any;
     const email = dto.email.toLowerCase().trim();
@@ -329,7 +508,7 @@ export class AuthService {
       companyId: user.companyId,
       role: user.role,
       email: user.email,
-      platformAdmin: isPlatformAdminUser({ email: user.email }),
+      platformAdmin: isPlatformAdminUser({ email: user.email, emailVerified: Boolean(user.emailVerified) } as any),
       tokenVersion: Number(user.tokenVersion ?? 0),
       emailVerified: Boolean(user.emailVerified),
       demoUser: user.email === '@mytitan.co.uk',
@@ -345,7 +524,7 @@ export class AuthService {
         email: user.email,
         emailVerified: Boolean(user.emailVerified),
         role: user.role,
-        platformAdmin: isPlatformAdminUser({ email: user.email }),
+        platformAdmin: isPlatformAdminUser({ email: user.email, emailVerified: Boolean(user.emailVerified) } as any),
         createdAt: user.createdAt,
         lastLoginAt: new Date().toISOString(),
       },
@@ -468,11 +647,20 @@ export class AuthService {
       throw new BadRequestException('This reset link is no longer valid. Request a new link to keep going.');
     }
     const passwordHash = await bcrypt.hash(dto.newPassword, 10);
+    const verifiesPlatformStaff = this.isMytitanStaffEmail(token.user?.email);
     await db.$transaction([
-      db.user.update({ where: { id: token.userId }, data: { passwordHash, tokenVersion: { increment: 1 } } }),
+      db.user.update({
+        where: { id: token.userId },
+        data: {
+          passwordHash,
+          emailVerified: verifiesPlatformStaff ? true : undefined,
+          isActive: verifiesPlatformStaff ? true : undefined,
+          tokenVersion: { increment: 1 },
+        },
+      }),
       db.passwordResetToken.update({ where: { id: token.id }, data: { consumedAt: new Date() } }),
     ]);
-    await this.audit.log(token.companyId, 'auth.reset-password', 'Password reset completed', token.userId);
+    await this.audit.log(token.companyId, verifiesPlatformStaff ? 'auth.platform-staff.setup-completed' : 'auth.reset-password', verifiesPlatformStaff ? 'Platform staff password setup completed' : 'Password reset completed', token.userId);
     return { ok: true };
   }
 
@@ -566,6 +754,46 @@ export class AuthService {
     return { ok: Boolean(resetHref), resetHref };
   }
 
+  private assertPlatformStaffSetupFixtureEmail(email: string) {
+    const normalized = this.normalizeEmail(email);
+    if (!this.isMytitanStaffEmail(normalized)) {
+      throw new BadRequestException('Platform staff setup fixture access is not available.');
+    }
+    if (
+      process.env.MYTITAN_ENABLE_E2E_FIXTURES !== '1' &&
+      !/^staff\.(setup|expire)\.\d+@mytitan\.co\.uk$/.test(normalized)
+    ) {
+      throw new BadRequestException('Platform staff setup fixture access is not available.');
+    }
+    return normalized;
+  }
+
+  async getLatestPlatformStaffSetupFixture(email: string) {
+    const db = this.prisma as any;
+    const normalizedEmail = this.assertPlatformStaffSetupFixtureEmail(email);
+    const user = await db.user.findFirst({
+      where: { email: normalizedEmail },
+      select: { id: true, companyId: true },
+    });
+    if (!user?.id) {
+      throw new BadRequestException('Platform staff setup fixture account not found.');
+    }
+    const notification = await db.notification.findFirst({
+      where: {
+        companyId: user.companyId,
+        userId: user.id,
+        type: 'platform_staff_setup_email',
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true },
+    });
+    if (!notification?.id) {
+      return { ok: false, setupHref: null };
+    }
+    const setupHref = await this.notifications.resolveTrackedDestinationForFixture(notification.id);
+    return { ok: Boolean(setupHref), setupHref };
+  }
+
   async isPasswordResetFixtureToken(token: string) {
     const db = this.prisma as any;
     const normalizedToken = String(token || '').trim();
@@ -594,6 +822,31 @@ export class AuthService {
     });
     if (!user?.id) {
       throw new BadRequestException('Password reset fixture account not found.');
+    }
+    const token = await db.passwordResetToken.findFirst({
+      where: { userId: user.id, consumedAt: null },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true },
+    });
+    if (!token?.id) {
+      return { ok: false };
+    }
+    await db.passwordResetToken.update({
+      where: { id: token.id },
+      data: { expiresAt: new Date(Date.now() - 60_000) },
+    });
+    return { ok: true };
+  }
+
+  async expireLatestPlatformStaffSetupFixture(email: string) {
+    const db = this.prisma as any;
+    const normalizedEmail = this.assertPlatformStaffSetupFixtureEmail(email);
+    const user = await db.user.findFirst({
+      where: { email: normalizedEmail },
+      select: { id: true },
+    });
+    if (!user?.id) {
+      throw new BadRequestException('Platform staff setup fixture account not found.');
     }
     const token = await db.passwordResetToken.findFirst({
       where: { userId: user.id, consumedAt: null },

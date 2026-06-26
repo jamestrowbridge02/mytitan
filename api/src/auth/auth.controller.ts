@@ -7,7 +7,16 @@ import { JwtPayload } from './auth.types';
 import { JwtAuthGuard } from './auth.guard';
 import { CurrentUser } from './current-user.decorator';
 import { AuthService } from './auth.service';
-import { ForgotPasswordDto, LoginDto, ResendVerificationDto, ResetPasswordDto, SignupDto, VerifyEmailDto } from './dto';
+import {
+  ForgotPasswordDto,
+  LoginDto,
+  PlatformStaffSetupCompleteDto,
+  PlatformStaffSetupRequestDto,
+  ResendVerificationDto,
+  ResetPasswordDto,
+  SignupDto,
+  VerifyEmailDto,
+} from './dto';
 
 @Controller('auth')
 export class AuthController {
@@ -105,6 +114,19 @@ export class AuthController {
     return this.auth.resetPassword(dto);
   }
 
+  @Post('platform-staff/setup-request')
+  @HttpCode(202)
+  platformStaffSetupRequest(@Req() req: Request, @Body() dto: PlatformStaffSetupRequestDto) {
+    this.enforceRateLimit(req, String(dto?.email || '').trim().toLowerCase());
+    return this.auth.requestPlatformStaffSetup(dto);
+  }
+
+  @Post('platform-staff/setup-complete')
+  async platformStaffSetupComplete(@Req() req: Request, @Body() dto: PlatformStaffSetupCompleteDto) {
+    this.enforceRateLimit(req, String(dto?.token || '').slice(0, 24));
+    return this.auth.completePlatformStaffSetup(dto);
+  }
+
   @Post('verify-email')
   verifyEmail(@Req() req: Request, @Body() dto: VerifyEmailDto) {
     this.enforceRateLimit(req, String(dto?.token || '').slice(0, 24));
@@ -132,9 +154,19 @@ export class AuthController {
     return this.auth.getLatestPasswordResetFixture(String(email || ''));
   }
 
+  @Get('e2e/platform-staff-setup-link')
+  latestPlatformStaffSetupFixture(@Query('email') email?: string) {
+    return this.auth.getLatestPlatformStaffSetupFixture(String(email || ''));
+  }
+
   @Post('e2e/password-reset-expire')
   expirePasswordResetFixture(@Body() body: { email?: string }) {
     return this.auth.expireLatestPasswordResetFixture(String(body?.email || ''));
+  }
+
+  @Post('e2e/platform-staff-setup-expire')
+  expirePlatformStaffSetupFixture(@Body() body: { email?: string }) {
+    return this.auth.expireLatestPlatformStaffSetupFixture(String(body?.email || ''));
   }
 
   @Post('logout')

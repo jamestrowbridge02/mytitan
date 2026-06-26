@@ -51,6 +51,22 @@ const FIXTURE = {
     password: "MyTitanE2EPlatform!2026",
     role: "OWNER",
   },
+  platformStaff: {
+    verified: {
+      id: "e2e-user-platform-staff-verified",
+      email: "ops.staff@mytitan.co.uk",
+      password: "MyTitanStaff!2026",
+      role: "STAFF",
+      emailVerified: true,
+    },
+    unverified: {
+      id: "e2e-user-platform-staff-unverified",
+      email: "pending.staff@mytitan.co.uk",
+      password: "MyTitanPending!2026",
+      role: "STAFF",
+      emailVerified: false,
+    },
+  },
   supportAccount: {
     company: {
       id: "e2e-support-company",
@@ -471,7 +487,7 @@ async function ensureWorkspaceUser(companyId, locationId, fixture) {
       id: fixture.id,
       companyId,
       email: fixture.email,
-      emailVerified: true,
+      emailVerified: fixture.emailVerified === false ? false : true,
       passwordHash,
       role: fixture.role,
       defaultLocationId: locationId,
@@ -481,7 +497,7 @@ async function ensureWorkspaceUser(companyId, locationId, fixture) {
     update: {
       companyId,
       email: fixture.email,
-      emailVerified: true,
+      emailVerified: fixture.emailVerified === false ? false : true,
       passwordHash,
       role: fixture.role,
       defaultLocationId: locationId,
@@ -510,6 +526,30 @@ async function ensurePlatformAdminUser(companyId, locationId) {
   const email = String(fixture.email).trim().toLowerCase();
   const staleEmail = String(fixture.staleEmail || "").trim().toLowerCase();
   const passwordHash = await bcrypt.hash(fixture.password, 10);
+  async function neutralizeUser(row) {
+    if (!row?.id) return;
+    await prisma.user.update({
+      where: { id: row.id },
+      data: {
+        email: `neutralized-${row.id}@mytitan.invalid`,
+        emailVerified: false,
+        isActive: false,
+        tokenVersion: { increment: 1 },
+      },
+    });
+  }
+  async function neutralizeOtherPrincipalAdmins(activeUserId) {
+    const duplicates = await prisma.user.findMany({
+      where: {
+        email,
+        id: { not: activeUserId },
+      },
+      select: { id: true },
+    });
+    for (const duplicate of duplicates) {
+      await neutralizeUser(duplicate);
+    }
+  }
   const intended = await prisma.user.findFirst({ where: { companyId, email } });
   const stale = staleEmail
     ? await prisma.user.findFirst({
@@ -537,33 +577,30 @@ async function ensurePlatformAdminUser(companyId, locationId) {
       data: activeData,
     });
     if (stale && stale.id !== intended.id) {
-      await prisma.user.update({
-        where: { id: stale.id },
-        data: {
-          email: `neutralized-${stale.id}@mytitan.invalid`,
-          emailVerified: false,
-          isActive: false,
-          tokenVersion: { increment: 1 },
-        },
-      });
+      await neutralizeUser(stale);
     }
+    await neutralizeOtherPrincipalAdmins(user.id);
     return user;
   }
 
   if (stale) {
-    return prisma.user.update({
+    const user = await prisma.user.update({
       where: { id: stale.id },
       data: activeData,
     });
+    await neutralizeOtherPrincipalAdmins(user.id);
+    return user;
   }
 
-  return prisma.user.create({
+  const user = await prisma.user.create({
     data: {
       id: fixture.id,
       ...activeData,
       lastLoginAt: new Date(),
     },
   });
+  await neutralizeOtherPrincipalAdmins(user.id);
+  return user;
 }
 
 async function ensureInvoiceCounter(companyId) {
@@ -1938,6 +1975,8 @@ async function main() {
   const location = locations.hq;
   const operator = await ensureOperator(company.id, location.id);
   const platformAdminUser = await ensurePlatformAdminUser(company.id, location.id);
+  await ensureWorkspaceUser(company.id, location.id, FIXTURE.platformStaff.verified);
+  await ensureWorkspaceUser(company.id, location.id, FIXTURE.platformStaff.unverified);
   await ensureWorkspaceUser(company.id, location.id, FIXTURE.workspaceUsers.admin);
   const dispatcherUser = await ensureWorkspaceUser(company.id, location.id, FIXTURE.workspaceUsers.dispatcher);
   const financeUser = await ensureWorkspaceUser(company.id, location.id, FIXTURE.workspaceUsers.finance);
@@ -4289,6 +4328,8 @@ async function main() {
   console.log(`viewer_email=${FIXTURE.workspaceUsers.viewer.email}`);
   console.log(`password_reset_email=${FIXTURE.workspaceUsers.passwordReset.email}`);
   console.log(`platform_admin_email=${FIXTURE.platformAdmin.email}`);
+  console.log(`platform_staff_verified_email=${FIXTURE.platformStaff.verified.email}`);
+  console.log(`platform_staff_unverified_email=${FIXTURE.platformStaff.unverified.email}`);
   console.log(`support_email=${FIXTURE.supportAccount.user.email}`);
   console.log(`convertible_booking=${FIXTURE.bookings.convertible.id}`);
   console.log(`blocked_booking=${FIXTURE.bookings.blocked.id}`);

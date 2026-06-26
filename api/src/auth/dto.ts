@@ -75,3 +75,19 @@ export class ResendVerificationDto {
   @Transform(normalizeEmailInput)
   email?: string;
 }
+
+export class PlatformStaffSetupRequestDto {
+  @IsEmail()
+  @Transform(normalizeEmailInput)
+  email!: string;
+}
+
+export class PlatformStaffSetupCompleteDto {
+  @IsString()
+  @MinLength(20)
+  token!: string;
+
+  @IsString()
+  @MinLength(8)
+  newPassword!: string;
+}

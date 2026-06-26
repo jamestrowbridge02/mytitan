@@ -37,7 +37,7 @@ export default function Login() {
     try {
       const res = await apiFetch('/auth/login', {
         method: 'POST',
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
       });
       setToken(res.token);
 
@@ -100,7 +100,7 @@ export default function Login() {
           </div>
           <h1>Welcome back</h1>
           {error ? <p className="auth-shell__status auth-shell__status--error">{error}</p> : null}
-          <form className="auth-shell__form" onSubmit={handleSubmit}>
+          <form className="auth-shell__form" onSubmit={handleSubmit} noValidate>
             <label htmlFor="login-email">Email</label>
             <input id="login-email" className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
             <label htmlFor="login-password">Password</label>

@@ -17,6 +17,124 @@ test.describe("platform backend admin recovery", () => {
     await expect(page.locator("body")).not.toContainText("Invalid credentials");
   });
 
+  test("verified MyTitan staff can access Platform Admin while pending staff and tenant users cannot", async ({ request }) => {
+    const staffLogin = await requestLocalApi(request, "/auth/login", {
+      method: "POST",
+      data: { email: fixtureRefs.platformStaffEmail, password: fixtureRefs.platformStaffPassword },
+    });
+    expect(staffLogin.ok()).toBeTruthy();
+    const staffJson = await staffLogin.json();
+    expect(staffJson?.user?.platformAdmin).toBe(true);
+    const staffMe = await requestLocalApi(request, "/me", {
+      headers: { Authorization: `Bearer ${staffJson.token}` },
+    });
+    expect(staffMe.ok()).toBeTruthy();
+    expect((await staffMe.json())?.platformAdmin).toBe(true);
+
+    const pendingLogin = await requestLocalApi(request, "/auth/login", {
+      method: "POST",
+      data: { email: fixtureRefs.platformPendingStaffEmail, password: fixtureRefs.platformPendingStaffPassword },
+    });
+    expect(pendingLogin.ok()).toBeTruthy();
+    const pendingJson = await pendingLogin.json();
+    expect(pendingJson?.user?.platformAdmin).toBe(false);
+    const pendingVault = await requestLocalApi(request, vaultPath, {
+      headers: { Authorization: `Bearer ${pendingJson.token}` },
+    });
+    expect([401, 403]).toContain(pendingVault.status());
+
+    const tenantLogin = await requestLocalApi(request, "/auth/login", {
+      method: "POST",
+      data: { email: fixtureRefs.workspaceAdminEmail, password: fixtureRefs.workspaceAdminPassword },
+    });
+    expect(tenantLogin.ok()).toBeTruthy();
+    const tenantJson = await tenantLogin.json();
+    expect(tenantJson?.user?.platformAdmin).toBe(false);
+  });
+
+  test("MyTitan staff setup tokens are redacted, single-use, expiring, and grant Platform Admin only after setup", async ({ page, request }) => {
+    await installApiProxy(page, request);
+    const staffEmail = `staff.setup.${Date.now()}@mytitan.co.uk`;
+    const staffPassword = "MyTitanStaffSetup!2026";
+    const requestSetup = await requestLocalApi(request, "/auth/platform-staff/setup-request", {
+      method: "POST",
+      data: { email: ` ${staffEmail.toUpperCase()} ` },
+    });
+    expect(requestSetup.status()).toBe(202);
+    const setupBody = await requestSetup.json();
+    expect(JSON.stringify(setupBody)).not.toMatch(/reset_|token|passwordHash|MyTitanStaffSetup/i);
+
+    await expect.poll(async () => {
+      const response = await requestLocalApi(request, `/auth/e2e/platform-staff-setup-link?email=${encodeURIComponent(staffEmail)}`);
+      const payload = await response.json();
+      return String(payload?.setupHref || "");
+    }, { timeout: 5000 }).toContain("/reset-password?token=");
+
+    const linkResponse = await requestLocalApi(request, `/auth/e2e/platform-staff-setup-link?email=${encodeURIComponent(staffEmail)}`);
+    const setupHref = String((await linkResponse.json())?.setupHref || "");
+    const setupToken = String(new URL(setupHref).searchParams.get("token") || "");
+    expect(setupToken).toMatch(/^reset_/);
+
+    const beforeLogin = await requestLocalApi(request, "/auth/login", {
+      method: "POST",
+      data: { email: staffEmail, password: staffPassword },
+    });
+    expect(beforeLogin.status()).toBe(401);
+
+    await page.goto(setupHref);
+    await page.getByLabel("New password").fill(staffPassword);
+    await page.getByLabel("Confirm password").fill(staffPassword);
+    await page.getByRole("button", { name: "Reset password" }).click();
+    await expect(page.getByText("Your password has been updated. You can sign in with the new one now.")).toBeVisible();
+    await expect(page.locator("body")).not.toContainText(setupToken);
+
+    const staffLogin = await requestLocalApi(request, "/auth/login", {
+      method: "POST",
+      data: { email: staffEmail, password: staffPassword },
+    });
+    expect(staffLogin.ok()).toBeTruthy();
+    const staffJson = await staffLogin.json();
+    expect(staffJson?.user?.platformAdmin).toBe(true);
+
+    const reuse = await requestLocalApi(request, "/auth/platform-staff/setup-complete", {
+      method: "POST",
+      data: { token: setupToken, newPassword: "MyTitanStaffSetup!2026-v2" },
+    });
+    expect(reuse.status()).toBe(400);
+
+    const expiringEmail = `staff.expire.${Date.now()}@mytitan.co.uk`;
+    const expiringSetup = await requestLocalApi(request, "/auth/platform-staff/setup-request", {
+      method: "POST",
+      data: { email: expiringEmail },
+    });
+    expect(expiringSetup.status()).toBe(202);
+    await expect.poll(async () => {
+      const response = await requestLocalApi(request, `/auth/e2e/platform-staff-setup-link?email=${encodeURIComponent(expiringEmail)}`);
+      const payload = await response.json();
+      return String(payload?.setupHref || "");
+    }, { timeout: 5000 }).toContain("/reset-password?token=");
+    const expire = await requestLocalApi(request, "/auth/e2e/platform-staff-setup-expire", {
+      method: "POST",
+      data: { email: expiringEmail },
+    });
+    expect(expire.ok()).toBeTruthy();
+    const expiredLinkResponse = await requestLocalApi(request, `/auth/e2e/platform-staff-setup-link?email=${encodeURIComponent(expiringEmail)}`);
+    const expiredHref = String((await expiredLinkResponse.json())?.setupHref || "");
+    const expiredToken = String(new URL(expiredHref).searchParams.get("token") || "");
+    const expiredComplete = await requestLocalApi(request, "/auth/platform-staff/setup-complete", {
+      method: "POST",
+      data: { token: expiredToken, newPassword: "MyTitanStaffExpired!2026" },
+    });
+    expect(expiredComplete.status()).toBe(400);
+
+    const nonDomain = await requestLocalApi(request, "/auth/platform-staff/setup-request", {
+      method: "POST",
+      data: { email: `not-staff-${Date.now()}@example.com` },
+    });
+    expect(nonDomain.status()).toBe(202);
+    expect(JSON.stringify(await nonDomain.json())).not.toMatch(/reset_|token|passwordHash/i);
+  });
+
   test("tenant roles cannot access the platform payment-provider vault", async ({ request }) => {
     const deniedUsers = [
       [fixtureRefs.workspaceAdminEmail, fixtureRefs.workspaceAdminPassword],

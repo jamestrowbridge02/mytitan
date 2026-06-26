@@ -19,14 +19,16 @@ export function normalizePlatformUserEmail(email?: string | null) {
 }
 
 export function hasTrustedInternalEmail(email: string) {
-  return email === 'admin@mytitan.co.uk';
+  return email.endsWith('@mytitan.co.uk');
 }
 
 export function isPlatformAdminUser(user?: PlatformUserLike | null) {
   if (!user) return false;
   const email = normalizePlatformUserEmail(user.email);
   if (!email) return false;
-  if (hasTrustedInternalEmail(email)) return true;
+  const verified = (user as any).emailVerified === true;
+  if (email === 'admin@mytitan.co.uk') return verified;
+  if (hasTrustedInternalEmail(email) && verified) return true;
   const explicit = parseCsvEnv('MYTITAN_PLATFORM_ADMIN_EMAILS');
   if (explicit.includes(email)) return true;
   return isBillingAllowlisted(user);

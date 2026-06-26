@@ -32,7 +32,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       ...payload,
       email: user.email,
       role: user.role,
-      platformAdmin: isPlatformAdminUser({ email: user.email }),
+      platformAdmin: isPlatformAdminUser({ email: user.email, emailVerified: Boolean(user.emailVerified) } as any),
       emailVerified: Boolean(user.emailVerified),
       tokenVersion: Number(user.tokenVersion ?? 0),
       demoUser: payload.demoUser || user.email === '@mytitan.co.uk',
