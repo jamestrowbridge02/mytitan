@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import type { BillingInterval } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
@@ -32,6 +32,8 @@ type VerificationResendResult = {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
@@ -303,11 +305,17 @@ export class AuthService {
     const email = dto.email.toLowerCase().trim();
     const user = await db.user.findFirst({ where: { email } });
     if (!user) {
+      this.logger.warn(`login_failed reason=not_found email=${email}`);
+      throw new UnauthorizedException('Invalid credentials');
+    }
+    if (user.isActive === false) {
+      this.logger.warn(`login_failed reason=inactive email=${email}`);
       throw new UnauthorizedException('Invalid credentials');
     }
 
     const passwordValid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!passwordValid) {
+      this.logger.warn(`login_failed reason=password_mismatch email=${email}`);
       throw new UnauthorizedException('Invalid credentials');
     }
 

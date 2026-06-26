@@ -1,4 +1,9 @@
 import { IsEmail, IsOptional, IsString, Length, MinLength } from 'class-validator';
+import { Transform } from 'class-transformer';
+
+function normalizeEmailInput({ value }: { value: unknown }) {
+  return String(value || '').trim().toLowerCase();
+}
 
 export class SignupDto {
   @IsString()
@@ -24,6 +29,7 @@ export class SignupDto {
   currency?: string;
 
   @IsEmail()
+  @Transform(normalizeEmailInput)
   email!: string;
 
   @IsString()
@@ -33,6 +39,7 @@ export class SignupDto {
 
 export class LoginDto {
   @IsEmail()
+  @Transform(normalizeEmailInput)
   email!: string;
 
   @IsString()
@@ -42,6 +49,7 @@ export class LoginDto {
 
 export class ForgotPasswordDto {
   @IsEmail()
+  @Transform(normalizeEmailInput)
   email!: string;
 }
 
@@ -64,5 +72,6 @@ export class VerifyEmailDto {
 export class ResendVerificationDto {
   @IsOptional()
   @IsEmail()
+  @Transform(normalizeEmailInput)
   email?: string;
 }

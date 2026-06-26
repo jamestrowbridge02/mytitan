@@ -7,6 +7,16 @@ const vaultPath = "/admin/platform/platform-configuration/payment-providers";
 test.describe("platform backend admin recovery", () => {
   test.skip(!hasDashboardAuth(), "Seed the E2E fixtures before running platform-admin recovery tests.");
 
+  test("seeded platform admin can log in through the app runtime and reach Platform Admin", async ({ page }) => {
+    await page.goto("/login", { waitUntil: "networkidle" });
+    await page.locator("#login-email").fill(` ${fixtureRefs.platformAdminEmail.toUpperCase()} `);
+    await page.locator("#login-password").fill(fixtureRefs.platformAdminPassword);
+    await page.getByRole("button", { name: "Log in" }).click();
+    await expect(page).toHaveURL(/\/platform(?:$|[?#/])/, { timeout: 15000 });
+    await expect(page.locator("body")).toContainText("Platform Admin");
+    await expect(page.locator("body")).not.toContainText("Invalid credentials");
+  });
+
   test("tenant roles cannot access the platform payment-provider vault", async ({ request }) => {
     const deniedUsers = [
       [fixtureRefs.workspaceAdminEmail, fixtureRefs.workspaceAdminPassword],

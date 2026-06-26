@@ -46,7 +46,8 @@ const FIXTURE = {
   },
   platformAdmin: {
     id: "e2e-user-platform-admin",
-    email: "e2e.platform@mytitan.co.uk",
+    email: "admin@mytitan.co.uk",
+    staleEmail: "e2e.platform@mytitan.co.uk",
     password: "MyTitanE2EPlatform!2026",
     role: "OWNER",
   },
@@ -502,6 +503,67 @@ async function ensureWorkspaceUser(companyId, locationId, fixture) {
   await ensureLocationMembership(companyId, locationId, user.id);
 
   return user;
+}
+
+async function ensurePlatformAdminUser(companyId, locationId) {
+  const fixture = FIXTURE.platformAdmin;
+  const email = String(fixture.email).trim().toLowerCase();
+  const staleEmail = String(fixture.staleEmail || "").trim().toLowerCase();
+  const passwordHash = await bcrypt.hash(fixture.password, 10);
+  const intended = await prisma.user.findFirst({ where: { companyId, email } });
+  const stale = staleEmail
+    ? await prisma.user.findFirst({
+        where: {
+          companyId,
+          OR: [{ id: fixture.id }, { email: staleEmail }],
+        },
+      })
+    : await prisma.user.findFirst({ where: { companyId, id: fixture.id } });
+
+  const activeData = {
+    companyId,
+    email,
+    emailVerified: true,
+    passwordHash,
+    role: fixture.role,
+    isActive: true,
+    defaultLocationId: locationId,
+    lastActiveAt: new Date(),
+  };
+
+  if (intended) {
+    const user = await prisma.user.update({
+      where: { id: intended.id },
+      data: activeData,
+    });
+    if (stale && stale.id !== intended.id) {
+      await prisma.user.update({
+        where: { id: stale.id },
+        data: {
+          email: `neutralized-${stale.id}@mytitan.invalid`,
+          emailVerified: false,
+          isActive: false,
+          tokenVersion: { increment: 1 },
+        },
+      });
+    }
+    return user;
+  }
+
+  if (stale) {
+    return prisma.user.update({
+      where: { id: stale.id },
+      data: activeData,
+    });
+  }
+
+  return prisma.user.create({
+    data: {
+      id: fixture.id,
+      ...activeData,
+      lastLoginAt: new Date(),
+    },
+  });
 }
 
 async function ensureInvoiceCounter(companyId) {
@@ -1875,7 +1937,7 @@ async function main() {
   const locations = await ensureLocations(company.id);
   const location = locations.hq;
   const operator = await ensureOperator(company.id, location.id);
-  const platformAdminUser = await ensureWorkspaceUser(company.id, location.id, FIXTURE.platformAdmin);
+  const platformAdminUser = await ensurePlatformAdminUser(company.id, location.id);
   await ensureWorkspaceUser(company.id, location.id, FIXTURE.workspaceUsers.admin);
   const dispatcherUser = await ensureWorkspaceUser(company.id, location.id, FIXTURE.workspaceUsers.dispatcher);
   const financeUser = await ensureWorkspaceUser(company.id, location.id, FIXTURE.workspaceUsers.finance);

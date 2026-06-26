@@ -81,7 +81,7 @@ export const fixtureRefs = {
   externalOperatorPassword: "MyTitanE2EExternal!2026",
   viewerEmail: "e2e.viewer@mytitan.local",
   viewerPassword: "MyTitanE2EViewer!2026",
-  platformAdminEmail: "e2e.platform@mytitan.co.uk",
+  platformAdminEmail: "admin@mytitan.co.uk",
   platformAdminPassword: "MyTitanE2EPlatform!2026",
   supportOwnerEmail: "support@mytitan.co.uk",
   supportOwnerPassword: "MyTitanSupport!2026",

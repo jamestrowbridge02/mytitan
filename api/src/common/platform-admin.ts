@@ -19,7 +19,7 @@ export function normalizePlatformUserEmail(email?: string | null) {
 }
 
 export function hasTrustedInternalEmail(email: string) {
-  return email.endsWith('@mytitan.co.uk');
+  return email === 'admin@mytitan.co.uk';
 }
 
 export function isPlatformAdminUser(user?: PlatformUserLike | null) {

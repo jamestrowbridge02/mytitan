@@ -251,7 +251,7 @@ test.describe("trial model and platform admin separation", () => {
     });
   });
 
-  test("support@mytitan.co.uk does not get trial treatment", async ({ request }) => {
+  test("support@mytitan.co.uk does not get trial treatment or platform-admin access", async ({ request }) => {
     const credentials = {
       email: "support@mytitan.co.uk",
       password: "MyTitanSupport!2026",
@@ -262,7 +262,7 @@ test.describe("trial model and platform admin separation", () => {
     });
     expect(loginResponse.ok()).toBeTruthy();
     const loginJson = await loginResponse.json();
-    expect(loginJson?.user?.platformAdmin).toBe(true);
+    expect(loginJson?.user?.platformAdmin).toBe(false);
 
     const billingResponse = await request.get("http://127.0.0.1:3000/billing/me", {
       headers: { Authorization: `Bearer ${loginJson.token}` },
