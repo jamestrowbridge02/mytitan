@@ -83,13 +83,22 @@ export function EntityArtifactsCard({
   const [folderFilter, setFolderFilter] = useState("ALL");
   const [governance, setGovernance] = useState<MediaGovernance | null>(null);
   const labelInputRef = useRef<HTMLInputElement | null>(null);
+  const labelOverridesRef = useRef<Record<string, string>>({});
+  const previousEntityKeyRef = useRef(`${entityType}:${entityId}`);
+
+  function applyLocalLabelOverrides(rows: ArtifactItem[]) {
+    return rows.map((item) => {
+      const override = labelOverridesRef.current[item.id];
+      return override ? { ...item, label: override } : item;
+    });
+  }
 
   async function load() {
     if (!entityId) return;
     setLoading(true);
     try {
       const response = await apiFetch(`/artifacts/entities/${entityType}/${entityId}`);
-      setItems(Array.isArray(response) ? response : []);
+      setItems(Array.isArray(response) ? applyLocalLabelOverrides(response) : []);
       const governanceResponse = await apiFetch("/artifacts/governance").catch(() => null);
       setGovernance(governanceResponse || null);
     } catch (err: any) {
@@ -107,6 +116,9 @@ export function EntityArtifactsCard({
   }, [entityType, entityId]);
 
   useEffect(() => {
+    const entityKey = `${entityType}:${entityId}`;
+    if (previousEntityKeyRef.current === entityKey) return;
+    previousEntityKeyRef.current = entityKey;
     setKind(KIND_OPTIONS[entityType][0]?.value || "");
     setPortalVisible(false);
     setFile(null);
@@ -138,10 +150,13 @@ export function EntityArtifactsCard({
       const uploadPath = `/artifacts/entities/${entityType}/${entityId}/upload${uploadParams.toString() ? `?${uploadParams.toString()}` : ""}`;
       const created = await apiFetch(uploadPath, {
         method: "POST",
+        headers: currentLabel ? { "x-artifact-label": currentLabel } : undefined,
         body: form,
       });
       if (created?.id) {
-        setItems((current) => [created, ...current.filter((item) => item.id !== created.id)]);
+        if (currentLabel) labelOverridesRef.current[created.id] = currentLabel;
+        const createdWithLabel = currentLabel ? { ...created, label: currentLabel } : created;
+        setItems((current) => [createdWithLabel, ...current.filter((item) => item.id !== created.id)]);
         setLoading(false);
       }
       setFile(null);

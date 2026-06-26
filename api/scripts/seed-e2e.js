@@ -335,8 +335,50 @@ async function writeSeedArtifact(companyId, entityType, entityId, fileName, cont
 }
 
 async function ensurePlan() {
-  const plan = await prisma.plan.findFirst({ where: { code: "SOLE_TRADER" } });
-  return plan?.id || null;
+  const plan = await prisma.plan.upsert({
+    where: { code: "SOLE_TRADER" },
+    create: {
+      id: "e2e-plan-sole-trader",
+      code: "SOLE_TRADER",
+      name: "E2E Sole Trader",
+      stripePriceMonthlyId: "price_e2e_sole_trader_monthly",
+      stripePriceAnnualId: "price_e2e_sole_trader_annual",
+      aiRequestsLimitMonthly: 1000,
+      aiTokensLimitMonthly: 100000,
+      featuresJson: {
+        seeded: true,
+        liveBilling: false,
+        bookings_enabled: true,
+        accounting_enabled: true,
+        payments_enabled: true,
+        social_enabled: false,
+        ai_enabled: true,
+        completed_jobs_monthly_limit: 9999,
+        completed_jobs_monthly_label: "E2E validation",
+        extra_job_completion_packs_status: "coming_soon",
+      },
+    },
+    update: {
+      name: "E2E Sole Trader",
+      stripePriceMonthlyId: "price_e2e_sole_trader_monthly",
+      stripePriceAnnualId: "price_e2e_sole_trader_annual",
+      aiRequestsLimitMonthly: 1000,
+      aiTokensLimitMonthly: 100000,
+      featuresJson: {
+        seeded: true,
+        liveBilling: false,
+        bookings_enabled: true,
+        accounting_enabled: true,
+        payments_enabled: true,
+        social_enabled: false,
+        ai_enabled: true,
+        completed_jobs_monthly_limit: 9999,
+        completed_jobs_monthly_label: "E2E validation",
+        extra_job_completion_packs_status: "coming_soon",
+      },
+    },
+  });
+  return plan.id;
 }
 
 async function ensureCompany() {
@@ -495,6 +537,7 @@ async function ensureTenantSettings(companyId, defaultLocationId, planId) {
       featurePayments: true,
       accountingEnabled: true,
       bookingPublicEnabled: true,
+      autoConfirmPublicBookings: true,
       bookingPublicToken: token,
       bookingIcsToken: icsToken,
       guidedSetupCurrentStep: 0,
@@ -556,6 +599,7 @@ async function ensureTenantSettings(companyId, defaultLocationId, planId) {
       featurePayments: true,
       accountingEnabled: true,
       bookingPublicEnabled: true,
+      autoConfirmPublicBookings: true,
       bookingPublicToken: token,
       bookingIcsToken: icsToken,
       guidedSetupCurrentStep: 0,
@@ -612,8 +656,8 @@ async function ensureTenantSubscription(companyId, planId) {
   await prisma.tenantSubscription.upsert({
     where: { tenantId: companyId },
     create: {
-      tenantId: companyId,
-      planId,
+      tenant: { connect: { id: companyId } },
+      plan: { connect: { id: planId } },
       status: "trialing",
       trialStartedAt: now,
       trialEndsAt,
@@ -621,7 +665,7 @@ async function ensureTenantSubscription(companyId, planId) {
       cancelAtPeriodEnd: false,
     },
     update: {
-      planId,
+      plan: { connect: { id: planId } },
       status: "trialing",
       trialStartedAt: now,
       trialEndsAt,
@@ -881,8 +925,8 @@ async function ensureInternalSupportWorkspace(planId) {
   await prisma.tenantSubscription.upsert({
     where: { tenantId: company.id },
     create: {
-      tenantId: company.id,
-      planId,
+      tenant: { connect: { id: company.id } },
+      plan: { connect: { id: planId } },
       status: "active",
       trialStartedAt: null,
       trialEndsAt: null,
@@ -890,7 +934,7 @@ async function ensureInternalSupportWorkspace(planId) {
       cancelAtPeriodEnd: false,
     },
     update: {
-      planId,
+      plan: { connect: { id: planId } },
       status: "active",
       trialStartedAt: null,
       trialEndsAt: null,

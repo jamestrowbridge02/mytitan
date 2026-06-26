@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "typecheck": "tsc --noEmit -p tsconfig.release.json",
     "start": "next start",
     "test:e2e:seed": "cd .. && docker compose exec -T api npm run seed:e2e",
     "test:e2e": "playwright test",

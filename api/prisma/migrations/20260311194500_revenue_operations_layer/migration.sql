@@ -1,6 +1,8 @@
 DO $$
 BEGIN
-  ALTER TYPE "CustomerApprovalEntityType" ADD VALUE IF NOT EXISTS 'QUOTE';
+  IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'CustomerApprovalEntityType') THEN
+    ALTER TYPE "CustomerApprovalEntityType" ADD VALUE IF NOT EXISTS 'QUOTE';
+  END IF;
 EXCEPTION
   WHEN duplicate_object THEN NULL;
 END $$;

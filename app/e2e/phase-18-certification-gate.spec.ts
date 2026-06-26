@@ -6,9 +6,10 @@ import { fixtureRefs, loginAs, requestLocalApi } from "./utils";
 
 const repoRoot = path.join(__dirname, "..", "..");
 const evidenceDoc = path.join(repoRoot, "docs/audit/phase-18-evidence-based-certification-gate.md");
+const phase19Doc = path.join(repoRoot, "docs/audit/phase-19-engineering-and-product-excellence.md");
 
-function runScript(script: string, env: Record<string, string | undefined> = {}) {
-  return execFileSync("bash", [script], {
+function runScript(script: string, env: Record<string, string | undefined> = {}, args: string[] = []) {
+  return execFileSync("bash", [script, ...args], {
     cwd: repoRoot,
     encoding: "utf8",
     env: { ...process.env, ...env },
@@ -31,14 +32,24 @@ test.describe("phase 18 evidence-based certification gate", () => {
 
     const scorecard = page.getByTestId("phase17-excellence-scorecard");
     await expect(scorecard).toBeVisible();
-    await expect(scorecard).toContainText("Scores are deliberately evidence-led");
+    await expect(scorecard).toContainText("Engineering Excellence");
+    await expect(scorecard).toContainText("Product Excellence");
     await expect(scorecard).toContainText("Evidence attached");
     await expect(scorecard).toContainText("Missing evidence");
+    await expect(scorecard).toContainText("Evidence state");
     await expect(scorecard).toContainText("10/10 gate");
     await expect(scorecard).toContainText("Blocked while critical evidence is missing");
     await expect(scorecard).toContainText("Independent security assessment: not attached.");
     await expect(scorecard).toContainText("Production Web Vitals evidence: not attached.");
     await expect(scorecard).toContainText("External uptime monitor: not_configured");
+    await expect(scorecard).toContainText("Typecheck evidence");
+    await expect(scorecard).toContainText("Bundle budgets");
+    await expect(scorecard).toContainText("API contracts");
+    await expect(scorecard).toContainText("Architecture docs");
+    await expect(scorecard).toContainText("release-evidence");
+    await expect(page.getByTestId("phase19-product-excellence-scorecard")).toContainText("Not proven");
+    await expect(page.getByTestId("phase19-performance-evidence-dashboard")).toContainText("Core Web Vitals");
+    await expect(page.getByTestId("phase19-performance-evidence-dashboard")).toContainText("INP, LCP, and CLS");
 
     const cards = scorecard.locator(".platform-admin-excellence-card");
     await expect(cards).toHaveCount(7);
@@ -74,11 +85,18 @@ test.describe("phase 18 evidence-based certification gate", () => {
 
   test("tracked evidence file blocks unsupported claims and does not expose secrets", async ({ request }) => {
     const doc = fs.readFileSync(evidenceDoc, "utf8");
+    const phase19 = fs.readFileSync(phase19Doc, "utf8");
     expect(doc).toContain("Independent security assessment: not attached.");
     expect(doc).toContain("Production Web Vitals evidence: not attached.");
     expect(doc).toContain("Do not fake uptime, customers, reviews, revenue, AI, provider readiness");
     expect(doc).toContain("Do not route tenant customer money through MyTitan billing Stripe.");
     expect(doc).toContain("Do not mutate Stripe products or prices during readiness checks.");
+    expect(phase19).toContain("Engineering Excellence is measured only from evidence MyTitan can control");
+    expect(phase19).toContain("Product Excellence is measured only from real-world operational evidence");
+    expect(phase19).toContain("It cannot reach 10/10 from local automation");
+    expect(phase19).not.toMatch(/sk_(live|test)_[A-Za-z0-9]+/);
+    expect(phase19).not.toMatch(/pk_(live|test)_[A-Za-z0-9]+/);
+    expect(phase19).not.toMatch(/whsec_[A-Za-z0-9]+/);
     expect(doc).not.toMatch(/sk_(live|test)_[A-Za-z0-9]+/);
     expect(doc).not.toMatch(/pk_(live|test)_[A-Za-z0-9]+/);
     expect(doc).not.toMatch(/whsec_[A-Za-z0-9]+/);
@@ -106,5 +124,56 @@ test.describe("phase 18 evidence-based certification gate", () => {
     expect(output).not.toContain("99.9%");
     expect(output).not.toMatch(/sk_(live|test)_/);
     expect(output).not.toMatch(/whsec_/);
+  });
+
+  test("phase 19 evidence commands create truthful slots without secrets", async () => {
+    const tempEvidenceDir = "/tmp/mytitan-phase19-e2e-evidence";
+    const tempArchitectureDir = "/tmp/mytitan-phase19-e2e-architecture";
+    const scripts = [
+      "./scripts/check-bundle-budgets.sh",
+      "./scripts/collect-screenshot-baseline.sh",
+      "./scripts/generate-local-lighthouse-evidence.sh",
+      "./scripts/run-accessibility-evidence.sh",
+      "./scripts/collect-api-contract-evidence.sh",
+    ];
+
+    for (const script of scripts) {
+      const output = runScript(script, { MYTITAN_EVIDENCE_DIR: tempEvidenceDir });
+      expect(output).not.toMatch(/sk_(live|test)_/);
+      expect(output).not.toMatch(/whsec_/);
+    }
+    const architectureOutput = runScript("./scripts/generate-architecture-docs.sh", { MYTITAN_ARCHITECTURE_DOCS_DIR: tempArchitectureDir });
+    expect(architectureOutput).not.toMatch(/sk_(live|test)_/);
+    expect(architectureOutput).not.toMatch(/whsec_/);
+
+    const bundle = fs.readFileSync(path.join(tempEvidenceDir, "bundle/latest.json"), "utf8");
+    const screenshots = fs.readFileSync(path.join(tempEvidenceDir, "screenshots/manifest.json"), "utf8");
+    const lighthouse = fs.readFileSync(path.join(tempEvidenceDir, "lighthouse/latest.json"), "utf8");
+    const accessibility = fs.readFileSync(path.join(tempEvidenceDir, "accessibility/latest.json"), "utf8");
+    const apiContract = fs.readFileSync(path.join(tempEvidenceDir, "api-contract/latest.json"), "utf8");
+    const architectureManifest = fs.readFileSync(path.join(tempArchitectureDir, "manifest.md"), "utf8");
+    const packageOutput = runScript("./scripts/create-release-evidence-package.sh", {
+      MYTITAN_EVIDENCE_DIR: tempEvidenceDir,
+      MYTITAN_ARCHITECTURE_DOCS_DIR: tempArchitectureDir,
+    }, ["phase19-e2e"]);
+    const packageDir = path.join(repoRoot, "release-evidence/phase19-e2e");
+    const packageManifest = fs.readFileSync(path.join(packageDir, "manifest.json"), "utf8");
+    const scorecardSummary = fs.readFileSync(path.join(packageDir, "scorecard-summary.json"), "utf8");
+    const stableSuiteSlot = fs.readFileSync(path.join(packageDir, "logs/stable-suite.log"), "utf8");
+
+    expect(bundle).toContain("overallStatus");
+    expect(screenshots).toContain("public-booking");
+    expect(screenshots).toContain("tenant-360");
+    expect(lighthouse).toContain("\"productionWebVitalsClaimed\": false");
+    expect(accessibility).toContain("keyboard navigation");
+    expect(apiContract).toContain("tenant isolation endpoint checks");
+    expect(architectureManifest).toContain("Generated Architecture Manifest");
+    expect(packageOutput).toContain("SECRET_SCAN_STATUS:pass");
+    expect(packageManifest).toContain("scorecardSummary");
+    expect(scorecardSummary).toContain("\"productExcellence\"");
+    expect(scorecardSummary).toContain("\"tenOutOfTenBlocked\": true");
+    expect(stableSuiteSlot).toContain("needs_evidence");
+    expect(packageManifest).not.toMatch(/sk_(live|test)_[A-Za-z0-9]+/);
+    expect(scorecardSummary).not.toMatch(/whsec_[A-Za-z0-9]+/);
   });
 });

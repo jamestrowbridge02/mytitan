@@ -20,6 +20,8 @@ api/src/**/generated/
 api/tmp/
 tmp/
 backups/
+evidence/
+release-evidence/
 nginx-backup-*/
 api/prisma/migrations/**/.DS_Store
 .DS_Store

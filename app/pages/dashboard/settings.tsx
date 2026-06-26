@@ -828,8 +828,9 @@ export default function SettingsPage() {
   const loadTemplateLibrary = async () => {
     try {
       const response = await apiFetch('/templates/library');
+      const firstTemplateId = Array.isArray(response?.templates) && response.templates.length ? response.templates[0]?.id : '';
       setTemplateLibrary(response);
-      setSelectedTemplateId(String(response?.activeTemplate?.id || settings?.activeJobSheetTemplateId || ''));
+      setSelectedTemplateId(String(response?.activeTemplate?.id || settings?.activeJobSheetTemplateId || firstTemplateId || ''));
     } catch {
       setTemplateLibrary(null);
     }

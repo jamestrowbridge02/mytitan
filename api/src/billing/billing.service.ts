@@ -4603,10 +4603,22 @@ export class BillingService {
         lookupKey: row?.lookupKey || definition.code,
       }, row, process.env[definition.envPriceId] || null, process.env[definition.envProductId] || null);
       const snapshotPack = storedJobPackMap.get(definition.code) as any;
+      const hasMappedProviderIds = Boolean(
+        String(row?.stripePriceId || process.env[definition.envPriceId] || '').trim() &&
+        String(row?.stripeProductId || process.env[definition.envProductId] || '').trim(),
+      );
+      const syncStatus =
+        snapshotPack?.status && snapshotPack.status !== 'missing'
+          ? snapshotPack.status
+          : hasMappedProviderIds
+            ? 'setup_needed'
+            : 'missing';
       return {
         ...mapped,
-        syncStatus: snapshotPack?.status || 'missing',
-        syncMessage: snapshotPack?.message || null,
+        syncStatus,
+        syncMessage:
+          snapshotPack?.message ||
+          (syncStatus === 'setup_needed' ? 'Catalog mapping is saved; run the job-pack sync verifier to attach provider evidence before checkout.' : null),
         webhookGrantReadiness: storedJobPackSnapshot.grantingReadiness?.status || 'setup_required',
         checkoutReadiness:
           snapshotPack?.status === 'ready' &&
@@ -4621,8 +4633,10 @@ export class BillingService {
             ? 'Add the Stripe price ID for this pack, then dry-run validate.'
             : !String(row?.stripeProductId || process.env[definition.envProductId] || '').trim()
               ? 'Add the Stripe product ID for this pack, then dry-run validate.'
-              : snapshotPack?.status !== 'ready'
-                ? snapshotPack?.message || mapped.nextAction
+              : syncStatus === 'setup_needed'
+                ? 'Run the job-pack sync verifier and attach webhook/canary evidence before checkout confirmation.'
+                : snapshotPack?.status !== 'ready'
+                  ? snapshotPack?.message || mapped.nextAction
                 : storedJobPackSnapshot.grantingReadiness?.status !== 'ready'
                   ? 'Verify webhook-backed granting before checkout can be considered.'
                   : process.env.MYTITAN_CONFIRM_JOB_PACK_CHECKOUT === '1'

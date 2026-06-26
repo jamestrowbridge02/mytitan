@@ -7,6 +7,7 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   Res,
   UploadedFile,
   UseGuards,
@@ -93,14 +94,23 @@ export class ArtifactsController {
     @Param("entityId") entityId: string,
     @Body() body: Record<string, any>,
     @Query() query: Record<string, any>,
+    @Req() req: any,
     @UploadedFile() file: any,
   ) {
+    const headerLabel = typeof req?.headers?.["x-artifact-label"] === "string" ? req.headers["x-artifact-label"] : null;
+    const requestBody = (req?.body || {}) as Record<string, any>;
+    const requestQuery = (req?.query || {}) as Record<string, any>;
     return this.artifacts.createFromUpload({
       tenantId: user.companyId,
       userId: user.sub,
       entityType,
       entityId,
-      label: typeof body?.label === "string" ? body.label : typeof query?.label === "string" ? query.label : null,
+      label:
+        typeof body?.label === "string" ? body.label :
+        typeof query?.label === "string" ? query.label :
+        typeof requestBody?.label === "string" ? requestBody.label :
+        typeof requestQuery?.label === "string" ? requestQuery.label :
+        headerLabel,
       kind: typeof body?.kind === "string" ? body.kind : typeof query?.kind === "string" ? query.kind : "",
       portalVisible: body?.portalVisible ?? query?.portalVisible,
       file,

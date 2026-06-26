@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { DashboardShell } from "../../../components/dashboard-shell";
@@ -239,6 +239,7 @@ export default function TradeAccountProfilePage() {
   const [loading, setLoading] = useState(false);
   const [draftState, setDraftState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [profileForm, setProfileForm] = useState<Record<string, any>>({});
+  const profileFormRef = useRef<Record<string, any>>({});
   const [locationForm, setLocationForm] = useState<LocationState[]>([blankLocation()]);
   const [contactForm, setContactForm] = useState<ContactState[]>([blankContact()]);
   const [profileSaving, setProfileSaving] = useState(false);
@@ -287,7 +288,7 @@ export default function TradeAccountProfilePage() {
           : []
       );
       const account = accountPayload?.account || accountPayload || {};
-      setProfileForm({
+      const nextProfileForm = {
         name: account.name || "",
         contactName: account.contactName || "",
         contactEmail: account.contactEmail || "",
@@ -315,7 +316,9 @@ export default function TradeAccountProfilePage() {
         billingCountry: account.billingCountry || "",
         paymentTermsDays: account.paymentTermsDays ?? 7,
         portalEnabled: Boolean(account.portalEnabled),
-      });
+      };
+      profileFormRef.current = nextProfileForm;
+      setProfileForm(nextProfileForm);
       setPortalInviteEmail(account.billingEmail || account.contactEmail || "");
       setPortalAccess(Array.isArray(accessRows) ? accessRows : []);
       setLocationForm(normalizeLocations(account));
@@ -463,8 +466,9 @@ export default function TradeAccountProfilePage() {
     setError("");
     setRequestId(undefined);
     setProfileSaving(true);
+    const currentProfileForm = profileFormRef.current || profileForm;
     const profilePayload = {
-      ...profileForm,
+      ...currentProfileForm,
       locations: locationForm
         .map((location) => ({
           id: location.id,
@@ -472,37 +476,37 @@ export default function TradeAccountProfilePage() {
           kind: location.kind,
           addressLine1: String(
             location.isBilling
-              ? profileForm.billingAddressLine1 ?? location.addressLine1
+              ? currentProfileForm.billingAddressLine1 ?? location.addressLine1
               : location.isPrimary
-                ? profileForm.businessAddressLine1 ?? location.addressLine1
+                ? currentProfileForm.businessAddressLine1 ?? location.addressLine1
                 : location.addressLine1,
           ).trim(),
           addressLine2: String(
             location.isBilling
-              ? profileForm.billingAddressLine2 ?? location.addressLine2
+              ? currentProfileForm.billingAddressLine2 ?? location.addressLine2
               : location.isPrimary
-                ? profileForm.businessAddressLine2 ?? location.addressLine2
+                ? currentProfileForm.businessAddressLine2 ?? location.addressLine2
                 : location.addressLine2,
           ).trim(),
           city: String(
             location.isBilling
-              ? profileForm.billingCity ?? location.city
+              ? currentProfileForm.billingCity ?? location.city
               : location.isPrimary
-                ? profileForm.businessCity ?? location.city
+                ? currentProfileForm.businessCity ?? location.city
                 : location.city,
           ).trim(),
           postcode: String(
             location.isBilling
-              ? profileForm.billingPostcode ?? location.postcode
+              ? currentProfileForm.billingPostcode ?? location.postcode
               : location.isPrimary
-                ? profileForm.businessPostcode ?? location.postcode
+                ? currentProfileForm.businessPostcode ?? location.postcode
                 : location.postcode,
           ).trim(),
           country: String(
             location.isBilling
-              ? profileForm.billingCountry ?? location.country
+              ? currentProfileForm.billingCountry ?? location.country
               : location.isPrimary
-                ? profileForm.businessCountry ?? location.country
+                ? currentProfileForm.businessCountry ?? location.country
                 : location.country,
           ).trim(),
           isPrimary: location.isPrimary,
@@ -523,31 +527,31 @@ export default function TradeAccountProfilePage() {
           id: contact.id,
           name: String(
             contact.isPrimary
-              ? profileForm.contactName ?? contact.name
+              ? currentProfileForm.contactName ?? contact.name
               : contact.isBilling
-                ? profileForm.billingContactName ?? contact.name
+                ? currentProfileForm.billingContactName ?? contact.name
                 : contact.name,
           ).trim(),
           roleLabel: contact.roleLabel.trim(),
           email: String(
             contact.isPrimary
-              ? profileForm.contactEmail ?? contact.email
+              ? currentProfileForm.contactEmail ?? contact.email
               : contact.isBilling
-                ? profileForm.billingEmail ?? contact.email
+                ? currentProfileForm.billingEmail ?? contact.email
                 : contact.email,
           ).trim(),
           phone: String(
             contact.isPrimary
-              ? profileForm.contactPhone ?? contact.phone
+              ? currentProfileForm.contactPhone ?? contact.phone
               : contact.isBilling
-                ? profileForm.billingPhone ?? contact.phone
+                ? currentProfileForm.billingPhone ?? contact.phone
                 : contact.phone,
           ).trim(),
           mobile: String(
             contact.isPrimary
-              ? profileForm.contactMobile ?? contact.mobile
+              ? currentProfileForm.contactMobile ?? contact.mobile
               : contact.isBilling
-                ? profileForm.billingMobile ?? contact.mobile
+                ? currentProfileForm.billingMobile ?? contact.mobile
                 : contact.mobile,
           ).trim(),
           tradeAccountLocationId: contact.tradeAccountLocationId || undefined,
@@ -575,7 +579,7 @@ export default function TradeAccountProfilePage() {
           method: "POST",
           body: JSON.stringify({
             id,
-            name: account.name || profileForm.name || "Trade account",
+            name: account.name || currentProfileForm.name || "Trade account",
             ...profilePayload,
           }),
         });
@@ -651,6 +655,11 @@ export default function TradeAccountProfilePage() {
       const primaryId = current.find((contact) => contact.isPrimary)?.id || current[0]?.id;
       return current.map((contact) => contact.id === primaryId ? { ...contact, ...patch } : contact);
     });
+  }
+
+  function updateProfileField(key: string, value: any) {
+    profileFormRef.current = { ...(profileFormRef.current || profileForm), [key]: value };
+    setProfileForm((prev) => ({ ...prev, [key]: value }));
   }
 
   function toggleContactPreference(contactId: string, event: ContactPreferenceState["event"], channel: ContactPreferenceState["channel"]) {
@@ -826,28 +835,28 @@ export default function TradeAccountProfilePage() {
               <div>
                 <label htmlFor="crm-contact-name">Primary contact</label>
                 <input id="crm-contact-name" className="input" value={profileForm.contactName || ""} onChange={(e) => {
-                  setProfileForm((prev) => ({ ...prev, contactName: e.target.value }));
+                  updateProfileField("contactName", e.target.value);
                   updatePrimaryContact({ name: e.target.value });
                 }} />
               </div>
               <div>
                 <label htmlFor="crm-contact-email">Primary email</label>
                 <input id="crm-contact-email" className="input" type="email" value={profileForm.contactEmail || ""} onChange={(e) => {
-                  setProfileForm((prev) => ({ ...prev, contactEmail: e.target.value }));
+                  updateProfileField("contactEmail", e.target.value);
                   updatePrimaryContact({ email: e.target.value });
                 }} />
               </div>
               <div>
                 <label htmlFor="crm-contact-phone">Primary phone</label>
                 <input id="crm-contact-phone" className="input" value={profileForm.contactPhone || ""} onChange={(e) => {
-                  setProfileForm((prev) => ({ ...prev, contactPhone: e.target.value }));
+                  updateProfileField("contactPhone", e.target.value);
                   updatePrimaryContact({ phone: e.target.value });
                 }} />
               </div>
               <div>
                 <label htmlFor="crm-contact-mobile">Primary mobile</label>
                 <input id="crm-contact-mobile" className="input" value={profileForm.contactMobile || ""} onChange={(e) => {
-                  setProfileForm((prev) => ({ ...prev, contactMobile: e.target.value }));
+                  updateProfileField("contactMobile", e.target.value);
                   updatePrimaryContact({ mobile: e.target.value });
                 }} />
               </div>
@@ -925,7 +934,7 @@ export default function TradeAccountProfilePage() {
               </div>
               <div>
                 <label htmlFor="crm-billing-city">Billing city</label>
-                <input id="crm-billing-city" className="input" value={profileForm.billingCity || ""} onChange={(e) => setProfileForm((prev) => ({ ...prev, billingCity: e.target.value }))} />
+                <input id="crm-billing-city" className="input" value={profileForm.billingCity || ""} onChange={(e) => updateProfileField("billingCity", e.target.value)} />
               </div>
               <div>
                 <label htmlFor="crm-billing-postcode">Billing postcode</label>

@@ -18,7 +18,12 @@ CREATE INDEX IF NOT EXISTS "Customer_companyId_phone_idx" ON "Customer"("company
 CREATE INDEX IF NOT EXISTS "Customer_companyId_createdAt_idx" ON "Customer"("companyId", "createdAt");
 
 ALTER TABLE "Job" ADD COLUMN IF NOT EXISTS "customerId" TEXT;
-ALTER TABLE "ActivityEvent" ADD COLUMN IF NOT EXISTS "customerId" TEXT;
+DO $$
+BEGIN
+  IF to_regclass('public."ActivityEvent"') IS NOT NULL THEN
+    ALTER TABLE "ActivityEvent" ADD COLUMN IF NOT EXISTS "customerId" TEXT;
+  END IF;
+END$$;
 
 DO $$
 BEGIN
@@ -46,7 +51,7 @@ END$$;
 
 DO $$
 BEGIN
-  IF NOT EXISTS (
+  IF to_regclass('public."ActivityEvent"') IS NOT NULL AND NOT EXISTS (
     SELECT 1 FROM pg_constraint WHERE conname = 'ActivityEvent_customerId_fkey'
   ) THEN
     ALTER TABLE "ActivityEvent"
@@ -57,7 +62,12 @@ BEGIN
 END$$;
 
 CREATE INDEX IF NOT EXISTS "Job_companyId_customerId_createdAt_idx" ON "Job"("companyId", "customerId", "createdAt");
-CREATE INDEX IF NOT EXISTS "ActivityEvent_tenantId_customerId_at_idx" ON "ActivityEvent"("tenantId", "customerId", "at");
+DO $$
+BEGIN
+  IF to_regclass('public."ActivityEvent"') IS NOT NULL THEN
+    CREATE INDEX IF NOT EXISTS "ActivityEvent_tenantId_customerId_at_idx" ON "ActivityEvent"("tenantId", "customerId", "at");
+  END IF;
+END$$;
 
 -- Seed Customer rows from legacy job/activity string fields.
 WITH source_customers AS (
@@ -68,17 +78,6 @@ WITH source_customers AS (
     NULLIF(btrim(j."customerPhone"), '') AS phone
   FROM "Job" j
   WHERE COALESCE(btrim(j."customerName"), '') <> ''
-
-  UNION
-
-  SELECT
-    a."tenantId" AS "companyId",
-    btrim(a."customerName") AS name,
-    NULL::TEXT AS email,
-    NULL::TEXT AS phone
-  FROM "ActivityEvent" a
-  WHERE a."tenantId" IS NOT NULL
-    AND COALESCE(btrim(a."customerName"), '') <> ''
 ),
 dedup AS (
   SELECT DISTINCT
@@ -159,32 +158,42 @@ WHERE j."id" = m.job_id
   AND m.rn = 1;
 
 -- Link activity to customer via job first.
-UPDATE "ActivityEvent" a
-SET "customerId" = j."customerId"
-FROM "Job" j
-WHERE a."customerId" IS NULL
-  AND a."jobId" = j."id"
-  AND j."customerId" IS NOT NULL;
+DO $$
+BEGIN
+  IF to_regclass('public."ActivityEvent"') IS NOT NULL THEN
+    UPDATE "ActivityEvent" a
+    SET "customerId" = j."customerId"
+    FROM "Job" j
+    WHERE a."customerId" IS NULL
+      AND a."jobId" = j."id"
+      AND j."customerId" IS NOT NULL;
+  END IF;
+END$$;
 
 -- Link activity to customer via tenant + customerName fallback.
-WITH activity_matches AS (
-  SELECT
-    a."id" AS activity_id,
-    c."id" AS customer_id,
-    row_number() OVER (
-      PARTITION BY a."id"
-      ORDER BY c."updatedAt" DESC
-    ) AS rn
-  FROM "ActivityEvent" a
-  JOIN "Customer" c
-    ON c."companyId" = a."tenantId"
-   AND lower(c."name") = lower(btrim(a."customerName"))
-  WHERE a."customerId" IS NULL
-    AND a."tenantId" IS NOT NULL
-    AND COALESCE(btrim(a."customerName"), '') <> ''
-)
-UPDATE "ActivityEvent" a
-SET "customerId" = m.customer_id
-FROM activity_matches m
-WHERE a."id" = m.activity_id
-  AND m.rn = 1;
+DO $$
+BEGIN
+  IF to_regclass('public."ActivityEvent"') IS NOT NULL THEN
+    WITH activity_matches AS (
+      SELECT
+        a."id" AS activity_id,
+        c."id" AS customer_id,
+        row_number() OVER (
+          PARTITION BY a."id"
+          ORDER BY c."updatedAt" DESC
+        ) AS rn
+      FROM "ActivityEvent" a
+      JOIN "Customer" c
+        ON c."companyId" = a."tenantId"
+       AND lower(c."name") = lower(btrim(a."customerName"))
+      WHERE a."customerId" IS NULL
+        AND a."tenantId" IS NOT NULL
+        AND COALESCE(btrim(a."customerName"), '') <> ''
+    )
+    UPDATE "ActivityEvent" a
+    SET "customerId" = m.customer_id
+    FROM activity_matches m
+    WHERE a."id" = m.activity_id
+      AND m.rn = 1;
+  END IF;
+END$$;
