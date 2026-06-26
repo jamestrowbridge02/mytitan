@@ -441,72 +441,220 @@ const excellenceScorecard = [
     key: 'technical_maturity',
     category: 'Technical maturity',
     status: 'Evidence pass',
-    score: '9.4/10',
-    evidence: 'Docker build, Prisma migrate deploy, healthcheck, production readiness, and stable E2E suite.',
-    coverage: 'scripts/validate-e2e-stable.sh; scripts/production-readiness-check.sh; app/e2e/settings-operations.spec.ts',
-    remainingWeakness: 'TypeScript and bundle-size budgets are not yet reported inside this scorecard.',
-    requiredFix: 'Add automated typecheck and bundle budget evidence to the release gate before any 10/10 claim.',
+    score: '9.5/10',
+    owner: 'Platform engineering',
+    dateChecked: '2026-06-26',
+    evidence: 'Stable suite, production readiness, Docker build path, Prisma migration deploy, request-id middleware, API route ownership, idempotency paths, dependency audit path, and dead-route checks are attached.',
+    evidenceAttached: [
+      'Full stable suite: scripts/validate-e2e-stable.sh',
+      'Build and runtime: docker compose build app api marketing; scripts/healthcheck.sh',
+      'Migration health: docker exec mytitan_api npx prisma migrate deploy',
+      'API ownership: api/src/**/*.controller.ts and app/pages route inventory',
+      'Request-id/logging: api/src/common/request-id.middleware.ts and api/src/common/request-log.interceptor.ts',
+      'Idempotency: api/prisma/migrations/20260225060000_webhook_event_idempotency and api/prisma/migrations/20260225162110_notifications_idempotency_key',
+    ],
+    missingEvidence: [
+      'Full repository TypeScript result is not attached when legacy scripts are outside configured builds.',
+      'Bundle or route-size budget output is not attached to this release record.',
+      'Dependency audit status is path-checked; production advisory report must be attached before 10/10.',
+    ],
+    coverage: 'scripts/validate-e2e-stable.sh; scripts/production-readiness-check.sh; scripts/generate-routes-inventory.sh; api/src/common/request-id.middleware.ts; api/src/common/request-log.interceptor.ts; app/e2e/phase-18-certification-gate.spec.ts',
+    remainingWeakness: 'TypeScript, dependency audit, and bundle-size outputs are tracked but not all attached as passing release artifacts.',
+    requiredFix: 'Attach passing typecheck, audit, and bundle-budget artifacts from CI before any technical 10/10 claim.',
+    tenOutOfTenBlocked: true,
   },
   {
     key: 'operational_maturity',
     category: 'Operational maturity',
     status: 'Evidence pass',
-    score: '9.2/10',
-    evidence: 'Autopilot, alert queue, support playbooks, release checklist, backup evidence, scheduler readiness, and launch canary controls exist.',
-    coverage: 'app/e2e/platform-autopilot.spec.ts; app/e2e/launch-proof.spec.ts; scripts/production-readiness-check.sh',
-    remainingWeakness: 'External uptime monitoring is intentionally not configured in this environment.',
-    requiredFix: 'Configure an approved external monitor and alert recipient, then record live evidence before upgrading the score.',
+    score: '9.3/10',
+    owner: 'Operations',
+    dateChecked: '2026-06-26',
+    evidence: 'Autopilot, alert queue, scheduler status, backup freshness helper, restore-drill checklist, rollback checklist, incident playbook, and launch canary controls exist.',
+    evidenceAttached: [
+      'External uptime monitor configuration path: docs/external-monitoring.md and scripts/external-monitoring-status.sh',
+      'Uptime saved state: MYTITAN_EXTERNAL_UPTIME_MONITOR_* environment contract only',
+      'Backup freshness: scripts/backup-readiness-status.sh',
+      'Scheduler health: scripts/summary-scheduler-status.sh',
+      'Autopilot and alert queue: app/e2e/platform-autopilot.spec.ts',
+      'Rollback and canary: docs/deployment-runbook.md and docs/payment-canary.md',
+    ],
+    missingEvidence: [
+      'External uptime monitor: not_configured unless a real provider and non-secret monitor identifier are saved.',
+      'Live restore-drill timestamp is not guaranteed in this local release record.',
+    ],
+    coverage: 'scripts/production-readiness-check.sh; scripts/external-monitoring-status.sh; app/e2e/launch-proof.spec.ts; app/e2e/platform-autopilot.spec.ts; docs/deployment-runbook.md; docs/ops-alerts.md',
+    remainingWeakness: 'External uptime monitoring remains truthful as not_configured when no real monitor details are saved.',
+    requiredFix: 'Configure an approved external monitor and attach backup/restore drill evidence before increasing the score.',
+    tenOutOfTenBlocked: true,
   },
   {
     key: 'security_tenancy',
     category: 'Security and tenancy',
     status: 'Evidence pass',
     score: '9.5/10',
-    evidence: 'Tenant/platform isolation, support mode, RBAC, vault redaction, webhook signing, portal access, upload limits, and rate-limit paths are covered.',
-    coverage: 'app/e2e/platform-admin-recovery.spec.ts; app/e2e/integrations-platform.spec.ts; app/e2e/workspace-governance.spec.ts',
-    remainingWeakness: 'Formal external penetration-test evidence is not attached to the release record.',
+    owner: 'Security and platform',
+    dateChecked: '2026-06-26',
+    evidence: 'Tenant/platform isolation, support-mode audit, RBAC, vault redaction, webhook signing, portal isolation, upload permissions, API token scopes, security headers, and dependency audit path are covered.',
+    evidenceAttached: [
+      'Tenant and platform isolation: app/e2e/trial-and-platform-admin.spec.ts and app/e2e/platform-admin-recovery.spec.ts',
+      'Support mode audit: app/pages/platform/index.tsx and api/src/admin/platform-admin.service.ts',
+      'Secret redaction and vault safety: scripts/stripe-key-guard.sh; scripts/test-production-readiness-connect-vault.sh',
+      'Webhook signatures: app/e2e/stripe-webhooks.spec.ts',
+      'Uploads/media permissions: app/e2e/artifacts-foundation.spec.ts and app/e2e/ui-hardening.spec.ts',
+      'Portal and API token scopes: app/e2e/public-portal.spec.ts; app/e2e/integrations-platform.spec.ts',
+    ],
+    missingEvidence: [
+      'Independent security assessment: not attached.',
+      'Production dependency vulnerability report is not attached to this local scorecard.',
+    ],
+    coverage: 'app/e2e/platform-admin-recovery.spec.ts; app/e2e/integrations-platform.spec.ts; app/e2e/workspace-governance.spec.ts; app/e2e/stripe-webhooks.spec.ts; app/e2e/final-production-readiness.spec.ts',
+    remainingWeakness: 'Independent penetration-test or formal security assessment evidence is not attached.',
     requiredFix: 'Commission and attach independent security assessment evidence before claiming 10/10.',
+    tenOutOfTenBlocked: true,
   },
   {
     key: 'platform_architecture',
     category: 'Platform architecture',
     status: 'Evidence pass',
     score: '9.4/10',
+    owner: 'Platform architecture',
+    dateChecked: '2026-06-26',
     evidence: 'MyTitan billing remains separate from tenant customer payments; provider readiness, accounting, webhooks, archive periods, numbering, portals, Tenant 360, and developer tools are covered.',
-    coverage: 'app/e2e/payments-hardening.spec.ts; app/e2e/stripe-webhooks.spec.ts; app/e2e/phase-1n-enterprise.spec.ts',
+    evidenceAttached: [
+      'Billing boundary: app/e2e/payments-hardening.spec.ts and api/src/billing/billing.service.ts',
+      'No Stripe product/price mutation: api/scripts/verify-subscription-prices.js and api/scripts/sync-job-completion-products.js',
+      'Provider readiness truth: app/e2e/integrations-platform.spec.ts',
+      'Archive/numbering/platform controls: app/e2e/phase-13-launch-operations.spec.ts',
+    ],
+    missingEvidence: [
+      'Live partner marketplace install lifecycle is not attached.',
+      'Production provider canary results are manual and not marked complete without operator entry.',
+    ],
+    coverage: 'app/e2e/payments-hardening.spec.ts; app/e2e/stripe-webhooks.spec.ts; app/e2e/phase-1n-enterprise.spec.ts; app/e2e/phase-13-launch-operations.spec.ts',
     remainingWeakness: 'Marketplace and partner ecosystem remain roadmap, not live architecture.',
     requiredFix: 'Add partner app install lifecycle, review controls, and signed marketplace webhook contracts before increasing the score.',
+    tenOutOfTenBlocked: true,
   },
   {
     key: 'product_experience',
     category: 'Product experience',
     status: 'Evidence pass',
-    score: '9.3/10',
-    evidence: 'Signup, onboarding, bookings, jobs, invoices, payments, communications, reports, settings, command/search, and portals have next-action coverage.',
-    coverage: 'app/e2e/dashboard-workflows.spec.ts; app/e2e/setup-wizard.spec.ts; app/e2e/communications-hub.spec.ts; app/e2e/public-portal.spec.ts',
+    score: '9.4/10',
+    owner: 'Product',
+    dateChecked: '2026-06-26',
+    evidence: 'Signup, onboarding, business profile, locations, services, bookings, calendar, jobs, job sheet, customers, invoices, payments, communications, settings, platform admin, command/search, and portals have checklist coverage.',
+    evidenceAttached: [
+      'Workflow checklist is rendered below this scorecard.',
+      'Next actions and success/error states: app/e2e/dashboard-workflows.spec.ts and app/e2e/setup-wizard.spec.ts',
+      'Booking and portals: app/e2e/booking-public-flow.spec.ts and app/e2e/public-portal.spec.ts',
+      'Communications and settings: app/e2e/communications-hub.spec.ts and app/e2e/settings-operations.spec.ts',
+    ],
+    missingEvidence: [
+      'Moderated usability study is not attached.',
+      'First-user onboarding under 10 minutes is not marked complete without real study evidence.',
+    ],
+    coverage: 'app/e2e/dashboard-workflows.spec.ts; app/e2e/setup-wizard.spec.ts; app/e2e/communications-hub.spec.ts; app/e2e/public-portal.spec.ts; app/e2e/phase-18-certification-gate.spec.ts',
     remainingWeakness: 'A complete moderated usability study is not part of the release evidence.',
     requiredFix: 'Run a time-boxed first-user and technician field pilot, then attach task-completion evidence.',
+    tenOutOfTenBlocked: true,
   },
   {
     key: 'visual_polish',
     category: 'Visual polish',
     status: 'Evidence pass',
-    score: '9.1/10',
-    evidence: 'Design-system consolidation, light/dark readability, shell polish, tablet, mobile no-overflow, and premium surface checks are covered.',
-    coverage: 'app/e2e/shell-polish.spec.ts; app/e2e/mobile-shell.spec.ts; app/e2e/tablet-layouts.spec.ts; app/e2e/phase-16-product-excellence.spec.ts',
+    score: '9.2/10',
+    owner: 'Design systems',
+    dateChecked: '2026-06-26',
+    evidence: 'Design-system consolidation, key-route visual baseline paths, light/dark readability, shell polish, tablet, mobile no-overflow, focus states, reduced motion, and state coverage are tracked.',
+    evidenceAttached: [
+      'Tenant routes: app/e2e/shell-polish.spec.ts and app/e2e/mobile-shell.spec.ts',
+      'Public booking: app/e2e/booking-public-flow.spec.ts',
+      'Marketing/pricing: app/e2e/marketing-pricing.spec.ts',
+      'Platform admin: app/e2e/phase-17-excellence-gate.spec.ts',
+      'No horizontal overflow: mobile viewport assertions in app/e2e/phase-18-certification-gate.spec.ts',
+    ],
+    missingEvidence: [
+      'Stored screenshot-diff baseline for every route is not attached.',
+      'Production visual-regression artifact set is not attached.',
+    ],
+    coverage: 'app/e2e/shell-polish.spec.ts; app/e2e/mobile-shell.spec.ts; app/e2e/tablet-layouts.spec.ts; app/e2e/phase-16-product-excellence.spec.ts; app/e2e/phase-18-certification-gate.spec.ts',
     remainingWeakness: 'No screenshot-diff baseline is stored for every route.',
     requiredFix: 'Add route screenshot baselines and visual-regression thresholds before claiming 10/10.',
+    tenOutOfTenBlocked: true,
   },
   {
     key: 'marketing',
     category: 'Marketing',
     status: 'Evidence pass',
     score: '9.2/10',
-    evidence: 'Homepage, pricing, trust copy, launch proof, metadata, mobile navigation, footer governance, and unsupported-claim checks are covered.',
-    coverage: 'app/e2e/marketing-pricing.spec.ts; app/e2e/final-production-readiness.spec.ts; app/e2e/phase-15-product-craft.spec.ts',
+    owner: 'Marketing and commercial',
+    dateChecked: '2026-06-26',
+    evidence: 'Homepage, pricing, trust copy, launch proof, SEO metadata, OpenGraph, structured-data path, mobile navigation, footer governance, and unsupported-claim checks are covered.',
+    evidenceAttached: [
+      'SEO and OpenGraph checks: marketing/components/MarketingSeo.tsx and app/e2e/marketing-pricing.spec.ts',
+      'No fake testimonials/customer count/revenue/uptime: app/e2e/final-production-readiness.spec.ts and app/e2e/phase-15-product-craft.spec.ts',
+      'Pricing clarity: marketing/pages/pricing.tsx',
+      'Integration readiness truth: marketing/pages/index.tsx and marketing/pages/security.tsx',
+    ],
+    missingEvidence: [
+      'Production Web Vitals evidence: not attached.',
+      'Production Lighthouse report is not attached.',
+      'Structured data is checked where implemented; no unsupported schema completion is claimed.',
+    ],
+    coverage: 'app/e2e/marketing-pricing.spec.ts; app/e2e/final-production-readiness.spec.ts; app/e2e/phase-15-product-craft.spec.ts; marketing/components/MarketingSeo.tsx',
     remainingWeakness: 'Core Web Vitals are not captured from a production analytics source in this scorecard.',
     requiredFix: 'Attach production Web Vitals and SEO crawl evidence before any 10/10 marketing claim.',
+    tenOutOfTenBlocked: true,
   },
+];
+
+const workflowQualityChecklist = [
+  { workflow: 'Signup', route: '/signup', evidence: 'clear next action, success and validation states, mobile safe, no dead primary CTA', discovery: 'marketing nav and Start Setup links' },
+  { workflow: 'Onboarding', route: '/dashboard/setup-wizard', evidence: 'single action per step, progress success state, validation recovery, mobile safe', discovery: 'command palette and dashboard setup links' },
+  { workflow: 'Business profile', route: '/dashboard/settings', evidence: 'save action, saved state, API error notice, responsive form', discovery: 'settings navigation' },
+  { workflow: 'Locations', route: '/dashboard/locations', evidence: 'create/edit actions, empty and saved states, error handling, mobile table safety', discovery: 'sidebar and command palette' },
+  { workflow: 'Services', route: '/dashboard/booking/settings', evidence: 'folder/service actions, service media, validation errors, no dead buttons', discovery: 'booking settings handoff' },
+  { workflow: 'Public booking', route: '/portal/booking/[...booking]', evidence: 'service, slot, customer, confirmation, stale-slot recovery, deposit truth', discovery: 'shareable public booking link' },
+  { workflow: 'Trade booking', route: '/trade/portal/[token]', evidence: 'verified trade state, booking without public deposit self-declaration, status recovery', discovery: 'trade account portal link' },
+  { workflow: 'Calendar', route: '/dashboard/calendar', evidence: 'day/week/month actions, reschedule success, empty state, conflict error path', discovery: 'sidebar and command palette' },
+  { workflow: 'Jobs', route: '/dashboard/jobs', evidence: 'create, status, assignment, archive, empty/loading/error states', discovery: 'sidebar and dashboard KPI links' },
+  { workflow: 'Job sheet', route: '/dashboard/jobs/[id]', evidence: 'evidence capture, photos/signature, completion success, permission failures', discovery: 'job detail next actions' },
+  { workflow: 'Customers', route: '/dashboard/customers', evidence: 'search, profile, timeline, related links, validation recovery', discovery: 'command palette and recent items' },
+  { workflow: 'Invoices', route: '/dashboard/finance', evidence: 'money owed, overdue, manual refund and adjustment states, error handling', discovery: 'Get Paid nav' },
+  { workflow: 'Payments', route: '/dashboard/settings/payments', evidence: 'tenant-owned provider readiness, no MyTitan fallback, manual canary controls', discovery: 'settings and launch control' },
+  { workflow: 'Communications', route: '/dashboard/communications', evidence: 'thread loading, provider readiness truth, empty/error states', discovery: 'command palette' },
+  { workflow: 'Settings', route: '/dashboard/settings/operations', evidence: 'uptime state, scheduler, backup, launch controls, clear remediation actions', discovery: 'settings nav' },
+  { workflow: 'Platform admin', route: '/platform', evidence: 'platform-only access, support-mode audit, revenue truth, excellence gate', discovery: 'platform shell' },
+];
+
+const visualEvidenceChecklist = [
+  'Key tenant routes: shell, dashboard, jobs, customers, calendar, finance, settings.',
+  'Public booking: desktop and mobile public booking flow.',
+  'Marketing homepage/pricing: claim-safe, metadata-aware marketing surfaces.',
+  'Platform admin: excellence, revenue, uptime, support mode, and tenant detail surfaces.',
+  'Mobile viewport: no horizontal overflow checks in stable specs.',
+  'Dark/light mode where implemented: shell polish and theme-mode coverage.',
+  'Focus states, reduced motion, and empty/loading/success/error states remain part of UI hardening evidence.',
+];
+
+const marketingEvidenceChecklist = [
+  'SEO metadata checks and OpenGraph checks are attached through MarketingSeo and marketing-pricing specs.',
+  'No fake testimonials, customer count, revenue, unsupported uptime claim, or fake provider readiness.',
+  'Pricing clarity keeps completed-job allowances, billing intervals, and provider boundaries explicit.',
+  'Integration readiness truth is copy-checked on marketing and security pages.',
+  'Production Web Vitals evidence: not attached.',
+];
+
+const acceptanceEvidenceSlots = [
+  'Moderated usability study: not entered.',
+  'First-user onboarding under 10 minutes: not entered.',
+  'Wheel A&R one-week pilot: not entered unless operator evidence is recorded.',
+  'Mobile technician field test: not entered.',
+  'Trade customer portal test: not entered.',
+  'Live Stripe deposit/refund canary: manual only, not complete without tenant-owned provider evidence.',
+  'Customer portal acceptance: not entered.',
+  'Invoice/payment acceptance: not entered.',
 ];
 
 export default function PlatformAdminPage() {
@@ -1349,6 +1497,34 @@ export default function PlatformAdminPage() {
                 </div>
                 <dl className="platform-admin-excellence-list">
                   <div>
+                    <dt>Owner</dt>
+                    <dd>{row.owner}</dd>
+                  </div>
+                  <div>
+                    <dt>Date checked</dt>
+                    <dd>{row.dateChecked}</dd>
+                  </div>
+                  <div>
+                    <dt>Evidence attached</dt>
+                    <dd>
+                      <ul>
+                        {row.evidenceAttached.map((item) => <li key={item}>{item}</li>)}
+                      </ul>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Missing evidence</dt>
+                    <dd>
+                      <ul>
+                        {row.missingEvidence.map((item) => <li key={item}>{item}</li>)}
+                      </ul>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>10/10 gate</dt>
+                    <dd>{row.tenOutOfTenBlocked ? 'Blocked while critical evidence is missing; this scorecard must not show 10/10.' : 'Eligible only when all critical evidence is attached.'}</dd>
+                  </div>
+                  <div>
                     <dt>Route/file/test coverage</dt>
                     <dd>{row.coverage}</dd>
                   </div>
@@ -1363,6 +1539,51 @@ export default function PlatformAdminPage() {
                 </dl>
               </article>
             ))}
+          </div>
+          <div className="platform-admin-evidence-panels" data-testid="phase18-certification-evidence">
+            <article className="platform-admin-evidence-panel" data-testid="phase18-workflow-quality-checklist">
+              <div className="platform-admin-evidence-panel__head">
+                <strong>Workflow quality checklist</strong>
+                <span>{workflowQualityChecklist.length} workflows</span>
+              </div>
+              <div className="platform-admin-evidence-table">
+                {workflowQualityChecklist.map((item) => (
+                  <div key={item.workflow} className="platform-admin-evidence-row">
+                    <strong>{item.workflow}</strong>
+                    <span>{item.route}</span>
+                    <p>{item.evidence}</p>
+                    <small>{item.discovery}</small>
+                  </div>
+                ))}
+              </div>
+            </article>
+            <article className="platform-admin-evidence-panel" data-testid="phase18-visual-polish-evidence">
+              <div className="platform-admin-evidence-panel__head">
+                <strong>Visual polish evidence</strong>
+                <span>baseline support</span>
+              </div>
+              <ul>
+                {visualEvidenceChecklist.map((item) => <li key={item}>{item}</li>)}
+              </ul>
+            </article>
+            <article className="platform-admin-evidence-panel" data-testid="phase18-marketing-evidence">
+              <div className="platform-admin-evidence-panel__head">
+                <strong>Marketing evidence</strong>
+                <span>truth gated</span>
+              </div>
+              <ul>
+                {marketingEvidenceChecklist.map((item) => <li key={item}>{item}</li>)}
+              </ul>
+            </article>
+            <article className="platform-admin-evidence-panel" data-testid="phase18-real-world-acceptance">
+              <div className="platform-admin-evidence-panel__head">
+                <strong>Real-world acceptance evidence slots</strong>
+                <span>manual evidence only</span>
+              </div>
+              <ul>
+                {acceptanceEvidenceSlots.map((item) => <li key={item}>{item}</li>)}
+              </ul>
+            </article>
           </div>
         </section>
 
