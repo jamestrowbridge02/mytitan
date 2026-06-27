@@ -498,6 +498,79 @@ export class AuthService {
     };
   }
 
+  private assertOperationalPassword(password: string) {
+    if (password.length < 10) {
+      throw new BadRequestException('Principal admin password does not meet the minimum length policy.');
+    }
+    if (!/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
+      throw new BadRequestException('Principal admin password must include upper-case, lower-case, and numeric characters.');
+    }
+  }
+
+  async resetPrincipalAdminPassword(input: { password: string; actor?: string }) {
+    const db = this.prisma as any;
+    const email = 'admin@mytitan.co.uk';
+    const password = String(input.password || '');
+    this.assertOperationalPassword(password);
+
+    const admin = await db.user.findFirst({
+      where: { email },
+      select: {
+        id: true,
+        email: true,
+        companyId: true,
+        emailVerified: true,
+        isActive: true,
+        role: true,
+      },
+    });
+    if (!admin?.id) {
+      throw new BadRequestException('Principal platform admin account does not exist.');
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const updated = await db.$transaction(async (tx: any) => {
+      const user = await tx.user.update({
+        where: { id: admin.id },
+        data: {
+          passwordHash,
+          isActive: true,
+          emailVerified: true,
+          role: 'OWNER',
+          tokenVersion: { increment: 1 },
+        },
+        select: {
+          id: true,
+          email: true,
+          companyId: true,
+          isActive: true,
+          emailVerified: true,
+          role: true,
+        },
+      });
+      await tx.auditEvent.create({
+        data: {
+          companyId: user.companyId,
+          userId: user.id,
+          type: 'principal_admin_password_reset',
+          message: `Principal platform admin password reset by ${String(input.actor || 'cli').slice(0, 80)}`,
+        },
+      });
+      return user;
+    });
+
+    return {
+      ok: true,
+      email: updated.email,
+      passwordUpdated: true,
+      active: Boolean(updated.isActive),
+      emailVerified: Boolean(updated.emailVerified),
+      role: updated.role,
+      platformAdminEligible: isPlatformAdminUser({ email: updated.email, emailVerified: Boolean(updated.emailVerified) } as any),
+      auditRecorded: true,
+    };
+  }
+
   async completePlatformStaffSetup(dto: PlatformStaffSetupCompleteDto) {
     const db = this.prisma as any;
     const tokenHash = this.tokenHash(dto.token);

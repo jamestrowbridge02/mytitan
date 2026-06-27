@@ -164,7 +164,9 @@ export function EntityArtifactsCard({
       setPortalVisible(false);
       const input = document.querySelector<HTMLInputElement>(`input[data-artifact-input="${entityType}-${entityId}"]`);
       if (input) input.value = "";
-      void load();
+      if (!currentLabel) {
+        void load();
+      }
     } catch (err: any) {
       setError(err?.message || "Failed to upload artifact");
     } finally {
