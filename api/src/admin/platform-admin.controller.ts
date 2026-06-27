@@ -17,6 +17,13 @@ import { PlatformAdminService } from './platform-admin.service';
 import { PlatformPaymentProviderConfigService } from '../platform-config/platform-payment-provider-config.service';
 import { PlatformAutopilotService } from './platform-autopilot.service';
 
+function maskEmailForPlatform(email: string) {
+  const normalized = String(email || '').trim().toLowerCase();
+  const [local, domain] = normalized.split('@');
+  if (!local || !domain) return 'invalid';
+  return `${local.slice(0, 2)}**@${domain.slice(0, 2)}****${domain.slice(-2)}`;
+}
+
 @UseGuards(JwtAuthGuard)
 @Controller('admin/platform')
 export class PlatformAdminController {
@@ -739,6 +746,59 @@ export class PlatformAdminController {
       reason: body?.reason,
       userId: user.sub,
     });
+  }
+
+  @Post('email-control/test-email')
+  async sendEmailControlTest(
+    @CurrentUser() user: JwtPayload,
+    @Body() body: Record<string, any>,
+    @Req() req: Request & { requestId?: string },
+  ) {
+    await this.assertAccess(user, req, 'platform.email_control.test_email');
+    const to = String(body?.to || '').trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+      throw new BadRequestException('A real operator-controlled recipient email is required.');
+    }
+    if (/\.(test|example|invalid|localhost)$/i.test(to) || to.endsWith('@mytitan.local')) {
+      throw new BadRequestException('Use a real routable inbox for the platform email test.');
+    }
+    const readiness = await this.email.getReadiness(null, { ownership: 'system', probe: true });
+    if (readiness.status !== 'ready' || readiness.transport !== 'smtp' || !readiness.canSend) {
+      return {
+        ok: false,
+        status: 'not_ready',
+        recipientMasked: maskEmailForPlatform(to),
+        readiness: {
+          status: readiness.status,
+          transport: readiness.transport,
+          source: readiness.source,
+          canSend: readiness.canSend,
+          guidance: readiness.guidance,
+        },
+      };
+    }
+    const result = await this.email.sendSystemOperationalEmail(
+      {
+        to,
+        subject: 'MyTitan public launch email delivery test',
+        text: 'MyTitan public launch email delivery test.\nThis message verifies the configured system email provider can send real mail.',
+      },
+      {
+        category: 'public_launch_email_test',
+        templateKey: 'public_launch_email_test',
+        actorUserId: user.sub,
+        dedupeWindowMinutes: 0,
+        bypassDuplicateSuppression: true,
+      },
+    );
+    await this.audit.log(user.companyId, 'platform.email_control.test_email', `Platform email test ${result.status} to ${maskEmailForPlatform(to)}`, user.sub);
+    return {
+      ok: Boolean(result.delivered && result.status === 'sent'),
+      status: result.status,
+      delivered: Boolean(result.delivered),
+      recipientMasked: maskEmailForPlatform(to),
+      senderOwnership: result.senderOwnership || 'system',
+    };
   }
 
   @Post('tenants/:tenantId/pricing-adjustment')

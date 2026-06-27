@@ -38,10 +38,61 @@ type ProviderStatus = {
   } | null;
 };
 
+type EmailControlResponse = {
+  control?: {
+    paused?: boolean;
+    providerSuspended?: boolean;
+    pausedReason?: string | null;
+    providerSuspensionReason?: string | null;
+  };
+  environment?: {
+    mode?: string;
+    liveSmtpAllowed?: boolean;
+    captureOnly?: boolean;
+  };
+  sender?: {
+    readiness?: {
+      status?: string;
+      transport?: string;
+      source?: string;
+      canSend?: boolean;
+      fromEmail?: string | null;
+      fromName?: string | null;
+      guidance?: string;
+      dnsRecords?: string[];
+    };
+    senderIdentityVerified?: boolean;
+  };
+  domainAlignment?: {
+    spf?: string;
+    dkim?: string;
+    dmarc?: string;
+    warmup?: string;
+  };
+  health?: {
+    sentLast24h?: number;
+    deferredLast24h?: number;
+    failedLast24h?: number;
+    blockedLast24h?: number;
+    activeSuppressions?: number;
+    recentProviderResponses?: Array<{
+      id: string;
+      createdAt: string;
+      status: string;
+      category: string;
+      recipientMasked: string;
+      responseSummary: string;
+      providerCode: string | null;
+    }>;
+  };
+};
+
 export default function PlatformConfigurationPage() {
   const [allowed, setAllowed] = useState<boolean | null>(null);
   const [billing, setBilling] = useState<any>(null);
   const [connect, setConnect] = useState<ProviderStatus | null>(null);
+  const [emailControl, setEmailControl] = useState<EmailControlResponse | null>(null);
+  const [testEmailTo, setTestEmailTo] = useState("");
   const [platformSecret, setPlatformSecret] = useState("");
   const [webhookSecret, setWebhookSecret] = useState("");
   const [mode, setMode] = useState<"test" | "live">("test");
@@ -59,8 +110,10 @@ export default function PlatformConfigurationPage() {
     }
     setAllowed(true);
     const response = await apiFetch("/admin/platform/platform-configuration/payment-providers");
+    const emailResponse = await apiFetch("/admin/platform/email-control");
     setBilling(response?.myTitanBillingStripe || null);
     setConnect(response?.stripeConnect || null);
+    setEmailControl(emailResponse || null);
     setMode(response?.stripeConnect?.mode === "live" ? "live" : "test");
   }
 
@@ -153,6 +206,29 @@ export default function PlatformConfigurationPage() {
     }
   }
 
+  async function sendTestEmail() {
+    setBusy("email-test");
+    setError("");
+    setMessage("");
+    try {
+      const response = await apiFetch("/admin/platform/email-control/test-email", {
+        method: "POST",
+        body: JSON.stringify({ to: testEmailTo }),
+      });
+      if (!response?.ok) {
+        setError(response?.readiness?.guidance || `Email test did not pass: ${response?.status || "not_ready"}`);
+      } else {
+        setMessage(`Email provider test sent to ${response.recipientMasked || "the configured recipient"}.`);
+        setTestEmailTo("");
+      }
+      await load();
+    } catch (sendError: any) {
+      setError(sendError?.message || "Email provider test could not run.");
+    } finally {
+      setBusy("");
+    }
+  }
+
   if (allowed === null) return <PlatformShell><div className="card">Loading protected platform configuration…</div></PlatformShell>;
   if (!allowed) {
     return (
@@ -176,6 +252,57 @@ export default function PlatformConfigurationPage() {
           </div>
           {message ? <div className="alert success" role="status">{message}</div> : null}
           {error ? <div className="alert warning" role="alert">{error}</div> : null}
+        </section>
+
+        <section className="platform-admin-section card" data-testid="platform-email-provider-config">
+          <div className="platform-admin-section-copy">
+            <div className="platform-admin-section-copy__eyebrow">Email Provider</div>
+            <h2>System email delivery</h2>
+            <p>Platform-owned auth, staff setup, invite, booking, invoice, and operational mail must use a verified system sender.</p>
+          </div>
+          <div className="platform-admin-kpi-grid">
+            <StatusCard label="Readiness" value={emailControl?.sender?.readiness?.status || "not_configured"} />
+            <StatusCard label="Transport" value={emailControl?.sender?.readiness?.transport || "none"} />
+            <StatusCard label="Environment" value={emailControl?.environment?.captureOnly ? "capture only" : emailControl?.environment?.liveSmtpAllowed ? "live SMTP allowed" : "unknown"} />
+            <StatusCard label="Sender identity" value={emailControl?.sender?.senderIdentityVerified ? "verified" : "not verified"} />
+            <StatusCard label="Paused" value={emailControl?.control?.paused || emailControl?.control?.providerSuspended ? "yes" : "no"} />
+            <StatusCard label="Sent 24h" value={String(emailControl?.health?.sentLast24h ?? 0)} />
+          </div>
+          <div className="platform-admin-detail-grid">
+            <div className="platform-admin-list">
+              <p><strong>Sender</strong></p>
+              <p>From: {emailControl?.sender?.readiness?.fromEmail || "missing"}</p>
+              <p>Name: {emailControl?.sender?.readiness?.fromName || "missing"}</p>
+              <p>Source: {emailControl?.sender?.readiness?.source || "missing"}</p>
+              <p>{emailControl?.sender?.readiness?.guidance || "Configure the real provider before launch certification."}</p>
+            </div>
+            <div className="platform-admin-list" data-testid="platform-email-dns-checklist">
+              <p><strong>SPF / DKIM / DMARC checklist</strong></p>
+              <p>SPF: {emailControl?.domainAlignment?.spf || "unknown"}</p>
+              <p>DKIM: {emailControl?.domainAlignment?.dkim || "unknown"}</p>
+              <p>DMARC: {emailControl?.domainAlignment?.dmarc || "unknown"}</p>
+              <p>Warmup: {emailControl?.domainAlignment?.warmup || "unknown"}</p>
+            </div>
+          </div>
+          <div className="platform-admin-detail-grid" data-testid="platform-email-test-action">
+            <label>
+              <span className="muted">Operator-controlled test recipient</span>
+              <input className="input" type="email" value={testEmailTo} onChange={(event) => setTestEmailTo(event.target.value)} placeholder="ops@example.com" data-testid="platform-email-test-recipient" />
+            </label>
+            <div style={{ display: "flex", alignItems: "end" }}>
+              <button className="button secondary" type="button" disabled={busy !== "" || !testEmailTo.trim()} onClick={() => void sendTestEmail()} data-testid="platform-email-send-test">
+                {busy === "email-test" ? "Sending…" : "Send test email"}
+              </button>
+            </div>
+          </div>
+          <div className="platform-admin-list" data-testid="platform-email-delivery-log">
+            <p><strong>Recent delivery issues</strong></p>
+            {(emailControl?.health?.recentProviderResponses || []).slice(0, 5).length ? (
+              (emailControl?.health?.recentProviderResponses || []).slice(0, 5).map((event) => (
+                <p key={event.id}>{formatTimestamp(event.createdAt)} · {event.status} · {event.recipientMasked} · {event.responseSummary || "redacted provider response"}</p>
+              ))
+            ) : <p>No recent provider failures recorded.</p>}
+          </div>
         </section>
 
         <section className="platform-admin-section card" data-testid="platform-mytitan-billing-stripe-status">
