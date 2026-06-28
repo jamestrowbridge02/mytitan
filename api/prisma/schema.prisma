@@ -1830,6 +1830,53 @@ model OutboundEmailControl {
   updatedAt                DateTime  @updatedAt
 }
 
+model PlatformEmailProviderConfig {
+  id                    String    @id @default("system_email")
+  provider              String    @default("smtp")
+  host                  String?
+  port                  Int?
+  tlsMode               String    @default("starttls")
+  username              String?
+  secretEncrypted       String?
+  secretLastFour        String?
+  fromEmail             String?
+  fromName              String?
+  replyToEmail          String?
+  operatorTestRecipient String?
+  spfStatus             String    @default("unknown")
+  dkimStatus            String    @default("unknown")
+  dmarcStatus           String    @default("unknown")
+  evidence              String?
+  verificationStatus    String    @default("missing")
+  verifiedAt            DateTime?
+  failureReason         String?
+  updatedByUserId       String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([provider, updatedAt])
+}
+
+model PlatformExternalMonitorConfig {
+  id                 String    @id @default("external_monitor")
+  provider           String?
+  name               String?
+  marketingUrl       String?
+  appUrl             String?
+  apiHealthUrl       String?
+  alertRecipient     String?
+  status             String    @default("not_configured")
+  evidence           String?
+  manualReason       String?
+  failureReason      String?
+  lastCheckedAt      DateTime?
+  updatedByUserId    String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([status, updatedAt])
+}
+
 model OutboundEmailSuppression {
   id              String    @id @default(cuid())
   companyId       String?

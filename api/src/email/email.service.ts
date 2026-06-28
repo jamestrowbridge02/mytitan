@@ -1,7 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import * as net from 'net';
 import * as tls from 'tls';
-import { decryptText } from '../integrations/integrations.crypto';
+import { decryptText, encryptText } from '../integrations/integrations.crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { resolvePublicUrl } from '../common/public-url';
 import type { WorkspaceEmailBranding } from './email-templates';
@@ -22,7 +22,7 @@ export type EmailReadinessStatus = 'ready' | 'safe_capture' | 'not_configured' |
 
 export type EmailReadiness = {
   status: EmailReadinessStatus;
-  source: 'environment' | 'safe_capture' | 'missing';
+  source: 'environment' | 'encrypted_vault' | 'safe_capture' | 'missing';
   transport: 'smtp' | 'capture' | 'none';
   canSend: boolean;
   fromEmail: string | null;
@@ -64,7 +64,8 @@ type EmailConfig = {
   fromEmail: string;
   fromName: string | null;
   replyToEmail: string | null;
-  source: 'environment' | 'missing';
+  source: 'environment' | 'encrypted_vault' | 'missing';
+  provider?: string;
 };
 
 type EmailDeliveryOverrides = {
@@ -530,7 +531,27 @@ export class EmailService {
     };
   }
 
-  private buildSystemConfig(overrides?: EmailDeliveryOverrides): EmailConfig {
+  private async buildSystemConfig(overrides?: EmailDeliveryOverrides): Promise<EmailConfig> {
+    const db = this.prisma as any;
+    const vault = await db.platformEmailProviderConfig.findUnique({ where: { id: 'system_email' } }).catch(() => null);
+    if (vault?.provider && String(vault.provider).toLowerCase() !== 'env_runtime') {
+      const password = this.decryptWorkspacePassword(vault.secretEncrypted);
+      const port = Number(vault.port || 587);
+      const overrideReplyToEmail = this.normalizeEmail(overrides?.replyToEmail || '');
+      const overrideFromName = String(overrides?.fromName || '').replace(/[\r\n"]/g, '').trim();
+      return {
+        host: String(vault.host || '').trim(),
+        port,
+        secure: String(vault.tlsMode || '').toLowerCase() === 'ssl' || port === 465,
+        user: String(vault.username || '').trim(),
+        password,
+        fromEmail: this.normalizeEmail(vault.fromEmail || ''),
+        fromName: overrideFromName || String(vault.fromName || '').replace(/[\r\n"]/g, '').trim() || null,
+        replyToEmail: overrideReplyToEmail || this.normalizeEmail(vault.replyToEmail || '') || null,
+        source: 'encrypted_vault',
+        provider: String(vault.provider || 'smtp').toLowerCase(),
+      };
+    }
     const host = this.firstNonEmpty(process.env.SMTP_HOST, process.env.MAIL_HOST);
     const port = Number(this.firstNonEmpty(process.env.SMTP_PORT, process.env.MAIL_PORT) || 587);
     const user = this.firstNonEmpty(process.env.SMTP_USER, process.env.MAIL_USER);
@@ -565,6 +586,7 @@ export class EmailService {
       fromName: overrideFromName || configuredFromName || (fromEmail ? 'MyTitan' : null),
       replyToEmail: overrideReplyToEmail || this.normalizeEmail(process.env.REPLY_TO_EMAIL || process.env.SUPPORT_EMAIL || '') || null,
       source: host ? 'environment' : 'missing',
+      provider: 'smtp',
     };
   }
 
@@ -884,7 +906,7 @@ export class EmailService {
         guidance:
           ownership === 'workspace'
             ? 'Customer email is not set up yet. Add your sending email in Settings.'
-            : 'MyTitan email is not set up yet. Please contact support.',
+            : 'Configure Email Provider in Platform Admin Infrastructure.',
         dnsRecords,
         environment: mode,
       };
@@ -909,7 +931,7 @@ export class EmailService {
           ownership === 'workspace'
             ? 'Customer email is not set up yet. Add your sending email in Settings.'
             : missingSenderSetup
-              ? 'MyTitan email is not set up yet. Please contact support.'
+              ? 'Configure Email Provider in Platform Admin Infrastructure.'
               : 'Email delivery is partially configured. Complete the SMTP host, sender email, sender name, and matching credential fields on the server, then retry.',
         dnsRecords,
         environment: mode,
@@ -1094,7 +1116,7 @@ export class EmailService {
         reason:
           ownership === 'workspace'
             ? 'Customer email is not set up yet. Add your sending email in Settings.'
-            : 'MyTitan email is not set up yet. Please contact support.',
+            : 'MyTitan email is not set up yet. Configure Email Provider in Platform Admin Infrastructure.',
         metaJson: {
           transport: readiness.transport,
           source: readiness.source,
@@ -1107,7 +1129,7 @@ export class EmailService {
         reason:
           ownership === 'workspace'
             ? 'Customer email is not set up yet. Add your sending email in Settings.'
-            : 'MyTitan email is not set up yet. Please contact support.',
+            : 'MyTitan email is not set up yet. Configure Email Provider in Platform Admin Infrastructure.',
         actionHref,
       };
     }
@@ -1341,6 +1363,7 @@ export class EmailService {
         take: 20,
       }),
     ]);
+    const config = await this.getPlatformEmailProviderConfig();
 
     const countStatus = (statuses: string[]) => recentEvents.filter((row: any) => statuses.includes(String(row.status || ''))).length;
     const delivered = countStatus(['sent', 'captured']);
@@ -1371,6 +1394,7 @@ export class EmailService {
         replyToValid: Boolean(systemReadiness.replyToEmail),
         senderIdentityVerified: ['1', 'true', 'yes', 'on'].includes(String(process.env.MYTITAN_EMAIL_SENDER_IDENTITY_VERIFIED || '').trim().toLowerCase()),
       },
+      config,
       domainAlignment: {
         spf: String(process.env.MYTITAN_EMAIL_SPF_STATUS || '').trim() || 'unknown',
         dkim: String(process.env.MYTITAN_EMAIL_DKIM_STATUS || '').trim() || 'unknown',
@@ -1438,5 +1462,117 @@ export class EmailService {
       providerSuspended: Boolean(next.providerSuspended),
       reason: next.pausedReason || next.providerSuspensionReason || null,
     };
+  }
+
+  async getPlatformEmailProviderConfig() {
+    const db = this.prisma as any;
+    const row = await db.platformEmailProviderConfig.findUnique({ where: { id: 'system_email' } }).catch(() => null);
+    const envHost = this.firstNonEmpty(process.env.SMTP_HOST, process.env.MAIL_HOST);
+    const envUser = this.firstNonEmpty(process.env.SMTP_USER, process.env.MAIL_USER);
+    const envSecret = this.firstNonEmpty(process.env.SMTP_PASSWORD, process.env.SMTP_PASS, process.env.MAIL_PASSWORD);
+    const envFromEmail = this.normalizeEmail(this.firstNonEmpty(process.env.SMTP_FROM_EMAIL, process.env.SMTP_FROM, process.env.MAIL_FROM, process.env.EMAIL_FROM, process.env.FROM_EMAIL, process.env.SYSTEM_EMAIL));
+    const source = row?.provider && String(row.provider).toLowerCase() !== 'env_runtime'
+      ? 'encrypted_vault'
+      : envHost
+        ? 'runtime_environment'
+        : 'missing';
+    return {
+      provider: row?.provider || (envHost ? 'smtp' : 'env_runtime'),
+      source,
+      editable: source !== 'runtime_environment',
+      host: row?.host || (source === 'runtime_environment' ? envHost : null),
+      port: row?.port || (source === 'runtime_environment' ? Number(this.firstNonEmpty(process.env.SMTP_PORT, process.env.MAIL_PORT) || 587) : null),
+      tlsMode: row?.tlsMode || (source === 'runtime_environment' && String(process.env.SMTP_SECURE || '').trim() === 'true' ? 'ssl' : 'starttls'),
+      usernamePresent: Boolean(row?.username || envUser),
+      secret: {
+        present: Boolean(row?.secretEncrypted || envSecret),
+        lastFour: row?.secretLastFour || (envSecret ? envSecret.slice(-4) : null),
+        source,
+      },
+      fromEmail: row?.fromEmail || (source === 'runtime_environment' ? envFromEmail : null),
+      fromName: row?.fromName || (source === 'runtime_environment' ? this.firstNonEmpty(process.env.SMTP_FROM_NAME, process.env.MAIL_FROM_NAME, process.env.EMAIL_FROM_NAME, process.env.SYSTEM_EMAIL_NAME) : null),
+      replyToEmail: row?.replyToEmail || (source === 'runtime_environment' ? this.normalizeEmail(process.env.REPLY_TO_EMAIL || process.env.SUPPORT_EMAIL || '') || null : null),
+      operatorTestRecipient: row?.operatorTestRecipient || null,
+      spfStatus: row?.spfStatus || String(process.env.MYTITAN_EMAIL_SPF_STATUS || '').trim() || 'unknown',
+      dkimStatus: row?.dkimStatus || String(process.env.MYTITAN_EMAIL_DKIM_STATUS || '').trim() || 'unknown',
+      dmarcStatus: row?.dmarcStatus || String(process.env.MYTITAN_EMAIL_DMARC_STATUS || '').trim() || 'unknown',
+      evidence: row?.evidence || null,
+      verificationStatus: row?.verificationStatus || (envHost ? 'runtime_environment' : 'missing'),
+      verifiedAt: row?.verifiedAt || null,
+      failureReason: row?.failureReason || null,
+      lastChecked: row?.updatedAt || null,
+      owner: 'Platform operations',
+      nextAction: row || envHost ? 'Verify provider readiness and send an operator test email.' : 'Configure Email Provider.',
+      secretsReturned: false,
+    };
+  }
+
+  async savePlatformEmailProviderConfig(input: Record<string, any> & { actorUserId?: string | null }) {
+    const provider = String(input.provider || 'smtp').trim().toLowerCase();
+    const allowedProviders = new Set(['smtp', 'resend', 'postmark', 'ses', 'sendgrid', 'mailgun', 'env_runtime']);
+    if (!allowedProviders.has(provider)) throw new BadRequestException('Unsupported email provider.');
+    const secret = String(input.secret || input.password || input.apiKey || '').trim();
+    const port = input.port === undefined || input.port === null || input.port === '' ? null : Number(input.port);
+    const fromEmail = this.normalizeEmail(input.fromEmail || '');
+    if (provider !== 'env_runtime' && !fromEmail) throw new BadRequestException('From Email is required.');
+    const data: any = {
+      id: 'system_email',
+      provider,
+      host: String(input.host || '').trim() || null,
+      port,
+      tlsMode: ['none', 'starttls', 'ssl'].includes(String(input.tlsMode || '').toLowerCase()) ? String(input.tlsMode).toLowerCase() : 'starttls',
+      username: String(input.username || '').trim() || null,
+      fromEmail: fromEmail || null,
+      fromName: String(input.fromName || '').replace(/[\r\n"]/g, '').trim() || null,
+      replyToEmail: this.normalizeEmail(input.replyToEmail || '') || null,
+      operatorTestRecipient: this.normalizeEmail(input.operatorTestRecipient || '') || null,
+      spfStatus: String(input.spfStatus || 'unknown').trim().toLowerCase() || 'unknown',
+      dkimStatus: String(input.dkimStatus || 'unknown').trim().toLowerCase() || 'unknown',
+      dmarcStatus: String(input.dmarcStatus || 'unknown').trim().toLowerCase() || 'unknown',
+      evidence: String(input.evidence || '').trim().slice(0, 1000) || null,
+      verificationStatus: 'needs_verification',
+      failureReason: null,
+      updatedByUserId: input.actorUserId || null,
+    };
+    if (secret) {
+      data.secretEncrypted = encryptText(secret);
+      data.secretLastFour = secret.slice(-4);
+    }
+    if (provider === 'env_runtime') {
+      data.host = null;
+      data.port = null;
+      data.username = null;
+      data.secretEncrypted = null;
+      data.secretLastFour = null;
+      data.fromEmail = null;
+      data.fromName = null;
+      data.replyToEmail = null;
+      data.operatorTestRecipient = null;
+      data.evidence = null;
+      data.verificationStatus = 'missing';
+    }
+    const db = this.prisma as any;
+    await db.platformEmailProviderConfig.upsert({
+      where: { id: 'system_email' },
+      create: data,
+      update: data,
+    });
+    return this.getPlatformEmailProviderConfig();
+  }
+
+  async verifyPlatformEmailProviderConfig(input: { actorUserId?: string | null }) {
+    const db = this.prisma as any;
+    const readiness = await this.getReadiness(null, { ownership: 'system', probe: this.allowLiveSmtp() });
+    const ok = readiness.status === 'ready' || readiness.status === 'safe_capture';
+    await db.platformEmailProviderConfig.update({
+      where: { id: 'system_email' },
+      data: {
+        verificationStatus: ok ? 'verified' : readiness.status,
+        verifiedAt: ok ? new Date() : null,
+        failureReason: ok ? null : readiness.guidance,
+        updatedByUserId: input.actorUserId || null,
+      },
+    }).catch(() => undefined);
+    return { ok, readiness, config: await this.getPlatformEmailProviderConfig() };
   }
 }

@@ -13,12 +13,10 @@ export function PlatformShell({ children }: { children: React.ReactNode }) {
     { label: 'Commercial', icon: '£', href: '/platform#lookup' },
     { label: 'Revenue', icon: '↗', href: '/platform#revenue' },
     { label: 'Health', icon: '◇', href: '/platform#support' },
-    { label: 'Payments', icon: '◈', href: '/platform/configuration' },
-    { label: 'Integrations', icon: '⛓', href: '/platform/autopilot' },
+    { label: 'Infrastructure', icon: '◈', href: '/platform/infrastructure' },
     { label: 'Autopilot', icon: '⚡', href: '/platform/autopilot' },
     { label: 'Support Mode', icon: '◉', href: '/platform#lookup' },
     { label: 'Audit', icon: '≣', href: '/platform#lookup' },
-    { label: 'Configuration', icon: '⚙', href: '/platform/configuration' },
   ];
 
   function signOut() {

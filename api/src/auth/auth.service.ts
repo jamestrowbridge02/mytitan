@@ -236,7 +236,7 @@ export class AuthService {
           mail.status === 'suppressed'
             ? 'This address cannot receive live verification email from this environment.'
             : mail.status === 'not_configured'
-              ? 'MyTitan email is not set up yet. Please contact support.'
+              ? 'MyTitan email is not set up yet. Configure Email Provider in Platform Admin Infrastructure.'
               : 'MyTitan cannot send verification emails right now. Try again shortly.',
       };
     }
@@ -401,7 +401,7 @@ export class AuthService {
             ? verificationDelivery.status === 'suppressed'
               ? 'Your account is ready, but this address cannot receive live verification email from this environment.'
               : verificationDelivery.status === 'not_configured'
-                ? 'Your account is ready, but MyTitan email is not set up yet. Please contact support.'
+                ? 'Your account is ready, but MyTitan email is not set up yet. Configure Email Provider in Platform Admin Infrastructure.'
                 : 'Your account is ready, but MyTitan cannot send the verification email just now. Try resending in a moment.'
             : 'Your account is ready, but MyTitan could not send the verification email just now. Try resending in a moment.',
       emailActionHref: null,

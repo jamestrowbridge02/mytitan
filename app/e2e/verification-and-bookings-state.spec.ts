@@ -150,7 +150,7 @@ test.describe("verification resend and bookings state", () => {
     ).toBeVisible();
     await page.getByRole("button", { name: "Resend verification" }).click();
 
-    const notSetUpMessage = page.getByText("MyTitan email is not set up yet. Please contact support.");
+    const notSetUpMessage = page.getByText("MyTitan email is not set up yet. Configure Email Provider in Platform Admin Infrastructure.");
     const unavailableMessage = page.getByText("MyTitan cannot send verification emails right now. Try again shortly.");
     const suppressedMessage = page.getByText("This address cannot receive live verification email from this environment.");
     const sentMessage = page.getByText("Verification email sent from MyTitan. Check your inbox for the new link.");
@@ -230,7 +230,7 @@ test.describe("verification resend and bookings state", () => {
         expect(String(workspace?.effective?.notice || "")).toMatch(/sent by mytitan because your workspace sending email is not set up/i);
       }
     } else {
-      expect(String(system?.guidance || "")).toMatch(/mytitan email|smtp host|server/i);
+      expect(String(system?.guidance || "")).toMatch(/mytitan email|smtp host|server|configure email provider/i);
       expect(system?.fromEmail ?? null).toBeNull();
       expect(system?.fromName ?? null).toBeNull();
     }
@@ -329,6 +329,9 @@ test.describe("verification resend and bookings state", () => {
 
     try {
       await page.goto("/dashboard/settings?tab=messages");
+      if (!(await page.getByTestId("internal-recipient-add").isVisible().catch(() => false))) {
+        await page.getByRole("button", { name: /Email & Notifications/i }).click();
+      }
       await page.getByTestId("internal-recipient-add").click();
       await page.getByTestId("internal-recipient-email-0").fill("ops@example.com");
       await page.getByTestId("internal-recipient-label-0").fill("Ops desk");
@@ -339,8 +342,11 @@ test.describe("verification resend and bookings state", () => {
       await page.getByTestId("internal-recipient-label-1").fill("Suppressed");
       await page.getByTestId("internal-recipient-category-1-workspace_alerts").check();
 
-      await page.getByTestId("settings-save-button").click();
-      await expect(page.getByTestId("operator-notice-success")).toContainText(/settings saved/i);
+      const saveResponse = page.waitForResponse((response) =>
+        response.url().includes("/tenant/settings") && response.request().method() === "PUT",
+      );
+      await page.getByTestId("settings-save-button").first().click();
+      expect((await saveResponse).ok()).toBeTruthy();
 
       const updatedSettings = await getTenantSettings(request, token);
       expect(updatedSettings?.emailNotificationRecipients).toEqual(

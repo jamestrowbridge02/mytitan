@@ -409,6 +409,82 @@ test.describe("platform backend admin recovery", () => {
     }
   });
 
+  test("Infrastructure exposes action-led email, Stripe, billing, and monitor controls without tenant access", async ({ page, request }) => {
+    await installApiProxy(page, request);
+    const platformToken = await loginAs(page, request, fixtureRefs.platformAdminEmail, fixtureRefs.platformAdminPassword);
+    const headers = { Authorization: `Bearer ${platformToken}`, "Content-Type": "application/json" };
+
+    const emailSecret = `smtp_secret_${Date.now()}_Z9Y8`;
+    try {
+      const saveEmail = await requestLocalApi(request, "/admin/platform/email-control/provider", {
+        method: "PATCH",
+        headers,
+        data: {
+          provider: "smtp",
+          host: "smtp.example.invalid",
+          port: 587,
+          tlsMode: "starttls",
+          username: "platform-smtp-user",
+          secret: emailSecret,
+          fromEmail: "ops@mytitan.co.uk",
+          fromName: "MyTitan",
+          replyToEmail: "ops@mytitan.co.uk",
+          operatorTestRecipient: "ops@mytitan.co.uk",
+          spfStatus: "configured",
+          dkimStatus: "configured",
+          dmarcStatus: "configured",
+          evidence: "e2e dns evidence reference",
+        },
+      });
+      expect(saveEmail.ok()).toBeTruthy();
+      const saveEmailBody = await saveEmail.json();
+      expect(saveEmailBody.config.secret).toMatchObject({ present: true, lastFour: "Z9Y8" });
+      expect(JSON.stringify(saveEmailBody)).not.toContain(emailSecret);
+
+      const saveMonitor = await requestLocalApi(request, "/admin/platform/infrastructure/external-monitor", {
+        method: "PATCH",
+        headers,
+        data: {
+          provider: "E2E Monitor",
+          name: "E2E public uptime",
+          marketingUrl: "https://www.mytitan.co.uk/",
+          appUrl: "https://app.mytitan.co.uk/",
+          apiHealthUrl: "https://api.mytitan.co.uk/health",
+          alertRecipient: "ops@mytitan.co.uk",
+          manualReason: "E2E monitor configured for verification only",
+        },
+      });
+      expect(saveMonitor.ok()).toBeTruthy();
+      expect((await saveMonitor.json()).monitor.status).toBe("verifying");
+
+      await page.goto("/platform/infrastructure", { waitUntil: "networkidle" });
+      await expect(page.getByTestId("platform-infrastructure")).toBeVisible();
+      await expect(page.getByTestId("platform-email-provider-config")).toContainText("Configure Email Provider");
+      await expect(page.getByTestId("platform-email-provider-config")).toContainText("Verify provider");
+      await expect(page.getByTestId("platform-email-provider-config")).toContainText("Send test email");
+      await expect(page.getByTestId("platform-stripe-connect-config")).toContainText("Configure secrets");
+      await expect(page.getByTestId("platform-mytitan-billing-stripe-status")).toContainText("platform_subscriptions_only");
+      await expect(page.getByTestId("platform-external-monitor-config")).toContainText("Configure monitor");
+      await expect(page.locator("body")).not.toContainText(emailSecret);
+      await expect(page.locator("body")).not.toContainText(/contact support/i);
+
+      await loginAs(page, request, fixtureRefs.workspaceAdminEmail, fixtureRefs.workspaceAdminPassword);
+      await page.goto("/platform/infrastructure", { waitUntil: "networkidle" });
+      await expect(page.getByTestId("platform-configuration-forbidden")).toBeVisible();
+    } finally {
+      await requestLocalApi(request, "/admin/platform/email-control/provider", {
+        method: "PATCH",
+        headers,
+        data: { provider: "env_runtime" },
+      });
+      await requestLocalApi(request, "/admin/platform/infrastructure/external-monitor", {
+        method: "PATCH",
+        headers,
+        data: {},
+      });
+    }
+  });
+
   test("missing Connect credentials preserve explicit live mode and block onboarding as missing_config", async ({ request }) => {
     const platformLogin = await requestLocalApi(request, "/auth/login", {
       method: "POST",

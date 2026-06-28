@@ -94,7 +94,7 @@ test.describe("workspace governance", () => {
         body: JSON.stringify({
           ok: true,
           status: "delivery_unavailable",
-          message: "MyTitan email is not set up yet. Please contact support.",
+          message: "MyTitan email is not set up yet. Configure Email Provider in Platform Admin Infrastructure.",
         }),
       });
     });
@@ -103,7 +103,7 @@ test.describe("workspace governance", () => {
     await page.getByTestId("team-invite-email").fill(`invite-${Date.now()}@example.com`);
     await page.getByTestId("team-invite-submit").click();
 
-    await expect(page.getByText(/MyTitan email is not set up yet\. Please contact support\./i)).toBeVisible();
+    await expect(page.getByText(/MyTitan email is not set up yet\. Configure Email Provider in Platform Admin Infrastructure\./i)).toBeVisible();
     await expect(page.getByTestId("team-invite-card")).toContainText(/workspace customer-email settings are not used here/i);
   });
 

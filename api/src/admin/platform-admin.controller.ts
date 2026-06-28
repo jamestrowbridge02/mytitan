@@ -734,6 +734,32 @@ export class PlatformAdminController {
     return { ok: true, ...(await this.email.getPlatformEmailSafetyOverview()) };
   }
 
+  @Patch('email-control/provider')
+  async saveEmailProviderConfig(
+    @CurrentUser() user: JwtPayload,
+    @Body() body: Record<string, any>,
+    @Req() req: Request & { requestId?: string },
+  ) {
+    await this.assertAccess(user, req, 'platform.email_provider_config.write');
+    const config = await this.email.savePlatformEmailProviderConfig({
+      ...(body || {}),
+      actorUserId: user.sub,
+    });
+    await this.audit.log(user.companyId, 'platform.email_provider_config.save', `Platform email provider configuration saved. Source=${config.source}`, user.sub);
+    return { ok: true, config, secretsReturned: false };
+  }
+
+  @Post('email-control/provider/verify')
+  async verifyEmailProviderConfig(
+    @CurrentUser() user: JwtPayload,
+    @Req() req: Request & { requestId?: string },
+  ) {
+    await this.assertAccess(user, req, 'platform.email_provider_config.verify');
+    const result = await this.email.verifyPlatformEmailProviderConfig({ actorUserId: user.sub });
+    await this.audit.log(user.companyId, 'platform.email_provider_config.verify', `Platform email provider verification completed. Status=${result.readiness.status}`, user.sub);
+    return { ok: true, ...result, secretsReturned: false };
+  }
+
   @Patch('email-control')
   async updateEmailControl(
     @CurrentUser() user: JwtPayload,
@@ -746,6 +772,39 @@ export class PlatformAdminController {
       reason: body?.reason,
       userId: user.sub,
     });
+  }
+
+  @Get('infrastructure/external-monitor')
+  async externalMonitorConfiguration(
+    @CurrentUser() user: JwtPayload,
+    @Req() req: Request & { requestId?: string },
+  ) {
+    await this.assertAccess(user, req, 'platform.infrastructure.external_monitor.read');
+    return { ok: true, monitor: await this.platformAdmin.getExternalMonitorConfiguration() };
+  }
+
+  @Patch('infrastructure/external-monitor')
+  async saveExternalMonitorConfiguration(
+    @CurrentUser() user: JwtPayload,
+    @Body() body: Record<string, any>,
+    @Req() req: Request & { requestId?: string },
+  ) {
+    await this.assertAccess(user, req, 'platform.infrastructure.external_monitor.write');
+    const monitor = await this.platformAdmin.saveExternalMonitorConfiguration({ ...(body || {}), actorUserId: user.sub });
+    await this.audit.log(user.companyId, 'platform.external_monitor_config.save', `External monitor configuration saved. Status=${monitor.status}`, user.sub);
+    return { ok: true, monitor };
+  }
+
+  @Post('infrastructure/external-monitor/verify')
+  async verifyExternalMonitorConfiguration(
+    @CurrentUser() user: JwtPayload,
+    @Body() body: Record<string, any>,
+    @Req() req: Request & { requestId?: string },
+  ) {
+    await this.assertAccess(user, req, 'platform.infrastructure.external_monitor.verify');
+    const monitor = await this.platformAdmin.verifyExternalMonitorConfiguration({ actorUserId: user.sub, manualReason: body?.reason });
+    await this.audit.log(user.companyId, 'platform.external_monitor_config.verify', `External monitor verification checked. Status=${monitor.status}`, user.sub);
+    return { ok: true, monitor };
   }
 
   @Post('email-control/test-email')

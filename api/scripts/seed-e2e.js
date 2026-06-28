@@ -8,6 +8,12 @@ const path = require("path");
 
 const prisma = new PrismaClient();
 
+function assertE2EWorkspaceId(companyId, action) {
+  if (!String(companyId || "").startsWith("e2e-")) {
+    throw new Error(`Refusing ${action}: E2E seed cleanup can only target explicit e2e-* workspace ids.`);
+  }
+}
+
 const FIXTURE = {
   company: {
     id: "e2e-company",
@@ -1863,6 +1869,7 @@ async function ensureSavedViews(companyId, userId) {
 }
 
 async function resetCustomFields(companyId) {
+  assertE2EWorkspaceId(companyId, "custom field reset");
   const baselineIds = Object.values(FIXTURE.customFields).map((field) => field.id);
   await prisma.customFieldValue.deleteMany({
     where: { tenantId: companyId },
@@ -1876,6 +1883,7 @@ async function resetCustomFields(companyId) {
 }
 
 async function resetJobs(companyId) {
+  assertE2EWorkspaceId(companyId, "job reset");
   const baselineJobIds = Object.values(FIXTURE.jobs).map((job) => job.id);
   await prisma.job.deleteMany({
     where: {
@@ -1886,6 +1894,7 @@ async function resetJobs(companyId) {
 }
 
 async function resetBookings(companyId) {
+  assertE2EWorkspaceId(companyId, "booking reset");
   const baselineBookingIds = Object.values(FIXTURE.bookings).map((booking) => booking.id);
   await prisma.booking.deleteMany({
     where: {
@@ -1896,12 +1905,14 @@ async function resetBookings(companyId) {
 }
 
 async function resetBookingServices(companyId) {
+  assertE2EWorkspaceId(companyId, "service reset");
   await prisma.service.deleteMany({
     where: { companyId },
   });
 }
 
 async function resetLocations(companyId) {
+  assertE2EWorkspaceId(companyId, "location reset");
   const baselineLocationIds = Object.values(FIXTURE.locations).map((location) => location.id);
   await prisma.location.deleteMany({
     where: {
@@ -1912,6 +1923,7 @@ async function resetLocations(companyId) {
 }
 
 async function resetInventory(companyId) {
+  assertE2EWorkspaceId(companyId, "inventory reset");
   const baselineStockItemIds = Object.values(FIXTURE.inventory.parts).map((item) => item.id);
   const baselineInventoryLocationIds = Object.values(FIXTURE.inventory.locations).map((location) => location.id);
   const baselineInventoryStockIds = Object.values(FIXTURE.inventory.stocks).map((stock) => stock.id);
@@ -1974,6 +1986,9 @@ async function main() {
   }
 
   console.log("Seeding deterministic MyTitan E2E fixtures...");
+
+  await prisma.platformEmailProviderConfig.deleteMany({ where: { id: "system_email" } }).catch(() => undefined);
+  await prisma.platformExternalMonitorConfig.deleteMany({ where: { id: "external_monitor" } }).catch(() => undefined);
 
   const company = await ensureCompany();
   const locations = await ensureLocations(company.id);

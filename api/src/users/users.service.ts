@@ -108,7 +108,7 @@ export class UsersService {
         message:
           delivery.status === 'failed'
             ? 'We could not send the team invite email just now. Please try again shortly.'
-            : delivery.reason || 'MyTitan email is not set up yet. Please contact support.',
+            : delivery.reason || 'MyTitan email is not set up yet. Configure Email Provider in Platform Admin Infrastructure.',
       };
     }
 

@@ -1,106 +1,23 @@
 import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import { PlatformShell } from "../../components/platform-shell";
 import { apiFetch } from "../../lib/api";
 
-type SecretStatus = {
-  present: boolean;
-  lastFour: string | null;
-  source: string;
-  verificationStatus: string;
-  lastVerifiedAt: string | null;
-  failureReason: string | null;
-};
+const providers = ["smtp", "resend", "postmark", "ses", "sendgrid", "mailgun", "env_runtime"];
 
-type ProviderStatus = {
-  mode: "test" | "live";
-  readiness: string;
-  platformSecret: SecretStatus;
-  webhookSecret: SecretStatus;
-  updatedAt: string | null;
-  updatedByUserId: string | null;
-  lastSavedAt?: string | null;
-  lastVerifiedAt?: string | null;
-  runtime?: {
-    mode: "test" | "live";
-    platformSecretLoaded: boolean;
-    webhookSecretLoaded: boolean;
-    runtimeLoaded: boolean;
-    lastReloadedAt: string | null;
-  };
-  lastOnboardingAttempt?: {
-    tenant: { id: string; name: string } | null;
-    result: string;
-    actionUrlReturned: boolean;
-    stripeAccountCreated: boolean;
-    accountLinkCreated: boolean;
-    failureReason: string | null;
-    attemptedAt: string;
-  } | null;
-};
-
-type EmailControlResponse = {
-  control?: {
-    paused?: boolean;
-    providerSuspended?: boolean;
-    pausedReason?: string | null;
-    providerSuspensionReason?: string | null;
-  };
-  environment?: {
-    mode?: string;
-    liveSmtpAllowed?: boolean;
-    captureOnly?: boolean;
-  };
-  sender?: {
-    readiness?: {
-      status?: string;
-      transport?: string;
-      source?: string;
-      canSend?: boolean;
-      fromEmail?: string | null;
-      fromName?: string | null;
-      guidance?: string;
-      dnsRecords?: string[];
-    };
-    senderIdentityVerified?: boolean;
-  };
-  domainAlignment?: {
-    spf?: string;
-    dkim?: string;
-    dmarc?: string;
-    warmup?: string;
-  };
-  health?: {
-    sentLast24h?: number;
-    deferredLast24h?: number;
-    failedLast24h?: number;
-    blockedLast24h?: number;
-    activeSuppressions?: number;
-    recentProviderResponses?: Array<{
-      id: string;
-      createdAt: string;
-      status: string;
-      category: string;
-      recipientMasked: string;
-      responseSummary: string;
-      providerCode: string | null;
-    }>;
-  };
-};
-
-export default function PlatformConfigurationPage() {
+export default function PlatformInfrastructurePage() {
   const [allowed, setAllowed] = useState<boolean | null>(null);
   const [billing, setBilling] = useState<any>(null);
-  const [connect, setConnect] = useState<ProviderStatus | null>(null);
-  const [emailControl, setEmailControl] = useState<EmailControlResponse | null>(null);
-  const [testEmailTo, setTestEmailTo] = useState("");
-  const [platformSecret, setPlatformSecret] = useState("");
-  const [webhookSecret, setWebhookSecret] = useState("");
-  const [mode, setMode] = useState<"test" | "live">("test");
-  const [confirmed, setConfirmed] = useState(false);
+  const [connect, setConnect] = useState<any>(null);
+  const [email, setEmail] = useState<any>(null);
+  const [monitor, setMonitor] = useState<any>(null);
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [preflight, setPreflight] = useState<any>(null);
+  const [testEmailTo, setTestEmailTo] = useState("");
+  const [connectForm, setConnectForm] = useState({ mode: "test", platformSecret: "", webhookSecret: "", confirmation: false });
+  const [emailForm, setEmailForm] = useState<any>({ provider: "smtp", host: "", port: 587, tlsMode: "starttls", username: "", secret: "", fromEmail: "", fromName: "MyTitan", replyToEmail: "", operatorTestRecipient: "", spfStatus: "unknown", dkimStatus: "unknown", dmarcStatus: "unknown", evidence: "" });
+  const [monitorForm, setMonitorForm] = useState<any>({ provider: "", name: "", marketingUrl: "", appUrl: "", apiHealthUrl: "", alertRecipient: "", evidence: "", manualReason: "" });
 
   async function load() {
     const me = await apiFetch("/me");
@@ -109,127 +26,63 @@ export default function PlatformConfigurationPage() {
       return;
     }
     setAllowed(true);
-    const response = await apiFetch("/admin/platform/platform-configuration/payment-providers");
-    const emailResponse = await apiFetch("/admin/platform/email-control");
-    setBilling(response?.myTitanBillingStripe || null);
-    setConnect(response?.stripeConnect || null);
-    setEmailControl(emailResponse || null);
-    setMode(response?.stripeConnect?.mode === "live" ? "live" : "test");
+    const [paymentResponse, emailResponse, monitorResponse] = await Promise.all([
+      apiFetch("/admin/platform/platform-configuration/payment-providers"),
+      apiFetch("/admin/platform/email-control"),
+      apiFetch("/admin/platform/infrastructure/external-monitor"),
+    ]);
+    setBilling(paymentResponse?.myTitanBillingStripe || null);
+    setConnect(paymentResponse?.stripeConnect || null);
+    setEmail(emailResponse || null);
+    setMonitor(monitorResponse?.monitor || null);
+    setConnectForm((current) => ({ ...current, mode: paymentResponse?.stripeConnect?.mode === "live" ? "live" : "test" }));
+    if (emailResponse?.config) {
+      setEmailForm((current: any) => ({
+        ...current,
+        provider: emailResponse.config.provider || "smtp",
+        host: emailResponse.config.host || "",
+        port: emailResponse.config.port || 587,
+        tlsMode: emailResponse.config.tlsMode || "starttls",
+        fromEmail: emailResponse.config.fromEmail || "",
+        fromName: emailResponse.config.fromName || "MyTitan",
+        replyToEmail: emailResponse.config.replyToEmail || "",
+        operatorTestRecipient: emailResponse.config.operatorTestRecipient || "",
+        spfStatus: emailResponse.config.spfStatus || "unknown",
+        dkimStatus: emailResponse.config.dkimStatus || "unknown",
+        dmarcStatus: emailResponse.config.dmarcStatus || "unknown",
+        evidence: emailResponse.config.evidence || "",
+      }));
+      setTestEmailTo(emailResponse.config.operatorTestRecipient || "");
+    }
+    if (monitorResponse?.monitor) {
+      setMonitorForm((current: any) => ({ ...current, ...monitorResponse.monitor, manualReason: "" }));
+    }
   }
 
   useEffect(() => {
     void load().catch((loadError: any) => {
       setAllowed(false);
-      setError(loadError?.message || "Platform configuration could not be loaded.");
+      setError(loadError?.message || "Platform Infrastructure could not be loaded.");
     });
   }, []);
 
-  async function save() {
-    setBusy("save");
+  async function runAction(name: string, action: () => Promise<string | void>) {
+    setBusy(name);
     setError("");
     setMessage("");
     try {
-      await apiFetch("/admin/platform/platform-configuration/payment-providers/stripe-connect", {
-        method: "PATCH",
-        body: JSON.stringify({
-          platformSecret: platformSecret || undefined,
-          webhookSecret: webhookSecret || undefined,
-          mode,
-          confirmation: confirmed,
-        }),
-      });
-      setPlatformSecret("");
-      setWebhookSecret("");
-      setConfirmed(false);
-      setMessage("Stripe Connect configuration saved. Full secret values will not be shown again.");
+      const nextMessage = await action();
+      setMessage(nextMessage || "Action completed.");
       await load();
-    } catch (saveError: any) {
-      setError(saveError?.message || "Stripe Connect configuration could not be saved.");
-    } finally {
-      setBusy("");
-    }
-  }
-
-  async function verify() {
-    setBusy("verify");
-    setError("");
-    setMessage("");
-    try {
-      await apiFetch("/admin/platform/platform-configuration/payment-providers/stripe-connect/verify", {
-        method: "POST",
-        body: JSON.stringify({}),
-      });
-      setMessage("Stripe Connect verification completed.");
-      await load();
-    } catch (verifyError: any) {
-      setError(verifyError?.message || "Stripe Connect verification failed.");
+    } catch (actionError: any) {
+      setError(actionError?.message || "Action failed.");
       await load().catch(() => undefined);
     } finally {
       setBusy("");
     }
   }
 
-  async function reloadRuntime() {
-    setBusy("reload");
-    setError("");
-    setMessage("");
-    try {
-      const response = await apiFetch("/admin/platform/platform-configuration/payment-providers/stripe-connect/reload", {
-        method: "POST",
-        body: JSON.stringify({}),
-      });
-      setConnect(response?.stripeConnect || null);
-      setMessage("Stripe Connect runtime configuration reloaded.");
-    } catch (reloadError: any) {
-      setError(reloadError?.message || "Stripe Connect runtime configuration could not be reloaded.");
-    } finally {
-      setBusy("");
-    }
-  }
-
-  async function runPreflight() {
-    setBusy("preflight");
-    setError("");
-    setMessage("");
-    try {
-      const response = await apiFetch("/admin/platform/platform-configuration/payment-providers/stripe-connect/preflight", {
-        method: "POST",
-        body: JSON.stringify({}),
-      });
-      setPreflight(response);
-      setMessage(response?.ok ? "Onboarding preflight passed without creating a connected account." : "Onboarding preflight found missing setup.");
-      await load();
-    } catch (preflightError: any) {
-      setError(preflightError?.message || "Stripe Connect onboarding preflight could not run.");
-    } finally {
-      setBusy("");
-    }
-  }
-
-  async function sendTestEmail() {
-    setBusy("email-test");
-    setError("");
-    setMessage("");
-    try {
-      const response = await apiFetch("/admin/platform/email-control/test-email", {
-        method: "POST",
-        body: JSON.stringify({ to: testEmailTo }),
-      });
-      if (!response?.ok) {
-        setError(response?.readiness?.guidance || `Email test did not pass: ${response?.status || "not_ready"}`);
-      } else {
-        setMessage(`Email provider test sent to ${response.recipientMasked || "the configured recipient"}.`);
-        setTestEmailTo("");
-      }
-      await load();
-    } catch (sendError: any) {
-      setError(sendError?.message || "Email provider test could not run.");
-    } finally {
-      setBusy("");
-    }
-  }
-
-  if (allowed === null) return <PlatformShell><div className="card">Loading protected platform configuration…</div></PlatformShell>;
+  if (allowed === null) return <PlatformShell><div className="card">Loading protected Platform Infrastructure...</div></PlatformShell>;
   if (!allowed) {
     return (
       <PlatformShell>
@@ -241,174 +94,168 @@ export default function PlatformConfigurationPage() {
     );
   }
 
+  const emailReadiness = email?.sender?.readiness;
+  const emailConfig = email?.config || {};
+
   return (
     <PlatformShell>
-      <div className="platform-admin-stack" data-testid="platform-payment-provider-vault">
+      <div className="platform-admin-stack" data-testid="platform-infrastructure">
+        <div data-testid="platform-payment-provider-vault" style={{ display: "contents" }}>
         <section className="platform-admin-section card">
           <div className="platform-admin-section-copy">
-            <div className="platform-admin-section-copy__eyebrow">Platform configuration</div>
-            <h2>Payment providers</h2>
-            <p>Server-side provider readiness. Secret values are encrypted at rest and never returned after save.</p>
+            <div className="platform-admin-section-copy__eyebrow">Platform Admin</div>
+            <h2>Infrastructure</h2>
+            <p>One authoritative home for platform dependency configuration, verification, diagnostics, and operational history.</p>
           </div>
           {message ? <div className="alert success" role="status">{message}</div> : null}
           {error ? <div className="alert warning" role="alert">{error}</div> : null}
         </section>
 
-        <section className="platform-admin-section card" data-testid="platform-email-provider-config">
-          <div className="platform-admin-section-copy">
-            <div className="platform-admin-section-copy__eyebrow">Email Provider</div>
-            <h2>System email delivery</h2>
-            <p>Platform-owned auth, staff setup, invite, booking, invoice, and operational mail must use a verified system sender.</p>
-          </div>
-          <div className="platform-admin-kpi-grid">
-            <StatusCard label="Readiness" value={emailControl?.sender?.readiness?.status || "not_configured"} />
-            <StatusCard label="Transport" value={emailControl?.sender?.readiness?.transport || "none"} />
-            <StatusCard label="Environment" value={emailControl?.environment?.captureOnly ? "capture only" : emailControl?.environment?.liveSmtpAllowed ? "live SMTP allowed" : "unknown"} />
-            <StatusCard label="Sender identity" value={emailControl?.sender?.senderIdentityVerified ? "verified" : "not verified"} />
-            <StatusCard label="Paused" value={emailControl?.control?.paused || emailControl?.control?.providerSuspended ? "yes" : "no"} />
-            <StatusCard label="Sent 24h" value={String(emailControl?.health?.sentLast24h ?? 0)} />
-          </div>
+        <InfrastructureCard
+          title="Email"
+          testId="platform-email-provider-config"
+          status={emailReadiness?.status || "not_configured"}
+          source={emailConfig.source || emailReadiness?.source || "missing"}
+          requiredConfig="Provider, host/port/TLS or API key, From Email, From Name, Reply-To, DNS evidence."
+          owner="Platform operations"
+          nextAction={emailConfig.nextAction || "Configure Email Provider."}
+          lastChecked={emailConfig.lastChecked || emailReadiness?.environment || null}
+          diagnostics={`transport=${emailReadiness?.transport || "none"} secret=${emailConfig.secret?.present ? `present ••••${emailConfig.secret?.lastFour || "stored"}` : "missing"}`}
+        >
           <div className="platform-admin-detail-grid">
-            <div className="platform-admin-list">
-              <p><strong>Sender</strong></p>
-              <p>From: {emailControl?.sender?.readiness?.fromEmail || "missing"}</p>
-              <p>Name: {emailControl?.sender?.readiness?.fromName || "missing"}</p>
-              <p>Source: {emailControl?.sender?.readiness?.source || "missing"}</p>
-              <p>{emailControl?.sender?.readiness?.guidance || "Configure the real provider before launch certification."}</p>
-            </div>
-            <div className="platform-admin-list" data-testid="platform-email-dns-checklist">
-              <p><strong>SPF / DKIM / DMARC checklist</strong></p>
-              <p>SPF: {emailControl?.domainAlignment?.spf || "unknown"}</p>
-              <p>DKIM: {emailControl?.domainAlignment?.dkim || "unknown"}</p>
-              <p>DMARC: {emailControl?.domainAlignment?.dmarc || "unknown"}</p>
-              <p>Warmup: {emailControl?.domainAlignment?.warmup || "unknown"}</p>
-            </div>
+            <label><span className="muted">Provider</span><select className="input" value={emailForm.provider} disabled={emailConfig.source === "runtime_environment"} onChange={(event) => setEmailForm({ ...emailForm, provider: event.target.value })} data-testid="platform-email-provider-select">{providers.map((provider) => <option key={provider} value={provider}>{provider}</option>)}</select></label>
+            <label><span className="muted">Host</span><input className="input" value={emailForm.host} disabled={emailConfig.source === "runtime_environment"} onChange={(event) => setEmailForm({ ...emailForm, host: event.target.value })} data-testid="platform-email-host" /></label>
+            <label><span className="muted">Port</span><input className="input" type="number" value={emailForm.port} disabled={emailConfig.source === "runtime_environment"} onChange={(event) => setEmailForm({ ...emailForm, port: Number(event.target.value || 0) })} data-testid="platform-email-port" /></label>
+            <label><span className="muted">TLS</span><select className="input" value={emailForm.tlsMode} disabled={emailConfig.source === "runtime_environment"} onChange={(event) => setEmailForm({ ...emailForm, tlsMode: event.target.value })} data-testid="platform-email-tls"><option value="starttls">STARTTLS</option><option value="ssl">SSL</option><option value="none">None</option></select></label>
+            <label><span className="muted">Username</span><input className="input" value={emailForm.username} disabled={emailConfig.source === "runtime_environment"} onChange={(event) => setEmailForm({ ...emailForm, username: event.target.value })} data-testid="platform-email-username" /></label>
+            <label><span className="muted">Password / API key</span><input className="input" type="password" autoComplete="new-password" placeholder={emailConfig.secret?.present ? `Stored ••••${emailConfig.secret?.lastFour || ""}` : "Stored encrypted after save"} disabled={emailConfig.source === "runtime_environment"} value={emailForm.secret} onChange={(event) => setEmailForm({ ...emailForm, secret: event.target.value })} data-testid="platform-email-secret" /></label>
+            <label><span className="muted">From Email</span><input className="input" type="email" value={emailForm.fromEmail} disabled={emailConfig.source === "runtime_environment"} onChange={(event) => setEmailForm({ ...emailForm, fromEmail: event.target.value })} data-testid="platform-email-from" /></label>
+            <label><span className="muted">From Name</span><input className="input" value={emailForm.fromName} disabled={emailConfig.source === "runtime_environment"} onChange={(event) => setEmailForm({ ...emailForm, fromName: event.target.value })} data-testid="platform-email-from-name" /></label>
+            <label><span className="muted">Reply-To</span><input className="input" type="email" value={emailForm.replyToEmail} disabled={emailConfig.source === "runtime_environment"} onChange={(event) => setEmailForm({ ...emailForm, replyToEmail: event.target.value })} data-testid="platform-email-reply-to" /></label>
+            <label><span className="muted">Operator test recipient</span><input className="input" type="email" value={emailForm.operatorTestRecipient} disabled={emailConfig.source === "runtime_environment"} onChange={(event) => { setEmailForm({ ...emailForm, operatorTestRecipient: event.target.value }); setTestEmailTo(event.target.value); }} data-testid="platform-email-test-recipient" /></label>
           </div>
-          <div className="platform-admin-detail-grid" data-testid="platform-email-test-action">
-            <label>
-              <span className="muted">Operator-controlled test recipient</span>
-              <input className="input" type="email" value={testEmailTo} onChange={(event) => setTestEmailTo(event.target.value)} placeholder="ops@example.com" data-testid="platform-email-test-recipient" />
-            </label>
-            <div style={{ display: "flex", alignItems: "end" }}>
-              <button className="button secondary" type="button" disabled={busy !== "" || !testEmailTo.trim()} onClick={() => void sendTestEmail()} data-testid="platform-email-send-test">
-                {busy === "email-test" ? "Sending…" : "Send test email"}
-              </button>
-            </div>
+          <div className="platform-admin-detail-grid" data-testid="platform-email-dns-checklist">
+            <label><span className="muted">SPF</span><input className="input" value={emailForm.spfStatus} disabled={emailConfig.source === "runtime_environment"} onChange={(event) => setEmailForm({ ...emailForm, spfStatus: event.target.value })} /></label>
+            <label><span className="muted">DKIM</span><input className="input" value={emailForm.dkimStatus} disabled={emailConfig.source === "runtime_environment"} onChange={(event) => setEmailForm({ ...emailForm, dkimStatus: event.target.value })} /></label>
+            <label><span className="muted">DMARC</span><input className="input" value={emailForm.dmarcStatus} disabled={emailConfig.source === "runtime_environment"} onChange={(event) => setEmailForm({ ...emailForm, dmarcStatus: event.target.value })} /></label>
+            <label><span className="muted">Evidence</span><input className="input" value={emailForm.evidence} disabled={emailConfig.source === "runtime_environment"} onChange={(event) => setEmailForm({ ...emailForm, evidence: event.target.value })} /></label>
           </div>
-          <div className="platform-admin-list" data-testid="platform-email-delivery-log">
-            <p><strong>Recent delivery issues</strong></p>
-            {(emailControl?.health?.recentProviderResponses || []).slice(0, 5).length ? (
-              (emailControl?.health?.recentProviderResponses || []).slice(0, 5).map((event) => (
-                <p key={event.id}>{formatTimestamp(event.createdAt)} · {event.status} · {event.recipientMasked} · {event.responseSummary || "redacted provider response"}</p>
-              ))
-            ) : <p>No recent provider failures recorded.</p>}
-          </div>
-        </section>
+          <ActionRow>
+            <button className="button" type="button" disabled={busy !== "" || emailConfig.source === "runtime_environment"} onClick={() => runAction("email-save", async () => { await apiFetch("/admin/platform/email-control/provider", { method: "PATCH", body: JSON.stringify(emailForm) }); setEmailForm({ ...emailForm, secret: "" }); return "Email provider saved encrypted. Stored secret values are not shown."; })} data-testid="platform-email-save">{busy === "email-save" ? "Saving..." : "Configure Email Provider"}</button>
+            <button className="button secondary" type="button" disabled={busy !== ""} onClick={() => runAction("email-verify", async () => { await apiFetch("/admin/platform/email-control/provider/verify", { method: "POST", body: JSON.stringify({}) }); return "Email provider verification completed truthfully."; })} data-testid="platform-email-verify">Verify provider</button>
+            <button className="button secondary" type="button" disabled={busy !== "" || !testEmailTo.trim()} onClick={() => runAction("email-test", async () => { const response = await apiFetch("/admin/platform/email-control/test-email", { method: "POST", body: JSON.stringify({ to: testEmailTo }) }); return response?.ok ? `Test email sent to ${response.recipientMasked}.` : response?.readiness?.guidance || "Email test returned a truthful provider error."; })} data-testid="platform-email-send-test">Send test email</button>
+            <button className="button secondary" type="button" disabled={busy !== ""} onClick={() => runAction("email-pause", async () => { await apiFetch("/admin/platform/email-control", { method: "PATCH", body: JSON.stringify({ action: email?.control?.paused ? "resume" : "pause", reason: "Platform admin infrastructure control" }) }); return email?.control?.paused ? "Email sending resumed." : "Email sending paused."; })} data-testid="platform-email-pause">{email?.control?.paused ? "Resume sending" : "Pause sending"}</button>
+          </ActionRow>
+          <HistoryList testId="platform-email-delivery-log" rows={(email?.health?.recentProviderResponses || []).map((event: any) => `${formatTimestamp(event.createdAt)} - ${event.status} - ${event.recipientMasked} - ${event.responseSummary || "redacted provider response"}`)} empty="No recent provider failures recorded." />
+        </InfrastructureCard>
 
-        <section className="platform-admin-section card" data-testid="platform-mytitan-billing-stripe-status">
-          <div className="platform-admin-section-copy">
-            <div className="platform-admin-section-copy__eyebrow">MyTitan Billing Stripe</div>
-            <h2>Status only</h2>
-            <p>Used only for MyTitan subscriptions, job packs, and platform billing.</p>
-          </div>
-          <div className="platform-admin-list">
-            <p>Backend: {billing?.configured ? "configured" : "missing"}</p>
-            <p>Key type: {billing?.backendKeyType || "missing"}</p>
-            <p>Webhook: {billing?.webhookConfigured ? "configured" : "missing"}</p>
-          </div>
-        </section>
-
-        <section className="platform-admin-section card" data-testid="platform-stripe-connect-config">
-          <div className="platform-admin-section-copy">
-            <div className="platform-admin-section-copy__eyebrow">Stripe Connect</div>
-            <h2>Tenant customer payments</h2>
-            <p>Used only for tenant customer deposits, invoices, final balances, and refunds.</p>
-          </div>
-          <div className="platform-admin-kpi-grid">
-            <StatusCard label="Readiness" value={connect?.readiness || "missing_config"} />
-            <StatusCard label="Platform credential" value={describeSecret(connect?.platformSecret)} />
-            <StatusCard label="Webhook credential" value={describeSecret(connect?.webhookSecret)} />
-            <StatusCard label="Mode" value={connect?.mode || "test"} />
-            <StatusCard label="Runtime loaded" value={connect?.runtime?.runtimeLoaded ? "Yes" : "No"} />
-            <StatusCard label="Last saved" value={formatTimestamp(connect?.lastSavedAt || connect?.updatedAt)} />
-            <StatusCard label="Last verified" value={formatTimestamp(connect?.lastVerifiedAt)} />
-          </div>
+        <InfrastructureCard title="Payments / Stripe Connect" testId="platform-stripe-connect-config" status={connect?.readiness || "missing_config"} source={connect?.platformSecret?.source || "missing"} requiredConfig="Connect platform secret, webhook secret, webhook URL, tenant onboarding canary evidence." owner="Platform operations" nextAction={connect?.readiness === "ready" ? "Run onboarding preflight before enabling tenant payments." : "Configure Stripe Connect credentials."} lastChecked={connect?.lastVerifiedAt || connect?.updatedAt} diagnostics={`mode=${connect?.mode || "test"} platform_secret=${describeSecret(connect?.platformSecret)} webhook_secret=${describeSecret(connect?.webhookSecret)} Runtime loaded=${connect?.runtime?.runtimeLoaded ? "yes" : "no"}`}>
           <div className="platform-admin-detail-grid">
-            <label>
-              <span className="muted">Mode</span>
-              <select className="input" value={mode} onChange={(event) => setMode(event.target.value === "live" ? "live" : "test")} data-testid="platform-connect-mode">
-                <option value="test">Test</option>
-                <option value="live">Live</option>
-              </select>
-            </label>
-            <label>
-              <span className="muted">Stripe Connect platform secret</span>
-              <input className="input" type="password" autoComplete="new-password" value={platformSecret} onChange={(event) => setPlatformSecret(event.target.value)} placeholder={connect?.platformSecret.present ? `Stored ••••${connect.platformSecret.lastFour || ""}` : "sk_test_… or sk_live_…"} data-testid="platform-connect-secret" />
-            </label>
-            <label>
-              <span className="muted">Stripe Connect webhook secret</span>
-              <input className="input" type="password" autoComplete="new-password" value={webhookSecret} onChange={(event) => setWebhookSecret(event.target.value)} placeholder={connect?.webhookSecret.present ? `Stored ••••${connect.webhookSecret.lastFour || ""}` : "whsec_…"} data-testid="platform-connect-webhook-secret" />
-            </label>
+            <label><span className="muted">Mode</span><select className="input" value={connectForm.mode} onChange={(event) => setConnectForm({ ...connectForm, mode: event.target.value })} data-testid="platform-connect-mode"><option value="test">Test</option><option value="live">Live</option></select></label>
+            <label><span className="muted">Platform secret</span><input className="input" type="password" value={connectForm.platformSecret} autoComplete="new-password" placeholder={connect?.platformSecret?.present ? `Stored ••••${connect.platformSecret.lastFour || ""}` : "sk_test_... or sk_live_..."} onChange={(event) => setConnectForm({ ...connectForm, platformSecret: event.target.value })} data-testid="platform-connect-secret" /></label>
+            <label><span className="muted">Webhook secret</span><input className="input" type="password" value={connectForm.webhookSecret} autoComplete="new-password" placeholder={connect?.webhookSecret?.present ? `Stored ••••${connect.webhookSecret.lastFour || ""}` : "whsec_..."} onChange={(event) => setConnectForm({ ...connectForm, webhookSecret: event.target.value })} data-testid="platform-connect-webhook-secret" /></label>
           </div>
-          <label className="toggle-row">
-            <input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} data-testid="platform-connect-confirm" />
-            Confirm this platform-only credential change or rotation.
-          </label>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <button className="button" type="button" disabled={!confirmed || busy !== ""} onClick={() => void save()} data-testid="platform-connect-save">
-              {busy === "save" ? "Saving…" : connect?.platformSecret.present || connect?.webhookSecret.present ? "Save / rotate" : "Save credentials"}
-            </button>
-            <button className="button secondary" type="button" disabled={busy !== "" || !connect?.platformSecret.present || !connect?.webhookSecret.present} onClick={() => void verify()} data-testid="platform-connect-verify">
-              {busy === "verify" ? "Verifying…" : "Verify readiness"}
-            </button>
-            <button className="button secondary" type="button" disabled={busy !== ""} onClick={() => void reloadRuntime()} data-testid="platform-connect-reload">
-              {busy === "reload" ? "Reloading…" : "Reload payment provider config"}
-            </button>
-            <button className="button secondary" type="button" disabled={busy !== ""} onClick={() => void runPreflight()} data-testid="platform-connect-preflight">
-              {busy === "preflight" ? "Checking…" : "Run onboarding preflight"}
-            </button>
+          <label className="toggle-row"><input type="checkbox" checked={connectForm.confirmation} onChange={(event) => setConnectForm({ ...connectForm, confirmation: event.target.checked })} data-testid="platform-connect-confirm" /> Confirm this platform-only credential change or rotation.</label>
+          <ActionRow>
+            <button className="button" disabled={!connectForm.confirmation || busy !== ""} onClick={() => runAction("connect-save", async () => { await apiFetch("/admin/platform/platform-configuration/payment-providers/stripe-connect", { method: "PATCH", body: JSON.stringify(connectForm) }); setConnectForm({ ...connectForm, platformSecret: "", webhookSecret: "", confirmation: false }); return "Stripe Connect credentials saved encrypted."; })} data-testid="platform-connect-save">Configure secrets</button>
+            <button className="button secondary" disabled={busy !== ""} onClick={() => runAction("connect-verify", async () => { await apiFetch("/admin/platform/platform-configuration/payment-providers/stripe-connect/verify", { method: "POST", body: JSON.stringify({}) }); return "Stripe Connect readiness verification completed."; })} data-testid="platform-connect-verify">Verify readiness</button>
+            <button className="button secondary" disabled={busy !== ""} onClick={() => runAction("connect-preflight", async () => { await apiFetch("/admin/platform/platform-configuration/payment-providers/stripe-connect/preflight", { method: "POST", body: JSON.stringify({}) }); return "Tenant onboarding preflight completed without creating a connected account."; })} data-testid="platform-connect-preflight">Generate onboarding test</button>
+          </ActionRow>
+          <HistoryList testId="platform-connect-last-onboarding-attempt" rows={connect?.lastOnboardingAttempt ? [`${formatTimestamp(connect.lastOnboardingAttempt.attemptedAt)} - ${connect.lastOnboardingAttempt.result} - ${connect.lastOnboardingAttempt.failureReason || "no redacted error"}`] : []} empty="No onboarding attempt recorded." />
+        </InfrastructureCard>
+
+        <InfrastructureCard title="MyTitan Billing Stripe" testId="platform-mytitan-billing-stripe-status" status={billing?.configured ? "configured" : "missing_config"} source="runtime_environment" requiredConfig="Platform subscription prices, job-pack products, billing webhook, restricted billing key." owner="Platform finance operations" nextAction="Run subscription price verification and job-pack sync during release validation." lastChecked={null} diagnostics={`backend=${billing?.backendKeyType || "missing"} webhook=${billing?.webhookConfigured ? "present" : "missing"} purpose=platform_subscriptions_only`}>
+          <ActionRow>
+            <span className="button secondary" aria-disabled="true">Verify subscription prices in validation</span>
+            <span className="button secondary" aria-disabled="true">Sync job-pack catalog in validation</span>
+          </ActionRow>
+        </InfrastructureCard>
+
+        <InfrastructureCard title="Monitoring" testId="platform-external-monitor-config" status={monitor?.status || "not_configured"} source={monitor?.sourceOfTruth || "missing"} requiredConfig="Provider, marketing URL, app URL, API health URL, alert recipient, external evidence." owner="Platform operations" nextAction={monitor?.nextAction || "Configure External Uptime Monitor."} lastChecked={monitor?.lastCheckedAt} diagnostics={monitor?.failureReason || "No redacted provider error recorded."}>
+          <div className="platform-admin-detail-grid">
+            <label><span className="muted">Provider</span><input className="input" value={monitorForm.provider || ""} onChange={(event) => setMonitorForm({ ...monitorForm, provider: event.target.value })} data-testid="platform-monitor-provider" /></label>
+            <label><span className="muted">Name</span><input className="input" value={monitorForm.name || ""} onChange={(event) => setMonitorForm({ ...monitorForm, name: event.target.value })} /></label>
+            <label><span className="muted">Marketing URL</span><input className="input" value={monitorForm.marketingUrl || ""} onChange={(event) => setMonitorForm({ ...monitorForm, marketingUrl: event.target.value })} /></label>
+            <label><span className="muted">App URL</span><input className="input" value={monitorForm.appUrl || ""} onChange={(event) => setMonitorForm({ ...monitorForm, appUrl: event.target.value })} /></label>
+            <label><span className="muted">API health URL</span><input className="input" value={monitorForm.apiHealthUrl || ""} onChange={(event) => setMonitorForm({ ...monitorForm, apiHealthUrl: event.target.value })} /></label>
+            <label><span className="muted">Alert recipient</span><input className="input" value={monitorForm.alertRecipient || ""} onChange={(event) => setMonitorForm({ ...monitorForm, alertRecipient: event.target.value })} /></label>
+            <label><span className="muted">Manual verifying reason</span><input className="input" value={monitorForm.manualReason || ""} onChange={(event) => setMonitorForm({ ...monitorForm, manualReason: event.target.value })} /></label>
+            <label><span className="muted">Evidence reference</span><input className="input" value={monitorForm.evidence || ""} onChange={(event) => setMonitorForm({ ...monitorForm, evidence: event.target.value })} /></label>
           </div>
-          {preflight ? (
-            <div className="platform-admin-list" data-testid="platform-connect-preflight-result">
-              <p>Mode: {preflight.mode}</p>
-              <p>Platform secret loaded: {preflight.checks?.platformSecretLoaded ? "yes" : "no"}</p>
-              <p>Webhook secret loaded: {preflight.checks?.webhookSecretLoaded ? "yes" : "no"}</p>
-              <p>Stripe client initialised: {preflight.checks?.stripeClientInitialised ? "yes" : "no"}</p>
-              <p>Connect platform access: {preflight.checks?.platformConnectAccess ? "yes" : "no"}</p>
-              <p>Connect access diagnostic: {preflight.checks?.platformConnectFailureReason || "none"}</p>
-              <p>Can reach account creation step: {preflight.checks?.canReachAccountCreationStep ? "yes" : "no"}</p>
-            </div>
-          ) : null}
-          <div className="platform-admin-list" data-testid="platform-connect-last-onboarding-attempt">
-            <p><strong>Last onboarding attempt</strong></p>
-            {connect?.lastOnboardingAttempt ? (
-              <>
-                <p>Tenant: {connect.lastOnboardingAttempt.tenant?.name || connect.lastOnboardingAttempt.tenant?.id || "Unknown"}</p>
-                <p>Result: {connect.lastOnboardingAttempt.result}</p>
-                <p>Action URL returned: {connect.lastOnboardingAttempt.actionUrlReturned ? "yes" : "no"}</p>
-                <p>Stripe account created: {connect.lastOnboardingAttempt.stripeAccountCreated ? "yes" : "no"}</p>
-                <p>Account Link created: {connect.lastOnboardingAttempt.accountLinkCreated ? "yes" : "no"}</p>
-                <p>Failure reason: {connect.lastOnboardingAttempt.failureReason || "none"}</p>
-                <p>Attempted: {formatTimestamp(connect.lastOnboardingAttempt.attemptedAt)}</p>
-              </>
-            ) : <p>No onboarding attempt recorded.</p>}
-          </div>
-          <p className="muted">Last updated: {connect?.updatedAt ? new Date(connect.updatedAt).toLocaleString() : "never"} · Updated by: {connect?.updatedByUserId || "runtime environment"}</p>
-        </section>
+          <ActionRow>
+            <button className="button" disabled={busy !== ""} onClick={() => runAction("monitor-save", async () => { await apiFetch("/admin/platform/infrastructure/external-monitor", { method: "PATCH", body: JSON.stringify(monitorForm) }); return "External monitor configuration saved as verifying."; })} data-testid="platform-monitor-save">Configure monitor</button>
+            <button className="button secondary" disabled={busy !== ""} onClick={() => runAction("monitor-verify", async () => { await apiFetch("/admin/platform/infrastructure/external-monitor/verify", { method: "POST", body: JSON.stringify({ reason: monitorForm.manualReason }) }); return "External monitor verification checked without faking healthy state."; })} data-testid="platform-monitor-verify">Verify monitor</button>
+          </ActionRow>
+          <HistoryList testId="platform-monitor-history" rows={[monitor?.evidence, monitor?.manualReason, monitor?.failureReason].filter(Boolean)} empty="No external monitor history recorded." />
+        </InfrastructureCard>
+
+        {[
+          ["Backups", "scripts/backup-readiness-status.sh", "Run backup readiness and restore drill evidence."],
+          ["Storage", "upload policy and artifact store", "Verify upload limits and artifact retention evidence."],
+          ["DNS / Sender Identity", "email provider DNS evidence", "Attach SPF, DKIM, DMARC, and sender identity status."],
+          ["Security", "production-readiness-check.sh", "Run production readiness and review security blockers."],
+          ["Runtime", "internal monitoring / healthcheck", "Run healthcheck and Autopilot sentinel refresh."],
+          ["Database / Redis / Scheduler", "internal monitoring snapshots", "Verify migrate deploy, Redis health, and summary scheduler status."],
+          ["Integrations", "integration rollout monitoring", "Review failed provider setup and webhook delivery attempts."],
+          ["Vault / Secrets", "encrypted platform config tables and runtime env", "Rotate secrets through provider-specific configure actions."],
+        ].map(([title, source, nextAction]) => (
+          <InfrastructureCard key={title} title={title} testId={`platform-infra-${slug(title)}`} status="action_required" source={source} requiredConfig="Operational evidence and owner-reviewed configuration." owner="Platform operations" nextAction={nextAction} lastChecked={null} diagnostics="No secret values displayed. Use release validation and provider logs for detailed evidence." />
+        ))}
+        </div>
       </div>
     </PlatformShell>
   );
 }
 
-function describeSecret(secret?: SecretStatus | null) {
-  if (!secret?.present) return "Missing";
-  return `${secret.verificationStatus} · ••••${secret.lastFour || "stored"}`;
+function InfrastructureCard({ title, testId, status, source, requiredConfig, owner, nextAction, lastChecked, diagnostics, children }: any) {
+  return (
+    <section className="platform-admin-section card" data-testid={testId}>
+      <div className="platform-admin-section-copy">
+        <div className="platform-admin-section-copy__eyebrow">Infrastructure</div>
+        <h2>{title}</h2>
+      </div>
+      <div className="platform-admin-kpi-grid">
+        <StatusCard label="Status" value={status} />
+        <StatusCard label="Source of truth" value={source} />
+        <StatusCard label="Owner" value={owner} />
+        <StatusCard label="Last checked" value={formatTimestamp(lastChecked)} />
+      </div>
+      <div className="platform-admin-list">
+        <p><strong>Required config</strong></p>
+        <p>{requiredConfig}</p>
+        <p><strong>Next action</strong></p>
+        <p>{nextAction}</p>
+        <p><strong>Redacted diagnostics</strong></p>
+        <p>{diagnostics}</p>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function ActionRow({ children }: { children: ReactNode }) {
+  return <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>{children}</div>;
+}
+
+function HistoryList({ testId, rows, empty }: { testId: string; rows: string[]; empty: string }) {
+  return <div className="platform-admin-list" data-testid={testId}><p><strong>Delivery / log / history</strong></p>{rows.length ? rows.slice(0, 6).map((row) => <p key={row}>{row}</p>) : <p>{empty}</p>}</div>;
+}
+
+function describeSecret(secret?: any) {
+  if (!secret?.present) return "missing";
+  return `${secret.verificationStatus || "present"} ••••${secret.lastFour || "stored"}`;
 }
 
 function formatTimestamp(value?: string | null) {
-  return value ? new Date(value).toLocaleString() : "Never";
+  if (!value) return "Never";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
 }
 
 function StatusCard({ label, value }: { label: string; value: string }) {
   return <article className="platform-admin-kpi-card"><span className="platform-admin-kpi-card__label">{label}</span><strong className="platform-admin-kpi-card__value">{value}</strong></article>;
+}
+
+function slug(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 }

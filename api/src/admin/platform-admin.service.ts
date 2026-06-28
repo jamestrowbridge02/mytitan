@@ -164,6 +164,17 @@ export class PlatformAdminService {
     return { value, state, detail, source };
   }
 
+  private normalizeUrl(value?: string | null) {
+    const raw = String(value || '').trim();
+    if (!raw) return null;
+    try {
+      const url = new URL(raw);
+      return url.protocol === 'https:' || url.protocol === 'http:' ? url.toString() : null;
+    } catch {
+      return null;
+    }
+  }
+
   private money(cents: number, currency = 'GBP') {
     const symbol = currency === 'USD' ? '$' : '£';
     return `${symbol}${(Math.max(0, cents) / 100).toFixed(2)}`;
@@ -419,6 +430,92 @@ export class PlatformAdminService {
       },
       secretsReturned: false,
     };
+  }
+
+  async getExternalMonitorConfiguration() {
+    const db = this.prisma as any;
+    const [row, snapshot] = await Promise.all([
+      db.platformExternalMonitorConfig.findUnique({ where: { id: 'external_monitor' } }).catch(() => null),
+      Promise.resolve(getExternalMonitoringSnapshot()),
+    ]);
+    const configured = Boolean(row?.provider && (row?.marketingUrl || row?.appUrl || row?.apiHealthUrl));
+    const externallyHealthy = snapshot.externalMonitorStatus === 'healthy';
+    return {
+      provider: row?.provider || null,
+      name: row?.name || null,
+      marketingUrl: row?.marketingUrl || snapshot.marketingUrl || null,
+      appUrl: row?.appUrl || snapshot.appUrl || null,
+      apiHealthUrl: row?.apiHealthUrl || snapshot.apiUrl || null,
+      alertRecipient: row?.alertRecipient || null,
+      status: externallyHealthy ? 'healthy' : row?.status || (configured ? 'verifying' : 'not_configured'),
+      sourceOfTruth: row ? 'platform_external_monitor_config' : 'runtime_status_script',
+      evidence: externallyHealthy ? snapshot.externalMonitorDetail : row?.evidence || null,
+      manualReason: row?.manualReason || null,
+      failureReason: row?.failureReason || snapshot.externalMonitorDetail || null,
+      lastCheckedAt: row?.lastCheckedAt || null,
+      updatedAt: row?.updatedAt || null,
+      owner: 'Platform operations',
+      nextAction: externallyHealthy
+        ? 'Review monitor evidence history after the next release canary.'
+        : configured
+          ? 'Verify monitor evidence from the external provider before marking healthy.'
+          : 'Configure External Uptime Monitor.',
+      secretsReturned: false,
+    };
+  }
+
+  async saveExternalMonitorConfiguration(input: Record<string, any> & { actorUserId?: string | null }) {
+    const db = this.prisma as any;
+    const provider = String(input.provider || '').trim();
+    const data = {
+      id: 'external_monitor',
+      provider: provider || null,
+      name: String(input.name || '').trim() || null,
+      marketingUrl: this.normalizeUrl(input.marketingUrl),
+      appUrl: this.normalizeUrl(input.appUrl),
+      apiHealthUrl: this.normalizeUrl(input.apiHealthUrl),
+      alertRecipient: String(input.alertRecipient || '').trim() || null,
+      status: provider ? 'verifying' : 'not_configured',
+      evidence: String(input.evidence || '').trim().slice(0, 1000) || null,
+      manualReason: String(input.manualReason || '').trim().slice(0, 500) || null,
+      failureReason: null,
+      lastCheckedAt: new Date(),
+      updatedByUserId: input.actorUserId || null,
+    };
+    await db.platformExternalMonitorConfig.upsert({
+      where: { id: 'external_monitor' },
+      create: data,
+      update: data,
+    });
+    return this.getExternalMonitorConfiguration();
+  }
+
+  async verifyExternalMonitorConfiguration(input: { actorUserId?: string | null; manualReason?: string | null }) {
+    const db = this.prisma as any;
+    const snapshot = getExternalMonitoringSnapshot();
+    const healthy = snapshot.externalMonitorStatus === 'healthy';
+    const status = healthy ? 'healthy' : snapshot.externalMonitorStatus === 'degraded' ? 'degraded' : 'verifying';
+    await db.platformExternalMonitorConfig.upsert({
+      where: { id: 'external_monitor' },
+      create: {
+        id: 'external_monitor',
+        status,
+        evidence: healthy ? snapshot.externalMonitorDetail : null,
+        manualReason: String(input.manualReason || '').trim().slice(0, 500) || null,
+        failureReason: healthy ? null : snapshot.externalMonitorDetail || 'External provider evidence is not healthy.',
+        lastCheckedAt: new Date(),
+        updatedByUserId: input.actorUserId || null,
+      },
+      update: {
+        status,
+        evidence: healthy ? snapshot.externalMonitorDetail : undefined,
+        manualReason: String(input.manualReason || '').trim().slice(0, 500) || null,
+        failureReason: healthy ? null : snapshot.externalMonitorDetail || 'External provider evidence is not healthy.',
+        lastCheckedAt: new Date(),
+        updatedByUserId: input.actorUserId || null,
+      },
+    });
+    return this.getExternalMonitorConfiguration();
   }
 
   private sanitizeIncident(row: any) {
