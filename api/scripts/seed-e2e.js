@@ -558,7 +558,7 @@ async function ensurePlatformAdminUser(companyId, locationId) {
       await neutralizeUser(duplicate);
     }
   }
-  const intended = await prisma.user.findFirst({ where: { companyId, email } });
+  const principal = await prisma.user.findFirst({ where: { email } });
   const stale = staleEmail
     ? await prisma.user.findFirst({
         where: {
@@ -578,12 +578,17 @@ async function ensurePlatformAdminUser(companyId, locationId) {
     lastActiveAt: new Date(),
   };
 
-  if (intended) {
+  if (principal) {
     const user = await prisma.user.update({
-      where: { id: intended.id },
-      data: activeData,
+      where: { id: principal.id },
+      data: {
+        emailVerified: true,
+        role: fixture.role,
+        isActive: true,
+        lastActiveAt: new Date(),
+      },
     });
-    if (stale && stale.id !== intended.id) {
+    if (stale && stale.id !== principal.id) {
       await neutralizeUser(stale);
     }
     await neutralizeOtherPrincipalAdmins(user.id);
