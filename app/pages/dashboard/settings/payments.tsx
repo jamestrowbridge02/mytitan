@@ -25,13 +25,19 @@ type ProviderRow = {
 };
 
 const PAYMENT_TYPES: Record<string, string> = {
-  "stripe-customer-payments": "Cards, payment links, deposits, invoices",
+  "stripe-customer-payments": "Connect each business's own Stripe account so customers can pay that business directly.",
   "manual-card-terminal": "Authorised manual terminal recording",
   "bank-transfer": "Bank transfer instructions and manual confirmation",
 };
 
+const PAYMENT_CATEGORIES: Record<string, string> = {
+  "stripe-customer-payments": "Tenant-owned account",
+  "manual-card-terminal": "External terminal",
+  "bank-transfer": "Manual transfer",
+};
+
 function providerDisplayName(provider: ProviderRow) {
-  if (provider.provider === "stripe-customer-payments") return "Stripe";
+  if (provider.provider === "stripe-customer-payments") return "Stripe Connect";
   return provider.advancedProviderName;
 }
 
@@ -237,7 +243,7 @@ export default function PaymentSettingsPage() {
         <div className="operator-section__header">
           <div>
             <h2 className="operator-section__title">Accept customer payments</h2>
-            <p className="operator-section__subtitle">Customer money goes directly to the payment method owned by your business.</p>
+            <p className="operator-section__subtitle">Customer deposits, invoice payments, refunds, and trade payments go directly through the provider owned or connected by your business. Platform billing is not a customer payment option.</p>
           </div>
           <OperatorStatusBadge label={ready ? `${counts.connected} connected` : "Loading"} tone={counts.attention ? "warning" : "info"} />
         </div>
@@ -247,6 +253,7 @@ export default function PaymentSettingsPage() {
             <article className="billing-provider-card" key={provider.provider} data-testid={`payments-provider-${provider.provider}`}>
               <div className="billing-ops-panel__header">
                 <div>
+                  <p className="muted" style={{ margin: "0 0 4px" }} data-testid={`payments-provider-category-${provider.provider}`}>{PAYMENT_CATEGORIES[provider.provider]}</p>
                   <strong>{providerDisplayName(provider)}</strong>
                   <p className="muted" style={{ margin: "4px 0 0" }}>{PAYMENT_TYPES[provider.provider]}</p>
                 </div>

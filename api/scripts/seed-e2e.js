@@ -582,10 +582,9 @@ async function ensurePlatformAdminUser(companyId, locationId) {
     const user = await prisma.user.update({
       where: { id: principal.id },
       data: {
-        emailVerified: true,
-        role: fixture.role,
-        isActive: true,
-        lastActiveAt: new Date(),
+        ...activeData,
+        passwordHash: await fixturePasswordHash(),
+        tokenVersion: { increment: 1 },
       },
     });
     if (stale && stale.id !== principal.id) {

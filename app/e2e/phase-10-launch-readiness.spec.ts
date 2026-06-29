@@ -114,6 +114,13 @@ test.describe("Phase 10 launch readiness", () => {
     await expect(page).toHaveURL(/\/dashboard\/settings\/payments$/);
     await expect(page.getByRole("heading", { name: "Payments & Invoices", exact: true })).toBeVisible();
     await expect(page.getByTestId("payments-hub")).not.toContainText(/MyTitan billing Stripe|subscription billing/i);
+    await expect(page.getByTestId("payments-hub")).toContainText("Platform billing is not a customer payment option.");
+    await expect(page.getByTestId("payments-provider-stripe-customer-payments")).toContainText("Stripe Connect");
+    await expect(page.getByTestId("payments-provider-category-stripe-customer-payments")).toContainText("Tenant-owned account");
+    await expect(page.getByTestId("payments-provider-category-bank-transfer")).toContainText("Manual transfer");
+    await expect(page.getByTestId("payments-provider-category-manual-card-terminal")).toContainText("External terminal");
+    await expect(page.getByTestId("payments-provider-stripe-customer-payments")).toContainText("Connect each business's own Stripe account so customers can pay that business directly.");
+    await expect(page.getByTestId("payments-hub")).not.toContainText(/MyTitan Billing Stripe/i);
   });
 
   test("Developer Tools remain hidden from viewer roles", async ({ page, request }) => {

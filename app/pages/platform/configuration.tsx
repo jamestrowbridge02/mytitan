@@ -149,7 +149,25 @@ export default function PlatformInfrastructurePage() {
           <HistoryList testId="platform-email-delivery-log" rows={(email?.health?.recentProviderResponses || []).map((event: any) => `${formatTimestamp(event.createdAt)} - ${event.status} - ${event.recipientMasked} - ${event.responseSummary || "redacted provider response"}`)} empty="No recent provider failures recorded." />
         </InfrastructureCard>
 
-        <InfrastructureCard title="Payments / Stripe Connect" testId="platform-stripe-connect-config" status={connect?.readiness || "missing_config"} source={connect?.platformSecret?.source || "missing"} requiredConfig="Connect platform secret, webhook secret, webhook URL, tenant onboarding canary evidence." owner="Platform operations" nextAction={connect?.readiness === "ready" ? "Run onboarding preflight before enabling tenant payments." : "Configure Stripe Connect credentials."} lastChecked={connect?.lastVerifiedAt || connect?.updatedAt} diagnostics={`mode=${connect?.mode || "test"} platform_secret=${describeSecret(connect?.platformSecret)} webhook_secret=${describeSecret(connect?.webhookSecret)} Runtime loaded=${connect?.runtime?.runtimeLoaded ? "yes" : "no"}`}>
+        <InfrastructureCard title="Tenant Customer Payment Providers" testId="platform-stripe-connect-config" status={connect?.readiness || "missing_config"} source={connect?.platformSecret?.source || "missing"} requiredConfig="Provider-owned or tenant-owned setup only: Stripe Connect platform secret, webhook secret, webhook URL, tenant onboarding canary evidence, bank transfer details, or manual card terminal recording." owner="Platform operations" nextAction={connect?.readiness === "ready" ? "Run onboarding preflight before enabling tenant payments." : "Configure Stripe Connect credentials."} lastChecked={connect?.lastVerifiedAt || connect?.updatedAt} diagnostics={`mode=${connect?.mode || "test"} platform_secret=${describeSecret(connect?.platformSecret)} webhook_secret=${describeSecret(connect?.webhookSecret)} Runtime loaded=${connect?.runtime?.runtimeLoaded ? "yes" : "no"}`}>
+          <BoundaryNotice
+            testId="tenant-customer-money-boundary"
+            eyebrow="Tenant customer money"
+            copy="Used by each business to receive money from its own customers. Customer deposits, invoice payments, refunds, and trade payments go directly through the provider owned or connected by that business."
+          />
+          <div className="platform-admin-detail-grid" data-testid="tenant-payment-provider-categories">
+            <ProviderOption name="Stripe Connect" category="Connected account" copy="Connect each business's own Stripe account so customers can pay that business directly." />
+            <ProviderOption name="Bank transfer" category="Manual transfer" copy="Show business-owned bank details and record payment only after the business confirms receipt." />
+            <ProviderOption name="Manual card terminal" category="External terminal" copy="Record payments taken on a card terminal owned or contracted by the business." />
+          </div>
+          <div className="platform-admin-list" data-testid="payment-boundary-never-mixed">
+            <p><strong>Platform money</strong></p>
+            <p>MyTitan subscriptions, plans, job packs, and platform invoices use MyTitan Billing Stripe.</p>
+            <p><strong>Tenant customer money</strong></p>
+            <p>Deposits, invoice payments, refunds, and trade payments use the tenant customer payment provider owned or connected by that business.</p>
+            <p><strong>Never mixed</strong></p>
+            <p>Tenant customer money must never be routed through MyTitan Billing Stripe.</p>
+          </div>
           <div className="platform-admin-detail-grid">
             <label><span className="muted">Mode</span><select className="input" value={connectForm.mode} onChange={(event) => setConnectForm({ ...connectForm, mode: event.target.value })} data-testid="platform-connect-mode"><option value="test">Test</option><option value="live">Live</option></select></label>
             <label><span className="muted">Platform secret</span><input className="input" type="password" value={connectForm.platformSecret} autoComplete="new-password" placeholder={connect?.platformSecret?.present ? `Stored ••••${connect.platformSecret.lastFour || ""}` : "sk_test_... or sk_live_..."} onChange={(event) => setConnectForm({ ...connectForm, platformSecret: event.target.value })} data-testid="platform-connect-secret" /></label>
@@ -165,10 +183,15 @@ export default function PlatformInfrastructurePage() {
         </InfrastructureCard>
 
         <InfrastructureCard title="MyTitan Billing Stripe" testId="platform-mytitan-billing-stripe-status" status={billing?.configured ? "configured" : "missing_config"} source="runtime_environment" requiredConfig="Platform subscription prices, job-pack products, billing webhook, restricted billing key." owner="Platform finance operations" nextAction="Run subscription price verification and job-pack sync during release validation." lastChecked={null} diagnostics={`backend=${billing?.backendKeyType || "missing"} webhook=${billing?.webhookConfigured ? "present" : "missing"} purpose=platform_subscriptions_only`}>
-          <ActionRow>
-            <span className="button secondary" aria-disabled="true">Verify subscription prices in validation</span>
-            <span className="button secondary" aria-disabled="true">Sync job-pack catalog in validation</span>
-          </ActionRow>
+          <BoundaryNotice
+            testId="platform-money-boundary"
+            eyebrow="Platform money"
+            copy="Used only for MyTitan subscriptions, plans, job packs, and platform billing. It must never receive customer deposit or invoice money for tenant businesses."
+          />
+          <div className="platform-admin-list" data-testid="mytitan-billing-validation-notes">
+            <p><strong>Validation only</strong></p>
+            <p>Verify subscription prices and sync the job-pack catalog during release validation. Do not mutate Stripe products or prices from this infrastructure page.</p>
+          </div>
         </InfrastructureCard>
 
         <InfrastructureCard title="Monitoring" testId="platform-external-monitor-config" status={monitor?.status || "not_configured"} source={monitor?.sourceOfTruth || "missing"} requiredConfig="Provider, marketing URL, app URL, API health URL, alert recipient, external evidence." owner="Platform operations" nextAction={monitor?.nextAction || "Configure External Uptime Monitor."} lastChecked={monitor?.lastCheckedAt} diagnostics={monitor?.failureReason || "No redacted provider error recorded."}>
@@ -230,6 +253,25 @@ function InfrastructureCard({ title, testId, status, source, requiredConfig, own
       </div>
       {children}
     </section>
+  );
+}
+
+function BoundaryNotice({ testId, eyebrow, copy }: { testId: string; eyebrow: string; copy: string }) {
+  return (
+    <div className="platform-admin-list" data-testid={testId}>
+      <p><strong>{eyebrow}</strong></p>
+      <p>{copy}</p>
+    </div>
+  );
+}
+
+function ProviderOption({ name, category, copy }: { name: string; category: string; copy: string }) {
+  return (
+    <div className="settings-premium-subcard">
+      <p className="muted" style={{ margin: "0 0 6px 0" }}>{category}</p>
+      <strong>{name}</strong>
+      <p className="muted" style={{ margin: "6px 0 0 0" }}>{copy}</p>
+    </div>
   );
 }
 
