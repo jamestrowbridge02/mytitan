@@ -84,6 +84,26 @@ export default function PlatformInfrastructurePage() {
     }
   }
 
+  async function saveStripeConnectConfiguration() {
+    try {
+      const response = await apiFetch("/admin/platform/platform-configuration/payment-providers/stripe-connect", {
+        method: "PATCH",
+        body: JSON.stringify(connectForm),
+      });
+      if (response?.stripeConnect) {
+        setConnect(response.stripeConnect);
+      }
+      return "Stripe Connect credentials saved encrypted.";
+    } finally {
+      setConnectForm((current) => ({
+        ...current,
+        platformSecret: "",
+        webhookSecret: "",
+        confirmation: false,
+      }));
+    }
+  }
+
   if (allowed === null) return <PlatformShell><div className="card">Loading protected Platform Infrastructure...</div></PlatformShell>;
   if (!allowed) {
     return (
@@ -176,9 +196,16 @@ export default function PlatformInfrastructurePage() {
             <label><span className="muted">Webhook secret</span><input className="input" type="password" value={connectForm.webhookSecret} autoComplete="new-password" placeholder={connect?.webhookSecret?.present ? `Stored ••••${connect.webhookSecret.lastFour || ""}` : "whsec_..."} onChange={(event) => setConnectForm({ ...connectForm, webhookSecret: event.target.value })} data-testid="platform-connect-webhook-secret" /></label>
             <label><span className="muted">Webhook URL</span><input className="input" readOnly value="/billing/customer-payments/webhooks/stripe-connect/:routeId" data-testid="platform-connect-webhook-url" /></label>
           </div>
+          <div className="platform-admin-list" data-testid="platform-connect-server-state">
+            <p><strong>Saved server state</strong></p>
+            <p>Platform secret: {describeStoredSecret(connect?.platformSecret)}</p>
+            <p>Webhook secret: {describeStoredSecret(connect?.webhookSecret)}</p>
+            <p>Runtime loaded: {connect?.runtime?.runtimeLoaded ? "yes" : "no"}</p>
+            <p>Last saved: {formatTimestamp(connect?.lastSavedAt || connect?.updatedAt)}</p>
+          </div>
           <label className="toggle-row"><input type="checkbox" checked={connectForm.confirmation} onChange={(event) => setConnectForm({ ...connectForm, confirmation: event.target.checked })} data-testid="platform-connect-confirm" /> Confirm this platform-only credential change or rotation.</label>
           <ActionRow>
-            <button className="button" disabled={!connectForm.confirmation || busy !== ""} onClick={() => runAction("connect-save", async () => { await apiFetch("/admin/platform/platform-configuration/payment-providers/stripe-connect", { method: "PATCH", body: JSON.stringify(connectForm) }); setConnectForm({ ...connectForm, platformSecret: "", webhookSecret: "", confirmation: false }); return "Stripe Connect credentials saved encrypted."; })} data-testid="platform-connect-save">Save / rotate</button>
+            <button className="button" disabled={!connectForm.confirmation || busy !== ""} onClick={() => runAction("connect-save", saveStripeConnectConfiguration)} data-testid="platform-connect-save">Save / rotate</button>
             <button className="button secondary" disabled={busy !== ""} onClick={() => runAction("connect-verify", async () => { await apiFetch("/admin/platform/platform-configuration/payment-providers/stripe-connect/verify", { method: "POST", body: JSON.stringify({}) }); return "Stripe Connect readiness verification completed."; })} data-testid="platform-connect-verify">Verify readiness</button>
             <button className="button secondary" disabled={busy !== ""} onClick={() => runAction("connect-preflight", async () => { await apiFetch("/admin/platform/platform-configuration/payment-providers/stripe-connect/preflight", { method: "POST", body: JSON.stringify({}) }); return "Tenant onboarding preflight completed without creating a connected account."; })} data-testid="platform-connect-preflight">Generate onboarding test</button>
             <button className="button secondary" disabled={busy !== ""} onClick={() => runAction("connect-reload", async () => { await apiFetch("/admin/platform/platform-configuration/payment-providers/stripe-connect/reload", { method: "POST", body: JSON.stringify({}) }); return "Stripe Connect runtime credentials reloaded."; })} data-testid="platform-connect-reload">Reload runtime</button>
@@ -317,6 +344,11 @@ function HistoryList({ testId, rows, empty }: { testId: string; rows: string[]; 
 function describeSecret(secret?: any) {
   if (!secret?.present) return "missing";
   return `${secret.verificationStatus || "present"} ••••${secret.lastFour || "stored"}`;
+}
+
+function describeStoredSecret(secret?: any) {
+  if (!secret?.present) return "missing";
+  return `${secret.source || "unknown"} ${secret.verificationStatus || "present"} ••••${secret.lastFour || "stored"}`;
 }
 
 function formatTimestamp(value?: string | null) {

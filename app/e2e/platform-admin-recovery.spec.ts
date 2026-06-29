@@ -307,6 +307,8 @@ test.describe("platform backend admin recovery", () => {
     const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
     const currentResponse = await requestLocalApi(request, vaultPath, { headers });
     const current = (await currentResponse.json()).stripeConnect;
+    const initialBillingResponse = await requestLocalApi(request, vaultPath, { headers });
+    const initialBilling = (await initialBillingResponse.json()).myTitanBillingStripe;
     if (current?.platformSecret?.present && current?.webhookSecret?.present) {
       expect(current.runtime).toMatchObject({
         mode: current.mode,
@@ -339,8 +341,8 @@ test.describe("platform backend admin recovery", () => {
       });
       expect(save.ok()).toBeTruthy();
       const saveBody = await save.json();
-      expect(saveBody.stripeConnect.platformSecret).toMatchObject({ present: true, lastFour: "ABCD" });
-      expect(saveBody.stripeConnect.webhookSecret).toMatchObject({ present: true, lastFour: "WXYZ" });
+      expect(saveBody.stripeConnect.platformSecret).toMatchObject({ present: true, lastFour: "ABCD", source: "vault" });
+      expect(saveBody.stripeConnect.webhookSecret).toMatchObject({ present: true, lastFour: "WXYZ", source: "vault" });
       expect(saveBody.stripeConnect.runtime).toMatchObject({
         mode: "test",
         platformSecretLoaded: true,
@@ -349,6 +351,23 @@ test.describe("platform backend admin recovery", () => {
       });
       expect(JSON.stringify(saveBody)).not.toContain(platformSecret);
       expect(JSON.stringify(saveBody)).not.toContain(webhookSecret);
+
+      const readback = await requestLocalApi(request, vaultPath, { headers });
+      expect(readback.ok()).toBeTruthy();
+      const readbackBody = await readback.json();
+      expect(readbackBody.stripeConnect.platformSecret).toMatchObject({ present: true, lastFour: "ABCD", source: "vault" });
+      expect(readbackBody.stripeConnect.webhookSecret).toMatchObject({ present: true, lastFour: "WXYZ", source: "vault" });
+      expect(readbackBody.stripeConnect.runtime).toMatchObject({
+        mode: "test",
+        platformSecretLoaded: true,
+        webhookSecretLoaded: true,
+        runtimeLoaded: true,
+      });
+      expect(readbackBody.myTitanBillingStripe?.readiness).toBe(initialBilling?.readiness);
+      expect(readbackBody.myTitanBillingStripe?.billingSecret?.source).toBe(initialBilling?.billingSecret?.source);
+      expect(readbackBody.myTitanBillingStripe?.webhookSecret?.source).toBe(initialBilling?.webhookSecret?.source);
+      expect(JSON.stringify(readbackBody)).not.toContain(platformSecret);
+      expect(JSON.stringify(readbackBody)).not.toContain(webhookSecret);
 
       const reload = await requestLocalApi(request, `${vaultPath}/stripe-connect/reload`, {
         method: "POST",
@@ -400,14 +419,33 @@ test.describe("platform backend admin recovery", () => {
       await expect(page.getByTestId("platform-stripe-connect-config")).toContainText("••••ABCD");
       await expect(page.getByTestId("platform-stripe-connect-config")).toContainText("••••WXYZ");
       await expect(page.getByTestId("platform-stripe-connect-config")).toContainText("Runtime loaded");
+      await expect(page.getByTestId("platform-connect-server-state")).toContainText("Platform secret: vault");
+      await expect(page.getByTestId("platform-connect-server-state")).toContainText("Webhook secret: vault");
+      await page.reload({ waitUntil: "networkidle" });
+      await expect(page.getByTestId("platform-connect-server-state")).toContainText("Platform secret: vault");
+      await expect(page.getByTestId("platform-connect-server-state")).toContainText("Webhook secret: vault");
+      await expect(page.getByTestId("platform-connect-server-state")).toContainText("Runtime loaded: yes");
       await expect(page.locator("body")).not.toContainText(platformSecret);
       await expect(page.locator("body")).not.toContainText(webhookSecret);
     } finally {
-      await requestLocalApi(request, `${vaultPath}/stripe-connect`, {
+      const deleted = await requestLocalApi(request, `${vaultPath}/stripe-connect`, {
         method: "DELETE",
         headers,
         data: { confirmation: true },
       });
+      expect(deleted.ok()).toBeTruthy();
+      const deletedBody = await deleted.json();
+      expect(deletedBody.stripeConnect).toMatchObject({
+        readiness: "missing_config",
+        platformSecret: { present: false, source: "missing" },
+        webhookSecret: { present: false, source: "missing" },
+        runtime: { runtimeLoaded: false },
+      });
+      const afterDelete = await requestLocalApi(request, vaultPath, { headers });
+      const afterDeleteBody = await afterDelete.json();
+      expect(afterDeleteBody.myTitanBillingStripe?.readiness).toBe(initialBilling?.readiness);
+      expect(afterDeleteBody.myTitanBillingStripe?.billingSecret?.source).toBe(initialBilling?.billingSecret?.source);
+      expect(afterDeleteBody.myTitanBillingStripe?.webhookSecret?.source).toBe(initialBilling?.webhookSecret?.source);
     }
   });
 
