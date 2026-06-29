@@ -4,6 +4,9 @@ import { PlatformShell } from "../../components/platform-shell";
 import { apiFetch } from "../../lib/api";
 
 const providers = ["smtp", "resend", "postmark", "ses", "sendgrid", "mailgun", "env_runtime"];
+const publicApiBase = String(process.env.NEXT_PUBLIC_API_BASE_URL || "https://api.mytitan.co.uk").replace(/\/+$/, "");
+const stripeConnectWebhookUrl = `${publicApiBase}/billing/stripe-connect/webhook`;
+const stripeConnectLegacyWebhookUrl = `${publicApiBase}/billing/customer-payments/stripe-connect/webhook`;
 
 export default function PlatformInfrastructurePage() {
   const [allowed, setAllowed] = useState<boolean | null>(null);
@@ -194,7 +197,18 @@ export default function PlatformInfrastructurePage() {
             <label><span className="muted">Mode</span><select className="input" value={connectForm.mode} onChange={(event) => setConnectForm({ ...connectForm, mode: event.target.value })} data-testid="platform-connect-mode"><option value="test">Test</option><option value="live">Live</option></select></label>
             <label><span className="muted">Platform secret</span><input className="input" type="password" value={connectForm.platformSecret} autoComplete="new-password" placeholder={connect?.platformSecret?.present ? `Stored ••••${connect.platformSecret.lastFour || ""}` : "sk_test_... or sk_live_..."} onChange={(event) => setConnectForm({ ...connectForm, platformSecret: event.target.value })} data-testid="platform-connect-secret" /></label>
             <label><span className="muted">Webhook secret</span><input className="input" type="password" value={connectForm.webhookSecret} autoComplete="new-password" placeholder={connect?.webhookSecret?.present ? `Stored ••••${connect.webhookSecret.lastFour || ""}` : "whsec_..."} onChange={(event) => setConnectForm({ ...connectForm, webhookSecret: event.target.value })} data-testid="platform-connect-webhook-secret" /></label>
-            <label><span className="muted">Webhook URL</span><input className="input" readOnly value="/billing/customer-payments/webhooks/stripe-connect/:routeId" data-testid="platform-connect-webhook-url" /></label>
+            <div className="platform-admin-list" data-testid="platform-connect-webhook-url-panel">
+              <p><strong>Recommended Stripe Connect Webhook URL</strong></p>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                <input className="input" readOnly value={stripeConnectWebhookUrl} data-testid="platform-connect-webhook-url" style={{ minWidth: "min(100%, 520px)", flex: "1 1 360px" }} />
+                <button className="button secondary" type="button" onClick={() => runAction("connect-copy-webhook", async () => { await navigator.clipboard?.writeText(stripeConnectWebhookUrl); return "Stripe Connect webhook URL copied."; })} data-testid="platform-connect-copy-webhook-url">Copy</button>
+              </div>
+              <p><strong>Stripe Dashboard destination type:</strong> Connect webhook endpoint.</p>
+              <p><strong>Event scope:</strong> Connected account events for tenant customer payments.</p>
+              <p><strong>Expected events:</strong> checkout.session.completed, payment_intent.succeeded, charge.refunded, payment_intent.payment_failed, dispute.created.</p>
+              <p><strong>Legacy alias accepted:</strong> {stripeConnectLegacyWebhookUrl}</p>
+              <p>The tenant route-id webhook is generated internally for tenant-owned provider credentials and is not the Stripe Dashboard URL for this platform Connect endpoint.</p>
+            </div>
           </div>
           <div className="platform-admin-list" data-testid="platform-connect-server-state">
             <p><strong>Saved server state</strong></p>

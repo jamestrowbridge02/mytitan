@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { execFileSync } from "child_process";
+import crypto from "crypto";
 import { cleanupGeneratedWorkspace, fixtureRefs, hasDashboardAuth, installApiProxy, loginAs, requestLocalApi } from "./utils";
 
 const tenantId = "e2e-company";
@@ -414,14 +415,79 @@ test.describe("platform backend admin recovery", () => {
       expect(JSON.stringify(verifyBody)).not.toContain(platformSecret);
       expect(JSON.stringify(verifyBody)).not.toContain(webhookSecret);
 
+      const connectEventBody = JSON.stringify({
+        id: `evt_connect_platform_${Date.now()}`,
+        object: "event",
+        type: "payment_intent.succeeded",
+        account: "acct_unknown_e2e_platform_connect",
+        data: { object: { id: "pi_e2e_connect_ignored", object: "payment_intent" } },
+      });
+      const timestamp = Math.floor(Date.now() / 1000);
+      const connectSignature = crypto.createHmac("sha256", webhookSecret).update(`${timestamp}.${connectEventBody}`).digest("hex");
+      const connectWebhookHeaders = {
+        "Content-Type": "application/json",
+        "stripe-signature": `t=${timestamp},v1=${connectSignature}`,
+      };
+      const recommendedWebhook = await request.fetch("http://127.0.0.1:3000/billing/stripe-connect/webhook", {
+        method: "POST",
+        headers: connectWebhookHeaders,
+        data: connectEventBody,
+        failOnStatusCode: false,
+      });
+      expect(recommendedWebhook.status()).toBe(202);
+      expect(await recommendedWebhook.json()).toMatchObject({ received: true, ignored: true });
+
+      const invalidRecommendedWebhook = await request.fetch("http://127.0.0.1:3000/billing/stripe-connect/webhook", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "stripe-signature": `t=${timestamp},v1=invalid`,
+        },
+        data: connectEventBody,
+        failOnStatusCode: false,
+      });
+      expect(invalidRecommendedWebhook.status()).toBe(403);
+
+      const legacyWebhook = await request.fetch("http://127.0.0.1:3000/billing/customer-payments/stripe-connect/webhook", {
+        method: "POST",
+        headers: connectWebhookHeaders,
+        data: connectEventBody,
+        failOnStatusCode: false,
+      });
+      expect(legacyWebhook.status()).toBe(202);
+      expect(await legacyWebhook.json()).toMatchObject({ received: true, ignored: true });
+
+      await page.addInitScript(() => {
+        Object.defineProperty(navigator, "clipboard", {
+          configurable: true,
+          value: {
+            writeText: (value: string) => {
+              (window as any).__copiedStripeConnectWebhookUrl = value;
+              return Promise.resolve();
+            },
+          },
+        });
+      });
       await page.goto("/platform/configuration", { waitUntil: "networkidle" });
       await expect(page.getByTestId("platform-payment-provider-vault")).toBeVisible();
       await expect(page.getByTestId("platform-stripe-connect-config")).toContainText("••••ABCD");
       await expect(page.getByTestId("platform-stripe-connect-config")).toContainText("••••WXYZ");
       await expect(page.getByTestId("platform-stripe-connect-config")).toContainText("Runtime loaded");
+      await expect(page.getByTestId("platform-connect-webhook-url")).toHaveValue(/\/billing\/stripe-connect\/webhook$/);
+      await expect(page.getByTestId("platform-connect-webhook-url")).not.toHaveValue(/:routeId/);
+      await expect(page.getByTestId("platform-connect-webhook-url-panel")).toContainText("Connect webhook endpoint");
+      await expect(page.getByTestId("platform-connect-webhook-url-panel")).toContainText("Connected account events");
+      await expect(page.getByTestId("platform-connect-webhook-url-panel")).toContainText("payment_intent.succeeded");
+      await expect(page.getByTestId("platform-connect-webhook-url-panel")).toContainText("Legacy alias accepted");
+      await expect(page.getByTestId("platform-connect-webhook-url-panel")).toContainText("/billing/customer-payments/stripe-connect/webhook");
+      await expect(page.getByTestId("platform-connect-webhook-url-panel")).toContainText("tenant route-id webhook is generated internally");
+      await page.getByTestId("platform-connect-copy-webhook-url").click();
+      await expect.poll(async () => page.evaluate(() => (window as any).__copiedStripeConnectWebhookUrl || "")).toMatch(/\/billing\/stripe-connect\/webhook$/);
       await expect(page.getByTestId("platform-connect-server-state")).toContainText("Platform secret: vault");
       await expect(page.getByTestId("platform-connect-server-state")).toContainText("Webhook secret: vault");
       await page.reload({ waitUntil: "networkidle" });
+      await expect(page.getByTestId("platform-connect-webhook-url")).toHaveValue(/\/billing\/stripe-connect\/webhook$/);
+      await expect(page.getByTestId("platform-stripe-connect-config")).not.toContainText(":routeId");
       await expect(page.getByTestId("platform-connect-server-state")).toContainText("Platform secret: vault");
       await expect(page.getByTestId("platform-connect-server-state")).toContainText("Webhook secret: vault");
       await expect(page.getByTestId("platform-connect-server-state")).toContainText("Runtime loaded: yes");
@@ -596,6 +662,9 @@ test.describe("platform backend admin recovery", () => {
       await expect(page.getByTestId("payment-boundary-never-mixed")).toContainText("Never mixed");
       await expect(page.getByTestId("platform-stripe-connect-config")).toContainText("Save / rotate");
       await expect(page.getByTestId("platform-stripe-connect-config")).toContainText("Webhook URL");
+      await expect(page.getByTestId("platform-connect-webhook-url")).toHaveValue(/\/billing\/stripe-connect\/webhook$/);
+      await expect(page.getByTestId("platform-stripe-connect-config")).not.toContainText(":routeId");
+      await expect(page.getByTestId("platform-connect-copy-webhook-url")).toBeVisible();
       await expect(page.getByTestId("platform-connect-canary-checklist")).toContainText("Canary checklist");
       await expect(page.getByTestId("platform-mytitan-billing-stripe-status")).toContainText("platform_subscriptions_only");
       await expect(page.getByTestId("platform-mytitan-billing-stripe-status")).toContainText("Billing Stripe secret");

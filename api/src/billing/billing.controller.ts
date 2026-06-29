@@ -365,3 +365,19 @@ export class CustomerPaymentWebhookController {
     return this.billing.handleTenantPaymentWebhook(provider, routeId, payload, req.headers || {});
   }
 }
+
+@Controller('billing')
+export class StripeConnectWebhookAliasController {
+  constructor(private readonly billing: BillingService) {}
+
+  @Post('stripe-connect/webhook')
+  @HttpCode(202)
+  async stripeConnectWebhook(
+    @Req() req: Request & { rawBody?: Buffer; body?: unknown },
+  ) {
+    const payload = Buffer.isBuffer(req.body)
+      ? req.body
+      : req.rawBody ?? Buffer.from(JSON.stringify(req.body || {}), 'utf8');
+    return this.billing.handleStripeConnectWebhook(payload, req.headers || {});
+  }
+}

@@ -53,7 +53,7 @@ async function bootstrap() {
   // Stripe signature verification requires the exact raw body bytes.
   app.use(['/stripe/webhook', '/billing/webhook'], raw({ type: 'application/json' }));
   app.use(/^\/integrations\/webhooks\/[^/]+\/[^/]+$/, raw({ type: '*/*' }));
-  app.use('/billing/customer-payments/stripe-connect/webhook', raw({ type: 'application/json' }));
+  app.use(['/billing/stripe-connect/webhook', '/billing/customer-payments/stripe-connect/webhook'], raw({ type: 'application/json' }));
   app.use(/^\/billing\/customer-payments\/webhook\/[^/]+\/[^/]+$/, raw({ type: '*/*' }));
   app.use(json({ limit: process.env.JSON_BODY_LIMIT || '40mb' }));
   app.useGlobalFilters(new UploadExceptionFilter());

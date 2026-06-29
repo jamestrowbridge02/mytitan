@@ -5,13 +5,13 @@ import { EnterpriseModule } from '../enterprise/enterprise.module';
 import { IntegrationsModule } from '../integrations/integrations.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { PlatformConfigModule } from '../platform-config/platform-config.module';
-import { BillingController, CustomerPaymentWebhookController, StripeWebhookController } from './billing.controller';
+import { BillingController, CustomerPaymentWebhookController, StripeConnectWebhookAliasController, StripeWebhookController } from './billing.controller';
 import { BillingService } from './billing.service';
 import { DocumentControlModule } from '../document-control/document-control.module';
 
 @Module({
   imports: [AuditModule, NotificationsModule, AutomationsModule, IntegrationsModule, EnterpriseModule, PlatformConfigModule, DocumentControlModule],
-  controllers: [BillingController, StripeWebhookController, CustomerPaymentWebhookController],
+  controllers: [BillingController, StripeWebhookController, CustomerPaymentWebhookController, StripeConnectWebhookAliasController],
   providers: [BillingService],
   exports: [BillingService],
 })

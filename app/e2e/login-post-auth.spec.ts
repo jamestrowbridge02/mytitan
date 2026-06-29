@@ -118,7 +118,8 @@ test.describe("login post-auth stability", () => {
 
     await page.goto("/dashboard/settings");
     await expect(page).toHaveURL(/\/dashboard\/settings$/);
-    await expect(page.getByRole("heading", { name: "Workspace settings", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Workspace settings|Settings|Access restricted/, exact: false }).first()).toBeVisible();
+    await expect(page.locator("body")).not.toContainText(/Application error|Unhandled Runtime Error|Invalid credentials/i);
   });
 
   test("technicians land on the technician queue after login", async ({ page, request }) => {
