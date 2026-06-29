@@ -1995,6 +1995,27 @@ model PlatformPaymentProviderConfig {
   @@index([provider, updatedAt])
 }
 
+model PlatformBillingStripeConfig {
+  id                      String    @id @default("mytitan_billing_stripe")
+  provider                String    @unique
+  mode                    String    @default("test")
+  billingSecretEncrypted  String?
+  billingSecretLastFour   String?
+  webhookSecretEncrypted  String?
+  webhookSecretLastFour   String?
+  credentialStatus        String    @default("missing")
+  credentialVerifiedAt    DateTime?
+  credentialFailureReason String?
+  webhookStatus           String    @default("missing")
+  webhookVerifiedAt       DateTime?
+  webhookFailureReason    String?
+  updatedByUserId         String?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  @@index([provider, updatedAt])
+}
+
 model PlatformAutopilotEvent {
   id            String    @id @default(cuid())
   kind          String

@@ -14,6 +14,7 @@ import { isEnterpriseFeatureFlagKey } from '../enterprise/enterprise-feature-fla
 import { PrismaService } from '../prisma/prisma.service';
 import { TemplatesService } from '../templates/templates.service';
 import { PlatformAdminService } from './platform-admin.service';
+import { PlatformBillingStripeConfigService } from '../platform-config/platform-billing-stripe-config.service';
 import { PlatformPaymentProviderConfigService } from '../platform-config/platform-payment-provider-config.service';
 import { PlatformAutopilotService } from './platform-autopilot.service';
 
@@ -35,6 +36,7 @@ export class PlatformAdminController {
     private readonly email: EmailService,
     private readonly templates: TemplatesService,
     private readonly enterpriseFlags: EnterpriseFeatureFlagsService,
+    private readonly billingStripeConfig: PlatformBillingStripeConfigService,
     private readonly paymentProviderConfig: PlatformPaymentProviderConfigService,
     private readonly autopilot: PlatformAutopilotService,
   ) {}
@@ -451,17 +453,23 @@ export class PlatformAdminController {
     @Req() req: Request & { requestId?: string },
   ) {
     await this.assertAccess(user, req, 'platform.payment_provider_config.read');
-    const [connect, billing, lastOnboardingAttempt] = await Promise.all([
+    const [connect, billingStripe, billing, lastOnboardingAttempt] = await Promise.all([
       this.paymentProviderConfig.getSafeStatus(),
+      this.billingStripeConfig.getSafeStatus(),
       this.billing.getPlatformRevenueDashboard(),
       this.billing.getLatestStripeConnectOnboardingAttempt(),
     ]);
     return {
       ok: true,
       myTitanBillingStripe: {
+        ...billingStripe,
         configured: billing.stripeAlignment.stripeConfigured,
         backendKeyType: billing.stripeAlignment.backendKeyType,
         webhookConfigured: billing.stripeAlignment.webhookSecretConfigured,
+        priceVerification: {
+          configuredPriceEnvNames: billing.stripeAlignment.configuredPriceEnvNames,
+          missingConfigNames: billing.stripeAlignment.missingConfigNames,
+        },
         purpose: 'MyTitan subscriptions, job packs, and platform billing only',
         secretsReturned: false,
       },
@@ -472,6 +480,95 @@ export class PlatformAdminController {
       },
       secretsReturned: false,
     };
+  }
+
+  @Patch('platform-configuration/payment-providers/mytitan-billing-stripe')
+  async saveMyTitanBillingStripeConfiguration(
+    @CurrentUser() user: JwtPayload,
+    @Body() body: Record<string, any>,
+    @Req() req: Request & { requestId?: string },
+  ) {
+    await this.assertAccess(user, req, 'platform.billing_stripe_config.update');
+    return {
+      ok: true,
+      myTitanBillingStripe: await this.billingStripeConfig.save({
+        billingSecret: body?.billingSecret,
+        webhookSecret: body?.webhookSecret,
+        mode: body?.mode,
+        confirmation: body?.confirmation === true,
+        actorCompanyId: user.companyId,
+        actorUserId: user.sub,
+      }),
+    };
+  }
+
+  @Post('platform-configuration/payment-providers/mytitan-billing-stripe/verify')
+  async verifyMyTitanBillingStripeConfiguration(
+    @CurrentUser() user: JwtPayload,
+    @Req() req: Request & { requestId?: string },
+  ) {
+    await this.assertAccess(user, req, 'platform.billing_stripe_config.verify');
+    return {
+      ok: true,
+      myTitanBillingStripe: await this.billingStripeConfig.verify({
+        actorCompanyId: user.companyId,
+        actorUserId: user.sub,
+      }),
+    };
+  }
+
+  @Post('platform-configuration/payment-providers/mytitan-billing-stripe/reload')
+  async reloadMyTitanBillingStripeConfiguration(
+    @CurrentUser() user: JwtPayload,
+    @Req() req: Request & { requestId?: string },
+  ) {
+    await this.assertAccess(user, req, 'platform.billing_stripe_config.reload');
+    return {
+      ok: true,
+      myTitanBillingStripe: await this.billingStripeConfig.reloadRuntime({
+        actorCompanyId: user.companyId,
+        actorUserId: user.sub,
+      }),
+    };
+  }
+
+  @Delete('platform-configuration/payment-providers/mytitan-billing-stripe')
+  async deleteMyTitanBillingStripeConfiguration(
+    @CurrentUser() user: JwtPayload,
+    @Body() body: Record<string, any>,
+    @Req() req: Request & { requestId?: string },
+  ) {
+    await this.assertAccess(user, req, 'platform.billing_stripe_config.delete');
+    return {
+      ok: true,
+      myTitanBillingStripe: await this.billingStripeConfig.remove({
+        confirmation: body?.confirmation === true,
+        actorCompanyId: user.companyId,
+        actorUserId: user.sub,
+      }),
+    };
+  }
+
+  @Post('platform-configuration/payment-providers/mytitan-billing-stripe/verify-subscription-prices')
+  async verifyMyTitanBillingStripeSubscriptionPrices(
+    @CurrentUser() user: JwtPayload,
+    @Req() req: Request & { requestId?: string },
+  ) {
+    await this.assertAccess(user, req, 'platform.billing_stripe_config.verify_subscription_prices');
+    const readiness = await this.billing.verifySubscriptionPricing({});
+    await this.audit.log(user.companyId, 'platform.billing_stripe_config.verify_subscription_prices', `Subscription price verification completed. Status=${readiness.status}`, user.sub);
+    return { ok: true, readiness, secretsReturned: false };
+  }
+
+  @Post('platform-configuration/payment-providers/mytitan-billing-stripe/sync-job-packs')
+  async syncMyTitanBillingStripeJobPacks(
+    @CurrentUser() user: JwtPayload,
+    @Req() req: Request & { requestId?: string },
+  ) {
+    await this.assertAccess(user, req, 'platform.billing_stripe_config.sync_job_packs');
+    const snapshot = await this.billing.verifyAllJobCompletionPacksDryRun(user.companyId, user.sub);
+    await this.audit.log(user.companyId, 'platform.billing_stripe_config.sync_job_packs', `Job-pack catalog validation completed. Status=${snapshot.status}`, user.sub);
+    return { ok: true, snapshot, secretsReturned: false };
   }
 
   @Get('autopilot')

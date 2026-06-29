@@ -389,6 +389,8 @@ test.describe("platform backend admin recovery", () => {
       expect(verify.ok()).toBeTruthy();
       const verifyBody = await verify.json();
       expect(["ready", "failed_verification"]).toContain(verifyBody.stripeConnect.readiness);
+      expect(verifyBody.stripeConnect.platformSecret.source).toBe("vault");
+      expect(verifyBody.stripeConnect.webhookSecret.source).toBe("vault");
       expect(verifyBody.stripeConnect.webhookSecret.verificationStatus).toBe("verified");
       expect(JSON.stringify(verifyBody)).not.toContain(platformSecret);
       expect(JSON.stringify(verifyBody)).not.toContain(webhookSecret);
@@ -402,6 +404,88 @@ test.describe("platform backend admin recovery", () => {
       await expect(page.locator("body")).not.toContainText(webhookSecret);
     } finally {
       await requestLocalApi(request, `${vaultPath}/stripe-connect`, {
+        method: "DELETE",
+        headers,
+        data: { confirmation: true },
+      });
+    }
+  });
+
+  test("platform admin saves MyTitan Billing Stripe credentials separately from Stripe Connect", async ({ page, request }) => {
+    await installApiProxy(page, request);
+    const token = await loginAs(page, request, fixtureRefs.platformAdminEmail, fixtureRefs.platformAdminPassword);
+    const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+    const billingSecret = `sk_test_billing_recovery_${Date.now()}_BILL`;
+    const billingWebhookSecret = `whsec_billing_recovery_${Date.now()}_HOOK`;
+
+    try {
+      const save = await requestLocalApi(request, `${vaultPath}/mytitan-billing-stripe`, {
+        method: "PATCH",
+        headers,
+        data: {
+          billingSecret,
+          webhookSecret: billingWebhookSecret,
+          mode: "test",
+          confirmation: true,
+        },
+      });
+      expect(save.ok()).toBeTruthy();
+      const saveBody = await save.json();
+      expect(saveBody.myTitanBillingStripe.billingSecret).toMatchObject({ present: true, lastFour: "BILL", source: "vault" });
+      expect(saveBody.myTitanBillingStripe.webhookSecret).toMatchObject({ present: true, lastFour: "HOOK", source: "vault" });
+      expect(saveBody.myTitanBillingStripe.runtime).toMatchObject({
+        mode: "test",
+        billingSecretLoaded: true,
+        webhookSecretLoaded: true,
+        runtimeLoaded: true,
+      });
+      expect(JSON.stringify(saveBody)).not.toContain(billingSecret);
+      expect(JSON.stringify(saveBody)).not.toContain(billingWebhookSecret);
+
+      const config = await requestLocalApi(request, vaultPath, { headers });
+      const configBody = await config.json();
+      expect(configBody.myTitanBillingStripe.billingSecret.source).toBe("vault");
+      expect(configBody.myTitanBillingStripe.webhookSecret.source).toBe("vault");
+      expect(configBody.myTitanBillingStripe.runtime.runtimeLoaded).toBe(true);
+      expect(configBody.stripeConnect?.platformSecret?.lastFour).not.toBe("BILL");
+      expect(JSON.stringify(configBody)).not.toContain(billingSecret);
+      expect(JSON.stringify(configBody)).not.toContain(billingWebhookSecret);
+
+      const reload = await requestLocalApi(request, `${vaultPath}/mytitan-billing-stripe/reload`, {
+        method: "POST",
+        headers,
+        data: {},
+      });
+      expect(reload.ok()).toBeTruthy();
+      expect((await reload.json()).myTitanBillingStripe.runtime).toMatchObject({
+        mode: "test",
+        runtimeLoaded: true,
+      });
+
+      const verify = await requestLocalApi(request, `${vaultPath}/mytitan-billing-stripe/verify`, {
+        method: "POST",
+        headers,
+        data: {},
+      });
+      expect(verify.ok()).toBeTruthy();
+      const verifyBody = await verify.json();
+      expect(["ready", "failed_verification", "needs_verification"]).toContain(verifyBody.myTitanBillingStripe.readiness);
+      expect(verifyBody.myTitanBillingStripe.webhookSecret.verificationStatus).toBe("verified");
+      expect(JSON.stringify(verifyBody)).not.toContain(billingSecret);
+      expect(JSON.stringify(verifyBody)).not.toContain(billingWebhookSecret);
+
+      await page.goto("/platform/configuration", { waitUntil: "networkidle" });
+      await expect(page.getByTestId("platform-mytitan-billing-stripe-status")).toContainText("MyTitan Billing Stripe");
+      await expect(page.getByTestId("platform-mytitan-billing-stripe-status")).toContainText("Save / rotate");
+      await expect(page.getByTestId("platform-mytitan-billing-stripe-status")).toContainText("Verify billing readiness");
+      await expect(page.getByTestId("platform-mytitan-billing-stripe-status")).toContainText("Verify subscription prices");
+      await expect(page.getByTestId("platform-mytitan-billing-stripe-status")).toContainText("Sync job-pack catalog");
+      await expect(page.getByTestId("platform-mytitan-billing-stripe-status")).toContainText("••••BILL");
+      await expect(page.getByTestId("platform-mytitan-billing-stripe-status")).toContainText("••••HOOK");
+      await expect(page.locator("body")).not.toContainText(billingSecret);
+      await expect(page.locator("body")).not.toContainText(billingWebhookSecret);
+    } finally {
+      await requestLocalApi(request, `${vaultPath}/mytitan-billing-stripe`, {
         method: "DELETE",
         headers,
         data: { confirmation: true },
@@ -472,8 +556,16 @@ test.describe("platform backend admin recovery", () => {
       await expect(page.getByTestId("payment-boundary-never-mixed")).toContainText("Platform money");
       await expect(page.getByTestId("payment-boundary-never-mixed")).toContainText("Tenant customer money");
       await expect(page.getByTestId("payment-boundary-never-mixed")).toContainText("Never mixed");
-      await expect(page.getByTestId("platform-stripe-connect-config")).toContainText("Configure secrets");
+      await expect(page.getByTestId("platform-stripe-connect-config")).toContainText("Save / rotate");
+      await expect(page.getByTestId("platform-stripe-connect-config")).toContainText("Webhook URL");
+      await expect(page.getByTestId("platform-connect-canary-checklist")).toContainText("Canary checklist");
       await expect(page.getByTestId("platform-mytitan-billing-stripe-status")).toContainText("platform_subscriptions_only");
+      await expect(page.getByTestId("platform-mytitan-billing-stripe-status")).toContainText("Billing Stripe secret");
+      await expect(page.getByTestId("platform-mytitan-billing-stripe-status")).toContainText("Billing webhook secret");
+      await expect(page.getByTestId("platform-mytitan-billing-stripe-status")).toContainText("Save / rotate");
+      await expect(page.getByTestId("platform-mytitan-billing-stripe-status")).toContainText("Verify billing readiness");
+      await expect(page.getByTestId("platform-mytitan-billing-stripe-status")).toContainText("Verify subscription prices");
+      await expect(page.getByTestId("platform-mytitan-billing-stripe-status")).toContainText("Sync job-pack catalog");
       await expect(page.getByTestId("platform-mytitan-billing-stripe-status")).toContainText("Used only for MyTitan subscriptions, plans, job packs, and platform billing.");
       await expect(page.getByTestId("platform-mytitan-billing-stripe-status")).toContainText("must never receive customer deposit or invoice money");
       await expect(page.getByTestId("platform-mytitan-billing-stripe-status")).not.toContainText("Stripe Connect");

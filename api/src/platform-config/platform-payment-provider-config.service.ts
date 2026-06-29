@@ -133,7 +133,7 @@ export class PlatformPaymentProviderConfigService implements OnModuleInit {
       platformSecret: {
         present: Boolean(row?.platformSecretEncrypted || envPlatform),
         lastFour: row?.platformSecretLastFour || (envPlatform ? envPlatform.slice(-4) : null),
-        source: row?.platformSecretEncrypted ? 'encrypted_vault' : envPlatform ? 'runtime_environment' : 'missing',
+        source: row?.platformSecretEncrypted ? 'vault' : envPlatform ? 'runtime_environment' : 'missing',
         verificationStatus: row?.platformSecretEncrypted
           ? vaultPlatformDecryptable
             ? row?.credentialStatus || 'needs_verification'
@@ -147,7 +147,7 @@ export class PlatformPaymentProviderConfigService implements OnModuleInit {
       webhookSecret: {
         present: Boolean(row?.webhookSecretEncrypted || envWebhook),
         lastFour: row?.webhookSecretLastFour || (envWebhook ? envWebhook.slice(-4) : null),
-        source: row?.webhookSecretEncrypted ? 'encrypted_vault' : envWebhook ? 'runtime_environment' : 'missing',
+        source: row?.webhookSecretEncrypted ? 'vault' : envWebhook ? 'runtime_environment' : 'missing',
         verificationStatus: row?.webhookSecretEncrypted
           ? vaultWebhookDecryptable
             ? row?.webhookStatus || 'needs_verification'

@@ -219,6 +219,12 @@ function clearLocalDraft(key: string) {
   window.localStorage.removeItem(key);
 }
 
+function readInputValue(id: string, fallback: any) {
+  if (typeof document === "undefined") return fallback;
+  const input = document.getElementById(id) as HTMLInputElement | null;
+  return input ? input.value : fallback;
+}
+
 function normalizeNextActionType(value: string): NextActionType | "" {
   return ["CALL", "EMAIL", "WHATSAPP", "FOLLOW_UP", "MEETING"].includes(value) ? (value as NextActionType) : "";
 }
@@ -466,7 +472,35 @@ export default function TradeAccountProfilePage() {
     setError("");
     setRequestId(undefined);
     setProfileSaving(true);
-    const currentProfileForm = profileFormRef.current || profileForm;
+    const currentProfileForm: Record<string, any> = {
+      ...(profileFormRef.current || profileForm),
+      contactName: readInputValue("crm-contact-name", profileFormRef.current?.contactName ?? profileForm.contactName),
+      contactEmail: readInputValue("crm-contact-email", profileFormRef.current?.contactEmail ?? profileForm.contactEmail),
+      contactPhone: readInputValue("crm-contact-phone", profileFormRef.current?.contactPhone ?? profileForm.contactPhone),
+      contactMobile: readInputValue("crm-contact-mobile", profileFormRef.current?.contactMobile ?? profileForm.contactMobile),
+      secondaryContactName: readInputValue("crm-secondary-contact-name", profileFormRef.current?.secondaryContactName ?? profileForm.secondaryContactName),
+      secondaryContactEmail: readInputValue("crm-secondary-contact-email", profileFormRef.current?.secondaryContactEmail ?? profileForm.secondaryContactEmail),
+      secondaryContactPhone: readInputValue("crm-secondary-contact-phone", profileFormRef.current?.secondaryContactPhone ?? profileForm.secondaryContactPhone),
+      secondaryContactMobile: readInputValue("crm-secondary-contact-mobile", profileFormRef.current?.secondaryContactMobile ?? profileForm.secondaryContactMobile),
+      vatNumber: readInputValue("crm-vat-number", profileFormRef.current?.vatNumber ?? profileForm.vatNumber),
+      companyNumber: readInputValue("crm-company-number", profileFormRef.current?.companyNumber ?? profileForm.companyNumber),
+      paymentTermsDays: Number(readInputValue("crm-payment-terms", profileFormRef.current?.paymentTermsDays ?? profileForm.paymentTermsDays ?? 7)),
+      businessAddressLine1: readInputValue("crm-business-address-1", profileFormRef.current?.businessAddressLine1 ?? profileForm.businessAddressLine1),
+      businessAddressLine2: readInputValue("crm-business-address-2", profileFormRef.current?.businessAddressLine2 ?? profileForm.businessAddressLine2),
+      businessCity: readInputValue("crm-business-city", profileFormRef.current?.businessCity ?? profileForm.businessCity),
+      businessPostcode: readInputValue("crm-business-postcode", profileFormRef.current?.businessPostcode ?? profileForm.businessPostcode),
+      businessCountry: readInputValue("crm-business-country", profileFormRef.current?.businessCountry ?? profileForm.businessCountry),
+      billingContactName: readInputValue("crm-billing-contact-name", profileFormRef.current?.billingContactName ?? profileForm.billingContactName),
+      billingEmail: readInputValue("crm-billing-email", profileFormRef.current?.billingEmail ?? profileForm.billingEmail),
+      billingPhone: readInputValue("crm-billing-phone", profileFormRef.current?.billingPhone ?? profileForm.billingPhone),
+      billingMobile: readInputValue("crm-billing-mobile", profileFormRef.current?.billingMobile ?? profileForm.billingMobile),
+      billingAddressLine1: readInputValue("crm-billing-address-1", profileFormRef.current?.billingAddressLine1 ?? profileForm.billingAddressLine1),
+      billingAddressLine2: readInputValue("crm-billing-address-2", profileFormRef.current?.billingAddressLine2 ?? profileForm.billingAddressLine2),
+      billingCity: readInputValue("crm-billing-city", profileFormRef.current?.billingCity ?? profileForm.billingCity),
+      billingPostcode: readInputValue("crm-billing-postcode", profileFormRef.current?.billingPostcode ?? profileForm.billingPostcode),
+      billingCountry: readInputValue("crm-billing-country", profileFormRef.current?.billingCountry ?? profileForm.billingCountry),
+    };
+    profileFormRef.current = currentProfileForm;
     const profilePayload = {
       ...currentProfileForm,
       locations: locationForm

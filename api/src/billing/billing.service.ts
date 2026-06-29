@@ -12,6 +12,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { IntegrationClientFactory } from '../integrations/integration-client.factory';
 import { encryptText } from '../integrations/integrations.crypto';
 import { EnterpriseFeatureFlagsService } from '../enterprise/enterprise-feature-flags.service';
+import { PlatformBillingStripeConfigService } from '../platform-config/platform-billing-stripe-config.service';
 import { PlatformPaymentProviderConfigService } from '../platform-config/platform-payment-provider-config.service';
 import { DEFAULT_INTERVAL, DEFAULT_PLAN_CODE, PLAN_DEFINITIONS, getPricingModelSummary } from './billing.constants';
 import { BillingBalanceAdjustmentDto, CustomerPaymentRequestDto, FinanceReportQueryDto, ManualPaymentRequestPaidDto, PricingAdjustmentDto, RefundBookingDepositDto, RefundPaymentDto, TrialOverrideDto, UpdatePaymentCollectionDto } from './billing.dto';
@@ -41,7 +42,8 @@ import { formatCurrencyMinorUnits, getPlanBasePriceCents, normalizeStoredPricing
 
 @Injectable()
 export class BillingService {
-  private readonly stripe: Stripe | null;
+  private stripeClient: Stripe | null = null;
+  private stripeSecretFingerprint = '';
   private stripeConnectClient: Stripe | null = null;
   private stripeConnectSecretFingerprint = '';
   private readonly logger = new Logger(BillingService.name);
@@ -75,11 +77,25 @@ export class BillingService {
     private readonly automations: AutomationsService,
     private readonly integrationClientFactory: IntegrationClientFactory,
     private readonly enterpriseFlags: EnterpriseFeatureFlagsService,
+    private readonly platformBillingStripeConfig: PlatformBillingStripeConfigService,
     private readonly platformPaymentProviderConfig: PlatformPaymentProviderConfigService,
     private readonly documents: DocumentControlService,
-  ) {
-    const billingSecret = this.resolveStripeSecretKey(process.env.STRIPE_SECRET_KEY);
-    this.stripe = billingSecret ? new Stripe(billingSecret, { apiVersion: '2023-10-16' }) : null;
+  ) {}
+
+  private get stripe() {
+    const configured = this.platformBillingStripeConfig.getRuntimeConfig().billingSecret;
+    const billingSecret = this.resolveStripeSecretKey(configured);
+    if (!billingSecret) {
+      this.stripeClient = null;
+      this.stripeSecretFingerprint = '';
+      return null;
+    }
+    const fingerprint = crypto.createHash('sha256').update(billingSecret).digest('hex');
+    if (!this.stripeClient || this.stripeSecretFingerprint !== fingerprint) {
+      this.stripeClient = new Stripe(billingSecret, { apiVersion: '2023-10-16' });
+      this.stripeSecretFingerprint = fingerprint;
+    }
+    return this.stripeClient;
   }
 
   private get stripeConnect() {
@@ -3165,7 +3181,9 @@ export class BillingService {
       'STRIPE_PRICE_ENTERPRISE_MONTHLY',
       'STRIPE_PRICE_ENTERPRISE_ANNUAL',
     ] as const;
-    const normalizedSecretKey = this.resolveStripeSecretKey(process.env.STRIPE_SECRET_KEY);
+    const billingRuntime = this.platformBillingStripeConfig.getRuntimeConfig();
+    const billingRuntimeStatus = this.platformBillingStripeConfig.getRuntimeStatus();
+    const normalizedSecretKey = this.resolveStripeSecretKey(billingRuntime.billingSecret);
     const configuredPriceEnvNames = requiredPriceEnvNames.filter((name) => Boolean(String(process.env[name] || '').trim()));
     const publishableKeyConfigured = Boolean(String(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || process.env.STRIPE_PUBLISHABLE_KEY || '').trim());
     const missingConfigNames = [
@@ -3184,6 +3202,18 @@ export class BillingService {
             ? 'standard_secret'
             : 'missing',
       webhookSecretConfigured: Boolean(this.resolveStripeWebhookSecret()),
+      runtimeLoaded: billingRuntimeStatus.runtimeLoaded,
+      runtimeReloadedAt: billingRuntimeStatus.lastReloadedAt,
+      credentialSource: !billingRuntime.billingSecret
+        ? 'missing'
+        : billingRuntime.billingSecret === String(process.env.STRIPE_SECRET_KEY || '').trim()
+          ? 'runtime_environment'
+          : 'vault',
+      webhookSource: !billingRuntime.webhookSecret
+        ? 'missing'
+        : billingRuntime.webhookSecret === String(process.env.STRIPE_WEBHOOK_SECRET || '').trim()
+          ? 'runtime_environment'
+          : 'vault',
       billingReturnUrlConfigured: Boolean(String(process.env.STRIPE_BILLING_RETURN_URL || '').trim()),
       publishableKeyConfigured,
       publishableKeyUsedByApp: false,
@@ -7517,7 +7547,7 @@ export class BillingService {
   }
 
   private resolveStripeWebhookSecret() {
-    const secret = String(process.env.STRIPE_WEBHOOK_SECRET || '').trim();
+    const secret = String(this.platformBillingStripeConfig.getRuntimeConfig().webhookSecret || '').trim();
     return secret || null;
   }
 

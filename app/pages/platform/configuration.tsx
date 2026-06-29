@@ -15,7 +15,8 @@ export default function PlatformInfrastructurePage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [testEmailTo, setTestEmailTo] = useState("");
-  const [connectForm, setConnectForm] = useState({ mode: "test", platformSecret: "", webhookSecret: "", confirmation: false });
+  const [billingForm, setBillingForm] = useState({ mode: "test", billingSecret: "", webhookSecret: "", confirmation: false, deleteConfirmation: false });
+  const [connectForm, setConnectForm] = useState({ mode: "test", platformSecret: "", webhookSecret: "", confirmation: false, deleteConfirmation: false });
   const [emailForm, setEmailForm] = useState<any>({ provider: "smtp", host: "", port: 587, tlsMode: "starttls", username: "", secret: "", fromEmail: "", fromName: "MyTitan", replyToEmail: "", operatorTestRecipient: "", spfStatus: "unknown", dkimStatus: "unknown", dmarcStatus: "unknown", evidence: "" });
   const [monitorForm, setMonitorForm] = useState<any>({ provider: "", name: "", marketingUrl: "", appUrl: "", apiHealthUrl: "", alertRecipient: "", evidence: "", manualReason: "" });
 
@@ -36,6 +37,7 @@ export default function PlatformInfrastructurePage() {
     setEmail(emailResponse || null);
     setMonitor(monitorResponse?.monitor || null);
     setConnectForm((current) => ({ ...current, mode: paymentResponse?.stripeConnect?.mode === "live" ? "live" : "test" }));
+    setBillingForm((current) => ({ ...current, mode: paymentResponse?.myTitanBillingStripe?.mode === "live" ? "live" : "test" }));
     if (emailResponse?.config) {
       setEmailForm((current: any) => ({
         ...current,
@@ -172,25 +174,54 @@ export default function PlatformInfrastructurePage() {
             <label><span className="muted">Mode</span><select className="input" value={connectForm.mode} onChange={(event) => setConnectForm({ ...connectForm, mode: event.target.value })} data-testid="platform-connect-mode"><option value="test">Test</option><option value="live">Live</option></select></label>
             <label><span className="muted">Platform secret</span><input className="input" type="password" value={connectForm.platformSecret} autoComplete="new-password" placeholder={connect?.platformSecret?.present ? `Stored ••••${connect.platformSecret.lastFour || ""}` : "sk_test_... or sk_live_..."} onChange={(event) => setConnectForm({ ...connectForm, platformSecret: event.target.value })} data-testid="platform-connect-secret" /></label>
             <label><span className="muted">Webhook secret</span><input className="input" type="password" value={connectForm.webhookSecret} autoComplete="new-password" placeholder={connect?.webhookSecret?.present ? `Stored ••••${connect.webhookSecret.lastFour || ""}` : "whsec_..."} onChange={(event) => setConnectForm({ ...connectForm, webhookSecret: event.target.value })} data-testid="platform-connect-webhook-secret" /></label>
+            <label><span className="muted">Webhook URL</span><input className="input" readOnly value="/billing/customer-payments/webhooks/stripe-connect/:routeId" data-testid="platform-connect-webhook-url" /></label>
           </div>
           <label className="toggle-row"><input type="checkbox" checked={connectForm.confirmation} onChange={(event) => setConnectForm({ ...connectForm, confirmation: event.target.checked })} data-testid="platform-connect-confirm" /> Confirm this platform-only credential change or rotation.</label>
           <ActionRow>
-            <button className="button" disabled={!connectForm.confirmation || busy !== ""} onClick={() => runAction("connect-save", async () => { await apiFetch("/admin/platform/platform-configuration/payment-providers/stripe-connect", { method: "PATCH", body: JSON.stringify(connectForm) }); setConnectForm({ ...connectForm, platformSecret: "", webhookSecret: "", confirmation: false }); return "Stripe Connect credentials saved encrypted."; })} data-testid="platform-connect-save">Configure secrets</button>
+            <button className="button" disabled={!connectForm.confirmation || busy !== ""} onClick={() => runAction("connect-save", async () => { await apiFetch("/admin/platform/platform-configuration/payment-providers/stripe-connect", { method: "PATCH", body: JSON.stringify(connectForm) }); setConnectForm({ ...connectForm, platformSecret: "", webhookSecret: "", confirmation: false }); return "Stripe Connect credentials saved encrypted."; })} data-testid="platform-connect-save">Save / rotate</button>
             <button className="button secondary" disabled={busy !== ""} onClick={() => runAction("connect-verify", async () => { await apiFetch("/admin/platform/platform-configuration/payment-providers/stripe-connect/verify", { method: "POST", body: JSON.stringify({}) }); return "Stripe Connect readiness verification completed."; })} data-testid="platform-connect-verify">Verify readiness</button>
             <button className="button secondary" disabled={busy !== ""} onClick={() => runAction("connect-preflight", async () => { await apiFetch("/admin/platform/platform-configuration/payment-providers/stripe-connect/preflight", { method: "POST", body: JSON.stringify({}) }); return "Tenant onboarding preflight completed without creating a connected account."; })} data-testid="platform-connect-preflight">Generate onboarding test</button>
+            <button className="button secondary" disabled={busy !== ""} onClick={() => runAction("connect-reload", async () => { await apiFetch("/admin/platform/platform-configuration/payment-providers/stripe-connect/reload", { method: "POST", body: JSON.stringify({}) }); return "Stripe Connect runtime credentials reloaded."; })} data-testid="platform-connect-reload">Reload runtime</button>
           </ActionRow>
+          <label className="toggle-row"><input type="checkbox" checked={connectForm.deleteConfirmation} onChange={(event) => setConnectForm({ ...connectForm, deleteConfirmation: event.target.checked })} data-testid="platform-connect-delete-confirm" /> Confirm deleting saved Stripe Connect vault credentials.</label>
+          <ActionRow>
+            <button className="button secondary" disabled={!connectForm.deleteConfirmation || busy !== ""} onClick={() => runAction("connect-delete", async () => { await apiFetch("/admin/platform/platform-configuration/payment-providers/stripe-connect", { method: "DELETE", body: JSON.stringify({ confirmation: connectForm.deleteConfirmation }) }); setConnectForm({ ...connectForm, platformSecret: "", webhookSecret: "", confirmation: false, deleteConfirmation: false }); return "Stripe Connect vault credentials deleted."; })} data-testid="platform-connect-delete">Delete saved Connect credentials</button>
+          </ActionRow>
+          <div className="platform-admin-list" data-testid="platform-connect-canary-checklist">
+            <p><strong>Canary checklist</strong></p>
+            <p>Save credentials, verify readiness, generate onboarding test, confirm tenant-owned connected account evidence, then run the deposit/refund canary before marking customer payments ready.</p>
+            <p>View redacted logs in onboarding history, Platform Admin audit, and safe error logs. Full secrets are never displayed after save.</p>
+          </div>
           <HistoryList testId="platform-connect-last-onboarding-attempt" rows={connect?.lastOnboardingAttempt ? [`${formatTimestamp(connect.lastOnboardingAttempt.attemptedAt)} - ${connect.lastOnboardingAttempt.result} - ${connect.lastOnboardingAttempt.failureReason || "no redacted error"}`] : []} empty="No onboarding attempt recorded." />
         </InfrastructureCard>
 
-        <InfrastructureCard title="MyTitan Billing Stripe" testId="platform-mytitan-billing-stripe-status" status={billing?.configured ? "configured" : "missing_config"} source="runtime_environment" requiredConfig="Platform subscription prices, job-pack products, billing webhook, restricted billing key." owner="Platform finance operations" nextAction="Run subscription price verification and job-pack sync during release validation." lastChecked={null} diagnostics={`backend=${billing?.backendKeyType || "missing"} webhook=${billing?.webhookConfigured ? "present" : "missing"} purpose=platform_subscriptions_only`}>
+        <InfrastructureCard title="MyTitan Billing Stripe" testId="platform-mytitan-billing-stripe-status" status={billing?.readiness || (billing?.configured ? "configured" : "missing_config")} source={billing?.billingSecret?.source || "missing"} requiredConfig="Platform subscription prices, job-pack products, billing webhook, restricted billing key." owner="Platform finance operations" nextAction={billing?.readiness === "ready" ? "Run billing verification before release validation." : "Configure MyTitan Billing Stripe credentials."} lastChecked={billing?.lastVerifiedAt || billing?.updatedAt} diagnostics={`mode=${billing?.mode || "test"} billing_secret=${describeSecret(billing?.billingSecret)} webhook_secret=${describeSecret(billing?.webhookSecret)} Runtime loaded=${billing?.runtime?.runtimeLoaded ? "yes" : "no"} purpose=platform_subscriptions_only`}>
           <BoundaryNotice
             testId="platform-money-boundary"
             eyebrow="Platform money"
             copy="Used only for MyTitan subscriptions, plans, job packs, and platform billing. It must never receive customer deposit or invoice money for tenant businesses."
           />
+          <div className="platform-admin-detail-grid">
+            <label><span className="muted">Mode</span><select className="input" value={billingForm.mode} onChange={(event) => setBillingForm({ ...billingForm, mode: event.target.value })} data-testid="platform-billing-stripe-mode"><option value="test">Test</option><option value="live">Live</option></select></label>
+            <label><span className="muted">Billing Stripe secret</span><input className="input" type="password" value={billingForm.billingSecret} autoComplete="new-password" placeholder={billing?.billingSecret?.present ? `Stored ••••${billing.billingSecret.lastFour || ""}` : "sk_test_... or rk_test_..."} onChange={(event) => setBillingForm({ ...billingForm, billingSecret: event.target.value })} data-testid="platform-billing-stripe-secret" /></label>
+            <label><span className="muted">Billing webhook secret</span><input className="input" type="password" value={billingForm.webhookSecret} autoComplete="new-password" placeholder={billing?.webhookSecret?.present ? `Stored ••••${billing.webhookSecret.lastFour || ""}` : "whsec_..."} onChange={(event) => setBillingForm({ ...billingForm, webhookSecret: event.target.value })} data-testid="platform-billing-stripe-webhook-secret" /></label>
+          </div>
+          <label className="toggle-row"><input type="checkbox" checked={billingForm.confirmation} onChange={(event) => setBillingForm({ ...billingForm, confirmation: event.target.checked })} data-testid="platform-billing-stripe-confirm" /> Confirm this MyTitan platform-billing credential change or rotation.</label>
+          <ActionRow>
+            <button className="button" disabled={!billingForm.confirmation || busy !== ""} onClick={() => runAction("billing-stripe-save", async () => { await apiFetch("/admin/platform/platform-configuration/payment-providers/mytitan-billing-stripe", { method: "PATCH", body: JSON.stringify(billingForm) }); setBillingForm({ ...billingForm, billingSecret: "", webhookSecret: "", confirmation: false }); return "MyTitan Billing Stripe credentials saved encrypted."; })} data-testid="platform-billing-stripe-save">Save / rotate</button>
+            <button className="button secondary" disabled={busy !== ""} onClick={() => runAction("billing-stripe-verify", async () => { await apiFetch("/admin/platform/platform-configuration/payment-providers/mytitan-billing-stripe/verify", { method: "POST", body: JSON.stringify({}) }); return "MyTitan Billing Stripe readiness verification completed."; })} data-testid="platform-billing-stripe-verify">Verify billing readiness</button>
+            <button className="button secondary" disabled={busy !== ""} onClick={() => runAction("billing-stripe-subscription-prices", async () => { await apiFetch("/admin/platform/platform-configuration/payment-providers/mytitan-billing-stripe/verify-subscription-prices", { method: "POST", body: JSON.stringify({}) }); return "Subscription price verification completed without creating or mutating prices."; })} data-testid="platform-billing-stripe-verify-prices">Verify subscription prices</button>
+            <button className="button secondary" disabled={busy !== ""} onClick={() => runAction("billing-stripe-job-packs", async () => { await apiFetch("/admin/platform/platform-configuration/payment-providers/mytitan-billing-stripe/sync-job-packs", { method: "POST", body: JSON.stringify({}) }); return "Job-pack catalog validation completed without Infrastructure product mutation."; })} data-testid="platform-billing-stripe-sync-job-packs">Sync job-pack catalog</button>
+            <button className="button secondary" disabled={busy !== ""} onClick={() => runAction("billing-stripe-reload", async () => { await apiFetch("/admin/platform/platform-configuration/payment-providers/mytitan-billing-stripe/reload", { method: "POST", body: JSON.stringify({}) }); return "MyTitan Billing Stripe runtime credentials reloaded."; })} data-testid="platform-billing-stripe-reload">Reload runtime</button>
+          </ActionRow>
+          <label className="toggle-row"><input type="checkbox" checked={billingForm.deleteConfirmation} onChange={(event) => setBillingForm({ ...billingForm, deleteConfirmation: event.target.checked })} data-testid="platform-billing-stripe-delete-confirm" /> Confirm deleting saved MyTitan Billing Stripe vault credentials.</label>
+          <ActionRow>
+            <button className="button secondary" disabled={!billingForm.deleteConfirmation || busy !== ""} onClick={() => runAction("billing-stripe-delete", async () => { await apiFetch("/admin/platform/platform-configuration/payment-providers/mytitan-billing-stripe", { method: "DELETE", body: JSON.stringify({ confirmation: billingForm.deleteConfirmation }) }); setBillingForm({ ...billingForm, billingSecret: "", webhookSecret: "", confirmation: false, deleteConfirmation: false }); return "MyTitan Billing Stripe vault credentials deleted."; })} data-testid="platform-billing-stripe-delete">Delete saved billing credentials</button>
+          </ActionRow>
           <div className="platform-admin-list" data-testid="mytitan-billing-validation-notes">
-            <p><strong>Validation only</strong></p>
+            <p><strong>Validation and safe configuration only</strong></p>
             <p>Verify subscription prices and sync the job-pack catalog during release validation. Do not mutate Stripe products or prices from this infrastructure page.</p>
+            <p>View redacted logs in Platform Admin audit and safe error logs. Full secrets are never displayed after save.</p>
           </div>
         </InfrastructureCard>
 
