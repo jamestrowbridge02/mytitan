@@ -30,6 +30,7 @@ test.describe("Company OS", () => {
     await expect(page.getByTestId("company-os-section-engineering")).toContainText("Engineering Excellence");
     await expect(page.getByTestId("company-os-engineering-dashboard")).toContainText("Test suite status");
     await expect(page.getByTestId("company-os-platform-operations")).toContainText("External uptime");
+    await expect(page.getByTestId("company-os-section-operations")).toContainText("Infrastructure");
     await expect(page.getByTestId("company-os-autopilot-linkage")).toContainText("Autopilot");
     await expect(page.locator("body")).not.toContainText(/sk_live_|sk_test_|whsec_|platformSecretEncrypted|webhookSecretEncrypted|smtpPasswordEncrypted/i);
 
