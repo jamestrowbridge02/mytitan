@@ -18,6 +18,8 @@
     "auth:verify-platform-admin-runtime": "node scripts/verify-platform-admin-runtime.js",
     "auth:issue-principal-admin-reset": "node scripts/issue-principal-admin-reset.js",
     "auth:reset-principal-admin-password": "node scripts/reset-principal-admin-password.js",
+    "auth:verify-principal-admin-immutability": "node scripts/verify-principal-admin-immutability.js",
+    "platform:verify-protected-records": "node scripts/verify-protected-records.js",
     "notifications:verify-password-reset-routing": "node scripts/verify-password-reset-routing.js",
     "notifications:send-test-email": "node scripts/send-test-email.js",
     "seed:wheel-ar-pilot": "node scripts/seed-wheel-ar-pilot.js",

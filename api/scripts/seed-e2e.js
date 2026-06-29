@@ -5,13 +5,18 @@ const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 const fs = require("fs/promises");
 const path = require("path");
+const {
+  PRINCIPAL_ADMIN_EMAIL,
+  assertE2eScope,
+  isMytitanStaffEmail,
+  normalizeEmail,
+  recordProtectedMutationWarning,
+} = require("./protected-mutation-policy");
 
 const prisma = new PrismaClient();
 
 function assertE2EWorkspaceId(companyId, action) {
-  if (!String(companyId || "").startsWith("e2e-")) {
-    throw new Error(`Refusing ${action}: E2E seed cleanup can only target explicit e2e-* workspace ids.`);
-  }
+  assertE2eScope(companyId, action);
 }
 
 const FIXTURE = {
@@ -486,7 +491,26 @@ async function ensureOperator(companyId, locationId) {
 }
 
 async function ensureWorkspaceUser(companyId, locationId, fixture) {
+  const existing = await prisma.user.findFirst({
+    where: {
+      OR: [{ id: fixture.id }, { companyId, email: fixture.email }],
+    },
+    select: { id: true, email: true, emailVerified: true, passwordHash: true },
+  });
   const passwordHash = await bcrypt.hash(fixture.password, 10);
+  const preserveProtectedStaffHash =
+    existing?.passwordHash &&
+    existing.emailVerified === true &&
+    isMytitanStaffEmail(existing.email || fixture.email);
+  if (preserveProtectedStaffHash) {
+    await recordProtectedMutationWarning(prisma, {
+      action: "seed:e2e preserve staff password hash",
+      area: "principal and platform staff",
+      target: normalizeEmail(existing.email || fixture.email),
+      summary: "E2E seed preserved an existing verified MyTitan staff password hash.",
+      sourceRef: "api/scripts/seed-e2e.js",
+    });
+  }
   const user = await prisma.user.upsert({
     where: { id: fixture.id },
     create: {
@@ -504,7 +528,7 @@ async function ensureWorkspaceUser(companyId, locationId, fixture) {
       companyId,
       email: fixture.email,
       emailVerified: fixture.emailVerified === false ? false : true,
-      passwordHash,
+      ...(preserveProtectedStaffHash ? {} : { passwordHash }),
       role: fixture.role,
       defaultLocationId: locationId,
       lastActiveAt: new Date(),
@@ -579,12 +603,17 @@ async function ensurePlatformAdminUser(companyId, locationId) {
   };
 
   if (principal) {
+    await recordProtectedMutationWarning(prisma, {
+      action: "seed:e2e preserve principal admin password hash",
+      area: "principal admin",
+      target: PRINCIPAL_ADMIN_EMAIL,
+      summary: "E2E seed preserved the existing principal admin password hash.",
+      sourceRef: "api/scripts/seed-e2e.js",
+    });
     const user = await prisma.user.update({
       where: { id: principal.id },
       data: {
         ...activeData,
-        passwordHash: await fixturePasswordHash(),
-        tokenVersion: { increment: 1 },
       },
     });
     if (stale && stale.id !== principal.id) {
@@ -971,12 +1000,29 @@ async function ensurePlatformSafeErrorLogs(platformAdminUserId) {
 
 async function ensureInternalSupportWorkspace(planId) {
   const supportEmail = FIXTURE.supportAccount.user.email;
+  const existingSupport = await prisma.user.findFirst({
+    where: {
+      OR: [{ id: FIXTURE.supportAccount.user.id }, { email: supportEmail }],
+    },
+    select: { id: true, email: true, emailVerified: true, passwordHash: true },
+  });
   const passwordHash = await bcrypt.hash(FIXTURE.supportAccount.user.password, 10);
+  const preserveSupportHash = existingSupport?.passwordHash && existingSupport.emailVerified === true;
+  if (preserveSupportHash) {
+    await recordProtectedMutationWarning(prisma, {
+      action: "seed:e2e preserve support staff password hash",
+      area: "principal and platform staff",
+      target: normalizeEmail(supportEmail),
+      summary: "E2E seed preserved the existing support staff password hash.",
+      sourceRef: "api/scripts/seed-e2e.js",
+    });
+  }
 
   await prisma.user.deleteMany({
     where: {
       email: supportEmail,
       id: { not: FIXTURE.supportAccount.user.id },
+      companyId: { startsWith: "e2e-" },
     },
   });
 
@@ -1011,7 +1057,7 @@ async function ensureInternalSupportWorkspace(planId) {
       companyId: company.id,
       email: supportEmail,
       emailVerified: true,
-      passwordHash,
+      ...(preserveSupportHash ? {} : { passwordHash }),
       role: FIXTURE.supportAccount.user.role,
       lastActiveAt: new Date(),
     },
@@ -1991,8 +2037,13 @@ async function main() {
 
   console.log("Seeding deterministic MyTitan E2E fixtures...");
 
-  await prisma.platformEmailProviderConfig.deleteMany({ where: { id: "system_email" } }).catch(() => undefined);
-  await prisma.platformExternalMonitorConfig.deleteMany({ where: { id: "external_monitor" } }).catch(() => undefined);
+  await recordProtectedMutationWarning(prisma, {
+    action: "seed:e2e preserve provider configuration",
+    area: "provider configuration",
+    target: "platform provider and email config",
+    summary: "E2E seed does not delete platform email, monitor, or payment provider configuration rows.",
+    sourceRef: "api/scripts/seed-e2e.js",
+  });
 
   const company = await ensureCompany();
   const locations = await ensureLocations(company.id);

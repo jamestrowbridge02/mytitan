@@ -23,16 +23,16 @@ test.describe("platform backend admin recovery", () => {
     async function requestAdminResetHref() {
       const response = await requestLocalApi(request, "/auth/forgot-password", {
         method: "POST",
-        data: { email: ` ${fixtureRefs.platformAdminEmail.toUpperCase()} ` },
+        data: { email: ` ${fixtureRefs.principalAdminEmail.toUpperCase()} ` },
       });
       expect(response.status()).toBe(202);
       expect(JSON.stringify(await response.json())).not.toMatch(/reset_|token|passwordHash/i);
       await expect.poll(async () => {
-        const fixtureResponse = await requestLocalApi(request, `/auth/e2e/password-reset-link?email=${encodeURIComponent(fixtureRefs.platformAdminEmail)}`);
+        const fixtureResponse = await requestLocalApi(request, `/auth/e2e/password-reset-link?email=${encodeURIComponent(fixtureRefs.principalAdminEmail)}`);
         const payload = await fixtureResponse.json();
         return String(payload?.resetHref || "");
       }, { timeout: 5000 }).toContain("/reset-password?token=");
-      const fixtureResponse = await requestLocalApi(request, `/auth/e2e/password-reset-link?email=${encodeURIComponent(fixtureRefs.platformAdminEmail)}`);
+      const fixtureResponse = await requestLocalApi(request, `/auth/e2e/password-reset-link?email=${encodeURIComponent(fixtureRefs.principalAdminEmail)}`);
       return String((await fixtureResponse.json())?.resetHref || "");
     }
 
@@ -51,15 +51,15 @@ test.describe("platform backend admin recovery", () => {
     await resetAdminPassword(await requestAdminResetHref(), temporaryPassword);
     const recoveredLogin = await requestLocalApi(request, "/auth/login", {
       method: "POST",
-      data: { email: fixtureRefs.platformAdminEmail, password: temporaryPassword },
+      data: { email: fixtureRefs.principalAdminEmail, password: temporaryPassword },
     });
     expect(recoveredLogin.ok()).toBeTruthy();
     expect((await recoveredLogin.json())?.user?.platformAdmin).toBe(true);
 
-    await resetAdminPassword(await requestAdminResetHref(), fixtureRefs.platformAdminPassword);
+    await resetAdminPassword(await requestAdminResetHref(), fixtureRefs.principalAdminPassword);
     const restoredLogin = await requestLocalApi(request, "/auth/login", {
       method: "POST",
-      data: { email: fixtureRefs.platformAdminEmail, password: fixtureRefs.platformAdminPassword },
+      data: { email: fixtureRefs.principalAdminEmail, password: fixtureRefs.principalAdminPassword },
     });
     expect(restoredLogin.ok()).toBeTruthy();
     expect((await restoredLogin.json())?.user?.platformAdmin).toBe(true);
@@ -128,7 +128,7 @@ test.describe("platform backend admin recovery", () => {
 
     const recoveredLogin = await requestLocalApi(request, "/auth/login", {
       method: "POST",
-      data: { email: fixtureRefs.platformAdminEmail, password: nextPassword },
+      data: { email: fixtureRefs.principalAdminEmail, password: nextPassword },
     });
     expect(recoveredLogin.ok()).toBeTruthy();
     expect((await recoveredLogin.json())?.user?.platformAdmin).toBe(true);
@@ -144,13 +144,13 @@ test.describe("platform backend admin recovery", () => {
     ], { encoding: "utf8" });
     expect(auditOutput).toContain("audit_present");
 
-    const restoreOutput = runReset(fixtureRefs.platformAdminPassword);
+    const restoreOutput = runReset(fixtureRefs.principalAdminPassword);
     expect(restoreOutput).toContain('"ok": true');
     expect(restoreOutput).not.toMatch(secretPattern);
 
     const restoredLogin = await requestLocalApi(request, "/auth/login", {
       method: "POST",
-      data: { email: fixtureRefs.platformAdminEmail, password: fixtureRefs.platformAdminPassword },
+      data: { email: fixtureRefs.principalAdminEmail, password: fixtureRefs.principalAdminPassword },
     });
     expect(restoredLogin.ok()).toBeTruthy();
     expect((await restoredLogin.json())?.user?.platformAdmin).toBe(true);

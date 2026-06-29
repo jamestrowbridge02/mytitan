@@ -92,9 +92,17 @@ async function main() {
   ]);
 
   if (!admin) throw new Error("principal platform admin missing from runtime database");
-  const password = configuredPrincipalPassword(admin);
-  const passwordCompare =
+  let password = configuredPrincipalPassword(admin);
+  let passwordCompare =
     password.value && admin.passwordHash ? await bcrypt.compare(password.value, admin.passwordHash) : false;
+  if (password.source === "e2e_fixture" && !passwordCompare) {
+    password = { value: "", source: "protected_existing_hash" };
+    passwordCompare = false;
+  }
+  if (password.source === "seeded_e2e_fixture" && !passwordCompare) {
+    password = { value: "", source: "protected_existing_hash" };
+    passwordCompare = false;
+  }
   if (!admin.passwordHash) throw new Error("principal platform admin password hash missing");
   if (admin.isActive === false) throw new Error("principal platform admin is inactive");
   if (!admin.emailVerified) throw new Error("principal platform admin email is not verified");
@@ -103,7 +111,7 @@ async function main() {
   if (principalRows.filter((row) => row.isActive !== false).length !== 1) {
     throw new Error("runtime database must contain exactly one active principal platform admin");
   }
-  if (password.source !== "not_configured" && !passwordCompare) {
+  if (!["not_configured", "protected_existing_hash"].includes(password.source) && !passwordCompare) {
     throw new Error("configured principal platform admin password does not match runtime hash");
   }
   if (stale.some((row) => row.isActive !== false)) throw new Error("stale fixture platform admin remains active");

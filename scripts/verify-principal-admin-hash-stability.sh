@@ -26,8 +26,11 @@ echo "PRINCIPAL_ADMIN_HASH_STABILITY:baseline captured"
 docker exec -w /app mytitan_api /bin/sh -lc 'npm run seed:e2e' >/dev/null
 assert_hash_unchanged "seed_e2e" "$baseline"
 
-docker exec -w /app mytitan_api /bin/sh -lc 'node -e "const {PrismaClient}=require(\"@prisma/client\");const db=new PrismaClient();(async()=>{await db.platformEmailProviderConfig.deleteMany({where:{id:\"system_email\"}}).catch(()=>undefined);await db.platformExternalMonitorConfig.deleteMany({where:{id:\"external_monitor\"}}).catch(()=>undefined);await db.\$disconnect();})().catch(async e=>{console.error(e.message);await db.\$disconnect();process.exit(1);});"' >/dev/null
-assert_hash_unchanged "infrastructure_config_cleanup" "$baseline"
+docker exec -w /app mytitan_api /bin/sh -lc 'npm run auth:verify-principal-admin-immutability' >/dev/null
+assert_hash_unchanged "principal_admin_immutability_verifier" "$baseline"
+
+docker exec -w /app mytitan_api /bin/sh -lc 'npm run platform:verify-protected-records' >/dev/null
+assert_hash_unchanged "protected_records_verifier" "$baseline"
 
 docker compose -p mytitan up -d --force-recreate api app >/dev/null
 assert_hash_unchanged "docker_recreate" "$baseline"
