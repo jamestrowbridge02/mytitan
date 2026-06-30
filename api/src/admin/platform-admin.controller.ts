@@ -660,6 +660,9 @@ export class PlatformAdminController {
   ) {
     await this.assertAccess(user, req, 'platform.payment_provider_config.update');
     const requestId = String(req.requestId || req.headers['x-request-id'] || '').trim() || 'unknown';
+    const normalizeCredentialLength = (value: any) => String(value || '').replace(/[\s\u200B-\u200D\uFEFF]+/g, '').trim().length;
+    const receivedPlatformSecretLength = normalizeCredentialLength(body?.platformSecret);
+    const receivedWebhookSecretLength = normalizeCredentialLength(body?.webhookSecret);
     try {
       return {
         ok: true,
@@ -672,15 +675,25 @@ export class PlatformAdminController {
           actorUserId: user.sub,
         }),
         requestId,
+        receivedPlatformSecretLength,
+        receivedWebhookSecretLength,
       };
     } catch (error: any) {
       const reason = String(error?.message || 'Stripe Connect configuration save failed').slice(0, 180);
       await this.audit.log(
         user.companyId,
         'platform.payment_provider_config.save_failed',
-        `Stripe Connect configuration save failed. RequestId=${requestId} Reason=${reason}`,
+        `Stripe Connect configuration save failed. RequestId=${requestId} PlatformSecretLength=${receivedPlatformSecretLength} WebhookSecretLength=${receivedWebhookSecretLength} Reason=${reason}`,
         user.sub,
       );
+      if (error instanceof BadRequestException) {
+        throw new BadRequestException({
+          message: reason,
+          requestId,
+          receivedPlatformSecretLength,
+          receivedWebhookSecretLength,
+        });
+      }
       throw error;
     }
   }

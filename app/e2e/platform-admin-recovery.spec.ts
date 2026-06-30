@@ -719,13 +719,31 @@ test.describe("platform backend admin recovery", () => {
     await page.goto("/platform/configuration", { waitUntil: "networkidle" });
     await expect(page.getByTestId("platform-payment-provider-vault")).toBeVisible();
 
-    await page.getByTestId("platform-connect-secret").fill("not_a_stripe_secret");
-    await page.getByTestId("platform-connect-webhook-secret").fill("whsec_rejected_input_kept");
+    let connectSaveRequests = 0;
+    page.on("request", (apiRequest) => {
+      if (apiRequest.method() === "PATCH" && apiRequest.url().includes("/platform-configuration/payment-providers/stripe-connect")) {
+        connectSaveRequests += 1;
+      }
+    });
+
     await page.getByTestId("platform-connect-confirm").check();
     await page.getByTestId("platform-connect-save").click();
+    await expect(page.locator("body")).toContainText(/one or both fields are empty/i);
+    await expect(page.getByTestId("platform-connect-submit-debug")).toContainText("platform=0 webhook=0");
+    await page.waitForTimeout(250);
+    expect(connectSaveRequests).toBe(0);
+
+    await page.getByTestId("platform-connect-secret").fill("not_a_stripe_secret");
+    await page.getByTestId("platform-connect-webhook-secret").fill("whsec_rejected_input_kept");
+    const connectRequest = page.waitForRequest((apiRequest) => apiRequest.method() === "PATCH" && apiRequest.url().includes("/platform-configuration/payment-providers/stripe-connect"));
+    await page.getByTestId("platform-connect-save").click();
+    const payload = JSON.parse((await connectRequest).postData() || "{}");
+    expect(String(payload.platformSecret || "").length).toBeGreaterThan(0);
+    expect(String(payload.webhookSecret || "").length).toBeGreaterThan(0);
 
     await expect(page.locator("body")).toContainText(/requires a matching (test|live) secret key|Action failed/i);
     await expect(page.locator("body")).toContainText(/Request ID:/i);
+    await expect(page.getByTestId("platform-connect-submit-debug")).toContainText(/platform=\d+ webhook=\d+ requestId=/);
     await expect(page.getByTestId("platform-connect-secret")).toHaveValue("not_a_stripe_secret");
     await expect(page.getByTestId("platform-connect-webhook-secret")).toHaveValue("whsec_rejected_input_kept");
   });

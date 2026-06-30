@@ -18,6 +18,7 @@ export default function PlatformInfrastructurePage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [testEmailTo, setTestEmailTo] = useState("");
+  const [connectDebug, setConnectDebug] = useState<{ sentPlatformSecretLength: number; sentWebhookSecretLength: number; requestId?: string | null } | null>(null);
   const [billingForm, setBillingForm] = useState({ mode: "test", billingSecret: "", webhookSecret: "", confirmation: false, deleteConfirmation: false });
   const [connectForm, setConnectForm] = useState({ mode: "test", platformSecret: "", webhookSecret: "", confirmation: false, deleteConfirmation: false });
   const [emailForm, setEmailForm] = useState<any>({ provider: "smtp", host: "", port: 587, tlsMode: "starttls", username: "", secret: "", fromEmail: "", fromName: "MyTitan", replyToEmail: "", operatorTestRecipient: "", spfStatus: "unknown", dkimStatus: "unknown", dmarcStatus: "unknown", evidence: "" });
@@ -81,6 +82,14 @@ export default function PlatformInfrastructurePage() {
       await load();
     } catch (actionError: any) {
       const requestId = actionError?.requestId ? ` Request ID: ${actionError.requestId}` : "";
+      if (name === "connect-save") {
+        const payload = actionError?.payload || {};
+        setConnectDebug((current) => ({
+          sentPlatformSecretLength: Number(payload.receivedPlatformSecretLength ?? current?.sentPlatformSecretLength ?? 0),
+          sentWebhookSecretLength: Number(payload.receivedWebhookSecretLength ?? current?.sentWebhookSecretLength ?? 0),
+          requestId: actionError?.requestId || payload.requestId || current?.requestId || null,
+        }));
+      }
       setError(`${actionError?.message || "Action failed."}${requestId}`);
       await load().catch(() => undefined);
     } finally {
@@ -94,10 +103,31 @@ export default function PlatformInfrastructurePage() {
     }
   }
 
+  function connectPayloadFromForm() {
+    return {
+      mode: connectForm.mode === "live" ? "live" : "test",
+      platformSecret: String(connectForm.platformSecret || ""),
+      webhookSecret: String(connectForm.webhookSecret || ""),
+      confirmation: connectForm.confirmation === true,
+    };
+  }
+
   async function saveStripeConnectConfiguration() {
+    const payload = connectPayloadFromForm();
+    const sentPlatformSecretLength = payload.platformSecret.trim().length;
+    const sentWebhookSecretLength = payload.webhookSecret.trim().length;
+    setConnectDebug({ sentPlatformSecretLength, sentWebhookSecretLength, requestId: null });
+    if (sentPlatformSecretLength === 0 || sentWebhookSecretLength === 0) {
+      throw new Error(`Stripe Connect credentials were not submitted because one or both fields are empty. sentPlatformSecretLength=${sentPlatformSecretLength} sentWebhookSecretLength=${sentWebhookSecretLength}`);
+    }
     const response = await apiFetch("/admin/platform/platform-configuration/payment-providers/stripe-connect", {
       method: "PATCH",
-      body: JSON.stringify(connectForm),
+      body: JSON.stringify(payload),
+    });
+    setConnectDebug({
+      sentPlatformSecretLength: Number(response?.receivedPlatformSecretLength ?? sentPlatformSecretLength),
+      sentWebhookSecretLength: Number(response?.receivedWebhookSecretLength ?? sentWebhookSecretLength),
+      requestId: response?.requestId || null,
     });
     const saved = response?.stripeConnect;
     assertPersistedRuntime(saved, "Stripe Connect credentials");
@@ -108,7 +138,7 @@ export default function PlatformInfrastructurePage() {
       webhookSecret: "",
       confirmation: false,
     }));
-    return `Stripe Connect credentials saved encrypted and loaded.${response?.requestId ? ` Request ID: ${response.requestId}` : ""}`;
+    return `Stripe Connect credentials saved encrypted and loaded. sentPlatformSecretLength=${sentPlatformSecretLength} sentWebhookSecretLength=${sentWebhookSecretLength}${response?.requestId ? ` Request ID: ${response.requestId}` : ""}`;
   }
 
   async function saveEmailProviderConfiguration() {
@@ -257,9 +287,9 @@ export default function PlatformInfrastructurePage() {
             <p>Tenant customer money must never be routed through MyTitan Billing Stripe.</p>
           </div>
           <div className="platform-admin-detail-grid">
-            <label><span className="muted">Mode</span><select className="input" value={connectForm.mode} onChange={(event) => setConnectForm({ ...connectForm, mode: event.target.value })} data-testid="platform-connect-mode"><option value="test">Test</option><option value="live">Live</option></select></label>
-            <label><span className="muted">Platform secret</span><input className="input" type="password" value={connectForm.platformSecret} autoComplete="new-password" placeholder={connect?.platformSecret?.present ? `Stored ••••${connect.platformSecret.lastFour || ""}` : "sk_test_... or sk_live_..."} onChange={(event) => setConnectForm({ ...connectForm, platformSecret: event.target.value })} data-testid="platform-connect-secret" /></label>
-            <label><span className="muted">Webhook secret</span><input className="input" type="password" value={connectForm.webhookSecret} autoComplete="new-password" placeholder={connect?.webhookSecret?.present ? `Stored ••••${connect.webhookSecret.lastFour || ""}` : "whsec_..."} onChange={(event) => setConnectForm({ ...connectForm, webhookSecret: event.target.value })} data-testid="platform-connect-webhook-secret" /></label>
+            <label><span className="muted">Mode</span><select className="input" value={connectForm.mode} onChange={(event) => setConnectForm((current) => ({ ...current, mode: event.target.value }))} data-testid="platform-connect-mode"><option value="test">Test</option><option value="live">Live</option></select></label>
+            <label><span className="muted">Platform secret</span><input className="input" type="password" name="platformSecret" value={connectForm.platformSecret} autoComplete="new-password" placeholder={connect?.platformSecret?.present ? `Stored ••••${connect.platformSecret.lastFour || ""}` : "sk_test_... or sk_live_..."} onChange={(event) => setConnectForm((current) => ({ ...current, platformSecret: event.target.value }))} data-testid="platform-connect-secret" /></label>
+            <label><span className="muted">Webhook secret</span><input className="input" type="password" name="webhookSecret" value={connectForm.webhookSecret} autoComplete="new-password" placeholder={connect?.webhookSecret?.present ? `Stored ••••${connect.webhookSecret.lastFour || ""}` : "whsec_..."} onChange={(event) => setConnectForm((current) => ({ ...current, webhookSecret: event.target.value }))} data-testid="platform-connect-webhook-secret" /></label>
             <div className="platform-admin-list" data-testid="platform-connect-webhook-url-panel">
               <p><strong>Recommended Stripe Connect Webhook URL</strong></p>
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
@@ -279,15 +309,16 @@ export default function PlatformInfrastructurePage() {
             <p>Webhook secret: {describeStoredSecret(connect?.webhookSecret)}</p>
             <p>Runtime loaded: {connect?.runtime?.runtimeLoaded ? "yes" : "no"}</p>
             <p>Last saved: {formatTimestamp(connect?.lastSavedAt || connect?.updatedAt)}</p>
+            {connectDebug ? <p data-testid="platform-connect-submit-debug">Last submit lengths: platform={connectDebug.sentPlatformSecretLength} webhook={connectDebug.sentWebhookSecretLength}{connectDebug.requestId ? ` requestId=${connectDebug.requestId}` : ""}</p> : null}
           </div>
-          <label className="toggle-row"><input type="checkbox" checked={connectForm.confirmation} onChange={(event) => setConnectForm({ ...connectForm, confirmation: event.target.checked })} data-testid="platform-connect-confirm" /> Confirm this platform-only credential change or rotation.</label>
+          <label className="toggle-row"><input type="checkbox" checked={connectForm.confirmation} onChange={(event) => setConnectForm((current) => ({ ...current, confirmation: event.target.checked }))} data-testid="platform-connect-confirm" /> Confirm this platform-only credential change or rotation.</label>
           <ActionRow>
             <button className="button" disabled={!connectForm.confirmation || busy !== ""} onClick={() => runAction("connect-save", saveStripeConnectConfiguration)} data-testid="platform-connect-save">Save / rotate</button>
             <button className="button secondary" disabled={busy !== ""} onClick={() => runAction("connect-verify", async () => { await apiFetch("/admin/platform/platform-configuration/payment-providers/stripe-connect/verify", { method: "POST", body: JSON.stringify({}) }); return "Stripe Connect readiness verification completed."; })} data-testid="platform-connect-verify">Verify readiness</button>
             <button className="button secondary" disabled={busy !== ""} onClick={() => runAction("connect-preflight", async () => { await apiFetch("/admin/platform/platform-configuration/payment-providers/stripe-connect/preflight", { method: "POST", body: JSON.stringify({}) }); return "Tenant onboarding preflight completed without creating a connected account."; })} data-testid="platform-connect-preflight">Generate onboarding test</button>
             <button className="button secondary" disabled={busy !== ""} onClick={() => runAction("connect-reload", async () => { await apiFetch("/admin/platform/platform-configuration/payment-providers/stripe-connect/reload", { method: "POST", body: JSON.stringify({}) }); return "Stripe Connect runtime credentials reloaded."; })} data-testid="platform-connect-reload">Reload runtime</button>
           </ActionRow>
-          <label className="toggle-row"><input type="checkbox" checked={connectForm.deleteConfirmation} onChange={(event) => setConnectForm({ ...connectForm, deleteConfirmation: event.target.checked })} data-testid="platform-connect-delete-confirm" /> Confirm deleting saved Stripe Connect vault credentials.</label>
+          <label className="toggle-row"><input type="checkbox" checked={connectForm.deleteConfirmation} onChange={(event) => setConnectForm((current) => ({ ...current, deleteConfirmation: event.target.checked }))} data-testid="platform-connect-delete-confirm" /> Confirm deleting saved Stripe Connect vault credentials.</label>
           <ActionRow>
             <button className="button secondary" disabled={!connectForm.deleteConfirmation || busy !== ""} onClick={() => runAction("connect-delete", deleteStripeConnectConfiguration)} data-testid="platform-connect-delete">Delete saved Connect credentials</button>
           </ActionRow>
