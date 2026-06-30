@@ -725,6 +725,7 @@ test.describe("platform backend admin recovery", () => {
     await page.getByTestId("platform-connect-save").click();
 
     await expect(page.locator("body")).toContainText(/requires a matching (test|live) secret key|Action failed/i);
+    await expect(page.locator("body")).toContainText(/Request ID:/i);
     await expect(page.getByTestId("platform-connect-secret")).toHaveValue("not_a_stripe_secret");
     await expect(page.getByTestId("platform-connect-webhook-secret")).toHaveValue("whsec_rejected_input_kept");
   });

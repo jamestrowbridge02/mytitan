@@ -80,7 +80,8 @@ export default function PlatformInfrastructurePage() {
       setMessage(nextMessage || "Action completed.");
       await load();
     } catch (actionError: any) {
-      setError(actionError?.message || "Action failed.");
+      const requestId = actionError?.requestId ? ` Request ID: ${actionError.requestId}` : "";
+      setError(`${actionError?.message || "Action failed."}${requestId}`);
       await load().catch(() => undefined);
     } finally {
       setBusy("");
@@ -107,7 +108,7 @@ export default function PlatformInfrastructurePage() {
       webhookSecret: "",
       confirmation: false,
     }));
-    return "Stripe Connect credentials saved encrypted and loaded.";
+    return `Stripe Connect credentials saved encrypted and loaded.${response?.requestId ? ` Request ID: ${response.requestId}` : ""}`;
   }
 
   async function saveEmailProviderConfiguration() {

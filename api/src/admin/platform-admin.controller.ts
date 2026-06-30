@@ -659,17 +659,30 @@ export class PlatformAdminController {
     @Req() req: Request & { requestId?: string },
   ) {
     await this.assertAccess(user, req, 'platform.payment_provider_config.update');
-    return {
-      ok: true,
-      stripeConnect: await this.paymentProviderConfig.save({
-        platformSecret: body?.platformSecret,
-        webhookSecret: body?.webhookSecret,
-        mode: body?.mode,
-        confirmation: body?.confirmation === true,
-        actorCompanyId: user.companyId,
-        actorUserId: user.sub,
-      }),
-    };
+    const requestId = String(req.requestId || req.headers['x-request-id'] || '').trim() || 'unknown';
+    try {
+      return {
+        ok: true,
+        stripeConnect: await this.paymentProviderConfig.save({
+          platformSecret: body?.platformSecret,
+          webhookSecret: body?.webhookSecret,
+          mode: body?.mode,
+          confirmation: body?.confirmation === true,
+          actorCompanyId: user.companyId,
+          actorUserId: user.sub,
+        }),
+        requestId,
+      };
+    } catch (error: any) {
+      const reason = String(error?.message || 'Stripe Connect configuration save failed').slice(0, 180);
+      await this.audit.log(
+        user.companyId,
+        'platform.payment_provider_config.save_failed',
+        `Stripe Connect configuration save failed. RequestId=${requestId} Reason=${reason}`,
+        user.sub,
+      );
+      throw error;
+    }
   }
 
   @Post('platform-configuration/payment-providers/stripe-connect/verify')
