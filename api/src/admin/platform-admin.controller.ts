@@ -679,11 +679,26 @@ export class PlatformAdminController {
         receivedWebhookSecretLength,
       };
     } catch (error: any) {
-      const reason = String(error?.message || 'Stripe Connect configuration save failed').slice(0, 180);
+      const errorResponse = typeof error?.getResponse === 'function' ? error.getResponse() : null;
+      const responseMessage =
+        errorResponse && typeof errorResponse === 'object' && 'message' in errorResponse
+          ? (errorResponse as any).message
+          : null;
+      const reason = String(responseMessage || error?.message || 'Stripe Connect configuration save failed').slice(0, 300);
+      const safeValidation =
+        errorResponse && typeof errorResponse === 'object'
+          ? {
+              platformSecretValidation: (errorResponse as any).platformSecretValidation || null,
+              webhookSecretValidation: (errorResponse as any).webhookSecretValidation || null,
+            }
+          : {
+              platformSecretValidation: null,
+              webhookSecretValidation: null,
+            };
       await this.audit.log(
         user.companyId,
         'platform.payment_provider_config.save_failed',
-        `Stripe Connect configuration save failed. RequestId=${requestId} PlatformSecretLength=${receivedPlatformSecretLength} WebhookSecretLength=${receivedWebhookSecretLength} Reason=${reason}`,
+        `Stripe Connect configuration save failed. RequestId=${requestId} PlatformSecretLength=${receivedPlatformSecretLength} WebhookSecretLength=${receivedWebhookSecretLength} Reason=${reason} Validation=${JSON.stringify(safeValidation)}`,
         user.sub,
       );
       if (error instanceof BadRequestException) {
@@ -692,6 +707,7 @@ export class PlatformAdminController {
           requestId,
           receivedPlatformSecretLength,
           receivedWebhookSecretLength,
+          ...safeValidation,
         });
       }
       throw error;

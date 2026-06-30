@@ -730,6 +730,8 @@ test.describe("platform backend admin recovery", () => {
     await page.getByTestId("platform-connect-save").click();
     await expect(page.locator("body")).toContainText(/one or both fields are empty/i);
     await expect(page.getByTestId("platform-connect-submit-debug")).toContainText("platform=0 webhook=0");
+    await expect(page.getByTestId("platform-connect-secret-error")).toContainText(/required/i);
+    await expect(page.getByTestId("platform-connect-webhook-secret-error")).toContainText(/required/i);
     await page.waitForTimeout(250);
     expect(connectSaveRequests).toBe(0);
 
@@ -741,8 +743,9 @@ test.describe("platform backend admin recovery", () => {
     expect(String(payload.platformSecret || "").length).toBeGreaterThan(0);
     expect(String(payload.webhookSecret || "").length).toBeGreaterThan(0);
 
-    await expect(page.locator("body")).toContainText(/requires a matching (test|live) secret key|Action failed/i);
+    await expect(page.locator("body")).toContainText(/platform secret appears incomplete|does not match the selected mode|Action failed/i);
     await expect(page.locator("body")).toContainText(/Request ID:/i);
+    await expect(page.getByTestId("platform-connect-secret-error")).toContainText(/incomplete|selected mode/i);
     await expect(page.getByTestId("platform-connect-submit-debug")).toContainText(/platform=\d+ webhook=\d+ requestId=/);
     await expect(page.getByTestId("platform-connect-secret")).toHaveValue("not_a_stripe_secret");
     await expect(page.getByTestId("platform-connect-webhook-secret")).toHaveValue("whsec_rejected_input_kept");

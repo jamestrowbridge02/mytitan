@@ -17,6 +17,8 @@ type CachedConnectConfig = {
 
 const PROVIDER = 'stripe_connect';
 const CONFIG_ID = 'stripe_connect';
+const MIN_STRIPE_SECRET_LENGTH = 32;
+const MIN_STRIPE_WEBHOOK_SECRET_LENGTH = 16;
 
 @Injectable()
 export class PlatformPaymentProviderConfigService implements OnModuleInit {
@@ -52,17 +54,56 @@ export class PlatformPaymentProviderConfigService implements OnModuleInit {
     return String(value || '').replace(/[\s\u200B-\u200D\uFEFF]+/g, '').trim();
   }
 
-  private validatePlatformSecret(secret: string, mode: 'test' | 'live') {
-    const expectedPrefix = mode === 'live' ? /^(sk|rk)_live_/ : /^(sk|rk)_test_/;
-    if (!expectedPrefix.test(secret)) {
-      throw new BadRequestException(`Stripe Connect ${mode} mode requires a matching ${mode} secret key.`);
+  private validateStripeConnectInputs(input: {
+    platformSecret?: string;
+    webhookSecret?: string;
+    mode: 'test' | 'live';
+  }) {
+    const platformSecretValidation = input.platformSecret
+      ? {
+          receivedLength: input.platformSecret.length,
+          minimumLengthPassed: input.platformSecret.length >= MIN_STRIPE_SECRET_LENGTH,
+          prefixPassed: (input.mode === 'live' ? /^(sk|rk)_live_/ : /^(sk|rk)_test_/).test(input.platformSecret),
+          formatPassed: /^(sk|rk)_(test|live)_[A-Za-z0-9_=-]+$/.test(input.platformSecret),
+        }
+      : null;
+    const webhookSecretValidation = input.webhookSecret
+      ? {
+          receivedLength: input.webhookSecret.length,
+          minimumLengthPassed: input.webhookSecret.length >= MIN_STRIPE_WEBHOOK_SECRET_LENGTH,
+          prefixPassed: /^whsec_/.test(input.webhookSecret),
+          formatPassed: /^whsec_[A-Za-z0-9_=-]+$/.test(input.webhookSecret),
+        }
+      : null;
+    const failures: string[] = [];
+    const modeLabel = input.mode === 'live' ? 'live' : 'test';
+    const expectedPlatformPrefix = input.mode === 'live' ? 'sk_live_ or rk_live_' : 'sk_test_ or rk_test_';
+    if (platformSecretValidation && !platformSecretValidation.minimumLengthPassed) {
+      failures.push(
+        `Stripe Connect platform secret appears incomplete. Expected a ${modeLabel} secret beginning ${expectedPlatformPrefix}; received length ${platformSecretValidation.receivedLength}.`,
+      );
+    } else if (platformSecretValidation && !platformSecretValidation.prefixPassed) {
+      failures.push(`Stripe Connect ${modeLabel} mode requires a ${modeLabel} platform secret beginning ${expectedPlatformPrefix}.`);
+    } else if (platformSecretValidation && !platformSecretValidation.formatPassed) {
+      failures.push('Stripe Connect platform secret contains unsupported characters.');
     }
-  }
-
-  private validateWebhookSecret(secret: string) {
-    if (!/^whsec_[A-Za-z0-9_=-]+$/.test(secret)) {
-      throw new BadRequestException('Stripe Connect webhook secret must start with whsec_.');
+    if (webhookSecretValidation && !webhookSecretValidation.minimumLengthPassed) {
+      failures.push(
+        `Stripe Connect webhook secret appears incomplete. Expected a secret beginning whsec_; received length ${webhookSecretValidation.receivedLength}.`,
+      );
+    } else if (webhookSecretValidation && !webhookSecretValidation.prefixPassed) {
+      failures.push('Stripe Connect webhook secret must start with whsec_.');
+    } else if (webhookSecretValidation && !webhookSecretValidation.formatPassed) {
+      failures.push('Stripe Connect webhook secret contains unsupported characters.');
     }
+    if (failures.length > 0) {
+      throw new BadRequestException({
+        message: failures.join(' '),
+        platformSecretValidation,
+        webhookSecretValidation,
+      });
+    }
+    return { platformSecretValidation, webhookSecretValidation };
   }
 
   async reload() {
@@ -264,8 +305,7 @@ export class PlatformPaymentProviderConfigService implements OnModuleInit {
     const platformSecret = this.normalizeCredentialInput(input.platformSecret);
     const webhookSecret = this.normalizeCredentialInput(input.webhookSecret);
     if (!platformSecret && !webhookSecret && !input.mode) throw new BadRequestException('Provide a credential or mode change.');
-    if (platformSecret) this.validatePlatformSecret(platformSecret, mode);
-    if (webhookSecret) this.validateWebhookSecret(webhookSecret);
+    this.validateStripeConnectInputs({ platformSecret, webhookSecret, mode });
 
     await db.platformPaymentProviderConfig.upsert({
       where: { id: CONFIG_ID },

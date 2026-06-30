@@ -19,6 +19,7 @@ export default function PlatformInfrastructurePage() {
   const [error, setError] = useState("");
   const [testEmailTo, setTestEmailTo] = useState("");
   const [connectDebug, setConnectDebug] = useState<{ sentPlatformSecretLength: number; sentWebhookSecretLength: number; requestId?: string | null } | null>(null);
+  const [connectFieldErrors, setConnectFieldErrors] = useState<{ platformSecret?: string; webhookSecret?: string }>({});
   const [billingForm, setBillingForm] = useState({ mode: "test", billingSecret: "", webhookSecret: "", confirmation: false, deleteConfirmation: false });
   const [connectForm, setConnectForm] = useState({ mode: "test", platformSecret: "", webhookSecret: "", confirmation: false, deleteConfirmation: false });
   const [emailForm, setEmailForm] = useState<any>({ provider: "smtp", host: "", port: 587, tlsMode: "starttls", username: "", secret: "", fromEmail: "", fromName: "MyTitan", replyToEmail: "", operatorTestRecipient: "", spfStatus: "unknown", dkimStatus: "unknown", dmarcStatus: "unknown", evidence: "" });
@@ -89,6 +90,12 @@ export default function PlatformInfrastructurePage() {
           sentWebhookSecretLength: Number(payload.receivedWebhookSecretLength ?? current?.sentWebhookSecretLength ?? 0),
           requestId: actionError?.requestId || payload.requestId || current?.requestId || null,
         }));
+        if (payload.platformSecretValidation || payload.webhookSecretValidation) {
+          setConnectFieldErrors({
+            platformSecret: connectValidationMessage(payload.platformSecretValidation, "platform"),
+            webhookSecret: connectValidationMessage(payload.webhookSecretValidation, "webhook"),
+          });
+        }
       }
       setError(`${actionError?.message || "Action failed."}${requestId}`);
       await load().catch(() => undefined);
@@ -112,12 +119,31 @@ export default function PlatformInfrastructurePage() {
     };
   }
 
+  function connectValidationMessage(validation: any, field: "platform" | "webhook") {
+    if (!validation) return undefined;
+    if (validation.minimumLengthPassed === false) {
+      return field === "platform" ? "Platform secret appears incomplete." : "Webhook secret appears incomplete.";
+    }
+    if (validation.prefixPassed === false) {
+      return field === "platform" ? "Platform secret does not match the selected mode." : "Webhook secret must start with whsec_.";
+    }
+    if (validation.formatPassed === false) {
+      return field === "platform" ? "Platform secret contains unsupported characters." : "Webhook secret contains unsupported characters.";
+    }
+    return undefined;
+  }
+
   async function saveStripeConnectConfiguration() {
+    setConnectFieldErrors({});
     const payload = connectPayloadFromForm();
     const sentPlatformSecretLength = payload.platformSecret.trim().length;
     const sentWebhookSecretLength = payload.webhookSecret.trim().length;
     setConnectDebug({ sentPlatformSecretLength, sentWebhookSecretLength, requestId: null });
     if (sentPlatformSecretLength === 0 || sentWebhookSecretLength === 0) {
+      setConnectFieldErrors({
+        platformSecret: sentPlatformSecretLength === 0 ? "Platform secret is required." : undefined,
+        webhookSecret: sentWebhookSecretLength === 0 ? "Webhook secret is required." : undefined,
+      });
       throw new Error(`Stripe Connect credentials were not submitted because one or both fields are empty. sentPlatformSecretLength=${sentPlatformSecretLength} sentWebhookSecretLength=${sentWebhookSecretLength}`);
     }
     const response = await apiFetch("/admin/platform/platform-configuration/payment-providers/stripe-connect", {
@@ -288,8 +314,8 @@ export default function PlatformInfrastructurePage() {
           </div>
           <div className="platform-admin-detail-grid">
             <label><span className="muted">Mode</span><select className="input" value={connectForm.mode} onChange={(event) => setConnectForm((current) => ({ ...current, mode: event.target.value }))} data-testid="platform-connect-mode"><option value="test">Test</option><option value="live">Live</option></select></label>
-            <label><span className="muted">Platform secret</span><input className="input" type="password" name="platformSecret" value={connectForm.platformSecret} autoComplete="new-password" placeholder={connect?.platformSecret?.present ? `Stored ••••${connect.platformSecret.lastFour || ""}` : "sk_test_... or sk_live_..."} onChange={(event) => setConnectForm((current) => ({ ...current, platformSecret: event.target.value }))} data-testid="platform-connect-secret" /></label>
-            <label><span className="muted">Webhook secret</span><input className="input" type="password" name="webhookSecret" value={connectForm.webhookSecret} autoComplete="new-password" placeholder={connect?.webhookSecret?.present ? `Stored ••••${connect.webhookSecret.lastFour || ""}` : "whsec_..."} onChange={(event) => setConnectForm((current) => ({ ...current, webhookSecret: event.target.value }))} data-testid="platform-connect-webhook-secret" /></label>
+            <label><span className="muted">Platform secret</span><input className="input" type="password" name="platformSecret" value={connectForm.platformSecret} autoComplete="new-password" placeholder={connect?.platformSecret?.present ? `Stored ••••${connect.platformSecret.lastFour || ""}` : "sk_test_... or sk_live_..."} onChange={(event) => { setConnectFieldErrors((current) => ({ ...current, platformSecret: undefined })); setConnectForm((current) => ({ ...current, platformSecret: event.target.value })); }} data-testid="platform-connect-secret" />{connectFieldErrors.platformSecret ? <span className="muted" data-testid="platform-connect-secret-error">{connectFieldErrors.platformSecret}</span> : null}</label>
+            <label><span className="muted">Webhook secret</span><input className="input" type="password" name="webhookSecret" value={connectForm.webhookSecret} autoComplete="new-password" placeholder={connect?.webhookSecret?.present ? `Stored ••••${connect.webhookSecret.lastFour || ""}` : "whsec_..."} onChange={(event) => { setConnectFieldErrors((current) => ({ ...current, webhookSecret: undefined })); setConnectForm((current) => ({ ...current, webhookSecret: event.target.value })); }} data-testid="platform-connect-webhook-secret" />{connectFieldErrors.webhookSecret ? <span className="muted" data-testid="platform-connect-webhook-secret-error">{connectFieldErrors.webhookSecret}</span> : null}</label>
             <div className="platform-admin-list" data-testid="platform-connect-webhook-url-panel">
               <p><strong>Recommended Stripe Connect Webhook URL</strong></p>
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
