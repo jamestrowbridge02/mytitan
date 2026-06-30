@@ -1,9 +1,13 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import * as net from 'net';
 import * as tls from 'tls';
-import { decryptText, encryptText } from '../integrations/integrations.crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { resolvePublicUrl } from '../common/public-url';
+import {
+  buildPlatformPersistenceState,
+  decryptPlatformSecret,
+  encryptPlatformSecret,
+} from '../platform-config/platform-secret-vault';
 import type { WorkspaceEmailBranding } from './email-templates';
 import {
   allowLiveSmtpInCurrentEnvironment,
@@ -594,7 +598,7 @@ export class EmailService {
     const input = String(value || '').trim();
     if (!input) return '';
     try {
-      return String(decryptText(input) || '').trim();
+      return String(decryptPlatformSecret(input) || '').trim();
     } catch {
       return input;
     }
@@ -1535,7 +1539,7 @@ export class EmailService {
       updatedByUserId: input.actorUserId || null,
     };
     if (secret) {
-      data.secretEncrypted = encryptText(secret);
+      data.secretEncrypted = encryptPlatformSecret(secret);
       data.secretLastFour = secret.slice(-4);
     }
     if (provider === 'env_runtime') {
@@ -1557,7 +1561,18 @@ export class EmailService {
       create: data,
       update: data,
     });
-    return this.getPlatformEmailProviderConfig();
+    const savedRow = await db.platformEmailProviderConfig.findUnique({ where: { id: 'system_email' } });
+    const config = await this.getPlatformEmailProviderConfig();
+    const runtimeLoaded = provider === 'env_runtime'
+      ? config.source === 'runtime_environment' && config.secret.present
+      : Boolean(savedRow?.host && savedRow?.fromEmail && savedRow?.secretEncrypted);
+    const persistence = buildPlatformPersistenceState({
+      row: savedRow,
+      encryptedFields: ['secretEncrypted'],
+      touchedFields: secret ? ['secretEncrypted'] : [],
+      runtimeLoaded,
+    });
+    return { ...config, ...persistence };
   }
 
   async verifyPlatformEmailProviderConfig(input: { actorUserId?: string | null }) {

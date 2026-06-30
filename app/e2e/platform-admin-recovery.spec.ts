@@ -344,6 +344,11 @@ test.describe("platform backend admin recovery", () => {
       const saveBody = await save.json();
       expect(saveBody.stripeConnect.platformSecret).toMatchObject({ present: true, lastFour: "ABCD", source: "vault" });
       expect(saveBody.stripeConnect.webhookSecret).toMatchObject({ present: true, lastFour: "WXYZ", source: "vault" });
+      expect(saveBody.stripeConnect).toMatchObject({
+        persisted: true,
+        saved: true,
+        runtimeLoaded: true,
+      });
       expect(saveBody.stripeConnect.runtime).toMatchObject({
         mode: "test",
         platformSecretLoaded: true,
@@ -537,6 +542,11 @@ test.describe("platform backend admin recovery", () => {
       const saveBody = await save.json();
       expect(saveBody.myTitanBillingStripe.billingSecret).toMatchObject({ present: true, lastFour: "BILL", source: "vault" });
       expect(saveBody.myTitanBillingStripe.webhookSecret).toMatchObject({ present: true, lastFour: "HOOK", source: "vault" });
+      expect(saveBody.myTitanBillingStripe).toMatchObject({
+        persisted: true,
+        saved: true,
+        runtimeLoaded: true,
+      });
       expect(saveBody.myTitanBillingStripe.runtime).toMatchObject({
         mode: "test",
         billingSecretLoaded: true,
@@ -627,6 +637,11 @@ test.describe("platform backend admin recovery", () => {
       expect(saveEmail.ok()).toBeTruthy();
       const saveEmailBody = await saveEmail.json();
       expect(saveEmailBody.config.secret).toMatchObject({ present: true, lastFour: "Z9Y8" });
+      expect(saveEmailBody.config).toMatchObject({
+        persisted: true,
+        saved: true,
+        runtimeLoaded: true,
+      });
       expect(JSON.stringify(saveEmailBody)).not.toContain(emailSecret);
 
       const saveMonitor = await requestLocalApi(request, "/admin/platform/infrastructure/external-monitor", {
@@ -696,6 +711,22 @@ test.describe("platform backend admin recovery", () => {
         data: {},
       });
     }
+  });
+
+  test("Platform Infrastructure keeps secret inputs when Connect save is rejected", async ({ page, request }) => {
+    await installApiProxy(page, request);
+    await loginAs(page, request, fixtureRefs.platformAdminEmail, fixtureRefs.platformAdminPassword);
+    await page.goto("/platform/configuration", { waitUntil: "networkidle" });
+    await expect(page.getByTestId("platform-payment-provider-vault")).toBeVisible();
+
+    await page.getByTestId("platform-connect-secret").fill("not_a_stripe_secret");
+    await page.getByTestId("platform-connect-webhook-secret").fill("whsec_rejected_input_kept");
+    await page.getByTestId("platform-connect-confirm").check();
+    await page.getByTestId("platform-connect-save").click();
+
+    await expect(page.locator("body")).toContainText(/requires a matching (test|live) secret key|Action failed/i);
+    await expect(page.getByTestId("platform-connect-secret")).toHaveValue("not_a_stripe_secret");
+    await expect(page.getByTestId("platform-connect-webhook-secret")).toHaveValue("whsec_rejected_input_kept");
   });
 
   test("missing Connect credentials preserve explicit live mode and block onboarding as missing_config", async ({ request }) => {

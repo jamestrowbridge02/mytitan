@@ -82,6 +82,7 @@ async function assertGuardBlocksUnsafeDelete() {
 async function main() {
   const providerBefore = {
     payment: await listIds("platformPaymentProviderConfig"),
+    billingStripe: await listIds("platformBillingStripeConfig"),
     email: await listIds("platformEmailProviderConfig"),
     monitor: await listIds("platformExternalMonitorConfig"),
   };
@@ -94,7 +95,8 @@ async function main() {
     }),
     nonE2eBookings: await safeCount("booking", { NOT: { id: { startsWith: "e2e-" } } }),
     nonE2eJobs: await safeCount("job", { NOT: { id: { startsWith: "e2e-" } } }),
-    providerVaultRows: providerBefore.payment.length,
+    providerVaultRows: Object.values(providerBefore).reduce((sum, ids) => sum + ids.length, 0),
+    providerVaultBreakdown: Object.fromEntries(Object.entries(providerBefore).map(([key, ids]) => [key, ids.length])),
   };
   const staffBefore = await verifiedStaffSnapshot();
 
@@ -103,6 +105,7 @@ async function main() {
 
   const providerAfter = {
     payment: await listIds("platformPaymentProviderConfig"),
+    billingStripe: await listIds("platformBillingStripeConfig"),
     email: await listIds("platformEmailProviderConfig"),
     monitor: await listIds("platformExternalMonitorConfig"),
   };
@@ -115,7 +118,8 @@ async function main() {
     }),
     nonE2eBookings: await safeCount("booking", { NOT: { id: { startsWith: "e2e-" } } }),
     nonE2eJobs: await safeCount("job", { NOT: { id: { startsWith: "e2e-" } } }),
-    providerVaultRows: providerAfter.payment.length,
+    providerVaultRows: Object.values(providerAfter).reduce((sum, ids) => sum + ids.length, 0),
+    providerVaultBreakdown: Object.fromEntries(Object.entries(providerAfter).map(([key, ids]) => [key, ids.length])),
   };
   assertStaffNotDowngraded(staffBefore, await verifiedStaffSnapshot());
 
@@ -125,6 +129,7 @@ async function main() {
     }
   }
   for (const [key, before] of Object.entries(countsBefore)) {
+    if (typeof before === "object") continue;
     const after = countsAfter[key];
     if (before !== null && after !== null && after < before) {
       throw new Error(`${key} count decreased during seed:e2e`);

@@ -1,8 +1,13 @@
 import { BadRequestException, Injectable, OnModuleInit, ServiceUnavailableException } from '@nestjs/common';
 import Stripe from 'stripe';
 import { AuditService } from '../audit/audit.service';
-import { decryptText, encryptText } from '../integrations/integrations.crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  buildPlatformPersistenceState,
+  decryptPlatformSecret,
+  encryptedPlatformSecretDecryptable,
+  encryptPlatformSecret,
+} from './platform-secret-vault';
 
 type CachedConnectConfig = {
   platformSecret: string | null;
@@ -36,17 +41,11 @@ export class PlatformPaymentProviderConfigService implements OnModuleInit {
   }
 
   private decryptOptional(value?: string | null) {
-    if (!value) return null;
-    return String(decryptText(value) || '').trim() || null;
+    return decryptPlatformSecret(value);
   }
 
   private encryptedSecretDecryptable(value?: string | null) {
-    if (!value) return false;
-    try {
-      return Boolean(this.decryptOptional(value));
-    } catch {
-      return false;
-    }
+    return encryptedPlatformSecretDecryptable(value);
   }
 
   private validatePlatformSecret(secret: string, mode: 'test' | 'live') {
@@ -270,9 +269,9 @@ export class PlatformPaymentProviderConfigService implements OnModuleInit {
         id: CONFIG_ID,
         provider: PROVIDER,
         mode,
-        platformSecretEncrypted: platformSecret ? encryptText(platformSecret) : null,
+        platformSecretEncrypted: platformSecret ? encryptPlatformSecret(platformSecret) : null,
         platformSecretLastFour: platformSecret ? platformSecret.slice(-4) : null,
-        webhookSecretEncrypted: webhookSecret ? encryptText(webhookSecret) : null,
+        webhookSecretEncrypted: webhookSecret ? encryptPlatformSecret(webhookSecret) : null,
         webhookSecretLastFour: webhookSecret ? webhookSecret.slice(-4) : null,
         credentialStatus: platformSecret ? 'needs_verification' : 'missing',
         webhookStatus: webhookSecret ? 'needs_verification' : 'missing',
@@ -282,7 +281,7 @@ export class PlatformPaymentProviderConfigService implements OnModuleInit {
         mode,
         ...(platformSecret
           ? {
-              platformSecretEncrypted: encryptText(platformSecret),
+              platformSecretEncrypted: encryptPlatformSecret(platformSecret),
               platformSecretLastFour: platformSecret.slice(-4),
               credentialStatus: 'needs_verification',
               credentialVerifiedAt: null,
@@ -291,7 +290,7 @@ export class PlatformPaymentProviderConfigService implements OnModuleInit {
           : {}),
         ...(webhookSecret
           ? {
-              webhookSecretEncrypted: encryptText(webhookSecret),
+              webhookSecretEncrypted: encryptPlatformSecret(webhookSecret),
               webhookSecretLastFour: webhookSecret.slice(-4),
               webhookStatus: 'needs_verification',
               webhookVerifiedAt: null,
@@ -301,14 +300,24 @@ export class PlatformPaymentProviderConfigService implements OnModuleInit {
         updatedByUserId: input.actorUserId,
       },
     });
+    const savedRow = await db.platformPaymentProviderConfig.findUnique({ where: { id: CONFIG_ID } });
     await this.reload();
+    const persistence = buildPlatformPersistenceState({
+      row: savedRow,
+      encryptedFields: ['platformSecretEncrypted', 'webhookSecretEncrypted'],
+      touchedFields: [
+        platformSecret ? 'platformSecretEncrypted' : null,
+        webhookSecret ? 'webhookSecretEncrypted' : null,
+      ].filter(Boolean) as string[],
+      runtimeLoaded: this.getRuntimeStatus().runtimeLoaded,
+    });
     const changed = [
       platformSecret ? `${existing?.platformSecretEncrypted ? 'rotated' : 'saved'} platform credential` : null,
       webhookSecret ? `${existing?.webhookSecretEncrypted ? 'rotated' : 'saved'} webhook credential` : null,
       input.mode ? `set ${mode} mode` : null,
     ].filter(Boolean).join(', ');
     await this.audit.log(input.actorCompanyId, 'platform.payment_provider_config.update', `Stripe Connect configuration updated: ${changed}`, input.actorUserId);
-    return this.getSafeStatus();
+    return { ...(await this.getSafeStatus()), ...persistence };
   }
 
   async verify(input: { actorCompanyId: string; actorUserId: string }) {
