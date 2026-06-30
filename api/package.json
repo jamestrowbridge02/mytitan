@@ -27,6 +27,7 @@
     "audit:top1": "node scripts/top1-audit.mjs",
     "billing:verify-subscription-prices": "node scripts/verify-subscription-prices.js",
     "billing:verify-connect-config-save": "node scripts/verify-connect-config-save.js",
+    "billing:trace-connect-config-save": "node scripts/trace-connect-config-save.js",
     "billing:sync-job-products": "node scripts/sync-job-completion-products.js",
     "billing:verify-job-products": "node scripts/sync-job-completion-products.js --dry-run",
     "billing:prepare-job-products": "node scripts/prepare-job-completion-products.js",

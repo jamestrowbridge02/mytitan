@@ -48,6 +48,10 @@ export class PlatformPaymentProviderConfigService implements OnModuleInit {
     return encryptedPlatformSecretDecryptable(value);
   }
 
+  private normalizeCredentialInput(value?: string | null) {
+    return String(value || '').replace(/[\s\u200B-\u200D\uFEFF]+/g, '').trim();
+  }
+
   private validatePlatformSecret(secret: string, mode: 'test' | 'live') {
     const expectedPrefix = mode === 'live' ? /^(sk|rk)_live_/ : /^(sk|rk)_test_/;
     if (!expectedPrefix.test(secret)) {
@@ -56,7 +60,7 @@ export class PlatformPaymentProviderConfigService implements OnModuleInit {
   }
 
   private validateWebhookSecret(secret: string) {
-    if (!/^whsec_[A-Za-z0-9_]+$/.test(secret)) {
+    if (!/^whsec_[A-Za-z0-9_=-]+$/.test(secret)) {
       throw new BadRequestException('Stripe Connect webhook secret must start with whsec_.');
     }
   }
@@ -257,8 +261,8 @@ export class PlatformPaymentProviderConfigService implements OnModuleInit {
     const db = this.prisma as any;
     const existing = await db.platformPaymentProviderConfig.findUnique({ where: { id: CONFIG_ID } });
     const mode = this.normalizeMode(input.mode || existing?.mode || this.cached.mode);
-    const platformSecret = String(input.platformSecret || '').trim();
-    const webhookSecret = String(input.webhookSecret || '').trim();
+    const platformSecret = this.normalizeCredentialInput(input.platformSecret);
+    const webhookSecret = this.normalizeCredentialInput(input.webhookSecret);
     if (!platformSecret && !webhookSecret && !input.mode) throw new BadRequestException('Provide a credential or mode change.');
     if (platformSecret) this.validatePlatformSecret(platformSecret, mode);
     if (webhookSecret) this.validateWebhookSecret(webhookSecret);
