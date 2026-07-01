@@ -11,6 +11,10 @@ const {
 
 const prisma = new PrismaClient();
 
+function isE2eScoped(row) {
+  return String(row?.id || "").startsWith("e2e-") || String(row?.companyId || "").startsWith("e2e-");
+}
+
 async function readPrincipal() {
   const rows = await prisma.user.findMany({
     where: { email: PRINCIPAL_ADMIN_EMAIL },
@@ -31,6 +35,7 @@ async function readPrincipal() {
   if (admin.isActive === false) throw new Error("principal admin is inactive");
   if (admin.emailVerified !== true) throw new Error("principal admin email is not verified");
   if (normalizeEmail(admin.email) !== PRINCIPAL_ADMIN_EMAIL) throw new Error("principal admin email is not normalized");
+  if (isE2eScoped(admin)) throw new Error("principal admin must not be E2E scoped");
   return admin;
 }
 
@@ -79,6 +84,8 @@ async function main() {
       active: true,
       emailVerified: true,
       role: after.role,
+      companyId: after.companyId,
+      e2eScoped: false,
       passwordFingerprintStable: beforeFingerprint === afterFingerprint,
     },
     seedE2ePreservedPrincipalAdmin: true,

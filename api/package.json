@@ -19,6 +19,8 @@
     "auth:issue-principal-admin-reset": "node scripts/issue-principal-admin-reset.js",
     "auth:reset-principal-admin-password": "node scripts/reset-principal-admin-password.js",
     "auth:verify-principal-admin-immutability": "node scripts/verify-principal-admin-immutability.js",
+    "auth:verify-user-password-hash-stability": "node scripts/verify-user-password-hash-stability.js",
+    "auth:repair-principal-admin-scope": "node scripts/repair-principal-admin-scope.js",
     "platform:verify-protected-records": "node scripts/verify-protected-records.js",
     "notifications:verify-password-reset-routing": "node scripts/verify-password-reset-routing.js",
     "notifications:send-test-email": "node scripts/send-test-email.js",

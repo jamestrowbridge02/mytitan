@@ -56,8 +56,8 @@ const FIXTURE = {
     passwordReset: { id: "e2e-user-password-reset", email: "e2e.password.reset@mytitan.example", password: "MyTitanReset!2026", role: "ADMIN" },
   },
   platformAdmin: {
-    id: "e2e-user-platform-admin",
-    email: "admin@mytitan.co.uk",
+    id: "e2e-user-platform-admin-v2",
+    email: "e2e.platform.admin@mytitan.co.uk",
     staleEmail: "e2e.platform@mytitan.co.uk",
     password: "MyTitanE2EPlatform!2026",
     role: "OWNER",
@@ -583,7 +583,7 @@ async function ensurePlatformAdminUser(companyId, locationId) {
     }
   }
   const principal = await prisma.user.findFirst({ where: { email } });
-  const stale = staleEmail
+  let stale = staleEmail
     ? await prisma.user.findFirst({
         where: {
           companyId,
@@ -591,6 +591,9 @@ async function ensurePlatformAdminUser(companyId, locationId) {
         },
       })
     : await prisma.user.findFirst({ where: { companyId, id: fixture.id } });
+  if (normalizeEmail(stale?.email) === PRINCIPAL_ADMIN_EMAIL) {
+    stale = null;
+  }
 
   const activeData = {
     companyId,
