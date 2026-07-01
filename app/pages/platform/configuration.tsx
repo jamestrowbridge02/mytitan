@@ -14,6 +14,7 @@ export default function PlatformInfrastructurePage() {
   const [connect, setConnect] = useState<any>(null);
   const [email, setEmail] = useState<any>(null);
   const [monitor, setMonitor] = useState<any>(null);
+  const [ops, setOps] = useState<any>(null);
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -32,15 +33,17 @@ export default function PlatformInfrastructurePage() {
       return;
     }
     setAllowed(true);
-    const [paymentResponse, emailResponse, monitorResponse] = await Promise.all([
+    const [paymentResponse, emailResponse, monitorResponse, opsResponse] = await Promise.all([
       apiFetch("/admin/platform/platform-configuration/payment-providers"),
       apiFetch("/admin/platform/email-control"),
       apiFetch("/admin/platform/infrastructure/external-monitor"),
+      apiFetch("/admin/platform/autopilot"),
     ]);
     setBilling(paymentResponse?.myTitanBillingStripe || null);
     setConnect(paymentResponse?.stripeConnect || null);
     setEmail(emailResponse || null);
     setMonitor(monitorResponse?.monitor || null);
+    setOps(opsResponse || null);
     setConnectForm((current) => ({ ...current, mode: paymentResponse?.stripeConnect?.mode === "live" ? "live" : "test" }));
     setBillingForm((current) => ({ ...current, mode: paymentResponse?.myTitanBillingStripe?.mode === "live" ? "live" : "test" }));
     if (emailResponse?.config) {
@@ -240,6 +243,85 @@ export default function PlatformInfrastructurePage() {
 
   const emailReadiness = email?.sender?.readiness;
   const emailConfig = email?.config || {};
+  const serviceByKey = new Map<string, any>((ops?.monitoring?.services || []).map((row: any) => [row.key, row]));
+  const backupEvidence = ops?.health?.backup || {};
+  const schedulerEvidence = ops?.health?.scheduler || {};
+  const externalEvidence = ops?.health?.external || {};
+  const liveCards = dedupeCards([
+    infrastructureEvidenceCard({
+      title: "Backups",
+      key: "backups",
+      service: serviceByKey.get("backups"),
+      source: backupEvidence.lastBackupArtifact || "backup-readiness-status.sh",
+      requiredConfig: "Recent encrypted backup, retention policy, and restore drill evidence.",
+      nextAction: backupEvidence.restoreStatus === "ready" ? "Keep backup and restore drill evidence current." : "Run backup readiness and restore drill evidence.",
+      diagnostics: `latest=${formatTimestamp(backupEvidence.lastBackupAt)} artifact=${backupEvidence.lastBackupArtifact || "not visible"} restore=${backupEvidence.restoreStatus || "unknown"} encrypted=${String(backupEvidence.detail || "").toLowerCase().includes("encrypted") ? "yes" : "unknown"}`,
+    }),
+    infrastructureEvidenceCard({
+      title: "Storage",
+      key: "storage",
+      service: serviceByKey.get("logo_selection"),
+      source: "upload policy and artifact store",
+      requiredConfig: "Upload provider/path, max file size, retention policy, and recent upload evidence.",
+      nextAction: "Verify upload limits and artifact retention evidence during release validation.",
+      diagnostics: "Uploads remain tenant-scoped; recent persisted logo selection is checked by Autopilot without exposing media paths.",
+    }),
+    infrastructureEvidenceCard({
+      title: "DNS / Sender Identity",
+      key: "dns-sender-identity",
+      service: serviceByKey.get("notification-routing"),
+      source: emailConfig.source || emailReadiness?.source || "email provider DNS evidence",
+      requiredConfig: "SPF, DKIM, DMARC, sender verified state, and last checked evidence.",
+      nextAction: emailConfig.nextAction || "Attach SPF, DKIM, DMARC, and sender identity status.",
+      diagnostics: `spf=${emailConfig.spfStatus || emailForm.spfStatus || "unknown"} dkim=${emailConfig.dkimStatus || emailForm.dkimStatus || "unknown"} dmarc=${emailConfig.dmarcStatus || emailForm.dmarcStatus || "unknown"} sender=${emailReadiness?.status || "unknown"}`,
+    }),
+    infrastructureEvidenceCard({
+      title: "Security",
+      key: "security",
+      service: serviceByKey.get("tls"),
+      source: "production-readiness-check.sh and TLS evidence",
+      requiredConfig: "Production readiness, npm audit high status, TLS/header/SSH notes.",
+      nextAction: "Run production readiness and review security blockers.",
+      diagnostics: `tls=${externalEvidence.tlsStatus || "unknown"} nginx=${externalEvidence.nginxStatus || "unknown"} ${externalEvidence.tlsDetail || externalEvidence.nginxDetail || "No unsafe detail exposed."}`,
+    }),
+    infrastructureEvidenceCard({
+      title: "Runtime",
+      key: "runtime",
+      service: serviceByKey.get("api"),
+      status: ops?.monitoring?.overall?.state,
+      source: "internal monitoring / healthcheck",
+      requiredConfig: "App, API, marketing, response times, and last healthcheck evidence.",
+      nextAction: "Keep healthcheck and Autopilot runtime checks green.",
+      diagnostics: `runtimeAvailability=${ops?.monitoring?.overall?.availabilityPercentage ?? "unknown"}% ${ops?.monitoring?.overall?.calculation?.summary || ""}`,
+    }),
+    infrastructureEvidenceCard({
+      title: "Database / Redis / Scheduler",
+      key: "database-redis-scheduler",
+      service: serviceByKey.get("database"),
+      source: "internal monitoring snapshots",
+      requiredConfig: "Migration state, database ping, Redis PONG, scheduler/timer status.",
+      nextAction: schedulerEvidence.status === "ready" ? "Keep migration and scheduler evidence current." : "Verify migrate deploy, Redis health, and summary scheduler status.",
+      diagnostics: `db=${serviceByKey.get("database")?.state || "unknown"} redis=${serviceByKey.get("redis")?.state || "unknown"} scheduler=${schedulerEvidence.status || serviceByKey.get("scheduler")?.state || "unknown"}`,
+    }),
+    infrastructureEvidenceCard({
+      title: "Integrations",
+      key: "integrations",
+      service: serviceByKey.get("connected_tools_actions"),
+      source: "integration rollout monitoring",
+      requiredConfig: "Provider readiness, webhook failures, and recent failed setup attempts.",
+      nextAction: "Review failed provider setup and webhook delivery attempts.",
+      diagnostics: serviceByKey.get("connected_tools_actions")?.detail || "Integration action surface checked without returning provider secrets.",
+    }),
+    infrastructureEvidenceCard({
+      title: "Vault / Secrets",
+      key: "vault-secrets",
+      service: serviceByKey.get("stripe_connect_onboarding"),
+      source: "encrypted platform config tables and runtime env",
+      requiredConfig: "Email, Billing Stripe, Connect, and Monitor encrypted row status.",
+      nextAction: "Rotate secrets through provider-specific configure actions only.",
+      diagnostics: `email=${emailConfig.secret?.present ? "present" : "missing"} billing=${billing?.billingSecret?.present ? "present" : "missing"} connect=${connect?.platformSecret?.present ? "present" : "missing"} monitor=${monitor?.status || "not_configured"}`,
+    }),
+  ]);
 
   return (
     <PlatformShell>
@@ -404,17 +486,8 @@ export default function PlatformInfrastructurePage() {
           <HistoryList testId="platform-monitor-history" rows={[monitor?.evidence, monitor?.manualReason, monitor?.failureReason].filter(Boolean)} empty="No external monitor history recorded." />
         </InfrastructureCard>
 
-        {[
-          ["Backups", "scripts/backup-readiness-status.sh", "Run backup readiness and restore drill evidence."],
-          ["Storage", "upload policy and artifact store", "Verify upload limits and artifact retention evidence."],
-          ["DNS / Sender Identity", "email provider DNS evidence", "Attach SPF, DKIM, DMARC, and sender identity status."],
-          ["Security", "production-readiness-check.sh", "Run production readiness and review security blockers."],
-          ["Runtime", "internal monitoring / healthcheck", "Run healthcheck and Autopilot sentinel refresh."],
-          ["Database / Redis / Scheduler", "internal monitoring snapshots", "Verify migrate deploy, Redis health, and summary scheduler status."],
-          ["Integrations", "integration rollout monitoring", "Review failed provider setup and webhook delivery attempts."],
-          ["Vault / Secrets", "encrypted platform config tables and runtime env", "Rotate secrets through provider-specific configure actions."],
-        ].map(([title, source, nextAction]) => (
-          <InfrastructureCard key={title} title={title} testId={`platform-infra-${slug(title)}`} status="action_required" source={source} requiredConfig="Operational evidence and owner-reviewed configuration." owner="Platform operations" nextAction={nextAction} lastChecked={null} diagnostics="No secret values displayed. Use release validation and provider logs for detailed evidence." />
+        {liveCards.map((card) => (
+          <InfrastructureCard key={card.key} title={card.title} testId={`platform-infra-${slug(card.title)}`} status={card.status} source={card.source} requiredConfig={card.requiredConfig} owner="Platform operations" nextAction={card.nextAction} lastChecked={card.lastChecked} diagnostics={card.diagnostics} />
         ))}
         </div>
       </div>
@@ -473,6 +546,37 @@ function ActionRow({ children }: { children: ReactNode }) {
 
 function HistoryList({ testId, rows, empty }: { testId: string; rows: string[]; empty: string }) {
   return <div className="platform-admin-list" data-testid={testId}><p><strong>Delivery / log / history</strong></p>{rows.length ? rows.slice(0, 6).map((row) => <p key={row}>{row}</p>) : <p>{empty}</p>}</div>;
+}
+
+function infrastructureEvidenceCard(input: {
+  title: string;
+  key: string;
+  service?: any;
+  status?: string;
+  source: string;
+  requiredConfig: string;
+  nextAction: string;
+  diagnostics: string;
+}) {
+  return {
+    key: input.key,
+    title: input.title,
+    status: input.status || input.service?.state || input.service?.status || "unknown",
+    source: input.source,
+    requiredConfig: input.requiredConfig,
+    nextAction: input.nextAction,
+    lastChecked: input.service?.checkedAt || null,
+    diagnostics: input.diagnostics || input.service?.detail || "Live evidence unavailable from this runtime.",
+  };
+}
+
+function dedupeCards<T extends { key: string }>(cards: T[]) {
+  const seen = new Set<string>();
+  return cards.filter((card) => {
+    if (seen.has(card.key)) return false;
+    seen.add(card.key);
+    return true;
+  });
 }
 
 function describeSecret(secret?: any) {

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { fixtureRefs, hasDashboardAuth, installApiProxy, loginAs } from "./utils";
+import { fixtureRefs, hasDashboardAuth, installApiProxy, loginAs, requestLocalApi } from "./utils";
 
 test.describe("scheduling capacity planning", () => {
   test.skip(!hasDashboardAuth(), "Seed the E2E fixtures or provide dashboard credentials before running authenticated workflow tests.");
@@ -17,9 +17,27 @@ test.describe("scheduling capacity planning", () => {
 
   test("capacity indicators show overloaded and unavailable states", async ({ page, request }) => {
     await installApiProxy(page, request);
-    await loginAs(page, request, "e2e.operator@mytitan.local", "MyTitanE2E!2026");
+    const token = await loginAs(page, request, "e2e.operator@mytitan.local", "MyTitanE2E!2026");
+    const today = new Date();
+    const candidateDates = [0, -1].map((offset) => {
+      const date = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() + offset));
+      return date.toISOString().slice(0, 10);
+    });
+    let seededDate = candidateDates[0];
+    for (const candidateDate of candidateDates) {
+      const pressure = await requestLocalApi(request, `/schedule/pressure?date=${candidateDate}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      expect(pressure.ok()).toBeTruthy();
+      const pressureBody = await pressure.json();
+      if (pressureBody?.technicians?.some((row: any) => row.overloaded)) {
+        seededDate = candidateDate;
+        break;
+      }
+    }
 
     await page.goto("/dashboard/scheduling");
+    await page.locator('input[type="date"]').fill(seededDate);
     await expect(page.getByTestId("scheduling-pressure-list")).toContainText(/Overloaded/i);
     await expect(page.getByTestId("scheduling-pressure-list")).toContainText(/Unavailable|Available/i);
     await expect(page.getByTestId("scheduling-capacity-grid")).toContainText(/Unavailable/i);

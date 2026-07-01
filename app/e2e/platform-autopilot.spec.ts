@@ -19,6 +19,8 @@ test.describe("platform Autopilot", () => {
     await expect(page.getByTestId("platform-autopilot-control-centre")).toBeVisible();
     await expect(page.getByTestId("autopilot-section-system-health")).toBeVisible();
     await expect(page.getByTestId("autopilot-card-api")).toContainText(/healthy|degraded|attention needed|down/i);
+    await expect(page.getByTestId("autopilot-availability-targets")).toContainText(/Runtime availability|Public endpoint availability|Operational readiness|Launch readiness/i);
+    await expect(page.getByTestId("autopilot-availability-calculation")).toContainText(/required runtime checks healthy/i);
     await expect(page.getByTestId("autopilot-booking-calendar-health")).toContainText(/Booking visibility|Calendar V2 route|Connected Tools actions|Public portal support wording/i);
     await expect(page.getByTestId("autopilot-manual-actions")).toContainText(/Stripe Connect|External uptime|Legal review|Tax compliance|Data residency/i);
     await expect(page.getByTestId("autopilot-alert-queue")).toBeVisible();
@@ -39,6 +41,24 @@ test.describe("platform Autopilot", () => {
       });
       expect([401, 403]).toContain(response.status());
     }
+  });
+
+  test("availability scoring excludes optional and operational readiness from runtime downtime", async ({ request }) => {
+    const token = await apiLogin(request, fixtureRefs.platformAdminEmail, fixtureRefs.platformAdminPassword);
+    const response = await requestLocalApi(request, "/admin/platform/autopilot?force=1", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(response.ok()).toBeTruthy();
+    const body = await response.json();
+    const calculation = body.monitoring?.overall?.calculation;
+    expect(calculation).toEqual(expect.objectContaining({
+      numerator: expect.any(Number),
+      denominator: expect.any(Number),
+      requiredKeys: expect.arrayContaining(["app", "api", "marketing", "database", "redis", "web-gateway", "tls"]),
+      excludedKeys: expect.arrayContaining(["backups", "restore-drill", "billing", "job-packs"]),
+    }));
+    expect(calculation.denominator).toBe(7);
+    expect(body.monitoring?.externalMonitoring?.status || "not_configured").toMatch(/not_configured|configured|verifying|ready|healthy|degraded|unknown/);
   });
 
   test("safe self-heal requires platform admin confirmation and writes before-after audit evidence", async ({ request }) => {

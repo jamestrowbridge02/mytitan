@@ -662,6 +662,20 @@ test.describe("platform backend admin recovery", () => {
 
       await page.goto("/platform/infrastructure", { waitUntil: "networkidle" });
       await expect(page.getByTestId("platform-infrastructure")).toBeVisible();
+      for (const card of [
+        "platform-infra-backups",
+        "platform-infra-storage",
+        "platform-infra-dns-sender-identity",
+        "platform-infra-security",
+        "platform-infra-runtime",
+        "platform-infra-database-redis-scheduler",
+        "platform-infra-integrations",
+        "platform-infra-vault-secrets",
+      ]) {
+        await expect(page.getByTestId(card)).toHaveCount(1);
+        await expect(page.getByTestId(card)).not.toContainText("action_required");
+        await expect(page.getByTestId(card)).not.toContainText("No secret values displayed. Use release validation and provider logs for detailed evidence.");
+      }
       await expect(page.getByTestId("platform-email-provider-config")).toContainText("Configure Email Provider");
       await expect(page.getByTestId("platform-email-provider-config")).toContainText("Verify provider");
       await expect(page.getByTestId("platform-email-provider-config")).toContainText("Send test email");

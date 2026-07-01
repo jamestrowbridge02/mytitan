@@ -18,6 +18,7 @@ type AutopilotCard = {
   lastSuccessfulCheckAt?: string | null;
   responseTimeMs?: number | null;
   availabilityPercentage?: number;
+  availabilityRole?: "runtime_required" | "operational_readiness" | "optional_external";
 };
 
 const supportPlaybooks = [
@@ -188,6 +189,17 @@ export default function PlatformAutopilotPage() {
     { title: "Payment Provider Health", keys: ["billing", "job-packs"] },
     { title: "Email Delivery", keys: ["notification-routing"] },
   ];
+  const runtimeCalculation = data?.monitoring?.overall?.calculation;
+  const operationalServices = (data?.monitoring?.services || []).filter((service: AutopilotCard) => service.availabilityRole !== "runtime_required");
+  const operationalHealthy = operationalServices.filter((service: AutopilotCard) => service.status === "healthy" || service.state === "healthy").length;
+  const operationalReadiness = operationalServices.length ? Math.round((operationalHealthy / operationalServices.length) * 100) : 0;
+  const publicEndpointServices = ["app", "api", "marketing", "web-gateway", "tls"].map((key) => serviceByKey.get(key) as AutopilotCard | undefined).filter(Boolean);
+  const publicHealthy = publicEndpointServices.filter((service) => service?.state === "healthy" || service?.status === "healthy").length;
+  const publicAvailability = publicEndpointServices.length ? Math.round((publicHealthy / publicEndpointServices.length) * 100) : 0;
+  const launchBlockers = [
+    ...(data?.manualActions || []).filter((action: any) => action.status !== "healthy"),
+    ...(data?.alerts || []),
+  ];
 
   return (
     <PlatformShell>
@@ -208,10 +220,17 @@ export default function PlatformAutopilotPage() {
           {error ? <div className="alert warning" role="alert">{error}</div> : null}
           <div className="platform-admin-kpi-grid">
             <Metric label="Overall" value={data?.monitoring?.overall?.label || "Unknown"} />
-            <Metric label="Recorded availability" value={`${data?.monitoring?.overall?.availabilityPercentage ?? 0}%`} />
+            <Metric label="Runtime availability" value={`${data?.monitoring?.overall?.availabilityPercentage ?? 0}%`} />
             <Metric label="Open alerts" value={String(data?.alerts?.length || 0)} />
             <Metric label="Sentinels" value={String(data?.sentinels?.length || 0)} />
           </div>
+          <div className="platform-admin-detail-grid" data-testid="autopilot-availability-targets">
+            <AvailabilityTarget title="Runtime availability" value={`${data?.monitoring?.overall?.availabilityPercentage ?? 0}%`} detail={runtimeCalculation?.summary || "No runtime calculation available."} />
+            <AvailabilityTarget title="Public endpoint availability" value={`${publicAvailability}%`} detail={`${publicHealthy}/${publicEndpointServices.length || 0} public endpoint checks healthy.`} />
+            <AvailabilityTarget title="Operational readiness" value={`${operationalReadiness}%`} detail={`${operationalHealthy}/${operationalServices.length || 0} operational readiness checks healthy; configuration gaps are not counted as app downtime.`} />
+            <AvailabilityTarget title="Launch readiness" value={launchBlockers.length ? "Blocked" : "Ready"} detail={launchBlockers.length ? `${launchBlockers.length} manual or alert item(s) remain.` : "No open manual or alert blockers in Autopilot."} />
+          </div>
+          {runtimeCalculation ? <p className="muted" data-testid="autopilot-availability-calculation">Calculation: {runtimeCalculation.numerator}/{runtimeCalculation.denominator} required runtime checks healthy. Excluded from runtime availability: {(runtimeCalculation.excludedKeys || []).join(", ") || "none"}.</p> : null}
           <p className="muted">Last checked: {formatDate(data?.checkedAt)} · {lastUpdatedAt ? "Updated just now · " : ""}Runtime uptime: {data?.monitoring?.runtimeFreshness?.uptimeMinutes ?? 0} minutes</p>
         </section>
 
@@ -330,6 +349,16 @@ function HealthCard({ card }: { card?: AutopilotCard }) {
 
 function Metric({ label, value }: { label: string; value: string }) {
   return <article className="platform-admin-kpi-card"><span className="platform-admin-kpi-card__label">{label}</span><strong className="platform-admin-kpi-card__value">{value}</strong></article>;
+}
+
+function AvailabilityTarget({ title, value, detail }: { title: string; value: string; detail: string }) {
+  return (
+    <article className="card platform-admin-card-stack">
+      <strong>{title}</strong>
+      <p>{value}</p>
+      <p className="muted">{detail}</p>
+    </article>
+  );
 }
 
 function formatDate(value?: string | null) {

@@ -11,6 +11,7 @@ import { getSummarySchedulerStatusSnapshot } from './summary-scheduler';
 
 type InternalMonitoringState = 'healthy' | 'degraded' | 'attention_needed' | 'down';
 type ResponseTimeBand = 'fast' | 'steady' | 'slow' | 'unknown';
+type AvailabilityRole = 'runtime_required' | 'operational_readiness' | 'optional_external';
 
 type InternalMonitoringServiceSnapshot = {
   key: string;
@@ -26,6 +27,7 @@ type InternalMonitoringServiceSnapshot = {
   availabilityRatio: number;
   availabilityPercentage: number;
   availabilityLabel: string;
+  availabilityRole: AvailabilityRole;
   degradedMinutes: number;
   lastRecoveredAt: string | null;
   lastStableAt: string | null;
@@ -52,6 +54,7 @@ type InternalMonitoringCacheFile = {
     state: InternalMonitoringState;
     lastSuccessfulCheckAt: string | null;
     responseTimeMs: number | null;
+    availabilityRole?: AvailabilityRole;
   }>;
   recentSnapshots: Array<{
     checkedAt: string;
@@ -74,6 +77,13 @@ export type InternalMonitoringSnapshot = {
     attentionCount: number;
     downCount: number;
     availabilityPercentage: number;
+    calculation: {
+      numerator: number;
+      denominator: number;
+      requiredKeys: string[];
+      excludedKeys: string[];
+      summary: string;
+    };
     averageResponseBand: string;
     lastRecoveryAt: string | null;
   };
@@ -212,9 +222,8 @@ function summarizeOverallState(services: InternalMonitoringServiceSnapshot[]) {
     degradedCount,
     attentionCount,
     downCount,
-    availabilityPercentage: Math.round(
-      (services.reduce((total, service) => total + service.availabilityRatio, 0) / Math.max(services.length, 1)) * 100,
-    ),
+    availabilityPercentage: calculateRuntimeAvailability(services).percentage,
+    calculation: calculateRuntimeAvailability(services),
     averageResponseBand: summarizeAverageResponseBand(services),
     lastRecoveryAt: services
       .map((service) => service.lastRecoveredAt)
@@ -222,6 +231,28 @@ function summarizeOverallState(services: InternalMonitoringServiceSnapshot[]) {
       .sort()
       .at(-1) || null,
   };
+}
+
+function calculateRuntimeAvailability(services: InternalMonitoringServiceSnapshot[]) {
+  const required = services.filter((service) => service.availabilityRole === 'runtime_required');
+  const healthy = required.filter((service) => service.state === 'healthy');
+  const excluded = services.filter((service) => service.availabilityRole !== 'runtime_required');
+  const denominator = Math.max(required.length, 1);
+  const percentage = Math.round((healthy.length / denominator) * 100);
+  return {
+    numerator: healthy.length,
+    denominator,
+    percentage,
+    requiredKeys: required.map((service) => service.key),
+    excludedKeys: excluded.map((service) => service.key),
+    summary: `${healthy.length}/${denominator} required runtime checks healthy; ${excluded.length} operational or optional checks excluded from runtime availability.`,
+  };
+}
+
+function defaultAvailabilityRole(key: string): AvailabilityRole {
+  return ['app', 'api', 'marketing', 'database', 'redis', 'web-gateway', 'tls'].includes(key)
+    ? 'runtime_required'
+    : 'operational_readiness';
 }
 
 function parseStatusLine(output: string, prefix: string) {
@@ -399,6 +430,7 @@ function buildServiceSnapshot(input: {
   responseTimeMs?: number | null;
   historyStates: InternalMonitoringState[];
   lastRecoveredAt?: string | null;
+  availabilityRole?: AvailabilityRole;
 }) {
   const lastSuccessfulCheckAt =
     input.state === 'healthy'
@@ -419,6 +451,7 @@ function buildServiceSnapshot(input: {
     availabilityRatio: availability.ratio,
     availabilityPercentage: Math.round(availability.ratio * 100),
     availabilityLabel: availability.label,
+    availabilityRole: input.availabilityRole || defaultAvailabilityRole(input.key),
     degradedMinutes: summarizeDegradedMinutes(input.historyStates, Math.round(CACHE_TTL_MS / 1000)),
     lastRecoveredAt: input.lastRecoveredAt || null,
     lastStableAt: lastSuccessfulCheckAt,
@@ -474,6 +507,7 @@ export async function getInternalMonitoringSnapshot(
       previous: previousByKey.get('app') || null,
       responseTimeMs: appProbe.durationMs,
       historyStates: [],
+      availabilityRole: 'runtime_required',
     }),
     buildServiceSnapshot({
       key: 'api',
@@ -485,6 +519,7 @@ export async function getInternalMonitoringSnapshot(
       previous: previousByKey.get('api') || null,
       responseTimeMs: apiProbe.durationMs,
       historyStates: [],
+      availabilityRole: 'runtime_required',
     }),
     buildServiceSnapshot({
       key: 'marketing',
@@ -500,6 +535,7 @@ export async function getInternalMonitoringSnapshot(
       previous: previousByKey.get('marketing') || null,
       responseTimeMs: marketingProbe.durationMs,
       historyStates: [],
+      availabilityRole: 'runtime_required',
     }),
     buildServiceSnapshot({
       key: 'database',
@@ -511,6 +547,7 @@ export async function getInternalMonitoringSnapshot(
       previous: previousByKey.get('database') || null,
       responseTimeMs: dbProbe.durationMs,
       historyStates: [],
+      availabilityRole: 'runtime_required',
     }),
     buildServiceSnapshot({
       key: 'redis',
@@ -526,6 +563,7 @@ export async function getInternalMonitoringSnapshot(
       previous: previousByKey.get('redis') || null,
       responseTimeMs: redisProbe.durationMs,
       historyStates: [],
+      availabilityRole: 'runtime_required',
     }),
     buildServiceSnapshot({
       key: 'web-gateway',
@@ -540,6 +578,7 @@ export async function getInternalMonitoringSnapshot(
       previous: previousByKey.get('web-gateway') || null,
       responseTimeMs: null,
       historyStates: [],
+      availabilityRole: 'runtime_required',
     }),
     buildServiceSnapshot({
       key: 'tls',
@@ -554,6 +593,7 @@ export async function getInternalMonitoringSnapshot(
       previous: previousByKey.get('tls') || null,
       responseTimeMs: null,
       historyStates: [],
+      availabilityRole: 'runtime_required',
     }),
     buildServiceSnapshot({
       key: 'scheduler',
@@ -565,6 +605,7 @@ export async function getInternalMonitoringSnapshot(
       previous: previousByKey.get('scheduler') || null,
       responseTimeMs: null,
       historyStates: [],
+      availabilityRole: 'operational_readiness',
     }),
     buildServiceSnapshot({
       key: 'backups',
@@ -586,6 +627,7 @@ export async function getInternalMonitoringSnapshot(
       previous: previousByKey.get('backups') || null,
       responseTimeMs: null,
       historyStates: [],
+      availabilityRole: 'operational_readiness',
     }),
     buildServiceSnapshot({
       key: 'restore-drill',
@@ -597,6 +639,7 @@ export async function getInternalMonitoringSnapshot(
       previous: previousByKey.get('restore-drill') || null,
       responseTimeMs: null,
       historyStates: [],
+      availabilityRole: 'operational_readiness',
     }),
     (() => {
       const normalizedOutput = notificationProbe.ok ? String(notificationProbe.value || '') : '';
@@ -615,6 +658,7 @@ export async function getInternalMonitoringSnapshot(
         previous: previousByKey.get('notification-routing') || null,
         responseTimeMs: notificationProbe.durationMs,
         historyStates: [],
+        availabilityRole: 'operational_readiness',
       });
     })(),
     (() => {
@@ -634,6 +678,7 @@ export async function getInternalMonitoringSnapshot(
         previous: previousByKey.get('billing') || null,
         responseTimeMs: billingProbe.durationMs,
         historyStates: [],
+        availabilityRole: 'operational_readiness',
       });
     })(),
     (() => {
@@ -653,6 +698,7 @@ export async function getInternalMonitoringSnapshot(
         previous: previousByKey.get('job-packs') || null,
         responseTimeMs: jobPackProbe.durationMs,
         historyStates: [],
+        availabilityRole: 'operational_readiness',
       });
     })(),
   ];
@@ -681,6 +727,7 @@ export async function getInternalMonitoringSnapshot(
       availabilityRatio: availability.ratio,
       availabilityPercentage: Math.round(availability.ratio * 100),
       availabilityLabel: availability.label,
+      availabilityRole: service.availabilityRole || defaultAvailabilityRole(service.key),
       degradedMinutes: summarizeDegradedMinutes(historyStates, Math.round(CACHE_TTL_MS / 1000)),
       lastRecoveredAt,
       lastStableAt: service.lastSuccessfulCheckAt,
@@ -722,6 +769,7 @@ export async function getInternalMonitoringSnapshot(
       state: service.state,
       lastSuccessfulCheckAt: service.lastSuccessfulCheckAt,
       responseTimeMs: service.responseTimeMs,
+      availabilityRole: service.availabilityRole,
     })),
     recentSnapshots: nextRecentSnapshots,
     incidents: nextIncidents.slice(-MAX_INCIDENTS),
@@ -838,6 +886,7 @@ function hydrateSnapshotFromCache(
       availabilityRatio: availability.ratio,
       availabilityPercentage: Math.round(availability.ratio * 100),
       availabilityLabel: availability.label,
+      availabilityRole: service.availabilityRole || 'operational_readiness',
       degradedMinutes: summarizeDegradedMinutes(historyStates, Math.round(CACHE_TTL_MS / 1000)),
       lastRecoveredAt:
         (cache.incidents || [])

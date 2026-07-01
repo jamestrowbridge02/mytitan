@@ -1390,6 +1390,29 @@ export class PlatformAdminService {
     ].filter(Boolean);
     const recommendedNextAction = String((risks[0] as any)?.action || (reasons.length ? `Resolve: ${reasons[0]}.` : 'No urgent action required.'));
 
+    const redactEvidence = (value: any): any => {
+      if (typeof value === 'string') {
+        return value
+          .replace(/\b(?:sk|rk|pk)_(?:test|live)_[A-Za-z0-9_=-]*/g, '[redacted_stripe_key]')
+          .replace(/\bwhsec_[A-Za-z0-9_=-]*/g, '[redacted_webhook_secret]')
+          .replace(/\b(platformSecretEncrypted|webhookSecretEncrypted|billingSecretEncrypted)\b/g, '[redacted_encrypted_field]');
+      }
+      if (Array.isArray(value)) return value.map((entry) => redactEvidence(entry));
+      if (value instanceof Date) return value;
+      if (value && typeof value === 'object') {
+        return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, redactEvidence(entry)]));
+      }
+      return value;
+    };
+    const redactedAuditHistory = auditHistory.map((row: any) => ({
+      ...row,
+      message: redactEvidence(row.message),
+    }));
+    const redactedCommercial = {
+      ...commercial,
+      auditHistory: Array.isArray(commercial?.auditHistory) ? redactEvidence(commercial.auditHistory) : commercial?.auditHistory,
+    };
+
     const timeline = [
       { type: 'workspace.created', label: 'Workspace created', at: company.createdAt },
       owner?.createdAt ? { type: 'owner.invited', label: 'Owner invited', at: owner.createdAt } : null,
@@ -1398,12 +1421,12 @@ export class PlatformAdminService {
       firstCompletedJob?.completedAt ? { type: 'job.first_completed', label: 'First job completed', at: firstCompletedJob.completedAt } : null,
       firstInvoice?.invoiceIssuedAt ? { type: 'invoice.first_sent', label: 'First invoice sent', at: firstInvoice.invoiceIssuedAt } : null,
       firstPayment?.invoicePaidAt ? { type: 'payment.first_recorded', label: 'First payment recorded', at: firstPayment.invoicePaidAt } : null,
-      ...auditHistory.map((row: any) => ({ type: row.type, label: row.message, at: row.createdAt, auditEventId: row.id })),
+      ...redactedAuditHistory.map((row: any) => ({ type: row.type, label: row.message, at: row.createdAt, auditEventId: row.id })),
     ]
       .filter(Boolean)
       .sort((left: any, right: any) => new Date(right.at).getTime() - new Date(left.at).getTime());
 
-    return {
+    const response = {
       ok: true,
       account: {
         id: company.id,
@@ -1427,7 +1450,7 @@ export class PlatformAdminService {
         lastActiveAt,
         riskStatus: status,
       },
-      commercial,
+      commercial: redactedCommercial,
       usage: {
         ...allowance.summary,
         recurringExtraAllowance: Number(allowance.summary?.recurringExtraAllowance || 0),
@@ -1462,8 +1485,9 @@ export class PlatformAdminService {
       risks,
       recommendedNextAction,
       timeline,
-      auditHistory,
+      auditHistory: redactedAuditHistory,
       secretsReturned: false,
     };
+    return redactEvidence(response);
   }
 }
