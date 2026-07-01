@@ -17,6 +17,7 @@ import { ErrorState } from '../../components/states/ErrorState';
 import { LoadingState } from '../../components/states/LoadingState';
 import { ApiError, apiFetch } from '../../lib/api';
 import {
+  isCalendarV1Enabled,
   isCalendarV2DragEnabled,
   isCalendarV2HardConflictsEnabled,
   isSchedulingIntelligenceV1Enabled,
@@ -593,6 +594,7 @@ export default function CalendarPage() {
   const [draggingBookingId, setDraggingBookingId] = useState<string | null>(null);
   const [rescheduleError, setRescheduleError] = useState('');
   const [rescheduleErrorRequestId, setRescheduleErrorRequestId] = useState<string | undefined>(undefined);
+  const calendarV1Enabled = isCalendarV1Enabled();
   const dragEnabled = isCalendarV2DragEnabled();
   const hardConflictEnabled = isCalendarV2HardConflictsEnabled();
   const [highlightedConflictIds, setHighlightedConflictIds] = useState<string[]>([]);
@@ -877,6 +879,15 @@ export default function CalendarPage() {
   useEffect(() => {
     let isActive = true;
     const load = async () => {
+      if (!calendarV1Enabled) {
+        if (isActive) {
+          setData(null);
+          setLoading(false);
+          setError('Scheduling calendar is not available in this environment.');
+          setRequestId(undefined);
+        }
+        return;
+      }
       if (isActive) {
         setLoading(true);
         setError('');
@@ -917,7 +928,7 @@ export default function CalendarPage() {
     return () => {
       isActive = false;
     };
-  }, [clearToast, range.from, range.to, refreshVersion]);
+  }, [calendarV1Enabled, clearToast, range.from, range.to, refreshVersion]);
 
   useEffect(() => {
     if (!schedulingEnabled || viewMode === 'month') {
@@ -1304,7 +1315,7 @@ export default function CalendarPage() {
   );
 
   const handleApplyBest = async (booking: CalendarBlock) => {
-    if (!schedulingEnabled || !isSuggestEligible(booking)) return;
+    if (!dragEnabled || !schedulingEnabled || !isSuggestEligible(booking)) return;
     const bookingId = booking.id;
     setApplyingBestBookingId(bookingId);
     try {
@@ -1441,7 +1452,11 @@ export default function CalendarPage() {
   return (
     <>
       <DashboardShell>
-        <div className="operator-stack" data-testid="calendar-v2-workspace" data-calendar-version="2">
+        <div
+          className="operator-stack"
+          data-testid={dragEnabled ? 'calendar-v2-workspace' : 'calendar-v1-workspace'}
+          data-calendar-version={dragEnabled ? '2' : '1'}
+        >
           <OperatorPageHeader
             eyebrow="Scheduling"
             title="Calendar"
@@ -1456,11 +1471,26 @@ export default function CalendarPage() {
               { label: 'Bookings', href: '/dashboard/bookings', variant: 'secondary' },
               { label: 'Today', onClick: () => setFocusDate(startOfDay(new Date())) },
             ]}
-            shortcuts={['Location first', 'Technician overlay optional', 'No route optimisation claims']}
+            shortcuts={[
+              'Location first',
+              dragEnabled ? 'Drag changes gated' : 'Read-only calendar',
+              'No route optimisation claims',
+            ]}
             stats={calendarStats}
           />
 
           <section className="operator-quickRail" data-testid="calendar-click-to-action-rail">
+            <div className="operator-actionTile" data-testid="calendar-v1-readonly-status">
+              <div className="operator-actionTile__body">
+                <h3>{dragEnabled ? 'Calendar V2 changes gated' : 'Calendar V1 read-only'}</h3>
+                <p>
+                  {dragEnabled
+                    ? 'Read access is provided by Calendar V1. Timing changes stay behind the separate Calendar V2 drag flag.'
+                    : 'View booking timing, assignment, location, and status without changing production records from this surface.'}
+                </p>
+              </div>
+              <span className="button secondary">{dragEnabled ? 'V2 enabled' : 'Read only'}</span>
+            </div>
             <Link className="operator-actionTile" href="/dashboard/bookings?view=today">
               <div className="operator-actionTile__body">
                 <h3>Today&apos;s booking queue</h3>
@@ -2178,18 +2208,20 @@ export default function CalendarPage() {
                                           >
                                             {suggestState?.open ? 'Hide' : 'Suggest'}
                                           </button>
-                                          <button
-                                            className="button primary"
-                                            type="button"
-                                            disabled={Boolean(suggestState?.loading) || applyingBest}
-                                            onClick={(event) => {
-                                              event.stopPropagation();
-                                              handleApplyBest(entry.booking);
-                                            }}
-                                            style={{ height: 24, fontSize: 10, padding: '0 8px' }}
-                                          >
-                                            Apply best
-                                          </button>
+                                          {dragEnabled ? (
+                                            <button
+                                              className="button primary"
+                                              type="button"
+                                              disabled={Boolean(suggestState?.loading) || applyingBest}
+                                              onClick={(event) => {
+                                                event.stopPropagation();
+                                                handleApplyBest(entry.booking);
+                                              }}
+                                              style={{ height: 24, fontSize: 10, padding: '0 8px' }}
+                                            >
+                                              Apply best
+                                            </button>
+                                          ) : null}
                                           {suggestState?.loading && !applyingBest ? (
                                             <Skeleton className="h-3 w-14" />
                                           ) : null}
@@ -2253,22 +2285,24 @@ export default function CalendarPage() {
                                               {formatSuggestedSlotLabel(suggestion.startsAt, suggestion.technicianName)}
                                               <SuggestedSlotReasons reasons={suggestion.reasons} />
                                             </div>
-                                            <button
-                                              className="button secondary"
-                                              type="button"
-                                              onClick={() =>
-                                                handleReschedule(
-                                                  entry.booking.id,
-                                                  suggestion.technicianId,
-                                                  new Date(suggestion.startsAt),
-                                                  new Date(suggestion.endsAt),
-                                                  { showSavedToast: true, showErrorToast: true },
-                                                )
-                                              }
-                                              style={{ height: 24, fontSize: 10, padding: '0 8px' }}
-                                            >
-                                              Apply
-                                            </button>
+                                            {dragEnabled ? (
+                                              <button
+                                                className="button secondary"
+                                                type="button"
+                                                onClick={() =>
+                                                  handleReschedule(
+                                                    entry.booking.id,
+                                                    suggestion.technicianId,
+                                                    new Date(suggestion.startsAt),
+                                                    new Date(suggestion.endsAt),
+                                                    { showSavedToast: true, showErrorToast: true },
+                                                  )
+                                                }
+                                                style={{ height: 24, fontSize: 10, padding: '0 8px' }}
+                                              >
+                                                Apply
+                                              </button>
+                                            ) : null}
                                           </div>
                                         ))}
                                       </div>
