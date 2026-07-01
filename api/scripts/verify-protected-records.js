@@ -153,11 +153,20 @@ function assertStaffNotDowngraded(before, after) {
 }
 
 function runSeedSilently() {
-  execFileSync("npm", ["run", "seed:e2e"], {
-    cwd: process.cwd(),
-    env: { ...process.env, MYTITAN_ENABLE_E2E_FIXTURES: "1" },
-    stdio: ["ignore", "ignore", "pipe"],
-  });
+  try {
+    execFileSync("npm", ["run", "seed:e2e"], {
+      cwd: process.cwd(),
+      env: { ...process.env, MYTITAN_ENABLE_E2E_FIXTURES: "1" },
+      stdio: ["ignore", "ignore", "pipe"],
+    });
+    return { ran: true, blocked: false };
+  } catch (error) {
+    const stderr = String(error?.stderr || "");
+    if (/refused:/i.test(stderr)) {
+      return { ran: false, blocked: true };
+    }
+    throw error;
+  }
 }
 
 async function assertGuardBlocksUnsafeDelete() {
@@ -200,7 +209,7 @@ async function main() {
   const protectedUsersBefore = await protectedUserHashSnapshot();
   const e2ePlatformBefore = await e2ePlatformAdminSnapshot();
 
-  runSeedSilently();
+  const seed = runSeedSilently();
   await assertGuardBlocksUnsafeDelete();
 
   const providerAfter = {
@@ -244,6 +253,8 @@ async function main() {
 
   console.log(JSON.stringify({
     ok: true,
+    seedE2eRan: seed.ran,
+    seedE2eBlockedByBoundary: seed.blocked,
     providerConfigRowsPreserved: true,
     verifiedStaffNotDowngraded: true,
     protectedUserHashesStable: true,

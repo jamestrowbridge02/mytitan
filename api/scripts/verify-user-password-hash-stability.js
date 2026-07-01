@@ -100,11 +100,20 @@ async function readNonE2eUserHashes() {
 }
 
 function runSeedSilently() {
-  execFileSync("npm", ["run", "seed:e2e"], {
-    cwd: process.cwd(),
-    env: { ...process.env, MYTITAN_ENABLE_E2E_FIXTURES: "1" },
-    stdio: ["ignore", "ignore", "pipe"],
-  });
+  try {
+    execFileSync("npm", ["run", "seed:e2e"], {
+      cwd: process.cwd(),
+      env: { ...process.env, MYTITAN_ENABLE_E2E_FIXTURES: "1" },
+      stdio: ["ignore", "ignore", "pipe"],
+    });
+    return { ran: true, blocked: false };
+  } catch (error) {
+    const stderr = String(error?.stderr || "");
+    if (/refused:/i.test(stderr)) {
+      return { ran: false, blocked: true };
+    }
+    throw error;
+  }
 }
 
 async function recordDrift(area, target, summary) {
@@ -124,7 +133,7 @@ async function main() {
   const e2ePlatformBefore = await readE2ePlatformAdmin();
   const nonE2eBefore = await readNonE2eUserHashes();
 
-  runSeedSilently();
+  const seed = runSeedSilently();
 
   const targetsAfter = await readTargets();
   const e2ePlatformAfter = await readE2ePlatformAdmin();
@@ -171,6 +180,8 @@ async function main() {
   console.log(JSON.stringify({
     ok: true,
     operation: "seed:e2e",
+    seedE2eRan: seed.ran,
+    seedE2eBlockedByBoundary: seed.blocked,
     protectedUsers,
     e2ePlatformAdmin: publicUserState(e2ePlatformAfter),
     e2ePlatformAdminStable: e2ePlatformBefore.id === e2ePlatformAfter.id && e2ePlatformBefore.passwordHash === e2ePlatformAfter.passwordHash,

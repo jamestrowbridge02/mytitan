@@ -17,6 +17,55 @@ function configuredPublicHosts() {
     .filter((host) => host && isPublicMyTitanHost(host));
 }
 
+function runtimeEnv() {
+  return String(process.env.MYTITAN_RUNTIME_ENV || process.env.MYTITAN_ENV || process.env.NODE_ENV || '')
+    .trim()
+    .toLowerCase();
+}
+
+function databaseUrlParts() {
+  try {
+    const url = new URL(String(process.env.DATABASE_URL || ''));
+    return {
+      host: url.hostname.toLowerCase(),
+      database: url.pathname.replace(/^\//, '').toLowerCase(),
+      raw: String(process.env.DATABASE_URL || ''),
+    };
+  } catch {
+    return { host: '', database: '', raw: String(process.env.DATABASE_URL || '') };
+  }
+}
+
+function looksDedicatedAutomationDatabase() {
+  const { host, database, raw } = databaseUrlParts();
+  const value = `${host} ${database} ${raw}`.toLowerCase();
+  return /(e2e|test|validation|staging|dev|local)/.test(value);
+}
+
+function assertAutomationBoundary({ scriptName, operation = 'automation mutation' } = {}) {
+  const env = runtimeEnv();
+  const allowedEnvs = new Set(['e2e', 'test', 'validation', 'development', 'dev', 'local']);
+  if (!allowedEnvs.has(env)) {
+    throw new Error(
+      `${scriptName || operation} refused: MYTITAN_RUNTIME_ENV must be e2e, test, validation, development, dev, or local for ${operation}.`,
+    );
+  }
+  if (!looksDedicatedAutomationDatabase()) {
+    const { host, database } = databaseUrlParts();
+    throw new Error(
+      `${scriptName || operation} refused: DATABASE_URL must identify a dedicated non-production database for ${operation}. ` +
+        `Current target host=${host || 'unknown'} database=${database || 'unknown'}.`,
+    );
+  }
+  const publicHosts = configuredPublicHosts();
+  if (publicHosts.length) {
+    throw new Error(
+      `${scriptName || operation} refused: public MyTitan hosts are configured (${publicHosts.join(', ')}). ` +
+        `Automation must run with isolated validation/local URLs.`,
+    );
+  }
+}
+
 function assertSafeSeedTarget({ scriptName, overrideEnv }) {
   if (process.env[overrideEnv] === '1') {
     return;
@@ -32,5 +81,6 @@ function assertSafeSeedTarget({ scriptName, overrideEnv }) {
 }
 
 module.exports = {
+  assertAutomationBoundary,
   assertSafeSeedTarget,
 };

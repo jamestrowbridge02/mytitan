@@ -40,17 +40,26 @@ async function readPrincipal() {
 }
 
 function runSeedSilently() {
-  execFileSync("npm", ["run", "seed:e2e"], {
-    cwd: process.cwd(),
-    env: { ...process.env, MYTITAN_ENABLE_E2E_FIXTURES: "1" },
-    stdio: ["ignore", "ignore", "pipe"],
-  });
+  try {
+    execFileSync("npm", ["run", "seed:e2e"], {
+      cwd: process.cwd(),
+      env: { ...process.env, MYTITAN_ENABLE_E2E_FIXTURES: "1" },
+      stdio: ["ignore", "ignore", "pipe"],
+    });
+    return { ran: true, blocked: false };
+  } catch (error) {
+    const stderr = String(error?.stderr || "");
+    if (/refused:/i.test(stderr)) {
+      return { ran: false, blocked: true };
+    }
+    throw error;
+  }
 }
 
 async function main() {
   const before = await readPrincipal();
   const beforeFingerprint = safeFingerprint(before.passwordHash);
-  runSeedSilently();
+  const seed = runSeedSilently();
   const after = await readPrincipal();
   const afterFingerprint = safeFingerprint(after.passwordHash);
   if (before.passwordHash !== after.passwordHash) {
@@ -78,6 +87,8 @@ async function main() {
 
   console.log(JSON.stringify({
     ok: true,
+    seedE2eRan: seed.ran,
+    seedE2eBlockedByBoundary: seed.blocked,
     principalAdmin: {
       email: PRINCIPAL_ADMIN_EMAIL,
       existsOnce: true,

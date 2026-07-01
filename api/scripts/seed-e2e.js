@@ -12,6 +12,7 @@ const {
   normalizeEmail,
   recordProtectedMutationWarning,
 } = require("./protected-mutation-policy");
+const { assertAutomationBoundary } = require("./runtime-guard");
 
 const prisma = new PrismaClient();
 
@@ -2037,6 +2038,10 @@ async function main() {
     console.log("E2E fixture seed skipped. Set MYTITAN_ENABLE_E2E_FIXTURES=1 to run.");
     return;
   }
+  assertAutomationBoundary({
+    scriptName: "seed:e2e",
+    operation: "E2E fixture seeding",
+  });
 
   console.log("Seeding deterministic MyTitan E2E fixtures...");
 

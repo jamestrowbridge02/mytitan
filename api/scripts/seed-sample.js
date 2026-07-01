@@ -4,7 +4,7 @@ const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 const readline = require('readline');
 const crypto = require('crypto');
-const { assertSafeSeedTarget } = require('./runtime-guard');
+const { assertAutomationBoundary } = require('./runtime-guard');
 
 const prisma = new PrismaClient();
 const DEMO_COMPANY_NAME = '';
@@ -807,9 +807,9 @@ async function main() {
     console.log(' seed skipped. Set ENABLE_DEMO_SEED=1 to run.');
     return;
   }
-  assertSafeSeedTarget({
+  assertAutomationBoundary({
     scriptName: 'seed-sample',
-    overrideEnv: 'MYTITAN_ACKNOWLEDGE_PUBLIC_SEED_TARGET',
+    operation: 'demo/sample seed',
   });
 
   const args = getArgs();

@@ -20,6 +20,17 @@ function extractPortalToken(portalUrl?: string | null) {
   return portalUrl.slice(index + marker.length).split("?")[0] || null;
 }
 
+function assertPlaywrightSeedBoundary(apiBase: string) {
+  const runtimeEnv = String(process.env.MYTITAN_RUNTIME_ENV || process.env.MYTITAN_ENV || process.env.NODE_ENV || "").trim().toLowerCase();
+  if (!["e2e", "test", "validation", "development", "dev", "local"].includes(runtimeEnv)) {
+    throw new Error("Playwright fixture seeding refused: MYTITAN_RUNTIME_ENV must be an explicit non-production value.");
+  }
+  const host = new URL(apiBase).hostname;
+  if (!["127.0.0.1", "localhost", "api"].includes(host)) {
+    throw new Error(`Playwright fixture seeding refused: API base host must be local/internal, got ${host}.`);
+  }
+}
+
 export default async function globalSetup(config: FullConfig) {
   const baseURL = process.env.PLAYWRIGHT_BASE_URL || String(config.projects[0]?.use?.baseURL || "http://127.0.0.1:3001");
   const appOrigin = new URL(baseURL).origin;
@@ -46,6 +57,7 @@ export default async function globalSetup(config: FullConfig) {
   }
 
   if (shouldSeedDockerFixtures) {
+    assertPlaywrightSeedBoundary(apiBase);
     execSync("docker compose exec -T api sh -lc 'cd /app && npm run seed:e2e'", {
       cwd: path.resolve(__dirname, "..", ".."),
       stdio: "inherit",
