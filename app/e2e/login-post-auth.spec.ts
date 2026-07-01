@@ -25,7 +25,7 @@ test.describe("login post-auth stability", () => {
   test("installed-app start route stays reachable and app manifest stays host-safe", async ({ page, request }) => {
     await installApiProxy(page, request);
 
-    const manifestResponse = await request.get("http://127.0.0.1:3001/site.webmanifest");
+    const manifestResponse = await request.get(`${process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:3001"}/site.webmanifest`);
     expect(manifestResponse.ok()).toBeTruthy();
     const manifest = await manifestResponse.json();
     expect(String(manifest?.start_url || "")).toBe("/");

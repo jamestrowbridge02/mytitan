@@ -63,7 +63,7 @@ test.describe("guided job form draft persistence", () => {
     const token = await page.evaluate(() => window.localStorage.getItem("mytitan_token"));
     expect(token).toBeTruthy();
 
-    const serverDraft = await request.get("http://127.0.0.1:3000/drafts/jobs/WHEELS", {
+    const serverDraft = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/drafts/jobs/WHEELS`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(serverDraft.ok()).toBeTruthy();

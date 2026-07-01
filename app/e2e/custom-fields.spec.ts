@@ -11,7 +11,7 @@ async function getToken(page: Page) {
 }
 
 async function getVisibleField(request: APIRequestContext, token: string, entityType: string, key: string) {
-  const response = await request.get(`http://127.0.0.1:3000/custom-fields?entityType=${entityType}&visible=true`, {
+  const response = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/custom-fields?entityType=${entityType}&visible=true`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   expect(response.ok()).toBeTruthy();
@@ -22,7 +22,7 @@ async function getVisibleField(request: APIRequestContext, token: string, entity
 }
 
 async function setCustomFieldValue(request: APIRequestContext, token: string, entityType: string, entityId: string, fieldId: string, valueJson: unknown) {
-  const response = await request.post("http://127.0.0.1:3000/custom-fields/values", {
+  const response = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/custom-fields/values`, {
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
@@ -46,12 +46,12 @@ test.describe("custom fields", () => {
 
     const token = await page.evaluate(() => window.localStorage.getItem("mytitan_token"));
     expect(token).toBeTruthy();
-    const fieldsResponse = await request.get("http://127.0.0.1:3000/custom-fields", {
+    const fieldsResponse = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/custom-fields`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     const existingFields = await fieldsResponse.json();
     for (const field of Array.isArray(existingFields) ? existingFields.filter((item: any) => item?.key === "site_access_notes") : []) {
-      await request.delete(`http://127.0.0.1:3000/custom-fields/${field.id}`, {
+      await request.delete(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/custom-fields/${field.id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
     }
@@ -100,7 +100,7 @@ test.describe("custom fields", () => {
     const token = await getToken(page);
     const warrantyField = await getVisibleField(request, token, "job", fixtureRefs.customFieldWarrantyKey);
 
-    const resetResponse = await request.patch(`http://127.0.0.1:3000/jobs/${fixtureRefs.automationJobId}`, {
+    const resetResponse = await request.patch(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/jobs/${fixtureRefs.automationJobId}`, {
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
@@ -122,7 +122,7 @@ test.describe("custom fields", () => {
     const token = await getToken(page);
     const warrantyField = await getVisibleField(request, token, "job", fixtureRefs.customFieldWarrantyKey);
 
-    const resetResponse = await request.patch(`http://127.0.0.1:3000/jobs/${fixtureRefs.automationJobId}`, {
+    const resetResponse = await request.patch(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/jobs/${fixtureRefs.automationJobId}`, {
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
@@ -145,12 +145,12 @@ test.describe("custom fields", () => {
     const token = await page.evaluate(() => window.localStorage.getItem("mytitan_token"));
     expect(token).toBeTruthy();
     const ruleName = "Playwright expired warranty follow-up";
-    const rulesResponse = await request.get("http://127.0.0.1:3000/automations/workspace-rules", {
+    const rulesResponse = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/automations/workspace-rules`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     const existingRules = await rulesResponse.json();
     for (const rule of Array.isArray(existingRules) ? existingRules.filter((item: any) => String(item?.name || "") === ruleName) : []) {
-      await request.delete(`http://127.0.0.1:3000/automations/workspace-rules/${rule.id}`, {
+      await request.delete(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/automations/workspace-rules/${rule.id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
     }
@@ -176,18 +176,18 @@ test.describe("custom fields", () => {
 
     const token = await getToken(page);
     const ruleName = "Playwright workflow stage readiness reminder";
-    const rulesResponse = await request.get("http://127.0.0.1:3000/automations/workspace-rules", {
+    const rulesResponse = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/automations/workspace-rules`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     const existingRules = await rulesResponse.json();
     for (const rule of Array.isArray(existingRules) ? existingRules.filter((item: any) => String(item?.name || "") === ruleName) : []) {
-      await request.delete(`http://127.0.0.1:3000/automations/workspace-rules/${rule.id}`, {
+      await request.delete(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/automations/workspace-rules/${rule.id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
     }
 
     const warrantyField = await getVisibleField(request, token, "job", fixtureRefs.customFieldWarrantyKey);
-    const resetResponse = await request.patch(`http://127.0.0.1:3000/jobs/${fixtureRefs.automationJobId}`, {
+    const resetResponse = await request.patch(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/jobs/${fixtureRefs.automationJobId}`, {
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
@@ -206,7 +206,7 @@ test.describe("custom fields", () => {
     await page.getByTestId("automation-rule-save").evaluate((element: HTMLButtonElement) => element.click());
     await expect(page.getByTestId("operator-notice-success")).toContainText(/Automation rule created/i);
 
-    const completeResponse = await request.patch(`http://127.0.0.1:3000/jobs/${fixtureRefs.automationJobId}/status`, {
+    const completeResponse = await request.patch(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/jobs/${fixtureRefs.automationJobId}/status`, {
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
@@ -216,7 +216,7 @@ test.describe("custom fields", () => {
     expect(completeResponse.ok()).toBeTruthy();
 
     await expect.poll(async () => {
-      const runsResponse = await request.get("http://127.0.0.1:3000/automations/runs?limit=20", {
+      const runsResponse = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/automations/runs?limit=20`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const runs = await runsResponse.json();

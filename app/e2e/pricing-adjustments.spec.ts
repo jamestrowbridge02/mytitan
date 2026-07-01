@@ -13,7 +13,7 @@ async function authHeaders(page: any) {
 }
 
 async function startSupportMode(request: any, headers: Record<string, string>) {
-  const response = await request.post(`http://127.0.0.1:3000/admin/platform/tenants/${TENANT_ID}/support-mode`, {
+  const response = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/admin/platform/tenants/${TENANT_ID}/support-mode`, {
     headers,
     data: { reason: "E2E pricing support investigation", durationMinutes: 5 },
   });
@@ -29,11 +29,11 @@ test.describe("pricing adjustments", () => {
     await page.goto("/platform", { waitUntil: "networkidle" });
     const headers = await authHeaders(page);
 
-    await request.delete(`http://127.0.0.1:3000/admin/platform/tenants/${TENANT_ID}/pricing-adjustment`, {
+    await request.delete(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/admin/platform/tenants/${TENANT_ID}/pricing-adjustment`, {
       headers,
       data: { confirmation: true, reason: "E2E pricing cleanup" },
     });
-    await request.delete(`http://127.0.0.1:3000/admin/platform/tenants/${TENANT_ID}/support-mode`, { headers });
+    await request.delete(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/admin/platform/tenants/${TENANT_ID}/support-mode`, { headers });
 
     await page.getByTestId("platform-tenant-search-input").fill("E2E MyTitan Workspace");
     await page.getByTestId("platform-tenant-search-submit").click();
@@ -61,30 +61,30 @@ test.describe("pricing adjustments", () => {
     await page.goto("/platform", { waitUntil: "networkidle" });
     const headers = await authHeaders(page);
 
-    await request.post(`http://127.0.0.1:3000/admin/platform/tenants/${TENANT_ID}/pricing-adjustment`, {
+    await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/admin/platform/tenants/${TENANT_ID}/pricing-adjustment`, {
       headers,
       data: { type: "fixed", value: 20, duration: "one_time", reason: "E2E one-time", confirmation: true },
     });
     await startSupportMode(request, headers);
-    const oneTimeState = await request.get(`http://127.0.0.1:3000/admin/platform/tenants/${TENANT_ID}`, { headers });
+    const oneTimeState = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/admin/platform/tenants/${TENANT_ID}`, { headers });
     expect(oneTimeState.ok()).toBeTruthy();
     const oneTimeJson = await oneTimeState.json();
     expect(oneTimeJson?.pricingState?.adjustment?.duration).toBe("one_time");
     expect(oneTimeJson?.pricingState?.adjustment?.appliesToNextPayment).toBe(true);
     expect(oneTimeJson?.pricingState?.adjustment?.appliesToFuturePayments).toBe(false);
 
-    await request.patch(`http://127.0.0.1:3000/admin/platform/tenants/${TENANT_ID}/pricing-adjustment`, {
+    await request.patch(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/admin/platform/tenants/${TENANT_ID}/pricing-adjustment`, {
       headers,
       data: { type: "percentage", value: 12, duration: "recurring", reason: "E2E recurring", confirmation: true },
     });
-    const recurringState = await request.get(`http://127.0.0.1:3000/admin/platform/tenants/${TENANT_ID}`, { headers });
+    const recurringState = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/admin/platform/tenants/${TENANT_ID}`, { headers });
     expect(recurringState.ok()).toBeTruthy();
     const recurringJson = await recurringState.json();
     expect(recurringJson?.pricingState?.adjustment?.duration).toBe("recurring");
     expect(recurringJson?.pricingState?.adjustment?.appliesToNextPayment).toBe(true);
     expect(recurringJson?.pricingState?.adjustment?.appliesToFuturePayments).toBe(true);
 
-    await request.delete(`http://127.0.0.1:3000/admin/platform/tenants/${TENANT_ID}/pricing-adjustment`, {
+    await request.delete(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/admin/platform/tenants/${TENANT_ID}/pricing-adjustment`, {
       headers,
       data: { confirmation: true, reason: "E2E pricing cleanup" },
     });
@@ -97,14 +97,14 @@ test.describe("pricing adjustments", () => {
     const headers = await authHeaders(page);
     const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
-    const applyResponse = await request.post(`http://127.0.0.1:3000/admin/platform/tenants/${TENANT_ID}/pricing-adjustment`, {
+    const applyResponse = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/admin/platform/tenants/${TENANT_ID}/pricing-adjustment`, {
       headers,
       data: { type: "percentage", value: 8, duration: "until_date", expiresAt: tomorrow, reason: "E2E expiry", confirmation: true },
     });
     expect(applyResponse.ok()).toBeTruthy();
     await startSupportMode(request, headers);
 
-    const pricingState = await request.get(`http://127.0.0.1:3000/admin/platform/tenants/${TENANT_ID}`, { headers });
+    const pricingState = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/admin/platform/tenants/${TENANT_ID}`, { headers });
     expect(pricingState.ok()).toBeTruthy();
     const pricingJson = await pricingState.json();
     expect(pricingJson?.pricingState?.adjustment?.duration).toBe("until_date");
@@ -112,7 +112,7 @@ test.describe("pricing adjustments", () => {
     expect(pricingJson?.pricingState?.adjustment?.expiresAt).toContain(tomorrow.slice(0, 10));
     expect(Number(pricingJson?.pricingState?.adjustedPriceCents || 0)).toBeLessThan(Number(pricingJson?.pricingState?.basePriceCents || 0));
 
-    await request.delete(`http://127.0.0.1:3000/admin/platform/tenants/${TENANT_ID}/pricing-adjustment`, {
+    await request.delete(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/admin/platform/tenants/${TENANT_ID}/pricing-adjustment`, {
       headers,
       data: { confirmation: true, reason: "E2E pricing cleanup" },
     });
@@ -127,7 +127,7 @@ test.describe("pricing adjustments", () => {
     await expect(page.getByTestId("billing-custom-pricing")).toHaveCount(0);
 
     const headers = await authHeaders(page);
-    const billingMe = await request.get("http://127.0.0.1:3000/billing/me", { headers });
+    const billingMe = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/billing/me`, { headers });
     expect(billingMe.ok()).toBeTruthy();
     const billingMeJson = await billingMe.json();
     expect(billingMeJson?.plan?.featuresJson).toBeUndefined();
@@ -138,7 +138,7 @@ test.describe("pricing adjustments", () => {
     expect(billingMeJson?.viewer?.role).toBe("ADMIN");
     expect(billingMeJson?.viewer?.canManageSubscription).toBe(false);
 
-    const entitlements = await request.get("http://127.0.0.1:3000/me/entitlements", { headers });
+    const entitlements = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/me/entitlements`, { headers });
     expect(entitlements.ok()).toBeTruthy();
     const entitlementsJson = await entitlements.json();
     expect(typeof entitlementsJson?.planCode).toBe("string");
@@ -147,7 +147,7 @@ test.describe("pricing adjustments", () => {
     expect(entitlementsJson?.trial).toBeUndefined();
     expect(entitlementsJson?.viewer).toBeUndefined();
 
-    const platformLookup = await request.get("http://127.0.0.1:3000/admin/platform/tenants?q=e2e", { headers });
+    const platformLookup = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/admin/platform/tenants?q=e2e`, { headers });
     expect(platformLookup.status()).toBe(403);
   });
 
@@ -159,7 +159,7 @@ test.describe("pricing adjustments", () => {
     await expect(page.getByTestId("billing-trial-card")).toBeVisible();
 
     const headers = await authHeaders(page);
-    const platformLookup = await request.get("http://127.0.0.1:3000/admin/platform/tenants?q=e2e", { headers });
+    const platformLookup = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/admin/platform/tenants?q=e2e`, { headers });
     expect(platformLookup.status()).toBe(403);
   });
 });

@@ -35,14 +35,14 @@ test.describe("integration platform foundation", () => {
   });
 
   test("personal integration status is scoped to the current user only", async ({ request }) => {
-    const operatorLogin = await request.post("http://127.0.0.1:3000/auth/login", {
+    const operatorLogin = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/login`, {
       data: { email: "e2e.operator@mytitan.local", password: "MyTitanE2E!2026" },
       headers: { "Content-Type": "application/json" },
     });
     expect(operatorLogin.ok()).toBeTruthy();
     const operatorToken = String((await operatorLogin.json())?.token || "");
 
-    const adminLogin = await request.post("http://127.0.0.1:3000/auth/login", {
+    const adminLogin = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/login`, {
       data: { email: fixtureRefs.workspaceAdminEmail, password: fixtureRefs.workspaceAdminPassword },
       headers: { "Content-Type": "application/json" },
     });
@@ -80,7 +80,7 @@ test.describe("integration platform foundation", () => {
   });
 
   test("integration rollout monitoring exposes safe counts only", async ({ request }) => {
-    const operatorLogin = await request.post("http://127.0.0.1:3000/auth/login", {
+    const operatorLogin = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/login`, {
       data: { email: "e2e.operator@mytitan.local", password: "MyTitanE2E!2026" },
       headers: { "Content-Type": "application/json" },
     });
@@ -181,14 +181,14 @@ test.describe("integration platform foundation", () => {
   });
 
   test("BYOG API returns safe tenant-scoped readiness without secrets", async ({ request }) => {
-    const operatorLogin = await request.post("http://127.0.0.1:3000/auth/login", {
+    const operatorLogin = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/login`, {
       data: { email: "e2e.operator@mytitan.local", password: "MyTitanE2E!2026" },
       headers: { "Content-Type": "application/json" },
     });
     expect(operatorLogin.ok()).toBeTruthy();
     const operatorToken = String((await operatorLogin.json())?.token || "");
 
-    const adminLogin = await request.post("http://127.0.0.1:3000/auth/login", {
+    const adminLogin = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/login`, {
       data: { email: fixtureRefs.workspaceAdminEmail, password: fixtureRefs.workspaceAdminPassword },
       headers: { "Content-Type": "application/json" },
     });
@@ -230,14 +230,14 @@ test.describe("integration platform foundation", () => {
   });
 
   test("disabled BYOG clients fail closed and cross-tenant routes stay isolated", async ({ request }) => {
-    const operatorLogin = await request.post("http://127.0.0.1:3000/auth/login", {
+    const operatorLogin = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/login`, {
       data: { email: "e2e.operator@mytitan.local", password: "MyTitanE2E!2026" },
       headers: { "Content-Type": "application/json" },
     });
     expect(operatorLogin.ok()).toBeTruthy();
     const operatorToken = String((await operatorLogin.json())?.token || "");
 
-    const supportLogin = await request.post("http://127.0.0.1:3000/auth/login", {
+    const supportLogin = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/login`, {
       data: { email: fixtureRefs.supportOwnerEmail, password: fixtureRefs.supportOwnerPassword },
       headers: { "Content-Type": "application/json" },
     });
@@ -281,19 +281,19 @@ test.describe("integration platform foundation", () => {
 
   test("orchestration map stays redacted, tenant-scoped, and blocked for technician or customer access", async ({ request }) => {
     const [operatorLogin, supportLogin, technicianLogin, customerLogin] = await Promise.all([
-      request.post("http://127.0.0.1:3000/auth/login", {
+      request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/login`, {
         data: { email: "e2e.operator@mytitan.local", password: "MyTitanE2E!2026" },
         headers: { "Content-Type": "application/json" },
       }),
-      request.post("http://127.0.0.1:3000/auth/login", {
+      request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/login`, {
         data: { email: fixtureRefs.supportOwnerEmail, password: fixtureRefs.supportOwnerPassword },
         headers: { "Content-Type": "application/json" },
       }),
-      request.post("http://127.0.0.1:3000/auth/login", {
+      request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/login`, {
         data: { email: fixtureRefs.technicianEmail, password: fixtureRefs.technicianPassword },
         headers: { "Content-Type": "application/json" },
       }),
-      request.post("http://127.0.0.1:3000/customer-auth/login", {
+      request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/customer-auth/login`, {
         data: { email: fixtureRefs.customerWorkspaceEmail, password: fixtureRefs.customerWorkspacePassword },
         headers: { "Content-Type": "application/json" },
       }),
@@ -350,11 +350,11 @@ test.describe("integration platform foundation", () => {
   });
 
   test("orchestration actions stay safe and dry-run webhook tests do not fake readiness", async ({ request }) => {
-    const operatorLogin = await request.post("http://127.0.0.1:3000/auth/login", {
+    const operatorLogin = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/login`, {
       data: { email: "e2e.operator@mytitan.local", password: "MyTitanE2E!2026" },
       headers: { "Content-Type": "application/json" },
     });
-    const supportLogin = await request.post("http://127.0.0.1:3000/auth/login", {
+    const supportLogin = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/login`, {
       data: { email: fixtureRefs.supportOwnerEmail, password: fixtureRefs.supportOwnerPassword },
       headers: { "Content-Type": "application/json" },
     });
@@ -378,7 +378,7 @@ test.describe("integration platform foundation", () => {
       expect(dryRunJson.ok).toBe(false);
     }
 
-    const invalidSupport = await request.fetch("http://127.0.0.1:3000/integrations/webhooks/generic-webhook/e2esupportroute001", {
+    const invalidSupport = await request.fetch(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/integrations/webhooks/generic-webhook/e2esupportroute001`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -406,7 +406,7 @@ test.describe("integration platform foundation", () => {
     const validSignature = "050d19e4959c028a60d4bd8831dce01f616316e1ccf71db7c7595de1d959846d";
     const invalidSignature = "bad_signature";
 
-    const invalid = await request.fetch("http://127.0.0.1:3000/integrations/webhooks/quickbooks/e2eqbohookroute001", {
+    const invalid = await request.fetch(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/integrations/webhooks/quickbooks/e2eqbohookroute001`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -417,7 +417,7 @@ test.describe("integration platform foundation", () => {
     });
     expect([403, 503]).toContain(invalid.status());
 
-    const accepted = await request.fetch("http://127.0.0.1:3000/integrations/webhooks/quickbooks/e2eqbohookroute001", {
+    const accepted = await request.fetch(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/integrations/webhooks/quickbooks/e2eqbohookroute001`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -433,7 +433,7 @@ test.describe("integration platform foundation", () => {
     expect(accepted.status()).toBe(202);
     expect(await accepted.json()).toMatchObject({ received: true });
 
-    const duplicate = await request.fetch("http://127.0.0.1:3000/integrations/webhooks/quickbooks/e2eqbohookroute001", {
+    const duplicate = await request.fetch(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/integrations/webhooks/quickbooks/e2eqbohookroute001`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -445,7 +445,7 @@ test.describe("integration platform foundation", () => {
     expect(duplicate.status()).toBe(202);
     expect(await duplicate.json()).toMatchObject({ received: true, duplicate: true });
 
-    const unknown = await request.fetch("http://127.0.0.1:3000/integrations/webhooks/quickbooks/not-a-real-route", {
+    const unknown = await request.fetch(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/integrations/webhooks/quickbooks/not-a-real-route`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -466,7 +466,7 @@ test.describe("integration platform foundation", () => {
     await expect(page.locator("body")).not.toContainText("support_webhook_secret");
     await expect(page.locator("body")).not.toContainText("google_e2e_personal_refresh");
 
-    const technicianLogin = await request.post("http://127.0.0.1:3000/auth/login", {
+    const technicianLogin = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/login`, {
       data: { email: fixtureRefs.technicianEmail, password: fixtureRefs.technicianPassword },
       headers: { "Content-Type": "application/json" },
     });

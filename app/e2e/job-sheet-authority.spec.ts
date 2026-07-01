@@ -6,6 +6,8 @@ test.use({ storageState: authFile });
 
 const PIXEL_DATA_URL =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9sQ8V6sAAAAASUVORK5CYII=";
+const appBaseUrl = process.env.PLAYWRIGHT_BASE_URL || "https://app.mytitan.co.uk";
+const apiBaseUrl = process.env.PLAYWRIGHT_API_BASE_URL || "https://api.mytitan.co.uk";
 
 async function getToken(page: Page) {
   const token = await page.evaluate(() => window.localStorage.getItem("mytitan_token"));
@@ -14,7 +16,7 @@ async function getToken(page: Page) {
 }
 
 async function getTenantSettings(request: any, token: string) {
-  const response = await request.get("http://127.0.0.1:3000/tenant/settings", {
+  const response = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/tenant/settings`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   expect(response.ok()).toBeTruthy();
@@ -22,7 +24,7 @@ async function getTenantSettings(request: any, token: string) {
 }
 
 async function getCurrentUser(request: any, token: string) {
-  const response = await request.get("http://127.0.0.1:3000/me", {
+  const response = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/me`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   expect(response.ok()).toBeTruthy();
@@ -30,7 +32,7 @@ async function getCurrentUser(request: any, token: string) {
 }
 
 async function updateTenantSettings(request: any, token: string, data: Record<string, unknown>) {
-  const response = await request.put("http://127.0.0.1:3000/tenant/settings", {
+  const response = await request.put(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/tenant/settings`, {
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
@@ -42,7 +44,7 @@ async function updateTenantSettings(request: any, token: string, data: Record<st
 }
 
 async function listServiceRecordDispatchAudits(request: any, token: string) {
-  const response = await request.get("http://127.0.0.1:3000/audit?type=notification.service_record_email.dispatch&pageSize=500", {
+  const response = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/audit?type=notification.service_record_email.dispatch&pageSize=500`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   expect(response.ok()).toBeTruthy();
@@ -101,7 +103,7 @@ test.describe("job sheet authority and settings IA", () => {
         },
       });
 
-      const createResponse = await request.post("http://127.0.0.1:3000/jobs", {
+      const createResponse = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/jobs`, {
         headers,
         data: {
           customerName: `Safe Output ${uniqueId}`,
@@ -133,10 +135,8 @@ test.describe("job sheet authority and settings IA", () => {
       });
       expect(createResponse.ok()).toBeTruthy();
       const createdJob = await createResponse.json();
-      expect(String(createdJob?.pdf?.portalUrl || "")).toMatch(/^https:\/\/app\.mytitan\.co\.uk\/portal\/job\//);
-      expect(String(createdJob?.pdf?.pdfUrl || "")).toMatch(/^https:\/\/api\.mytitan\.co\.uk\/public\/job\//);
-      expect(String(createdJob?.pdf?.portalUrl || "")).not.toContain("127.0.0.1");
-      expect(String(createdJob?.pdf?.pdfUrl || "")).not.toContain("127.0.0.1");
+      expect(String(createdJob?.pdf?.portalUrl || "")).toMatch(new RegExp(`^${appBaseUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/portal/job/`));
+      expect(String(createdJob?.pdf?.pdfUrl || "")).toMatch(new RegExp(`^${apiBaseUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/public/job/`));
 
       const afterDispatchAudits = await listServiceRecordDispatchAudits(request, token);
       const latestDispatch = afterDispatchAudits[0];
@@ -148,7 +148,7 @@ test.describe("job sheet authority and settings IA", () => {
       expect(message).toContain("footer=disabled");
       expect(message).not.toContain("@example.test");
 
-      const pdfResponse = await request.get(`http://127.0.0.1:3000${createdJob.pdf.url}`);
+      const pdfResponse = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}${createdJob.pdf.url}`);
       expect(pdfResponse.ok()).toBeTruthy();
       const pdfText = (await pdfResponse.body()).toString("utf8");
       expect(pdfText).not.toContain("BILLING DETAILS");
@@ -195,7 +195,7 @@ test.describe("job sheet authority and settings IA", () => {
         },
       });
 
-      const stockLevelsResponse = await request.get("http://127.0.0.1:3000/inventory/levels", {
+      const stockLevelsResponse = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/inventory/levels`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       expect(stockLevelsResponse.ok()).toBeTruthy();
@@ -205,7 +205,7 @@ test.describe("job sheet authority and settings IA", () => {
         : null;
       expect(stockedItem?.item?.id).toBeTruthy();
 
-      const createResponse = await request.post("http://127.0.0.1:3000/jobs", {
+      const createResponse = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/jobs`, {
         headers,
         data: {
           customerName: `Playwright Job Sheet ${uniqueId}`,
@@ -262,10 +262,8 @@ test.describe("job sheet authority and settings IA", () => {
       });
       expect(createResponse.ok()).toBeTruthy();
       const createdJob = await createResponse.json();
-      expect(String(createdJob?.pdf?.portalUrl || "")).toMatch(/^https:\/\/app\.mytitan\.co\.uk\/portal\/job\//);
-      expect(String(createdJob?.pdf?.pdfUrl || "")).toMatch(/^https:\/\/api\.mytitan\.co\.uk\/public\/job\//);
-      expect(String(createdJob?.pdf?.portalUrl || "")).not.toContain("127.0.0.1");
-      expect(String(createdJob?.pdf?.pdfUrl || "")).not.toContain("127.0.0.1");
+      expect(String(createdJob?.pdf?.portalUrl || "")).toMatch(new RegExp(`^${appBaseUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/portal/job/`));
+      expect(String(createdJob?.pdf?.pdfUrl || "")).toMatch(new RegExp(`^${apiBaseUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/public/job/`));
 
       expect(createdJob?.status).toBe("COMPLETED");
       expect(Array.isArray(createdJob?.submissionWarnings)).toBeTruthy();
@@ -275,7 +273,7 @@ test.describe("job sheet authority and settings IA", () => {
       expect(Array.isArray(createdJob?.partAllocations)).toBeTruthy();
       expect(createdJob.partAllocations).toHaveLength(1);
 
-      const jobDetailResponse = await request.get(`http://127.0.0.1:3000/jobs/${createdJob.id}`, {
+      const jobDetailResponse = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/jobs/${createdJob.id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       expect(jobDetailResponse.ok()).toBeTruthy();
@@ -293,7 +291,7 @@ test.describe("job sheet authority and settings IA", () => {
       expect(Array.isArray(jobDetail?.assets)).toBeTruthy();
       expect(jobDetail.assets.length).toBeGreaterThanOrEqual(5);
 
-      const pdfResponse = await request.get(`http://127.0.0.1:3000${createdJob.pdf.url}`);
+      const pdfResponse = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}${createdJob.pdf.url}`);
       expect(pdfResponse.ok()).toBeTruthy();
       const pdfText = (await pdfResponse.body()).toString("utf8");
       expect(pdfText).toContain("COMPLETION SUMMARY");
@@ -303,7 +301,7 @@ test.describe("job sheet authority and settings IA", () => {
       expect(pdfText).toContain("Additional services: Locking wheel nut removal");
       expect(pdfText).toContain("Vehicle colour: Silver");
 
-      const jobPartsResponse = await request.get(`http://127.0.0.1:3000/jobs/${createdJob.id}/parts`, {
+      const jobPartsResponse = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/jobs/${createdJob.id}/parts`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       expect(jobPartsResponse.ok()).toBeTruthy();
@@ -377,8 +375,6 @@ test.describe("job sheet authority and settings IA", () => {
     const currentSettings = await getTenantSettings(request, token);
     try {
       await updateTenantSettings(request, token, {
-        emailSenderName: "Workspace Sender",
-        emailReplyTo: `workspace-replies-${uniqueId}@example.test`,
         businessConfigJson: {
           ...(currentSettings?.businessConfigJson || {}),
           serviceRecordEmail: {
@@ -388,7 +384,7 @@ test.describe("job sheet authority and settings IA", () => {
         },
       });
 
-      const createResponse = await request.post("http://127.0.0.1:3000/jobs", {
+      const createResponse = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/jobs`, {
         headers,
         data: {
           customerName: `Operator Mail ${uniqueId}`,
@@ -419,8 +415,6 @@ test.describe("job sheet authority and settings IA", () => {
       expect(message).not.toContain("@example.test");
     } finally {
       await updateTenantSettings(request, token, {
-        emailSenderName: currentSettings?.emailSenderName ?? '',
-        emailReplyTo: currentSettings?.emailReplyTo ?? '',
         businessConfigJson: currentSettings?.businessConfigJson || {},
       });
     }

@@ -43,7 +43,7 @@ test.describe("workspace governance", () => {
 
   test("team invite API stays token-free and uses system delivery rules", async ({ page, request }) => {
     await installApiProxy(page, request);
-    const login = await request.post("http://127.0.0.1:3000/auth/login", {
+    const login = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/login`, {
       data: { email: defaultOperatorEmail, password: defaultOperatorPassword },
       headers: { "Content-Type": "application/json" },
     });

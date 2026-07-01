@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { fixtureRefs, hasDashboardAuth, installApiProxy, loginAs } from "./utils";
 
 async function customerAuthHeaders(request: any) {
-  const response = await request.post("http://127.0.0.1:3000/customer-auth/login", {
+  const response = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/customer-auth/login`, {
     data: {
       email: fixtureRefs.customerWorkspaceEmail,
       password: fixtureRefs.customerWorkspacePassword,
@@ -20,7 +20,7 @@ async function customerAuthHeaders(request: any) {
 }
 
 async function operatorAuthHeaders(request: any) {
-  const response = await request.post("http://127.0.0.1:3000/auth/login", {
+  const response = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/login`, {
     data: {
       email: "e2e.operator@mytitan.local",
       password: "MyTitanE2E!2026",
@@ -44,7 +44,7 @@ async function createOperatorServicePlan(request: any, options?: {
   portalVisible?: boolean;
 }) {
   const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  const response = await request.post("http://127.0.0.1:3000/service-plans", {
+  const response = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/service-plans`, {
     data: {
       customerId: options?.customerId || fixtureRefs.convertibleCustomerId,
       name: options?.name || `Playwright service plan ${suffix}`,
@@ -163,7 +163,7 @@ test.describe("service plans", () => {
     });
     const headers = await customerAuthHeaders(request);
     const uniqueNote = `Please stop this plan at the next renewal point. [pw-${Date.now()}]`;
-    const createResponse = await request.post(`http://127.0.0.1:3000/customer/service-plans/${requestPlan.id}/change-request`, {
+    const createResponse = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/customer/service-plans/${requestPlan.id}/change-request`, {
       data: {
         kind: "CANCEL_REQUEST",
         note: uniqueNote,
@@ -184,7 +184,7 @@ test.describe("service plans", () => {
     await requestRow.getByTestId("service-plan-request-approve").evaluate((element: HTMLButtonElement) => element.click());
     await expect(requestRow).toContainText(/APPROVED/i);
     await expect.poll(async () => {
-      const listResponse = await request.get("http://127.0.0.1:3000/service-plans/change-requests", {
+      const listResponse = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/service-plans/change-requests`, {
         headers: await operatorAuthHeaders(request),
       });
       const rows = await listResponse.json();
@@ -192,13 +192,13 @@ test.describe("service plans", () => {
       return target?.status || null;
     }).toBe("APPROVED");
     const operatorHeaders = await operatorAuthHeaders(request);
-    const completeResponse = await request.post(`http://127.0.0.1:3000/service-plans/change-requests/${createdRequest.id}/complete`, {
+    const completeResponse = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/service-plans/change-requests/${createdRequest.id}/complete`, {
       headers: operatorHeaders,
       data: {},
     });
     expect(completeResponse.ok()).toBeTruthy();
     await expect.poll(async () => {
-      const listResponse = await request.get("http://127.0.0.1:3000/service-plans/change-requests", {
+      const listResponse = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/service-plans/change-requests`, {
         headers: operatorHeaders,
       });
       const rows = await listResponse.json();
@@ -218,7 +218,7 @@ test.describe("service plans", () => {
     });
     const headers = await customerAuthHeaders(request);
     const uniqueNote = `Please add photo proof to this plan. [pw-${Date.now()}]`;
-    const createResponse = await request.post(`http://127.0.0.1:3000/customer/service-plans/${requestPlan.id}/change-request`, {
+    const createResponse = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/customer/service-plans/${requestPlan.id}/change-request`, {
       data: {
         kind: "SCOPE_CHANGE_REQUEST",
         note: uniqueNote,

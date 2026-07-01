@@ -66,6 +66,29 @@ function assertAutomationBoundary({ scriptName, operation = 'automation mutation
   }
 }
 
+async function readDatabaseEnvironmentMarker(prisma) {
+  if (!prisma?.databaseEnvironmentMarker?.findUnique) {
+    throw new Error('Database environment marker model is unavailable. Run migrations before automation writes.');
+  }
+  const marker = await prisma.databaseEnvironmentMarker.findUnique({ where: { id: 'default' } });
+  if (!marker) {
+    throw new Error('Database environment marker is missing. Run migrations and explicitly mark the environment before automation writes.');
+  }
+  return marker;
+}
+
+async function assertDatabaseEnvironment(prisma, { scriptName, allowed = ['e2e', 'validation', 'test', 'development', 'dev', 'local'] } = {}) {
+  const marker = await readDatabaseEnvironmentMarker(prisma);
+  const environment = String(marker.environment || '').trim().toLowerCase();
+  if (!allowed.includes(environment)) {
+    throw new Error(
+      `${scriptName || 'automation'} refused: database environment marker is ${environment || 'unknown'}, ` +
+        `allowed=${allowed.join(',')}, guardVersion=${marker.guardVersion || 'unknown'}.`,
+    );
+  }
+  return marker;
+}
+
 function assertSafeSeedTarget({ scriptName, overrideEnv }) {
   if (process.env[overrideEnv] === '1') {
     return;
@@ -82,5 +105,7 @@ function assertSafeSeedTarget({ scriptName, overrideEnv }) {
 
 module.exports = {
   assertAutomationBoundary,
+  assertDatabaseEnvironment,
+  readDatabaseEnvironmentMarker,
   assertSafeSeedTarget,
 };

@@ -39,6 +39,7 @@ api/prisma/migrations/**/.DS_Store
 .codex
 
 .env
+.env.validation
 .env.local
 docker-compose.override.yml
 app/playwright-report/

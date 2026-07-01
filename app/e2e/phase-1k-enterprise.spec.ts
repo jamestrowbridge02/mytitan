@@ -5,7 +5,7 @@ test.describe("Phase 1K enterprise foundations", () => {
   test.skip(!hasDashboardAuth(), "Seed the E2E fixtures or provide dashboard credentials before running authenticated workflow tests.");
 
   test("accounting and calendar foundations expose readiness without live sync", async ({ request }) => {
-    const login = await request.post("http://127.0.0.1:3000/auth/login", {
+    const login = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/login`, {
       data: { email: fixtureRefs.workspaceAdminEmail, password: fixtureRefs.workspaceAdminPassword },
       headers: { "Content-Type": "application/json" },
     });
@@ -33,7 +33,7 @@ test.describe("Phase 1K enterprise foundations", () => {
   });
 
   test("offline packet is assigned-job scoped and detects stale conflicts", async ({ request }) => {
-    const login = await request.post("http://127.0.0.1:3000/auth/login", {
+    const login = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/login`, {
       data: { email: fixtureRefs.technicianEmail, password: fixtureRefs.technicianPassword },
       headers: { "Content-Type": "application/json" },
     });
@@ -69,7 +69,7 @@ test.describe("Phase 1K enterprise foundations", () => {
   });
 
   test("exports are sanitized CSV and audited behind finance permission", async ({ request }) => {
-    const login = await request.post("http://127.0.0.1:3000/auth/login", {
+    const login = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/login`, {
       data: { email: fixtureRefs.financeEmail, password: fixtureRefs.financePassword },
       headers: { "Content-Type": "application/json" },
     });

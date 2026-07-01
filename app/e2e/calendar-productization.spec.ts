@@ -37,14 +37,14 @@ test.describe("calendar productization", () => {
     const technicianId = "e2e-user-technician";
     const bookingId = `pw-calendar-${Date.now()}`;
     const targetDay = "2026-03-18";
-    const locationsResponse = await request.get("http://127.0.0.1:3000/locations", {
+    const locationsResponse = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/locations`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(locationsResponse.ok()).toBeTruthy();
     const locations = await locationsResponse.json();
     const primaryLocation = Array.isArray(locations) ? locations.find((location: any) => location?.isActive) || locations[0] : null;
     expect(primaryLocation?.id).toBeTruthy();
-    const existingBookingsResponse = await request.get(`http://127.0.0.1:3000/calendar/bookings?from=${encodeURIComponent(`${targetDay}T00:00:00.000Z`)}&to=${encodeURIComponent("2026-03-19T00:00:00.000Z")}`, {
+    const existingBookingsResponse = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/calendar/bookings?from=${encodeURIComponent(`${targetDay}T00:00:00.000Z`)}&to=${encodeURIComponent("2026-03-19T00:00:00.000Z")}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(existingBookingsResponse.ok()).toBeTruthy();
@@ -73,7 +73,7 @@ test.describe("calendar productization", () => {
       return 15;
     })();
 
-    const createResponse = await request.post("http://127.0.0.1:3000/bookings", {
+    const createResponse = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/bookings`, {
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
@@ -93,7 +93,7 @@ test.describe("calendar productization", () => {
 
     await page.goto(`/dashboard/calendar?day=${targetDay}`);
     await expect(page.getByTestId("calendar-time-grid")).toBeVisible();
-    const rescheduleResponse = await request.patch(`http://127.0.0.1:3000/calendar/bookings/${createdBooking.id}/reschedule`, {
+    const rescheduleResponse = await request.patch(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/calendar/bookings/${createdBooking.id}/reschedule`, {
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
@@ -106,7 +106,7 @@ test.describe("calendar productization", () => {
     expect(rescheduleResponse.ok()).toBeTruthy();
     let movedBooking: any = null;
     for (let attempt = 0; attempt < 20; attempt += 1) {
-      const bookingsResponse = await request.get(`http://127.0.0.1:3000/calendar/bookings?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, {
+      const bookingsResponse = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/calendar/bookings?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       expect(bookingsResponse.ok()).toBeTruthy();

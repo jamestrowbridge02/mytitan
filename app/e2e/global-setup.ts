@@ -32,9 +32,9 @@ function assertPlaywrightSeedBoundary(apiBase: string) {
 }
 
 export default async function globalSetup(config: FullConfig) {
-  const baseURL = process.env.PLAYWRIGHT_BASE_URL || String(config.projects[0]?.use?.baseURL || "http://127.0.0.1:3001");
+  const baseURL = process.env.PLAYWRIGHT_BASE_URL || String(config.projects[0]?.use?.baseURL || `${process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:3001"}`);
   const appOrigin = new URL(baseURL).origin;
-  const apiBase = process.env.PLAYWRIGHT_API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:3000";
+  const apiBase = process.env.PLAYWRIGHT_API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || `${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}`;
   const email = process.env.PLAYWRIGHT_TEST_EMAIL?.trim() || defaultOperatorEmail;
   const password = process.env.PLAYWRIGHT_TEST_PASSWORD || defaultOperatorPassword;
   const shouldSeedDockerFixtures =

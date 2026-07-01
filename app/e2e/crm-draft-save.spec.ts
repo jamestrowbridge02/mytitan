@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { hasDashboardAuth, installApiProxy, loginAs } from "./utils";
 
 async function createTradeAccount(request: any, token: string, suffix: string) {
-  const response = await request.post("http://127.0.0.1:3000/trade-accounts", {
+  const response = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/trade-accounts`, {
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
@@ -26,7 +26,7 @@ test.describe("crm note draft persistence", () => {
     await installApiProxy(page, request);
     await loginAs(page, request, "e2e.operator@mytitan.local", "MyTitanE2E!2026");
 
-    const loginResponse = await request.post("http://127.0.0.1:3000/auth/login", {
+    const loginResponse = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/login`, {
       data: {
         email: "e2e.operator@mytitan.local",
         password: "MyTitanE2E!2026",
@@ -77,7 +77,7 @@ test.describe("crm note draft persistence", () => {
     await installApiProxy(page, request);
     await loginAs(page, request, "e2e.operator@mytitan.local", "MyTitanE2E!2026");
 
-    const loginResponse = await request.post("http://127.0.0.1:3000/auth/login", {
+    const loginResponse = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/login`, {
       data: {
         email: "e2e.operator@mytitan.local",
         password: "MyTitanE2E!2026",

@@ -97,7 +97,7 @@ test.describe("phase 4E offline sync and portal resilience", () => {
 
   test("customer portal hub respects customer-safe language and self-service controls", async ({ page, request }) => {
     await installApiProxy(page, request);
-    const response = await request.get(`http://127.0.0.1:3000/public/job/${fixtureRefs.portalToken}`);
+    const response = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/public/job/${fixtureRefs.portalToken}`);
     expect(response.ok()).toBeTruthy();
     const body = await response.json();
     expect(body.portal.enabled).toBeTruthy();

@@ -4,7 +4,7 @@ import { fixtureRefs, hasDashboardAuth, requestLocalApi } from "./utils";
 import { formatBusinessTime, parseBusinessTime, weekdayHours } from "../lib/business-hours";
 
 async function apiLogin(request: any, email: string, password: string) {
-  const response = await request.post("http://127.0.0.1:3000/auth/login", {
+  const response = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/login`, {
     headers: { "Content-Type": "application/json" },
     data: { email, password },
   });
@@ -194,7 +194,7 @@ test.describe("Phase 9 operational completion", () => {
       text: "Customer confirms the revised arrival time.",
     };
     const signature = createHmac("sha256", webhookSecret).update(JSON.stringify(payload)).digest("hex");
-    const inbound = await request.post(`http://127.0.0.1:3000/integrations/webhooks/whatsapp-business/${connection.routeId}`, {
+    const inbound = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/integrations/webhooks/whatsapp-business/${connection.routeId}`, {
       headers: { "Content-Type": "application/json", "x-provider-signature": signature },
       data: payload,
     });
@@ -220,13 +220,13 @@ test.describe("Phase 9 operational completion", () => {
   });
 
   test("tenant payment and asset workflow routes are rendered", async ({ request }) => {
-    const payments = await request.get("http://127.0.0.1:3001/dashboard/settings/payments");
+    const payments = await request.get(`${process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:3001"}/dashboard/settings/payments`);
     expect(payments.ok()).toBeTruthy();
     const paymentsHtml = await payments.text();
     expect(paymentsHtml).toContain("Payments");
     expect(paymentsHtml.toLowerCase()).not.toContain("coming soon");
 
-    const assets = await request.get("http://127.0.0.1:3001/dashboard/assets");
+    const assets = await request.get(`${process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:3001"}/dashboard/assets`);
     expect(assets.ok()).toBeTruthy();
     expect(await assets.text()).toContain("Assets &amp; tools");
   });

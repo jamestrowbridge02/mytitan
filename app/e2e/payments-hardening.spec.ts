@@ -4,7 +4,7 @@ import crypto from "crypto";
 import { defaultOperatorEmail, defaultOperatorPassword, fixtureRefs, installApiProxy, loginAs, requestLocalApi } from "./utils";
 
 async function createCompletedPaymentJob(request: any, token: string, suffix: string) {
-  const response = await request.post("http://127.0.0.1:3000/jobs", {
+  const response = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/jobs`, {
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
@@ -161,7 +161,7 @@ test.describe("payments hardening", () => {
       expect(JSON.stringify(paymentPayload)).not.toContain(webhookSecret);
       expect(JSON.stringify(paymentPayload)).not.toContain("sk_");
 
-      const invalidWebhook = await request.fetch(`http://127.0.0.1:3000/billing/customer-payments/webhook/stripe-customer-payments/${providerRow.routeId}`, {
+      const invalidWebhook = await request.fetch(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/billing/customer-payments/webhook/stripe-customer-payments/${providerRow.routeId}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -180,7 +180,7 @@ test.describe("payments hardening", () => {
       });
       const timestamp = Math.floor(Date.now() / 1000);
       const signature = crypto.createHmac("sha256", webhookSecret).update(`${timestamp}.${eventBody}`).digest("hex");
-      const accepted = await request.fetch(`http://127.0.0.1:3000/billing/customer-payments/webhook/stripe-customer-payments/${providerRow.routeId}`, {
+      const accepted = await request.fetch(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/billing/customer-payments/webhook/stripe-customer-payments/${providerRow.routeId}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -193,7 +193,7 @@ test.describe("payments hardening", () => {
       const acceptedJson = await accepted.json();
       expect(acceptedJson.received).toBe(true);
 
-      const duplicate = await request.fetch(`http://127.0.0.1:3000/billing/customer-payments/webhook/stripe-customer-payments/${providerRow.routeId}`, {
+      const duplicate = await request.fetch(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/billing/customer-payments/webhook/stripe-customer-payments/${providerRow.routeId}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -241,7 +241,7 @@ test.describe("payments hardening", () => {
 
     const financeToken = await loginAs(page, request, fixtureRefs.financeEmail, fixtureRefs.financePassword);
     const financeHeaders = { Authorization: `Bearer ${financeToken}`, "Content-Type": "application/json" };
-    const evidenceUpload = await request.post(`http://127.0.0.1:3000/artifacts/entities/job/${job.id}/upload`, {
+    const evidenceUpload = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/artifacts/entities/job/${job.id}/upload`, {
       headers: { Authorization: `Bearer ${financeToken}` },
       multipart: {
         kind: "PORTAL_DOCUMENT",

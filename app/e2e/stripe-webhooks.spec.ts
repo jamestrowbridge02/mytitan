@@ -115,7 +115,7 @@ function resolveConfiguredPlan() {
 
 async function postWebhook(request: Parameters<typeof test>[0]["request"], payloadObject: Record<string, any>, secret: string, signature?: string) {
   const payload = JSON.stringify(payloadObject);
-  return request.post("http://127.0.0.1:3000/billing/webhook", {
+  return request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/billing/webhook`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -127,7 +127,7 @@ async function postWebhook(request: Parameters<typeof test>[0]["request"], paylo
 }
 
 async function loginAsDefaultOperator(request: Parameters<typeof test>[0]["request"]) {
-  const response = await request.post("http://127.0.0.1:3000/auth/login", {
+  const response = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/login`, {
     headers: { "Content-Type": "application/json" },
     data: {
       email: defaultOperatorEmail,
@@ -278,7 +278,7 @@ test.describe("stripe webhook hardening", () => {
     test.skip(!configuredPlan, "Stripe price IDs are required for subscription webhook tests.");
 
     const uniqueId = Date.now();
-    const signupResponse = await request.post("http://127.0.0.1:3000/auth/signup", {
+    const signupResponse = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/signup`, {
       headers: { "Content-Type": "application/json" },
       data: {
         companyName: `Stripe Webhook Workspace ${uniqueId}`,
@@ -292,7 +292,7 @@ test.describe("stripe webhook hardening", () => {
     const ownerHeaders = { Authorization: `Bearer ${signupJson.token}` };
 
     try {
-      const initialBilling = await request.get("http://127.0.0.1:3000/billing/me", {
+      const initialBilling = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/billing/me`, {
         headers: ownerHeaders,
       });
       expect(initialBilling.ok()).toBeTruthy();
@@ -335,7 +335,7 @@ test.describe("stripe webhook hardening", () => {
       const checkoutResponse = await postWebhook(request, checkoutEvent, webhookSecret);
       expect(checkoutResponse.ok()).toBeTruthy();
 
-      const afterCheckout = await request.get("http://127.0.0.1:3000/billing/me", {
+      const afterCheckout = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/billing/me`, {
         headers: ownerHeaders,
       });
       expect(afterCheckout.ok()).toBeTruthy();
@@ -379,7 +379,7 @@ test.describe("stripe webhook hardening", () => {
       const invoiceResponse = await postWebhook(request, invoiceEvent, webhookSecret);
       expect(invoiceResponse.ok()).toBeTruthy();
 
-      const activatedBilling = await request.get("http://127.0.0.1:3000/billing/me", {
+      const activatedBilling = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/billing/me`, {
         headers: ownerHeaders,
       });
       expect(activatedBilling.ok()).toBeTruthy();
@@ -397,7 +397,7 @@ test.describe("stripe webhook hardening", () => {
     test.skip(!configuredPlan, "Stripe price IDs are required for subscription webhook tests.");
 
     const uniqueId = Date.now();
-    const signupResponse = await request.post("http://127.0.0.1:3000/auth/signup", {
+    const signupResponse = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/signup`, {
       headers: { "Content-Type": "application/json" },
       data: {
         companyName: `Stripe Duplicate Workspace ${uniqueId}`,
@@ -411,7 +411,7 @@ test.describe("stripe webhook hardening", () => {
     const ownerHeaders = { Authorization: `Bearer ${signupJson.token}` };
 
     try {
-      await request.get("http://127.0.0.1:3000/billing/me", { headers: ownerHeaders });
+      await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/billing/me`, { headers: ownerHeaders });
 
       const event = {
         id: `evt_subscription_${uniqueId}`,
@@ -461,7 +461,7 @@ test.describe("stripe webhook hardening", () => {
       const secondJson = await second.json();
       expect(secondJson?.duplicate).toBe(true);
 
-      const billing = await request.get("http://127.0.0.1:3000/billing/me", {
+      const billing = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/billing/me`, {
         headers: ownerHeaders,
       });
       expect(billing.ok()).toBeTruthy();
@@ -611,7 +611,7 @@ test.describe("stripe webhook hardening", () => {
 
   test("unknown Stripe prices are rejected without activating billing", async ({ request }) => {
     const uniqueId = Date.now();
-    const signupResponse = await request.post("http://127.0.0.1:3000/auth/signup", {
+    const signupResponse = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/signup`, {
       headers: { "Content-Type": "application/json" },
       data: {
         companyName: `Stripe Wrong Plan Workspace ${uniqueId}`,
@@ -625,7 +625,7 @@ test.describe("stripe webhook hardening", () => {
     const ownerHeaders = { Authorization: `Bearer ${signupJson.token}` };
 
     try {
-      const initialBilling = await request.get("http://127.0.0.1:3000/billing/me", {
+      const initialBilling = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/billing/me`, {
         headers: ownerHeaders,
       });
       expect(initialBilling.ok()).toBeTruthy();
@@ -673,7 +673,7 @@ test.describe("stripe webhook hardening", () => {
       const webhookResponse = await postWebhook(request, event, webhookSecret);
       expect(webhookResponse.status()).toBe(400);
 
-      const afterBilling = await request.get("http://127.0.0.1:3000/billing/me", {
+      const afterBilling = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/billing/me`, {
         headers: ownerHeaders,
       });
       expect(afterBilling.ok()).toBeTruthy();

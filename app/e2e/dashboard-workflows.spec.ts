@@ -306,14 +306,14 @@ test.describe("dashboard workflows", () => {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     };
-    const settingsResponse = await request.get("http://127.0.0.1:3000/tenant/settings", {
+    const settingsResponse = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/tenant/settings`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(settingsResponse.ok()).toBeTruthy();
     const currentSettings = await settingsResponse.json();
 
     try {
-      const disableResponse = await request.put("http://127.0.0.1:3000/tenant/settings", {
+      const disableResponse = await request.put(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/tenant/settings`, {
         headers: authHeaders,
         data: {
           bookingsEnabled: false,
@@ -328,7 +328,7 @@ test.describe("dashboard workflows", () => {
       await expect(page.getByText("Feature 'bookings_enabled' is disabled for this tenant")).toHaveCount(0);
       await expect(page.getByText("Bookings are off right now.")).toHaveCount(0);
     } finally {
-      const restoreResponse = await request.put("http://127.0.0.1:3000/tenant/settings", {
+      const restoreResponse = await request.put(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/tenant/settings`, {
         headers: authHeaders,
         data: {
           bookingsEnabled: Boolean(currentSettings?.bookingsEnabled),
@@ -668,13 +668,13 @@ test.describe("dashboard workflows", () => {
     await page.goto("/dashboard/command-centre-v2");
     await page.getByTestId("location-scope-switcher").locator("select").selectOption({ label: "All locations" });
     const token = await getToken(page);
-    const fieldsResponse = await request.get("http://127.0.0.1:3000/custom-fields?entityType=job&visible=true", {
+    const fieldsResponse = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/custom-fields?entityType=job&visible=true`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     const fields = await fieldsResponse.json();
     const serialField = Array.isArray(fields) ? fields.find((field: any) => field?.key === fixtureRefs.customFieldJobSerialKey) : null;
     expect(serialField?.id).toBeTruthy();
-    const resetResponse = await request.post("http://127.0.0.1:3000/custom-fields/values", {
+    const resetResponse = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/custom-fields/values`, {
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
@@ -707,7 +707,7 @@ test.describe("dashboard workflows", () => {
     await expect(page.getByTestId("settings-workflow-panel")).toBeVisible();
     const token = await page.evaluate(() => window.localStorage.getItem("mytitan_token"));
     expect(token).toBeTruthy();
-    const settingsResponse = await request.get("http://127.0.0.1:3000/tenant/settings", {
+    const settingsResponse = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/tenant/settings`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -717,7 +717,7 @@ test.describe("dashboard workflows", () => {
     const currentBusinessConfig = currentSettings?.businessConfigJson && typeof currentSettings.businessConfigJson === "object"
       ? currentSettings.businessConfigJson
       : {};
-    const updateResponse = await request.put("http://127.0.0.1:3000/tenant/settings", {
+    const updateResponse = await request.put(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/tenant/settings`, {
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",

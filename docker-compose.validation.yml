@@ -1,0 +1,194 @@
+services:
+  validation_postgres:
+    image: postgres:16
+    container_name: mytitan_validation_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: mytitan_validation
+      POSTGRES_USER: mytitan_validation
+      POSTGRES_PASSWORD: ${VALIDATION_POSTGRES_PASSWORD:-validation_postgres_password_change_me}
+    volumes:
+      - validation_pgdata:/var/lib/postgresql/data
+    networks:
+      - validation_internal
+
+  validation_redis:
+    image: redis:7
+    container_name: mytitan_validation_redis
+    restart: unless-stopped
+    volumes:
+      - validation_redisdata:/data
+    networks:
+      - validation_internal
+
+  validation_api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    image: mytitan_api:validation
+    container_name: mytitan_validation_api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      MYTITAN_RUNTIME_ENV: validation
+      MYTITAN_ENV: validation
+      MYTITAN_SCHEDULER_ENABLED: ${MYTITAN_VALIDATION_SCHEDULER_ENABLED:-0}
+      PORT: 3000
+      DATABASE_URL: postgresql://mytitan_validation:${VALIDATION_POSTGRES_PASSWORD:-validation_postgres_password_change_me}@validation_postgres:5432/mytitan_validation
+      REDIS_URL: redis://validation_redis:6379
+      APP_PUBLIC_URL: http://127.0.0.1:3101
+      API_PUBLIC_URL: http://127.0.0.1:3100
+      JWT_SECRET: ${VALIDATION_JWT_SECRET:-validation_jwt_secret_change_me_32_chars}
+      INTEGRATIONS_ENCRYPTION_KEY: ${VALIDATION_INTEGRATIONS_ENCRYPTION_KEY:-validation_integrations_key_change_me_32_chars}
+      BACKUP_ENCRYPTION_KEY: ${VALIDATION_BACKUP_ENCRYPTION_KEY:-validation_backup_key_change_me_32_chars}
+      UPLOAD_ROOT: /validation-media
+      MYTITAN_MEDIA_ROOT: /validation-media
+      MYTITAN_STORAGE_ROOT: /validation-media
+      RUN_MIGRATIONS: "false"
+      ENABLE_DEMO_SEED: "0"
+      MYTITAN_BILLING_MODE: validation
+      STRIPE_SECRET_KEY: ${VALIDATION_STRIPE_SECRET_KEY:-validation_stripe_disabled_placeholder}
+      STRIPE_WEBHOOK_SECRET: ${VALIDATION_STRIPE_WEBHOOK_SECRET:-validation_stripe_webhook_secret_placeholder}
+      STRIPE_CONNECT_PLATFORM_SECRET: ${VALIDATION_STRIPE_CONNECT_PLATFORM_SECRET:-validation_connect_disabled_placeholder}
+      STRIPE_CONNECT_WEBHOOK_SECRET: ${VALIDATION_STRIPE_CONNECT_WEBHOOK_SECRET:-validation_connect_webhook_secret_placeholder}
+      STRIPE_PRICE_SOLE_TRADER_MONTHLY: ${VALIDATION_STRIPE_PRICE_SOLE_TRADER_MONTHLY:-price_validation_sole_monthly}
+      STRIPE_PRICE_SOLE_TRADER_ANNUAL: ${VALIDATION_STRIPE_PRICE_SOLE_TRADER_ANNUAL:-price_validation_sole_annual}
+      STRIPE_PRICE_BUSINESS_MONTHLY: ${VALIDATION_STRIPE_PRICE_BUSINESS_MONTHLY:-price_validation_business_monthly}
+      STRIPE_PRICE_BUSINESS_ANNUAL: ${VALIDATION_STRIPE_PRICE_BUSINESS_ANNUAL:-price_validation_business_annual}
+      STRIPE_PRICE_ENTERPRISE_MONTHLY: ${VALIDATION_STRIPE_PRICE_ENTERPRISE_MONTHLY:-price_validation_enterprise_monthly}
+      STRIPE_PRICE_ENTERPRISE_ANNUAL: ${VALIDATION_STRIPE_PRICE_ENTERPRISE_ANNUAL:-price_validation_enterprise_annual}
+      MYTITAN_FEATURE_MARKETPLACE: "on"
+      MYTITAN_FEATURE_TRADE_PACKS: "on"
+      MYTITAN_FEATURE_START_HERE: "on"
+      MYTITAN_FEATURE_WHEELS_FORM_V1: "on"
+      MYTITAN_FEATURE_COMMAND_CENTRE: "on"
+      MYTITAN_FEATURE_CRM_V1: "on"
+      MYTITAN_FEATURE_DRAFTS_V1: "on"
+      MYTITAN_FEATURE_COMMAND_CENTRE_V1: "on"
+      MYTITAN_FEATURE_LOCATIONS_V1: "on"
+      MYTITAN_FEATURE_INVENTORY_V1: "on"
+      MYTITAN_FEATURE_COMMAND_CENTRE_PREMIUM_V1: "on"
+      MYTITAN_FEATURE_GUIDED_EVERYWHERE_V1: "on"
+      MYTITAN_FEATURE_AUTH_SECURITY_V1: "on"
+      MYTITAN_FEATURE_LOCATIONS_ADVANCED_V1: "on"
+      MYTITAN_FEATURE_INVENTORY_PRO_V1: "on"
+      MYTITAN_FEATURE_COMMAND_CENTRE_V2: "on"
+      MYTITAN_FEATURE_BOOKING_PRO_V1: "on"
+      MYTITAN_FEATURE_CRM_PRO_V1: "on"
+      MYTITAN_FEATURE_DEMO_POLISH_V1: "on"
+      MYTITAN_FEATURE_MEDIA_SIGNATURE_V1: "on"
+      MYTITAN_FEATURE_NOTIFICATIONS_V1: "on"
+      MYTITAN_FEATURE_AUTOMATIONS_V1: "on"
+      MYTITAN_FEATURE_ANALYTICS_V1: "on"
+      MYTITAN_FEATURE_CALENDAR_V1: "on"
+      MYTITAN_FEATURE_CALENDAR_V2_DRAG: "on"
+      MYTITAN_FEATURE_SCHEDULING_INTELLIGENCE_V1: "on"
+    volumes:
+      - validation_media:/validation-media
+    depends_on:
+      - validation_postgres
+      - validation_redis
+    ports:
+      - 127.0.0.1:3100:3000
+    networks:
+      - validation_internal
+
+  validation_app:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+      args:
+        MYTITAN_API_PROXY_TARGET: http://validation_api:3000
+        NEXT_PUBLIC_API_BASE_URL: ""
+        NEXT_PUBLIC_BILLING_MODE: validation
+        NEXT_PUBLIC_MYTITAN_FEATURE_MARKETPLACE: "on"
+        NEXT_PUBLIC_MYTITAN_FEATURE_PUBLIC_DEMO: "off"
+        NEXT_PUBLIC_MYTITAN_FEATURE_TRADE_PACKS: "on"
+        NEXT_PUBLIC_MYTITAN_FEATURE_START_HERE: "on"
+        NEXT_PUBLIC_MYTITAN_FEATURE_WHEELS_FORM_V1: "on"
+        NEXT_PUBLIC_MYTITAN_FEATURE_COMMAND_CENTRE: "on"
+        NEXT_PUBLIC_MYTITAN_FEATURE_CRM_V1: "on"
+        NEXT_PUBLIC_MYTITAN_FEATURE_DRAFTS_V1: "on"
+        NEXT_PUBLIC_MYTITAN_FEATURE_COMMAND_CENTRE_V1: "on"
+        NEXT_PUBLIC_MYTITAN_FEATURE_LOCATIONS_V1: "on"
+        NEXT_PUBLIC_MYTITAN_FEATURE_INVENTORY_V1: "on"
+        NEXT_PUBLIC_MYTITAN_FEATURE_COMMAND_CENTRE_PREMIUM_V1: "on"
+        NEXT_PUBLIC_MYTITAN_FEATURE_GUIDED_EVERYWHERE_V1: "on"
+        NEXT_PUBLIC_MYTITAN_FEATURE_AUTH_SECURITY_V1: "on"
+        NEXT_PUBLIC_MYTITAN_FEATURE_LOCATIONS_ADVANCED_V1: "on"
+        NEXT_PUBLIC_MYTITAN_FEATURE_INVENTORY_PRO_V1: "on"
+        NEXT_PUBLIC_MYTITAN_FEATURE_COMMAND_CENTRE_V2: "on"
+        NEXT_PUBLIC_MYTITAN_FEATURE_BOOKING_PRO_V1: "on"
+        NEXT_PUBLIC_MYTITAN_FEATURE_CRM_PRO_V1: "on"
+        NEXT_PUBLIC_MYTITAN_FEATURE_DEMO_POLISH_V1: "on"
+        NEXT_PUBLIC_MYTITAN_FEATURE_MEDIA_SIGNATURE_V1: "on"
+        NEXT_PUBLIC_MYTITAN_FEATURE_PORTAL_POLISH_V1: "on"
+        NEXT_PUBLIC_MYTITAN_FEATURE_NOTIFICATIONS_V1: "on"
+        NEXT_PUBLIC_MYTITAN_FEATURE_AUTOMATIONS_V1: "on"
+        NEXT_PUBLIC_MYTITAN_FEATURE_ANALYTICS_V1: "on"
+        NEXT_PUBLIC_MYTITAN_FEATURE_CALENDAR_V1: "on"
+        NEXT_PUBLIC_MYTITAN_FEATURE_CALENDAR_V2_DRAG: "on"
+        NEXT_PUBLIC_MYTITAN_FEATURE_SCHEDULING_INTELLIGENCE_V1: "on"
+    image: mytitan_app:validation
+    container_name: mytitan_validation_app
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      MYTITAN_RUNTIME_ENV: validation
+      PORT: 3001
+      MYTITAN_API_PROXY_TARGET: http://validation_api:3000
+      NEXT_PUBLIC_API_BASE_URL: ""
+      NEXT_PUBLIC_BILLING_MODE: validation
+      NEXT_PUBLIC_MYTITAN_FEATURE_MARKETPLACE: "on"
+      NEXT_PUBLIC_MYTITAN_FEATURE_PUBLIC_DEMO: "off"
+      NEXT_PUBLIC_MYTITAN_FEATURE_TRADE_PACKS: "on"
+      NEXT_PUBLIC_MYTITAN_FEATURE_START_HERE: "on"
+      NEXT_PUBLIC_MYTITAN_FEATURE_WHEELS_FORM_V1: "on"
+      NEXT_PUBLIC_MYTITAN_FEATURE_COMMAND_CENTRE: "on"
+      NEXT_PUBLIC_MYTITAN_FEATURE_CRM_V1: "on"
+      NEXT_PUBLIC_MYTITAN_FEATURE_DRAFTS_V1: "on"
+      NEXT_PUBLIC_MYTITAN_FEATURE_COMMAND_CENTRE_V1: "on"
+      NEXT_PUBLIC_MYTITAN_FEATURE_LOCATIONS_V1: "on"
+      NEXT_PUBLIC_MYTITAN_FEATURE_INVENTORY_V1: "on"
+      NEXT_PUBLIC_MYTITAN_FEATURE_COMMAND_CENTRE_PREMIUM_V1: "on"
+      NEXT_PUBLIC_MYTITAN_FEATURE_GUIDED_EVERYWHERE_V1: "on"
+      NEXT_PUBLIC_MYTITAN_FEATURE_AUTH_SECURITY_V1: "on"
+      NEXT_PUBLIC_MYTITAN_FEATURE_LOCATIONS_ADVANCED_V1: "on"
+      NEXT_PUBLIC_MYTITAN_FEATURE_INVENTORY_PRO_V1: "on"
+      NEXT_PUBLIC_MYTITAN_FEATURE_COMMAND_CENTRE_V2: "on"
+      NEXT_PUBLIC_MYTITAN_FEATURE_BOOKING_PRO_V1: "on"
+      NEXT_PUBLIC_MYTITAN_FEATURE_CRM_PRO_V1: "on"
+      NEXT_PUBLIC_MYTITAN_FEATURE_DEMO_POLISH_V1: "on"
+      NEXT_PUBLIC_MYTITAN_FEATURE_MEDIA_SIGNATURE_V1: "on"
+      NEXT_PUBLIC_MYTITAN_FEATURE_PORTAL_POLISH_V1: "on"
+    depends_on:
+      - validation_api
+    ports:
+      - 127.0.0.1:3101:3001
+    networks:
+      - validation_internal
+
+  validation_marketing:
+    build:
+      context: ./marketing
+      dockerfile: Dockerfile
+    image: mytitan_marketing:validation
+    container_name: mytitan_validation_marketing
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      MYTITAN_RUNTIME_ENV: validation
+      PORT: 3102
+    ports:
+      - 127.0.0.1:3102:3102
+    networks:
+      - validation_internal
+
+networks:
+  validation_internal:
+    driver: bridge
+
+volumes:
+  validation_pgdata:
+  validation_redisdata:
+  validation_media:

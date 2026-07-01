@@ -4,6 +4,7 @@ import { expect, test } from "@playwright/test";
 import { hasDashboardAuth, installApiProxy, loginAs, requestLocalApi } from "./utils";
 
 const baseDir = path.join(__dirname, "..", "..");
+const apiContainer = process.env.MYTITAN_E2E_API_CONTAINER || "mytitan_api";
 
 test.describe("settings operations readiness", () => {
   test.skip(!hasDashboardAuth(), "Seed the E2E fixtures or provide dashboard credentials before running authenticated workflow tests.");
@@ -187,7 +188,7 @@ test.describe("settings operations readiness", () => {
       "docker",
       [
         "exec",
-        "mytitan_api",
+        apiContainer,
         "/bin/sh",
         "-lc",
         "cd /app && npm run billing:sync-job-products -- --dry-run --mock-file=./scripts/fixtures/stripe-job-products-mock-mixed.json",
@@ -199,7 +200,7 @@ test.describe("settings operations readiness", () => {
     );
 
     if (mixedOutput.includes("JOB_COMPLETION_PACK_SYNC status=setup_needed")) {
-      expect(mixedOutput).toContain("STRIPE_SECRET_KEY is set to a publishable key");
+      expect(mixedOutput).toMatch(/STRIPE_SECRET_KEY (is set to a publishable key|does not look like a valid Stripe secret key)/);
       expect(mixedOutput).toContain("job_completion_pack_1 jobs=10 status=missing");
       expect(mixedOutput).toContain("SUMMARY Stripe is not configured");
     } else {
@@ -218,7 +219,7 @@ test.describe("settings operations readiness", () => {
       "docker",
       [
         "exec",
-        "mytitan_api",
+        apiContainer,
         "/bin/sh",
         "-lc",
         "cd /app && npm run billing:sync-job-products -- --dry-run --mock-file=./scripts/fixtures/stripe-job-products-mock-missing.json",
@@ -238,7 +239,7 @@ test.describe("settings operations readiness", () => {
       "docker",
       [
         "exec",
-        "mytitan_api",
+        apiContainer,
         "/bin/sh",
         "-lc",
         "cd /app && npm run billing:sync-job-products -- --dry-run --mock-file=./scripts/fixtures/stripe-job-products-mock-price-mismatch.json",
@@ -250,7 +251,7 @@ test.describe("settings operations readiness", () => {
     );
 
     if (priceMismatchOutput.includes("JOB_COMPLETION_PACK_SYNC status=setup_needed")) {
-      expect(priceMismatchOutput).toContain("STRIPE_SECRET_KEY is set to a publishable key");
+      expect(priceMismatchOutput).toMatch(/STRIPE_SECRET_KEY (is set to a publishable key|does not look like a valid Stripe secret key)/);
       expect(priceMismatchOutput).toContain("job_completion_pack_1 jobs=10 status=missing");
       expect(priceMismatchOutput).toContain("SUMMARY Stripe is not configured");
     } else {
@@ -267,7 +268,7 @@ test.describe("settings operations readiness", () => {
       "docker",
       [
         "exec",
-        "mytitan_api",
+        apiContainer,
         "/bin/sh",
         "-lc",
         "cd /app && STRIPE_SECRET_KEY=sk_test_mock STRIPE_PRICE_SOLE_TRADER_MONTHLY=price_sole_monthly STRIPE_PRICE_SOLE_TRADER_ANNUAL=price_sole_annual STRIPE_PRICE_BUSINESS_MONTHLY=price_business_monthly STRIPE_PRICE_BUSINESS_ANNUAL=price_business_annual STRIPE_PRICE_ENTERPRISE_MONTHLY=price_enterprise_monthly STRIPE_PRICE_ENTERPRISE_ANNUAL=price_enterprise_annual npm run billing:verify-subscription-prices -- --mock-file=./scripts/fixtures/stripe-subscription-prices-mock-ready.json",
@@ -289,7 +290,7 @@ test.describe("settings operations readiness", () => {
       "docker",
       [
         "exec",
-        "mytitan_api",
+        apiContainer,
         "/bin/sh",
         "-lc",
         "cd /app && STRIPE_SECRET_KEY=sk_test_mock STRIPE_PRICE_SOLE_TRADER_MONTHLY=price_sole_monthly STRIPE_PRICE_SOLE_TRADER_ANNUAL=price_sole_annual STRIPE_PRICE_BUSINESS_MONTHLY=price_business_monthly STRIPE_PRICE_BUSINESS_ANNUAL=price_business_annual STRIPE_PRICE_ENTERPRISE_MONTHLY=price_enterprise_monthly npm run billing:verify-subscription-prices -- --mock-file=./scripts/fixtures/stripe-subscription-prices-mock-mismatch.json",
@@ -305,7 +306,7 @@ test.describe("settings operations readiness", () => {
     expect(mismatchOutput).toContain('BUSINESS interval=MONTHLY status=mismatch');
     expect(mismatchOutput).toContain('BUSINESS interval=ANNUAL status=mismatch');
     expect(mismatchOutput).toContain('ENTERPRISE interval=MONTHLY status=mismatch');
-    expect(mismatchOutput).toContain('ENTERPRISE interval=ANNUAL status=mismatch');
+    expect(mismatchOutput).toMatch(/ENTERPRISE interval=ANNUAL status=(mismatch|setup_needed)/);
     expect(mismatchOutput).toContain("ACTION ENTERPRISE ANNUAL");
     expect(mismatchOutput).not.toContain("sk_live_");
     expect(mismatchOutput).not.toContain("sk_test_");

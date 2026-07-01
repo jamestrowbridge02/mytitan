@@ -5,7 +5,7 @@ const metadata = readMetadata();
 const portalToken = process.env.PLAYWRIGHT_PUBLIC_PORTAL_TOKEN || (hasDashboardAuth() ? fixtureRefs.portalToken : metadata.portalToken);
 
 async function loginAndGetToken(request: any) {
-  const response = await request.post("http://127.0.0.1:3000/auth/login", {
+  const response = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/login`, {
     data: { email: defaultOperatorEmail, password: defaultOperatorPassword },
     headers: { "Content-Type": "application/json" },
   });
@@ -54,7 +54,7 @@ test.describe("public portal workflow", () => {
 
   test("public portal shows customer-safe completion proof", async ({ page, request }) => {
     await installApiProxy(page, request);
-    const response = await request.get(`http://127.0.0.1:3000/public/job/${portalToken}`);
+    const response = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/public/job/${portalToken}`);
     expect(response.ok()).toBeTruthy();
     const body = await response.json();
     await page.goto(`/portal/job/${portalToken}`);
@@ -76,7 +76,7 @@ test.describe("public portal workflow", () => {
 
   test("public portal shows scoped work history and booking guidance", async ({ page, request }) => {
     await installApiProxy(page, request);
-    const response = await request.get(`http://127.0.0.1:3000/public/job/${portalToken}`);
+    const response = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/public/job/${portalToken}`);
     expect(response.ok()).toBeTruthy();
     const body = await response.json();
 
@@ -102,7 +102,7 @@ test.describe("public portal workflow", () => {
 
   test("public portal shows customer journey and truthful ETA without GPS or routes", async ({ page, request }) => {
     await installApiProxy(page, request);
-    const response = await request.get(`http://127.0.0.1:3000/public/job/${portalToken}`);
+    const response = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/public/job/${portalToken}`);
     expect(response.ok()).toBeTruthy();
     const body = await response.json();
     expect(body?.portal?.journey?.enabled).toBeTruthy();
@@ -181,7 +181,7 @@ test.describe("public portal workflow", () => {
   });
 
   test("public portal rejects invalid access tokens", async ({ request }) => {
-    const response = await request.get("http://127.0.0.1:3000/public/job/not-a-real-portal-token");
+    const response = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/public/job/not-a-real-portal-token`);
     expect(response.status()).toBe(404);
   });
 });

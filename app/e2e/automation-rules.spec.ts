@@ -57,7 +57,7 @@ test.describe("automation rules", () => {
     const token = await page.evaluate(() => window.localStorage.getItem("mytitan_token"));
     expect(token).toBeTruthy();
 
-    const rulesResponse = await request.get("http://127.0.0.1:3000/automations/workspace-rules", {
+    const rulesResponse = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/automations/workspace-rules`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -70,7 +70,7 @@ test.describe("automation rules", () => {
       : [];
 
     for (const rule of staleRules) {
-      const deleteResponse = await request.delete(`http://127.0.0.1:3000/automations/workspace-rules/${rule.id}`, {
+      const deleteResponse = await request.delete(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/automations/workspace-rules/${rule.id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },

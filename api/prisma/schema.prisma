@@ -550,6 +550,17 @@ model Company {
   archivePeriods                 ArchivePeriod[]
 }
 
+model DatabaseEnvironmentMarker {
+  id           String   @id @default("default")
+  environment  String
+  source       String
+  guardVersion String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("DatabaseEnvironmentMarker")
+}
+
 model User {
   id                             String                        @id @default(cuid())
   companyId                      String

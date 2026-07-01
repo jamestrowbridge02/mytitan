@@ -9,7 +9,7 @@ async function getToken(page: Page) {
 }
 
 async function getTenantSettings(request: any, token: string) {
-  const response = await request.get("http://127.0.0.1:3000/tenant/settings", {
+  const response = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/tenant/settings`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   expect(response.ok()).toBeTruthy();
@@ -17,7 +17,7 @@ async function getTenantSettings(request: any, token: string) {
 }
 
 async function updateTenantSettings(request: any, token: string, data: Record<string, any>) {
-  const response = await request.put("http://127.0.0.1:3000/tenant/settings", {
+  const response = await request.put(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/tenant/settings`, {
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
@@ -29,7 +29,7 @@ async function updateTenantSettings(request: any, token: string, data: Record<st
 }
 
 async function getBookingSettings(request: any, token: string) {
-  const response = await request.get("http://127.0.0.1:3000/bookings/settings", {
+  const response = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/bookings/settings`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   expect(response.ok()).toBeTruthy();
@@ -37,7 +37,7 @@ async function getBookingSettings(request: any, token: string) {
 }
 
 async function updateBookingSettings(request: any, token: string, data: Record<string, any>) {
-  const response = await request.post("http://127.0.0.1:3000/bookings/settings", {
+  const response = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/bookings/settings`, {
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
@@ -65,7 +65,7 @@ test.describe("verification resend and bookings state", () => {
   });
 
   test("geo defaults endpoint derives safe region and currency defaults without exposing raw IP data", async ({ request }) => {
-    const detectedResponse = await request.get("http://127.0.0.1:3000/auth/geo-defaults", {
+    const detectedResponse = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/geo-defaults`, {
       headers: { "cf-ipcountry": "US" },
     });
     expect(detectedResponse.ok()).toBeTruthy();
@@ -78,7 +78,7 @@ test.describe("verification resend and bookings state", () => {
     });
     expect(Object.keys(detectedBody)).not.toContain("ip");
 
-    const fallbackResponse = await request.get("http://127.0.0.1:3000/auth/geo-defaults");
+    const fallbackResponse = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/geo-defaults`);
     expect(fallbackResponse.ok()).toBeTruthy();
     const fallbackBody = await fallbackResponse.json();
     expect(fallbackBody).toMatchObject({
@@ -170,7 +170,7 @@ test.describe("verification resend and bookings state", () => {
     await page.goto("/dashboard");
     const token = await getToken(page);
 
-    const response = await request.post("http://127.0.0.1:3000/auth/resend-verification", {
+    const response = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/resend-verification`, {
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
@@ -186,7 +186,7 @@ test.describe("verification resend and bookings state", () => {
   });
 
   test("public verification resend keeps auth mail on the MyTitan-owned path", async ({ request }) => {
-    const response = await request.post("http://127.0.0.1:3000/auth/resend-verification/public", {
+    const response = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/resend-verification/public`, {
       headers: { "Content-Type": "application/json" },
       data: {
         email: `verify-public-${Date.now()}@example.test`,
@@ -205,10 +205,10 @@ test.describe("verification resend and bookings state", () => {
     const token = await getToken(page);
 
     const [workspaceResponse, systemResponse] = await Promise.all([
-      request.get("http://127.0.0.1:3000/tenant/settings/email-readiness", {
+      request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/tenant/settings/email-readiness`, {
         headers: { Authorization: `Bearer ${token}` },
       }),
-      request.get("http://127.0.0.1:3000/tenant/settings/email-readiness?ownership=system", {
+      request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/tenant/settings/email-readiness?ownership=system`, {
         headers: { Authorization: `Bearer ${token}` },
       }),
     ]);

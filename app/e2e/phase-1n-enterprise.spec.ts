@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { fixtureRefs, hasDashboardAuth, installApiProxy, loginAs, requestLocalApi } from "./utils";
 
 async function apiLogin(request: any, email: string, password: string) {
-  const response = await request.post("http://127.0.0.1:3000/auth/login", {
+  const response = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/login`, {
     headers: { "Content-Type": "application/json" },
     data: { email, password },
   });

@@ -80,7 +80,7 @@ test.describe("workflow SLA and compliance controls", () => {
 
     const resolveRow = page.locator(".operator-table__row", { hasText: fixtureRefs.complianceOpenExceptionSummary }).first();
     await expect(resolveRow.getByTestId("compliance-exception-resolve")).toBeVisible();
-    const resolveResponse = await request.post(`http://127.0.0.1:3000/compliance/exceptions/${fixtureRefs.complianceOpenManualOverrideId}/resolve`, {
+    const resolveResponse = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/compliance/exceptions/${fixtureRefs.complianceOpenManualOverrideId}/resolve`, {
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
@@ -94,7 +94,7 @@ test.describe("workflow SLA and compliance controls", () => {
 
     const dismissRow = page.locator(".operator-table__row", { hasText: fixtureRefs.complianceDismissExceptionSummary }).first();
     await expect(dismissRow.getByRole("button", { name: "Dismiss" })).toBeVisible();
-    const dismissResponse = await request.post(`http://127.0.0.1:3000/compliance/exceptions/${fixtureRefs.complianceOpenEvidenceReviewId}/dismiss`, {
+    const dismissResponse = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/compliance/exceptions/${fixtureRefs.complianceOpenEvidenceReviewId}/dismiss`, {
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",

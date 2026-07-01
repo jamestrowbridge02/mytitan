@@ -22,6 +22,24 @@ async function main() {
     process.exitCode = 1;
     return;
   }
+  const { requireProductionOperation } = require('./production-operation');
+  const operation = requireProductionOperation({
+    operation: 'principal_admin_password_reset',
+    target: 'admin@mytitan.co.uk',
+    operator: process.env.MYTITAN_OPERATION_OPERATOR || process.env.USER || 'cli',
+    reason: process.env.MYTITAN_OPERATION_REASON || '',
+  });
+  if (operation.dryRun) {
+    console.log(JSON.stringify({
+      ok: true,
+      email: 'admin@mytitan.co.uk',
+      passwordUpdated: false,
+      dryRun: true,
+      auditRecorded: false,
+      evidenceId: operation.evidenceId,
+    }, null, 2));
+    return;
+  }
 
   const { NestFactory } = require('@nestjs/core');
   const { AppModule } = require('../dist/app.module');
@@ -32,9 +50,9 @@ async function main() {
     const auth = app.get(AuthService);
     const result = await auth.resetPrincipalAdminPassword({
       password,
-      actor: process.env.USER || 'cli',
+      actor: operation.operator,
     });
-    console.log(JSON.stringify(result, null, 2));
+    console.log(JSON.stringify({ ...result, evidenceId: operation.evidenceId }, null, 2));
   } catch (error) {
     safeFailure(error instanceof Error ? error.message : 'Principal admin password reset failed.');
     process.exitCode = 1;

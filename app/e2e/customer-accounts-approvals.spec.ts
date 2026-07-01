@@ -3,7 +3,7 @@ import { fixtureRefs, hasDashboardAuth, installApiProxy, loginAs, loginCustomerA
 
 async function operatorToken() {
   const context = await playwrightRequest.newContext({
-    baseURL: "http://127.0.0.1:3000",
+    baseURL: `${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}`,
     extraHTTPHeaders: { "Content-Type": "application/json" },
   });
   try {
@@ -23,7 +23,7 @@ async function operatorToken() {
 async function requestRenewalWindow(request: any, planId: string) {
   const token = await operatorToken();
   const now = Date.now();
-  return request.post(`http://127.0.0.1:3000/service-plans/${planId}/renewals/request`, {
+  return request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/service-plans/${planId}/renewals/request`, {
     data: {
       renewalWindowStartAt: new Date(now).toISOString(),
       renewalWindowEndAt: new Date(now + 14 * 24 * 60 * 60 * 1000).toISOString(),
@@ -75,7 +75,7 @@ test.describe("customer accounts and approvals", () => {
 
   test("customer decline flow works for a newly requested approval", async ({ page, request }) => {
     const token = await operatorToken();
-    const createResponse = await request.post("http://127.0.0.1:3000/customer-approvals", {
+    const createResponse = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/customer-approvals`, {
       data: {
         customerId: "e2e-customer-portal-active",
         entityType: "JOB",

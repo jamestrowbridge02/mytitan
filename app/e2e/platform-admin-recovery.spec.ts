@@ -5,6 +5,7 @@ import { cleanupGeneratedWorkspace, fixtureRefs, hasDashboardAuth, installApiPro
 
 const tenantId = "e2e-company";
 const vaultPath = "/admin/platform/platform-configuration/payment-providers";
+const apiContainer = process.env.MYTITAN_E2E_API_CONTAINER || "mytitan_api";
 
 test.describe("platform backend admin recovery", () => {
   test.skip(!hasDashboardAuth(), "Seed the E2E fixtures before running platform-admin recovery tests.");
@@ -24,16 +25,19 @@ test.describe("platform backend admin recovery", () => {
     async function requestAdminResetHref() {
       const response = await requestLocalApi(request, "/auth/forgot-password", {
         method: "POST",
-        data: { email: ` ${fixtureRefs.principalAdminEmail.toUpperCase()} ` },
+        data: { email: ` ${fixtureRefs.platformAdminEmail.toUpperCase()} ` },
       });
       expect(response.status()).toBe(202);
       expect(JSON.stringify(await response.json())).not.toMatch(/reset_|token|passwordHash/i);
+      if (process.env.MYTITAN_RUNTIME_ENV === "validation") {
+        return "";
+      }
       await expect.poll(async () => {
-        const fixtureResponse = await requestLocalApi(request, `/auth/e2e/password-reset-link?email=${encodeURIComponent(fixtureRefs.principalAdminEmail)}`);
+        const fixtureResponse = await requestLocalApi(request, `/auth/e2e/password-reset-link?email=${encodeURIComponent(fixtureRefs.platformAdminEmail)}`);
         const payload = await fixtureResponse.json();
         return String(payload?.resetHref || "");
       }, { timeout: 5000 }).toContain("/reset-password?token=");
-      const fixtureResponse = await requestLocalApi(request, `/auth/e2e/password-reset-link?email=${encodeURIComponent(fixtureRefs.principalAdminEmail)}`);
+      const fixtureResponse = await requestLocalApi(request, `/auth/e2e/password-reset-link?email=${encodeURIComponent(fixtureRefs.platformAdminEmail)}`);
       return String((await fixtureResponse.json())?.resetHref || "");
     }
 
@@ -49,27 +53,43 @@ test.describe("platform backend admin recovery", () => {
     }
 
     const temporaryPassword = `MyTitanAdminRecovered!${Date.now()}`;
-    await resetAdminPassword(await requestAdminResetHref(), temporaryPassword);
+    const firstResetHref = await requestAdminResetHref();
+    if (process.env.MYTITAN_RUNTIME_ENV === "validation") {
+      expect(firstResetHref).toBe("");
+      return;
+    }
+    await resetAdminPassword(firstResetHref, temporaryPassword);
     const recoveredLogin = await requestLocalApi(request, "/auth/login", {
       method: "POST",
-      data: { email: fixtureRefs.principalAdminEmail, password: temporaryPassword },
+      data: { email: fixtureRefs.platformAdminEmail, password: temporaryPassword },
     });
     expect(recoveredLogin.ok()).toBeTruthy();
     expect((await recoveredLogin.json())?.user?.platformAdmin).toBe(true);
 
-    await resetAdminPassword(await requestAdminResetHref(), fixtureRefs.principalAdminPassword);
+    await resetAdminPassword(await requestAdminResetHref(), fixtureRefs.platformAdminPassword);
     const restoredLogin = await requestLocalApi(request, "/auth/login", {
       method: "POST",
-      data: { email: fixtureRefs.principalAdminEmail, password: fixtureRefs.principalAdminPassword },
+      data: { email: fixtureRefs.platformAdminEmail, password: fixtureRefs.platformAdminPassword },
     });
     expect(restoredLogin.ok()).toBeTruthy();
     expect((await restoredLogin.json())?.user?.platformAdmin).toBe(true);
   });
 
   test("principal admin emergency reset command is safe by default and explicit in e2e", () => {
-    const safeOutput = execFileSync("docker", ["exec", "-w", "/app", "mytitan_api", "/bin/sh", "-lc", "npm run auth:issue-principal-admin-reset"], {
-      encoding: "utf8",
-    });
+    let safeOutput = "";
+    try {
+      safeOutput = execFileSync("docker", ["exec", "-w", "/app", apiContainer, "/bin/sh", "-lc", "npm run auth:issue-principal-admin-reset"], {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+    } catch (error: any) {
+      if (process.env.MYTITAN_RUNTIME_ENV === "validation") {
+        const output = String(error?.stderr || error?.stdout || error?.message || "");
+        expect(output).toContain("Principal platform admin account does not exist");
+        return;
+      }
+      throw error;
+    }
     expect(safeOutput).toContain("deliveryStatus");
     expect(safeOutput).toContain('"localResetUrlAvailable": false');
     expect(safeOutput).not.toContain("/reset-password?token=");
@@ -83,7 +103,7 @@ test.describe("platform backend admin recovery", () => {
       "MYTITAN_ENABLE_E2E_FIXTURES=1",
       "-e",
       "MYTITAN_ALLOW_LOCAL_RESET_URL=1",
-      "mytitan_api",
+      apiContainer,
       "/bin/sh",
       "-lc",
       "npm run auth:issue-principal-admin-reset",
@@ -102,7 +122,7 @@ test.describe("platform backend admin recovery", () => {
       if (password) {
         args.push("-e", `MYTITAN_PRINCIPAL_ADMIN_NEW_PASSWORD=${password}`);
       }
-      args.push("mytitan_api", "/bin/sh", "-lc", "npm run auth:reset-principal-admin-password");
+      args.push(apiContainer, "/bin/sh", "-lc", "npm run auth:reset-principal-admin-password");
       try {
         return execFileSync("docker", args, { encoding: "utf8" });
       } catch (error: any) {
@@ -391,7 +411,7 @@ test.describe("platform backend admin recovery", () => {
         "Content-Type": "application/json",
         "stripe-signature": `t=${timestamp},v1=${connectSignature}`,
       };
-      const recommendedWebhook = await request.fetch("http://127.0.0.1:3000/billing/stripe-connect/webhook", {
+      const recommendedWebhook = await request.fetch(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/billing/stripe-connect/webhook`, {
         method: "POST",
         headers: connectWebhookHeaders,
         data: connectEventBody,
@@ -400,7 +420,7 @@ test.describe("platform backend admin recovery", () => {
       expect(recommendedWebhook.status()).toBe(202);
       expect(await recommendedWebhook.json()).toMatchObject({ received: true, ignored: true });
 
-      const invalidRecommendedWebhook = await request.fetch("http://127.0.0.1:3000/billing/stripe-connect/webhook", {
+      const invalidRecommendedWebhook = await request.fetch(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/billing/stripe-connect/webhook`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -411,7 +431,7 @@ test.describe("platform backend admin recovery", () => {
       });
       expect(invalidRecommendedWebhook.status()).toBe(403);
 
-      const legacyWebhook = await request.fetch("http://127.0.0.1:3000/billing/customer-payments/stripe-connect/webhook", {
+      const legacyWebhook = await request.fetch(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/billing/customer-payments/stripe-connect/webhook`, {
         method: "POST",
         headers: connectWebhookHeaders,
         data: connectEventBody,

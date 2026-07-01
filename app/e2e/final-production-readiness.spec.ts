@@ -234,7 +234,7 @@ test.describe("final production commercial readiness", () => {
     const marketingHeaders = await request.get("http://127.0.0.1:3002/");
     expect(marketingHeaders.headers()["x-content-type-options"]).toBe("nosniff");
     expect(marketingHeaders.headers()["x-frame-options"]).toBe("DENY");
-    const appHeaders = await request.get("http://127.0.0.1:3001/login");
+    const appHeaders = await request.get(`${process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:3001"}/login`);
     expect(appHeaders.headers()["x-content-type-options"]).toBe("nosniff");
     expect(appHeaders.headers()["x-frame-options"]).toBe("DENY");
   });

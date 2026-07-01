@@ -3,7 +3,7 @@ import os from "os";
 import path from "path";
 import type { APIRequestContext, Page, Route } from "@playwright/test";
 
-const LOCAL_API_BASE = "http://127.0.0.1:3000";
+const LOCAL_API_BASE = `${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}`;
 
 export const authDir = process.env.PLAYWRIGHT_AUTH_DIR?.trim() || path.join(os.tmpdir(), "mytitan-playwright");
 export const authFile = path.join(authDir, "operator-auth.json");
@@ -144,7 +144,7 @@ export function readMetadata(): E2EMetadata {
 }
 
 const apiOrigins = [
-  "http://127.0.0.1:3000",
+  `${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}`,
   "http://localhost:3000",
   "https://api.mytitan.co.uk",
 ];
@@ -279,7 +279,7 @@ export async function loginAs(page: Page, request: APIRequestContext, email: str
   let lastError: unknown = null;
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
-      response = await request.post("http://127.0.0.1:3000/auth/login", {
+      response = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/login`, {
         data: { email, password },
         headers: { "Content-Type": "application/json" },
       });
@@ -317,7 +317,7 @@ export async function loginAs(page: Page, request: APIRequestContext, email: str
 }
 
 export async function cleanupGeneratedWorkspace(request: APIRequestContext, token: string) {
-  const response = await request.post("http://127.0.0.1:3000/me/e2e-cleanup-generated-workspace", {
+  const response = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/me/e2e-cleanup-generated-workspace`, {
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
@@ -334,7 +334,7 @@ export async function loginCustomerAs(page: Page, request: APIRequestContext, em
   let lastError: unknown = null;
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
-      response = await request.post("http://127.0.0.1:3000/customer-auth/login", {
+      response = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/customer-auth/login`, {
         data: { email, password },
         headers: { "Content-Type": "application/json" },
       });

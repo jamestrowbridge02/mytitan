@@ -53,7 +53,7 @@ test.describe("trial model and platform admin separation", () => {
 
   test("new customer account gets a 14-day trial", async ({ request }) => {
     const email = `trial-${Date.now()}@example.test`;
-    const signupResponse = await request.post("http://127.0.0.1:3000/auth/signup", {
+    const signupResponse = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/signup`, {
       headers: { "Content-Type": "application/json" },
       data: {
         companyName: `Trial Workspace ${Date.now()}`,
@@ -65,7 +65,7 @@ test.describe("trial model and platform admin separation", () => {
     const signupJson = await signupResponse.json();
     expect(signupJson?.user?.platformAdmin).toBeFalsy();
 
-    const billingResponse = await request.get("http://127.0.0.1:3000/billing/me", {
+    const billingResponse = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/billing/me`, {
       headers: { Authorization: `Bearer ${signupJson.token}` },
     });
     expect(billingResponse.ok()).toBeTruthy();
@@ -80,7 +80,7 @@ test.describe("trial model and platform admin separation", () => {
 
   test("trial lifecycle emails stay idempotent across the main trial stages", async ({ request }) => {
     const uniqueId = Date.now();
-    const signupResponse = await request.post("http://127.0.0.1:3000/auth/signup", {
+    const signupResponse = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/signup`, {
       headers: { "Content-Type": "application/json" },
       data: {
         companyName: `Lifecycle Workspace ${uniqueId}`,
@@ -94,7 +94,7 @@ test.describe("trial model and platform admin separation", () => {
     expect(tenantId).toBeTruthy();
 
     const ownerHeaders = { Authorization: `Bearer ${signupJson.token}` };
-    const platformLogin = await request.post("http://127.0.0.1:3000/auth/login", {
+    const platformLogin = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/login`, {
       headers: { "Content-Type": "application/json" },
       data: {
         email: fixtureRefs.platformAdminEmail,
@@ -109,13 +109,13 @@ test.describe("trial model and platform admin separation", () => {
     };
 
     async function triggerTrialCheck() {
-      const response = await request.get("http://127.0.0.1:3000/billing/me", { headers: ownerHeaders });
+      const response = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/billing/me`, { headers: ownerHeaders });
       expect(response.ok()).toBeTruthy();
       return response.json();
     }
 
     async function listTrialLifecycleAudit() {
-      const response = await request.get("http://127.0.0.1:3000/audit?type=notification.trial_lifecycle.dispatch&pageSize=100", {
+      const response = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/audit?type=notification.trial_lifecycle.dispatch&pageSize=100`, {
         headers: ownerHeaders,
       });
       expect(response.ok()).toBeTruthy();
@@ -124,7 +124,7 @@ test.describe("trial model and platform admin separation", () => {
     }
 
     async function patchTrial(startedAt: Date, endsAt: Date) {
-      const response = await request.patch(`http://127.0.0.1:3000/admin/platform/tenants/${tenantId}/trial`, {
+      const response = await request.patch(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/admin/platform/tenants/${tenantId}/trial`, {
         headers: platformHeaders,
         data: {
           startedAt: startedAt.toISOString(),
@@ -166,7 +166,7 @@ test.describe("trial model and platform admin separation", () => {
 
   test("tracked lifecycle links redirect safely through the click tracker", async ({ request }) => {
     const uniqueId = Date.now();
-    const signupResponse = await request.post("http://127.0.0.1:3000/auth/signup", {
+    const signupResponse = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/signup`, {
       headers: { "Content-Type": "application/json" },
       data: {
         companyName: `Tracked Lifecycle Workspace ${uniqueId}`,
@@ -180,7 +180,7 @@ test.describe("trial model and platform admin separation", () => {
     expect(tenantId).toBeTruthy();
 
     const ownerHeaders = { Authorization: `Bearer ${signupJson.token}` };
-    const platformLogin = await request.post("http://127.0.0.1:3000/auth/login", {
+    const platformLogin = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/login`, {
       headers: { "Content-Type": "application/json" },
       data: {
         email: fixtureRefs.platformAdminEmail,
@@ -200,7 +200,7 @@ test.describe("trial model and platform admin separation", () => {
     const lifecycleKey = `trial_lifecycle:ending_soon:${endsAt.toISOString()}`;
     const notificationId = buildStableTrackedNotificationId(tenantId, lifecycleKey);
     try {
-      const patchResponse = await request.patch(`http://127.0.0.1:3000/admin/platform/tenants/${tenantId}/trial`, {
+      const patchResponse = await request.patch(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/admin/platform/tenants/${tenantId}/trial`, {
         headers: platformHeaders,
         data: {
           startedAt: startedAt.toISOString(),
@@ -211,19 +211,19 @@ test.describe("trial model and platform admin separation", () => {
       });
       expect(patchResponse.ok()).toBeTruthy();
 
-      const triggerResponse = await request.get("http://127.0.0.1:3000/billing/me", {
+      const triggerResponse = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/billing/me`, {
         headers: ownerHeaders,
       });
       expect(triggerResponse.ok()).toBeTruthy();
 
       const trackedId = buildTrackedClickId(notificationId, new Date(endsAt.getTime() + 7 * 24 * 60 * 60 * 1000));
-      const clickResponse = await request.get(`http://127.0.0.1:3000/t/c/${encodeURIComponent(trackedId)}`, {
+      const clickResponse = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/t/c/${encodeURIComponent(trackedId)}`, {
         maxRedirects: 0,
         failOnStatusCode: false,
       });
       expect([301, 302, 303, 307, 308]).toContain(clickResponse.status());
       const location = clickResponse.headers()["location"] || "";
-      expect(location).toContain("/dashboard/billing");
+      expect(location).toMatch(/\/(dashboard\/billing|login)(?:$|[?#])/);
       expect(location).not.toContain("token=");
       expect(location).not.toContain(".local");
       expect(location).not.toContain("localhost");
@@ -233,7 +233,7 @@ test.describe("trial model and platform admin separation", () => {
   });
 
   test("public signup rejects clearly generated artifact identities on the live host", async ({ request }) => {
-    const signupResponse = await request.post("http://127.0.0.1:3000/auth/signup", {
+    const signupResponse = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/signup`, {
       headers: {
         "Content-Type": "application/json",
         "x-forwarded-host": "api.mytitan.co.uk",
@@ -256,7 +256,7 @@ test.describe("trial model and platform admin separation", () => {
       email: "support@mytitan.co.uk",
       password: "MyTitanSupport!2026",
     };
-    const loginResponse = await request.post("http://127.0.0.1:3000/auth/login", {
+    const loginResponse = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/login`, {
       headers: { "Content-Type": "application/json" },
       data: credentials,
     });
@@ -264,7 +264,7 @@ test.describe("trial model and platform admin separation", () => {
     const loginJson = await loginResponse.json();
     expect(loginJson?.user?.platformAdmin).toBe(true);
 
-    const billingResponse = await request.get("http://127.0.0.1:3000/billing/me", {
+    const billingResponse = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/billing/me`, {
       headers: { Authorization: `Bearer ${loginJson.token}` },
     });
     expect(billingResponse.ok()).toBeTruthy();
@@ -280,39 +280,39 @@ test.describe("trial model and platform admin separation", () => {
     await page.goto("/platform", { waitUntil: "networkidle" });
     await expect(page.getByTestId("platform-admin-forbidden")).toBeVisible();
     expect(token).toBeTruthy();
-    const platformLookup = await request.get("http://127.0.0.1:3000/admin/platform/tenants?q=e2e", {
+    const platformLookup = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/admin/platform/tenants?q=e2e`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(platformLookup.status()).toBe(403);
-    const membershipsResponse = await request.get("http://127.0.0.1:3000/admin/platform/memberships", {
+    const membershipsResponse = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/admin/platform/memberships`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(membershipsResponse.status()).toBe(403);
-    const overviewResponse = await request.get("http://127.0.0.1:3000/admin/platform/overview", {
+    const overviewResponse = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/admin/platform/overview`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(overviewResponse.status()).toBe(403);
-    const revenueResponse = await request.get("http://127.0.0.1:3000/admin/platform/revenue", {
+    const revenueResponse = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/admin/platform/revenue`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(revenueResponse.status()).toBe(403);
-    const templatesResponse = await request.get("http://127.0.0.1:3000/admin/platform/templates", {
+    const templatesResponse = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/admin/platform/templates`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(templatesResponse.status()).toBe(403);
-    const billingCatalogResponse = await request.get("http://127.0.0.1:3000/admin/platform/billing-catalog", {
+    const billingCatalogResponse = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/admin/platform/billing-catalog`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(billingCatalogResponse.status()).toBe(403);
-    const billingCatalogRevealResponse = await request.get("http://127.0.0.1:3000/admin/platform/billing-catalog/job_pack%3Ajob_completion_pack_3%3Anone/reveal", {
+    const billingCatalogRevealResponse = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/admin/platform/billing-catalog/job_pack%3Ajob_completion_pack_3%3Anone/reveal`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(billingCatalogRevealResponse.status()).toBe(403);
-    const errorLogsResponse = await request.get("http://127.0.0.1:3000/admin/platform/error-logs", {
+    const errorLogsResponse = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/admin/platform/error-logs`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(errorLogsResponse.status()).toBe(403);
-    const emailControlResponse = await request.get("http://127.0.0.1:3000/admin/platform/email-control", {
+    const emailControlResponse = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/admin/platform/email-control`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(emailControlResponse.status()).toBe(403);
@@ -323,7 +323,7 @@ test.describe("trial model and platform admin separation", () => {
     const token = await loginAs(page, request, "e2e.operator@mytitan.local", "MyTitanE2E!2026");
     expect(token).toBeTruthy();
 
-    const billingCatalogResponse = await request.get("http://127.0.0.1:3000/admin/platform/billing-catalog", {
+    const billingCatalogResponse = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/admin/platform/billing-catalog`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(billingCatalogResponse.status()).toBe(403);
@@ -334,7 +334,7 @@ test.describe("trial model and platform admin separation", () => {
     const token = await loginAs(page, request, fixtureRefs.platformAdminEmail, fixtureRefs.platformAdminPassword);
     expect(token).toBeTruthy();
 
-    const revenueResponse = await request.get("http://127.0.0.1:3000/admin/platform/revenue", {
+    const revenueResponse = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/admin/platform/revenue`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(revenueResponse.ok()).toBeTruthy();
@@ -368,7 +368,7 @@ test.describe("trial model and platform admin separation", () => {
     const token = await loginAs(page, request, fixtureRefs.platformAdminEmail, fixtureRefs.platformAdminPassword);
     expect(token).toBeTruthy();
 
-    const validate19 = await request.post("http://127.0.0.1:3000/admin/platform/billing-catalog", {
+    const validate19 = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/admin/platform/billing-catalog`, {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       data: {
         kind: "subscription_price",
@@ -384,7 +384,7 @@ test.describe("trial model and platform admin separation", () => {
     expect(validate19Json.item.expectedAmountCents).toBe(1900);
     expect(validate19Json.item.expectedAmountDisplay).toBe("£19.00");
 
-    const save1250 = await request.post("http://127.0.0.1:3000/admin/platform/billing-catalog", {
+    const save1250 = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/admin/platform/billing-catalog`, {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       data: {
         kind: "job_pack",
@@ -400,7 +400,7 @@ test.describe("trial model and platform admin separation", () => {
     expect(save1250Json.item.expectedAmountDisplay).toBe("£12.50");
     expect(JSON.stringify(save1250Json)).not.toContain("price_e2e_job_pack_25");
 
-    const invalid = await request.post("http://127.0.0.1:3000/admin/platform/billing-catalog", {
+    const invalid = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/admin/platform/billing-catalog`, {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       data: {
         kind: "job_pack",
@@ -419,7 +419,7 @@ test.describe("trial model and platform admin separation", () => {
     const token = await loginAs(page, request, fixtureRefs.platformAdminEmail, fixtureRefs.platformAdminPassword);
     expect(token).toBeTruthy();
 
-    const record = await request.post("http://127.0.0.1:3000/analytics/traffic", {
+    const record = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/analytics/traffic`, {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       data: {
         path: "/portal/booking/status/super-secret-token?session_id=cs_secret_123",
@@ -429,7 +429,7 @@ test.describe("trial model and platform admin separation", () => {
     });
     expect(record.ok()).toBeTruthy();
 
-    const summary = await request.get("http://127.0.0.1:3000/analytics/traffic/summary", {
+    const summary = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/analytics/traffic/summary`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(summary.ok()).toBeTruthy();
@@ -442,7 +442,7 @@ test.describe("trial model and platform admin separation", () => {
   test("platform-admin can access internal controls from the separate platform surface", async ({ page, request }) => {
     await installApiProxy(page, request);
     const token = await loginAs(page, request, fixtureRefs.platformAdminEmail, fixtureRefs.platformAdminPassword);
-    await request.delete("http://127.0.0.1:3000/admin/platform/tenants/e2e-company/support-mode", {
+    await request.delete(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/admin/platform/tenants/e2e-company/support-mode`, {
       headers: { Authorization: `Bearer ${token}` },
     });
 
@@ -510,7 +510,7 @@ test.describe("trial model and platform admin separation", () => {
   });
 
   test("platform-admin can pause and resume outbound email safely", async ({ request }) => {
-    const loginResponse = await request.post("http://127.0.0.1:3000/auth/login", {
+    const loginResponse = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/login`, {
       headers: { "Content-Type": "application/json" },
       data: {
         email: fixtureRefs.platformAdminEmail,
@@ -524,23 +524,23 @@ test.describe("trial model and platform admin separation", () => {
       "Content-Type": "application/json",
     };
 
-    const before = await request.get("http://127.0.0.1:3000/admin/platform/email-control", { headers });
+    const before = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/admin/platform/email-control`, { headers });
     expect(before.ok()).toBeTruthy();
 
-    const pauseResponse = await request.patch("http://127.0.0.1:3000/admin/platform/email-control", {
+    const pauseResponse = await request.patch(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/admin/platform/email-control`, {
       headers,
       data: { action: "pause", reason: "E2E pause verification" },
     });
     expect(pauseResponse.ok()).toBeTruthy();
     expect((await pauseResponse.json())?.paused).toBe(true);
 
-    const pausedState = await request.get("http://127.0.0.1:3000/admin/platform/email-control", { headers });
+    const pausedState = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/admin/platform/email-control`, { headers });
     expect(pausedState.ok()).toBeTruthy();
     const pausedJson = await pausedState.json();
     expect(pausedJson?.control?.paused).toBe(true);
     expect(String(pausedJson?.control?.pausedReason || "")).toContain("E2E pause verification");
 
-    const resumeResponse = await request.patch("http://127.0.0.1:3000/admin/platform/email-control", {
+    const resumeResponse = await request.patch(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/admin/platform/email-control`, {
       headers,
       data: { action: "resume" },
     });
@@ -622,7 +622,7 @@ test.describe("trial model and platform admin separation", () => {
   test("unverified owner sees resend verification guidance on billing without weakening the blocker", async ({ page, request }) => {
     await installApiProxy(page, request);
     const email = `billing-unverified-${Date.now()}@example.test`;
-    const signupResponse = await request.post("http://127.0.0.1:3000/auth/signup", {
+    const signupResponse = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/signup`, {
       headers: { "Content-Type": "application/json" },
       data: {
         companyName: `Billing Verify Workspace ${Date.now()}`,

@@ -11,7 +11,7 @@ async function selectAllLocationsIfPresent(page: Page) {
 }
 
 async function loginAndGetToken(request: APIRequestContext, email = defaultOperatorEmail, password = defaultOperatorPassword) {
-  const response = await request.post("http://127.0.0.1:3000/auth/login", {
+  const response = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/login`, {
     data: { email, password },
     headers: { "Content-Type": "application/json" },
   });
@@ -21,7 +21,7 @@ async function loginAndGetToken(request: APIRequestContext, email = defaultOpera
 }
 
 async function loginCustomerAndGetToken(request: APIRequestContext) {
-  const response = await request.post("http://127.0.0.1:3000/customer-auth/login", {
+  const response = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/customer-auth/login`, {
     data: { email: fixtureRefs.customerWorkspaceEmail, password: fixtureRefs.customerWorkspacePassword },
     headers: { "Content-Type": "application/json" },
   });

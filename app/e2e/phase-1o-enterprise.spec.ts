@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { fixtureRefs, hasDashboardAuth, installApiProxy, loginAs, requestLocalApi } from "./utils";
 
 async function apiLogin(request: any, email: string, password: string) {
-  const response = await request.post("http://127.0.0.1:3000/auth/login", {
+  const response = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/login`, {
     headers: { "Content-Type": "application/json" },
     data: { email, password },
   });
@@ -137,7 +137,7 @@ test.describe("Phase 1O catalog readiness and accounting OAuth onboarding", () =
   test("Xero and QuickBooks OAuth onboarding is tenant-scoped and does not expose tokens", async ({ request }) => {
     const token = await apiLogin(request, fixtureRefs.workspaceAdminEmail, fixtureRefs.workspaceAdminPassword);
 
-    const wrongState = await request.fetch("http://127.0.0.1:3000/integrations/xero/callback?code=e2e_xero_wrong&state=wrong-state", {
+    const wrongState = await request.fetch(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/integrations/xero/callback?code=e2e_xero_wrong&state=wrong-state`, {
       failOnStatusCode: false,
       maxRedirects: 0,
     } as any);
@@ -159,8 +159,8 @@ test.describe("Phase 1O catalog readiness and accounting OAuth onboarding", () =
 
       const callbackUrl =
         provider === "qbo"
-          ? `http://127.0.0.1:3000/integrations/qbo/callback?code=e2e_qbo_code&state=${encodeURIComponent(state)}&realmId=e2e-qbo-company`
-          : `http://127.0.0.1:3000/integrations/xero/callback?code=e2e_xero_code&state=${encodeURIComponent(state)}`;
+          ? `${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/integrations/qbo/callback?code=e2e_qbo_code&state=${encodeURIComponent(state)}&realmId=e2e-qbo-company`
+          : `${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/integrations/xero/callback?code=e2e_xero_code&state=${encodeURIComponent(state)}`;
       const callback = await request.fetch(callbackUrl, {
         failOnStatusCode: false,
         maxRedirects: 0,

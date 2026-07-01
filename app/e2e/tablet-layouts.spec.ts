@@ -13,7 +13,7 @@ function pickPublicBookingStaffId(config: any) {
 }
 
 async function loginAndGetToken(request: any) {
-  const response = await request.post("http://127.0.0.1:3000/auth/login", {
+  const response = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/login`, {
     data: { email: "e2e.operator@mytitan.local", password: "MyTitanE2E!2026" },
     headers: { "Content-Type": "application/json" },
   });
@@ -167,7 +167,7 @@ async function expectViewportFit(page: any, selector?: string) {
 test.describe("tablet layouts", () => {
   test("billing and operations stay legible on tablet", async ({ page, request }) => {
     await installApiProxy(page, request);
-    const loginResponse = await request.post("http://127.0.0.1:3000/auth/login", {
+    const loginResponse = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/login`, {
       data: { email: "e2e.operator@mytitan.local", password: "MyTitanE2E!2026" },
       headers: { "Content-Type": "application/json" },
     });

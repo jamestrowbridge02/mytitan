@@ -3,7 +3,7 @@ import { hasDashboardAuth, installApiProxy, loginAs } from "./utils";
 
 async function operatorToken() {
   const context = await playwrightRequest.newContext({
-    baseURL: "http://127.0.0.1:3000",
+    baseURL: `${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}`,
     extraHTTPHeaders: { "Content-Type": "application/json" },
   });
   try {
@@ -22,7 +22,7 @@ async function operatorToken() {
 
 async function resetGuidedSetup(request: any) {
   const token = await operatorToken();
-  const response = await request.post("http://127.0.0.1:3000/guided-setup/reset", {
+  const response = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/guided-setup/reset`, {
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
@@ -53,7 +53,7 @@ test.describe("guided setup continuity", () => {
 
     await expect(page).toHaveURL(/\/dashboard(\/|$)/);
     const token = await operatorToken();
-    const statusResponse = await request.get("http://127.0.0.1:3000/guided-setup/status", {
+    const statusResponse = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/guided-setup/status`, {
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
@@ -129,7 +129,7 @@ test.describe("guided setup continuity", () => {
     await expect(page.getByRole("heading", { name: "Payments" })).toBeVisible();
 
     const token = await operatorToken();
-    const statusResponse = await request.get("http://127.0.0.1:3000/guided-setup/status", {
+    const statusResponse = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/guided-setup/status`, {
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",

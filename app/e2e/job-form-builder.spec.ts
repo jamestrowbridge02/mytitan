@@ -24,7 +24,7 @@ async function getToken(page: any) {
 }
 
 async function getTenantSettings(request: any, token: string) {
-  const response = await request.get("http://127.0.0.1:3000/tenant/settings", {
+  const response = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/tenant/settings`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   expect(response.ok()).toBeTruthy();
@@ -32,7 +32,7 @@ async function getTenantSettings(request: any, token: string) {
 }
 
 async function patchTenantSettings(request: any, token: string, data: Record<string, unknown>) {
-  const response = await request.patch("http://127.0.0.1:3000/tenant/settings", {
+  const response = await request.patch(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/tenant/settings`, {
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
@@ -191,7 +191,7 @@ test.describe("workspace job-sheet builder and service type management", () => {
     await page.getByTestId("job-form-service-type-select").selectOption("priority_repair");
     await expect(page.getByText("Site readiness")).toBeVisible();
     await expect(page.getByTestId("job-form-field-site_gate_code")).toBeVisible();
-    const missingFieldResponse = await request.post("http://127.0.0.1:3000/jobs", {
+    const missingFieldResponse = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/jobs`, {
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
@@ -213,7 +213,7 @@ test.describe("workspace job-sheet builder and service type management", () => {
     const missingFieldBody = await missingFieldResponse.json();
     expect(String(missingFieldBody?.message || "")).toContain("Please complete the required service fields: Site gate code.");
 
-    const createdJobResponse = await request.post("http://127.0.0.1:3000/jobs", {
+    const createdJobResponse = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/jobs`, {
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
@@ -254,7 +254,7 @@ test.describe("workspace job-sheet builder and service type management", () => {
     await page.getByTestId("job-form-service-type-select").selectOption("priority_repair");
     await expect(page.getByTestId("job-form-field-site_gate_code")).toHaveCount(0);
 
-    const jobDetailResponse = await request.get(`http://127.0.0.1:3000/jobs/${createdJob.id}`, {
+    const jobDetailResponse = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/jobs/${createdJob.id}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(jobDetailResponse.ok()).toBeTruthy();

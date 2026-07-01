@@ -25,7 +25,7 @@ const tinyPng = Buffer.from(
 );
 
 async function loginAndGetToken(request: any, email = defaultOperatorEmail, password = defaultOperatorPassword) {
-  const response = await request.post("http://127.0.0.1:3000/auth/login", {
+  const response = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/login`, {
     data: { email, password },
     headers: { "Content-Type": "application/json" },
   });

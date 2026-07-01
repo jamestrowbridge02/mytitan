@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { hasDashboardAuth, installApiProxy, loginAs } from "./utils";
 
 async function operatorToken(request: any) {
-  const response = await request.post("http://127.0.0.1:3000/auth/login", {
+  const response = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/login`, {
     data: {
       email: "e2e.operator@mytitan.local",
       password: "MyTitanE2E!2026",
@@ -15,7 +15,7 @@ async function operatorToken(request: any) {
 }
 
 async function createTradeAccount(request: any, token: string, suffix: string) {
-  const response = await request.post("http://127.0.0.1:3000/trade-accounts", {
+  const response = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/trade-accounts`, {
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
@@ -54,7 +54,7 @@ async function createTradeAccount(request: any, token: string, suffix: string) {
 }
 
 async function patchTradeAccountCrm(request: any, token: string, accountId: string, data: Record<string, unknown>) {
-  const response = await request.patch(`http://127.0.0.1:3000/crm/accounts/${accountId}`, {
+  const response = await request.patch(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/crm/accounts/${accountId}`, {
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
@@ -117,7 +117,7 @@ async function createJob(request: any, token: string, tradeAccountId: string, su
     customerSignature: signature,
   };
 
-  const response = await request.post("http://127.0.0.1:3000/jobs", {
+  const response = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/jobs`, {
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
@@ -199,7 +199,7 @@ test.describe("customer field consistency", () => {
     const job = await createJob(request, token, tradeAccount.id, suffix, false);
     const portalToken = extractPortalToken(String(job?.pdf?.url || job?.invoicePdfUrl || ""));
 
-    const portalResponse = await request.get(`http://127.0.0.1:3000/public/job/${portalToken}`);
+    const portalResponse = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/public/job/${portalToken}`);
     expect(portalResponse.ok()).toBeTruthy();
     const portalBody = await portalResponse.json();
     expect(portalBody?.job?.customerProfile?.businessName).toBe(`E2E Consistency Fleet ${suffix}`);
@@ -213,7 +213,7 @@ test.describe("customer field consistency", () => {
     expect(String(portalBody?.job?.whatsappCompletionLink || "")).toContain("/portal/job/");
     expect(String(portalBody?.portal?.summary?.nextCustomerStep || "")).toMatch(/publishing the remaining customer documents|review the completed work summary|track progress/i);
 
-    const pdfResponse = await request.get(`http://127.0.0.1:3000/public/job/${portalToken}/pdf`);
+    const pdfResponse = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/public/job/${portalToken}/pdf`);
     expect(pdfResponse.ok()).toBeTruthy();
     const pdfBuffer = await pdfResponse.body();
     const pdfText = pdfBuffer.toString("utf8");
@@ -241,7 +241,7 @@ test.describe("customer field consistency", () => {
     await installApiProxy(page, request);
     const token = await operatorToken(request);
     const suffix = `${Date.now()}-s`;
-    const tradeAccount = await request.post("http://127.0.0.1:3000/trade-accounts", {
+    const tradeAccount = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/trade-accounts`, {
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
@@ -261,7 +261,7 @@ test.describe("customer field consistency", () => {
     await expect(page.getByText(/Business IDs/i)).toHaveCount(0);
     await expect(page.getByText(/Secondary contact/i)).toHaveCount(0);
 
-    const pdfResponse = await request.get(`http://127.0.0.1:3000/public/job/${portalToken}/pdf`);
+    const pdfResponse = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/public/job/${portalToken}/pdf`);
     expect(pdfResponse.ok()).toBeTruthy();
     const pdfText = (await pdfResponse.body()).toString("utf8");
     expect(pdfText).not.toContain("Billing address:");
@@ -360,7 +360,7 @@ test.describe("customer field consistency", () => {
     expect(updated?.businessAddressLine1).toBe("22 Foundry Way");
     expect(updated?.billingAddressLine1).toBe("PO Box 200");
 
-    const crmFullResponse = await request.get(`http://127.0.0.1:3000/crm/accounts/${tradeAccount.id}/full`, {
+    const crmFullResponse = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/crm/accounts/${tradeAccount.id}/full`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(crmFullResponse.ok()).toBeTruthy();
@@ -376,7 +376,7 @@ test.describe("customer field consistency", () => {
     const job = await createJob(request, token, tradeAccount.id, `${suffix}-job`, true);
     const portalToken = extractPortalToken(String(job?.pdf?.url || job?.invoicePdfUrl || ""));
 
-    const portalResponse = await request.get(`http://127.0.0.1:3000/public/job/${portalToken}`);
+    const portalResponse = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/public/job/${portalToken}`);
     expect(portalResponse.ok()).toBeTruthy();
     const portalBody = await portalResponse.json();
     expect(portalBody?.job?.customerProfile?.primaryContact?.name).toBe("Morgan Ops");
@@ -386,7 +386,7 @@ test.describe("customer field consistency", () => {
     expect(portalBody?.job?.mergeFields?.billingContactName).toBe("Avery Accounts");
     expect(portalBody?.job?.mergeFields?.billingEmail).toBe(`accounts.${suffix}@normalized.test`);
 
-    const pdfResponse = await request.get(`http://127.0.0.1:3000/public/job/${portalToken}/pdf`);
+    const pdfResponse = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/public/job/${portalToken}/pdf`);
     expect(pdfResponse.ok()).toBeTruthy();
     const pdfText = (await pdfResponse.body()).toString("utf8");
     expect(pdfText).toContain("Primary contact: Morgan Ops | ops.");

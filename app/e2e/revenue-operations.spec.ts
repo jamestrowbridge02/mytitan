@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { fixtureRefs, hasDashboardAuth, installApiProxy, loginAs, loginCustomerAs } from "./utils";
 
 async function operatorAuthHeaders(request: any) {
-  const response = await request.post("http://127.0.0.1:3000/auth/login", {
+  const response = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/login`, {
     data: {
       email: "e2e.operator@mytitan.local",
       password: "MyTitanE2E!2026",
@@ -35,7 +35,7 @@ async function createQuote(request: any, headers: Record<string, string>, overri
     ],
     ...overrides,
   };
-  const response = await request.post("http://127.0.0.1:3000/quotes", {
+  const response = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/quotes`, {
     data: payload,
     headers,
   });
@@ -74,7 +74,7 @@ test.describe("revenue operations", () => {
 
     let createdCount = 0;
     for (let attempt = 0; attempt < 6; attempt += 1) {
-      const response = await request.get("http://127.0.0.1:3000/quotes", { headers });
+      const response = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/quotes`, { headers });
       if (response.ok()) {
         const rows = await response.json();
         createdCount = Array.isArray(rows) ? rows.filter((row: any) => row?.title === quoteTitle).length : 0;
@@ -111,8 +111,8 @@ test.describe("revenue operations", () => {
       customerId: fixtureRefs.convertibleCustomerId,
     });
 
-    await request.post(`http://127.0.0.1:3000/quotes/${approvable.id}/send`, { headers, data: {} });
-    await request.post(`http://127.0.0.1:3000/quotes/${declineable.id}/send`, { headers, data: {} });
+    await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/quotes/${approvable.id}/send`, { headers, data: {} });
+    await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/quotes/${declineable.id}/send`, { headers, data: {} });
 
     await installApiProxy(page, request);
     await loginAs(page, request, "e2e.operator@mytitan.local", "MyTitanE2E!2026");
@@ -137,8 +137,8 @@ test.describe("revenue operations", () => {
       title: "Convert-ready quote",
       customerId: fixtureRefs.convertibleCustomerId,
     });
-    await request.post(`http://127.0.0.1:3000/quotes/${created.id}/send`, { headers, data: {} });
-    await request.post(`http://127.0.0.1:3000/quotes/${created.id}/approve`, { headers, data: {} });
+    await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/quotes/${created.id}/send`, { headers, data: {} });
+    await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/quotes/${created.id}/approve`, { headers, data: {} });
 
     await installApiProxy(page, request);
     await loginAs(page, request, "e2e.operator@mytitan.local", "MyTitanE2E!2026");
@@ -153,13 +153,13 @@ test.describe("revenue operations", () => {
 
   test("job-sheet estimate workflow is feature-gated, audited, and converts into the job", async ({ page, request }) => {
     const headers = await operatorAuthHeaders(request);
-    const flagsResponse = await request.get("http://127.0.0.1:3000/enterprise/feature-flags", { headers });
+    const flagsResponse = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/enterprise/feature-flags`, { headers });
     expect(flagsResponse.ok()).toBeTruthy();
     const flagsPayload = await flagsResponse.json();
     const estimateFlag = (flagsPayload?.flags || []).find((flag: any) => flag?.key === "enterprise_estimates_v1");
     expect(estimateFlag?.enabled).toBe(true);
 
-    const jobResponse = await request.post("http://127.0.0.1:3000/jobs", {
+    const jobResponse = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/jobs`, {
       headers,
       data: {
         customerName: `E2E Estimate Customer ${Date.now()}`,
@@ -173,7 +173,7 @@ test.describe("revenue operations", () => {
     expect(jobResponse.ok()).toBeTruthy();
     const job = await jobResponse.json();
 
-    const createResponse = await request.post(`http://127.0.0.1:3000/quotes/job/${job.id}/estimates`, {
+    const createResponse = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/quotes/job/${job.id}/estimates`, {
       headers,
       data: {
         title: `Job sheet estimate ${Date.now()}`,
@@ -190,11 +190,11 @@ test.describe("revenue operations", () => {
     expect(estimate.jobId).toBe(job.id);
     expect(estimate.totalCents).toBe(13750);
 
-    const sendResponse = await request.post(`http://127.0.0.1:3000/quotes/${estimate.id}/send`, { headers, data: {} });
+    const sendResponse = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/quotes/${estimate.id}/send`, { headers, data: {} });
     expect(sendResponse.ok()).toBeTruthy();
-    const approveResponse = await request.post(`http://127.0.0.1:3000/quotes/${estimate.id}/approve`, { headers, data: {} });
+    const approveResponse = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/quotes/${estimate.id}/approve`, { headers, data: {} });
     expect(approveResponse.ok()).toBeTruthy();
-    const convertResponse = await request.post(`http://127.0.0.1:3000/quotes/job/${job.id}/estimates/${estimate.id}/convert`, {
+    const convertResponse = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/quotes/job/${job.id}/estimates/${estimate.id}/convert`, {
       headers,
       data: {},
     });
@@ -203,7 +203,7 @@ test.describe("revenue operations", () => {
     expect(converted.job.id).toBe(job.id);
     expect(converted.quote.status).toBe("CONVERTED");
 
-    const auditResponse = await request.get("http://127.0.0.1:3000/audit?type=enterprise_estimate.converted&pageSize=5", { headers });
+    const auditResponse = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/audit?type=enterprise_estimate.converted&pageSize=5`, { headers });
     expect(auditResponse.ok()).toBeTruthy();
     const auditPayload = await auditResponse.json();
     expect(JSON.stringify(auditPayload)).toContain("enterprise_estimate.converted");
@@ -232,7 +232,7 @@ test.describe("revenue operations", () => {
       jobId: "e2e-job-portal-active",
       title: "Customer workspace approval quote",
     });
-    await request.post(`http://127.0.0.1:3000/quotes/${created.id}/send`, { headers, data: {} });
+    await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/quotes/${created.id}/send`, { headers, data: {} });
 
     await installApiProxy(page, request);
     await loginCustomerAs(page, request, fixtureRefs.customerWorkspaceEmail, fixtureRefs.customerWorkspacePassword);

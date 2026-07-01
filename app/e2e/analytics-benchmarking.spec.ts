@@ -16,7 +16,7 @@ const DEFAULT_ANALYTICS_WIDGET_ORDER = [
 function readStoredOperatorToken() {
   const state = JSON.parse(fs.readFileSync(authFile, "utf8"));
   const origin = Array.isArray(state?.origins)
-    ? state.origins.find((entry: any) => entry?.origin === "http://127.0.0.1:3001")
+    ? state.origins.find((entry: any) => entry?.origin === `${process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:3001"}`)
     : null;
   const tokenEntry = Array.isArray(origin?.localStorage)
     ? origin.localStorage.find((entry: any) => entry?.name === "mytitan_token")
