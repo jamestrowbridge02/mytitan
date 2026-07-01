@@ -14,6 +14,11 @@ WORKERS="${PLAYWRIGHT_STABLE_WORKERS:-1}"
 TEST_TIMEOUT_MS="${PLAYWRIGHT_TEST_TIMEOUT_MS:-45000}"
 SUITE_TIMEOUT_SECONDS="${PLAYWRIGHT_SUITE_TIMEOUT_SECONDS:-7200}"
 JSON="${JSON_DIR}/isolated-final-proof.json"
+EXTRA_TEST_ARGS=()
+if [[ -n "${PLAYWRIGHT_TEST_ARGS:-}" ]]; then
+  # Optional local narrowing for debugging; default remains the full stable suite.
+  read -r -a EXTRA_TEST_ARGS <<< "${PLAYWRIGHT_TEST_ARGS}"
+fi
 
 mkdir -p "${JSON_DIR}" "${AUTH_DIR}" /tmp/mytitan-validation
 
@@ -74,4 +79,5 @@ PLAYWRIGHT_SKIP_DOCKER_SEED=1 \
 PLAYWRIGHT_STABLE_MODE=1 \
 PLAYWRIGHT_JSON_OUTPUT_NAME="${JSON}" \
 timeout --signal=TERM --kill-after=30s "${SUITE_TIMEOUT_SECONDS}s" \
-npx playwright test --workers="${WORKERS}" --reporter=line,json --output="${JSON_DIR}" --timeout="${TEST_TIMEOUT_MS}"
+npx playwright test --workers="${WORKERS}" --reporter=line,json --output="${JSON_DIR}" --timeout="${TEST_TIMEOUT_MS}" \
+  "${EXTRA_TEST_ARGS[@]}"

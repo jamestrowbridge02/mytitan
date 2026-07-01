@@ -1,5 +1,7 @@
 import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
+import * as bcrypt from 'bcryptjs';
+import * as crypto from 'crypto';
 import { JwtAuthGuard } from '../auth/auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import type { JwtPayload } from '../auth/auth.types';
@@ -9,8 +11,10 @@ import { PricingAdjustmentDto, TrialOverrideDto } from '../billing/billing.dto';
 import { assertPlatformAdminAccess } from '../common/platform-admin';
 import { buildAppUrl } from '../common/public-url';
 import { EmailService } from '../email/email.service';
+import { buildPasswordResetEmailTemplate } from '../email/email-templates';
 import { EnterpriseFeatureFlagsService } from '../enterprise/enterprise-feature-flags.service';
 import { isEnterpriseFeatureFlagKey } from '../enterprise/enterprise-feature-flags';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { TemplatesService } from '../templates/templates.service';
 import { PlatformAdminService } from './platform-admin.service';
@@ -34,6 +38,7 @@ export class PlatformAdminController {
     private readonly audit: AuditService,
     private readonly platformAdmin: PlatformAdminService,
     private readonly email: EmailService,
+    private readonly notifications: NotificationsService,
     private readonly templates: TemplatesService,
     private readonly enterpriseFlags: EnterpriseFeatureFlagsService,
     private readonly billingStripeConfig: PlatformBillingStripeConfigService,
@@ -88,6 +93,28 @@ export class PlatformAdminController {
       throw new ForbiddenException('Start support mode with a reason before accessing tenant data.');
     }
     return session;
+  }
+
+  private tokenHash(token: string) {
+    return crypto.createHash('sha256').update(token).digest('hex');
+  }
+
+  private makeResetToken() {
+    return `reset_${crypto.randomBytes(24).toString('hex')}`;
+  }
+
+  private safeRecoveryUser(user: any) {
+    if (!user) return null;
+    return {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      active: Boolean(user.isActive),
+      emailVerified: Boolean(user.emailVerified),
+      createdAt: user.createdAt,
+      lastLoginAt: user.lastLoginAt || null,
+      lastActiveAt: user.lastActiveAt || null,
+    };
   }
 
   @Get('tenants')
@@ -266,6 +293,9 @@ export class PlatformAdminController {
     if (accessMode === 'write' && reason.length < 12) {
       throw new BadRequestException('Write-mode support requires a specific reason.');
     }
+    if (accessMode === 'write' && body?.confirmation !== true) {
+      throw new BadRequestException('Write-mode support requires explicit confirmation.');
+    }
     const db = this.prisma as any;
     const tenant = await db.company.findUnique({ where: { id: tenantId }, select: { id: true, name: true } });
     if (!tenant) throw new BadRequestException('Tenant not found');
@@ -289,6 +319,9 @@ export class PlatformAdminController {
       `Support mode started for ${tenant.name}. Before=null After=${JSON.stringify({ viewRole, accessMode, expiresAt: session.expiresAt })} Reason=${reason.slice(0, 180)}`,
       user.sub,
     );
+    await this.audit.log(tenantId, 'support_mode.reason_recorded', `Support reason recorded for timed access. Reason=${reason.slice(0, 180)}`, user.sub);
+    await this.audit.log(tenantId, 'support_mode.role_selected', `Support view role selected: ${viewRole}`, user.sub);
+    await this.audit.log(tenantId, 'support_mode.mode_selected', `Support access mode selected: ${accessMode}`, user.sub);
     return { ok: true, session: this.sanitizeSupportSession(session) };
   }
 
@@ -308,6 +341,212 @@ export class PlatformAdminController {
     });
     await this.audit.log(tenantId, 'support_mode.ended', 'Support mode exited explicitly', user.sub);
     return { ok: true, session: this.sanitizeSupportSession(updated), exited: true };
+  }
+
+  @Get('tenants/:tenantId/owner-recovery')
+  async tenantOwnerRecoveryStatus(
+    @CurrentUser() user: JwtPayload,
+    @Param('tenantId') tenantId: string,
+    @Req() req: Request & { requestId?: string },
+  ) {
+    await this.assertAccess(user, req, 'platform.tenant_owner_recovery.read');
+    const db = this.prisma as any;
+    const tenant = await db.company.findUnique({ where: { id: tenantId }, select: { id: true, name: true } });
+    if (!tenant) throw new BadRequestException('Tenant not found');
+    const owners = await db.user.findMany({
+      where: { companyId: tenantId, role: 'OWNER' },
+      select: { id: true, email: true, role: true, isActive: true, emailVerified: true, createdAt: true, lastLoginAt: true, lastActiveAt: true },
+      orderBy: { createdAt: 'asc' },
+      take: 10,
+    });
+    const readiness = await this.email.getReadiness(null, { ownership: 'system', probe: true });
+    const recent = await db.auditEvent.findMany({
+      where: {
+        companyId: tenantId,
+        type: { in: ['tenant_owner_password_recovery_requested', 'tenant_owner_password_recovery_completed', 'tenant_owner_password_recovery_refused'] },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+      select: { id: true, type: true, message: true, createdAt: true, userId: true },
+    });
+    return {
+      ok: true,
+      tenant,
+      owners: owners.map((owner: any) => this.safeRecoveryUser(owner)),
+      email: {
+        status: readiness.status,
+        canSend: Boolean(readiness.canSend),
+        transport: readiness.transport,
+        source: readiness.source,
+        guidance: readiness.guidance,
+      },
+      recentRequests: recent,
+      secretsReturned: false,
+    };
+  }
+
+  @Post('tenants/:tenantId/owner-recovery')
+  async recoverTenantOwnerPassword(
+    @CurrentUser() user: JwtPayload,
+    @Param('tenantId') tenantId: string,
+    @Body() body: Record<string, any>,
+    @Req() req: Request & { requestId?: string },
+  ) {
+    await this.assertAccess(user, req, 'platform.tenant_owner_recovery.execute');
+    const reason = String(body?.reason || '').trim();
+    const targetUserId = String(body?.targetUserId || '').trim();
+    const action = String(body?.action || 'send_reset_email').trim();
+    const confirmation = body?.confirmation === true;
+    const requestId = String(req.requestId || req.headers['x-request-id'] || crypto.randomUUID()).trim();
+    if (!targetUserId) throw new BadRequestException('Select a tenant owner before requesting recovery.');
+    if (reason.length < 12) throw new BadRequestException('Tenant owner recovery requires a specific reason.');
+    if (!confirmation) throw new BadRequestException('Tenant owner recovery requires explicit confirmation.');
+
+    const db = this.prisma as any;
+    const [tenant, target] = await Promise.all([
+      db.company.findUnique({ where: { id: tenantId }, select: { id: true, name: true } }),
+      db.user.findFirst({
+        where: { id: targetUserId, companyId: tenantId },
+        select: { id: true, email: true, role: true, isActive: true, emailVerified: true, createdAt: true, lastLoginAt: true, lastActiveAt: true },
+      }),
+    ]);
+    if (!tenant) throw new BadRequestException('Tenant not found');
+    if (!target) throw new BadRequestException('Target user not found for this tenant.');
+    if (target.role !== 'OWNER') throw new BadRequestException('Last-resort recovery is limited to tenant owners.');
+
+    await this.audit.log(
+      tenantId,
+      'tenant_owner_password_recovery_requested',
+      `Tenant owner password recovery requested. RequestId=${requestId} Target=${target.id} Action=${action} Reason=${reason.slice(0, 220)}`,
+      user.sub,
+    );
+
+    if (action === 'server_reset_password') {
+      const phrase = String(body?.productionOperationConfirmation || '').trim();
+      const newPassword = String(body?.newPassword || '');
+      if (phrase !== 'CONFIRM_PRODUCTION_TENANT_OWNER_RECOVERY') {
+        await this.audit.log(tenantId, 'tenant_owner_password_recovery_refused', `Server-side password reset refused. RequestId=${requestId} Reason=missing_operation_confirmation`, user.sub);
+        throw new BadRequestException('Server-side owner reset requires the production operation confirmation phrase.');
+      }
+      if (newPassword.length < 10) {
+        await this.audit.log(tenantId, 'tenant_owner_password_recovery_refused', `Server-side password reset refused. RequestId=${requestId} Reason=password_policy`, user.sub);
+        throw new BadRequestException('Provide a compliant temporary password through the secure form.');
+      }
+      const passwordHash = await bcrypt.hash(newPassword, 10);
+      await db.user.update({
+        where: { id: target.id },
+        data: {
+          passwordHash,
+          tokenVersion: { increment: 1 },
+        },
+      });
+      await this.audit.log(
+        tenantId,
+        'tenant_owner_password_recovery_completed',
+        `Tenant owner server-side password reset completed. RequestId=${requestId} Target=${target.id} Role=${target.role} ActivePreserved=${target.isActive} EmailVerifiedPreserved=${target.emailVerified}`,
+        user.sub,
+      );
+      return {
+        ok: true,
+        status: 'server_reset_completed',
+        requestId,
+        target: this.safeRecoveryUser(target),
+        secretsReturned: false,
+      };
+    }
+
+    if (action !== 'send_reset_email') {
+      throw new BadRequestException('Unsupported tenant owner recovery action.');
+    }
+
+    const readiness = await this.email.getReadiness(null, { ownership: 'system', probe: true });
+    if (!readiness.canSend) {
+      await this.audit.log(
+        tenantId,
+        'tenant_owner_password_recovery_refused',
+        `Tenant owner reset email not sent. RequestId=${requestId} Target=${target.id} Status=${readiness.status}`,
+        user.sub,
+      );
+      return {
+        ok: false,
+        status: 'email_unavailable',
+        requestId,
+        message: 'System email is not ready. Use the audited server-side recovery path only with production operation confirmation.',
+        email: {
+          status: readiness.status,
+          canSend: Boolean(readiness.canSend),
+          guidance: readiness.guidance,
+        },
+        target: this.safeRecoveryUser(target),
+        secretsReturned: false,
+      };
+    }
+
+    await db.passwordResetToken.updateMany({
+      where: { userId: target.id, consumedAt: null },
+      data: { consumedAt: new Date() },
+    });
+    const token = this.makeResetToken();
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+    await db.passwordResetToken.create({
+      data: {
+        companyId: tenantId,
+        userId: target.id,
+        tokenHash: this.tokenHash(token),
+        expiresAt,
+      },
+    });
+    const resetUrl = buildAppUrl(`/reset-password?token=${encodeURIComponent(token)}`);
+    const tracking = await this.notifications.prepareTrackedEmailNotification({
+      companyId: tenantId,
+      userId: target.id,
+      type: 'tenant_owner_password_recovery_email',
+      title: 'Tenant owner password recovery pending',
+      body: 'Password recovery email is being prepared for the workspace owner.',
+      entityType: 'user',
+      entityId: target.id,
+      reasonKey: 'tenant_owner_password_recovery',
+      to: target.email,
+      summary: 'Platform Admin requested tenant owner password recovery.',
+      ctaHref: resetUrl,
+      trackingExpiresAt: expiresAt,
+      context: { requestId, requestedBy: user.sub },
+    });
+    const template = buildPasswordResetEmailTemplate(
+      await this.email.getBranding(null, { ownership: 'system' }),
+      resetUrl,
+      tracking.trackedHref || resetUrl,
+    );
+    const delivery = await this.email.sendTransactionalEmail(null, {
+      to: target.email,
+      subject: template.subject,
+      text: template.text,
+      html: template.html,
+    }, {
+      ownership: 'system',
+      category: 'password_reset',
+      templateKey: 'tenant_owner_password_recovery_email',
+      actorUserId: user.sub,
+      dedupeWindowMinutes: 5,
+    });
+    await this.notifications.finalizeTrackedEmailNotification(tracking.id, delivery, {
+      title: delivery.delivered ? 'Tenant owner password recovery sent' : 'Tenant owner password recovery pending',
+      body: delivery.delivered ? 'Password recovery email sent to the workspace owner.' : 'Password recovery email was not delivered.',
+    });
+    await this.audit.log(
+      tenantId,
+      'tenant_owner_password_recovery_completed',
+      `Tenant owner reset email ${delivery.delivered ? 'sent' : 'not_delivered'}. RequestId=${requestId} Target=${target.id} Status=${delivery.status}`,
+      user.sub,
+    );
+    return {
+      ok: Boolean(delivery.delivered),
+      status: delivery.delivered ? 'reset_email_sent' : 'email_unavailable',
+      requestId,
+      target: this.safeRecoveryUser(target),
+      deliveryStatus: delivery.status,
+      secretsReturned: false,
+    };
   }
 
   @Get('overview')

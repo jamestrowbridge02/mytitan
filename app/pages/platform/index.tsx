@@ -845,6 +845,7 @@ export default function PlatformAdminPage() {
   const [supportModeMinutes, setSupportModeMinutes] = useState('30');
   const [supportModeViewRole, setSupportModeViewRole] = useState<'owner' | 'admin' | 'operator' | 'finance' | 'customer_portal'>('owner');
   const [supportModeAccessMode, setSupportModeAccessMode] = useState<'read_only' | 'write'>('read_only');
+  const [supportModeWriteConfirmed, setSupportModeWriteConfirmed] = useState(false);
   const [supportModeBusy, setSupportModeBusy] = useState(false);
   const [pricingBusy, setPricingBusy] = useState(false);
   const [trialBusy, setTrialBusy] = useState(false);
@@ -1394,10 +1395,12 @@ export default function PlatformAdminPage() {
           durationMinutes: Number(supportModeMinutes || 30),
           viewRole: supportModeViewRole,
           accessMode: supportModeAccessMode,
+          confirmation: supportModeAccessMode === 'write' ? supportModeWriteConfirmed : undefined,
         }),
       });
       setSupportModeSession(response?.session || null);
       setSupportModeReason('');
+      setSupportModeWriteConfirmed(false);
       await loadTenant(selectedTenantId);
     } catch (err: any) {
       setError(err.message || 'Failed to start support mode');
@@ -2998,7 +3001,13 @@ export default function PlatformAdminPage() {
                         </select>
                       </label>
                     </div>
-                    <button className="button" type="button" data-testid="platform-support-mode-start" onClick={() => void startSupportMode()} disabled={supportModeBusy || supportModeReason.trim().length < 8}>
+                    {supportModeAccessMode === 'write' ? (
+                      <label className="check-row">
+                        <input data-testid="platform-support-mode-write-confirm" type="checkbox" checked={supportModeWriteConfirmed} onChange={(event) => setSupportModeWriteConfirmed(event.target.checked)} />
+                        Confirm audited write-mode support access for this timed session.
+                      </label>
+                    ) : null}
+                    <button className="button" type="button" data-testid="platform-support-mode-start" onClick={() => void startSupportMode()} disabled={supportModeBusy || supportModeReason.trim().length < 8 || (supportModeAccessMode === 'write' && !supportModeWriteConfirmed)}>
                       {supportModeBusy ? 'Starting...' : 'Start timed support mode'}
                     </button>
                   </div>

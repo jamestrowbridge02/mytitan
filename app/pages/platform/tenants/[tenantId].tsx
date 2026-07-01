@@ -79,6 +79,16 @@ export default function Tenant360Page() {
   const [busy, setBusy] = useState(false);
   const [activeAction, setActiveAction] = useState<CommercialAction>('extend_trial');
   const [confirmed, setConfirmed] = useState(false);
+  const [recovery, setRecovery] = useState<any>(null);
+  const [recoveryBusy, setRecoveryBusy] = useState(false);
+  const [recoveryMessage, setRecoveryMessage] = useState('');
+  const [recoveryForm, setRecoveryForm] = useState({
+    targetUserId: '',
+    reason: '',
+    confirmation: false,
+    productionOperationConfirmation: '',
+    newPassword: '',
+  });
   const [form, setForm] = useState({
     reason: '',
     effectiveDate: '',
@@ -102,6 +112,14 @@ export default function Tenant360Page() {
     return response;
   }
 
+  async function loadRecovery(nextTenantId = tenantId) {
+    const response = await apiFetch(`/admin/platform/tenants/${encodeURIComponent(nextTenantId)}/owner-recovery`);
+    setRecovery(response);
+    const firstOwnerId = response?.owners?.[0]?.id || '';
+    setRecoveryForm((current) => ({ ...current, targetUserId: current.targetUserId || firstOwnerId }));
+    return response;
+  }
+
   useEffect(() => {
     if (!router.isReady || !tenantId) return;
     void (async () => {
@@ -113,6 +131,7 @@ export default function Tenant360Page() {
         }
         setAllowed(true);
         await loadTenant360(tenantId);
+        await loadRecovery(tenantId);
       } catch (loadError: any) {
         setError(loadError?.message || 'Tenant 360 could not be loaded.');
       }
@@ -227,6 +246,38 @@ export default function Tenant360Page() {
     }
   }
 
+  async function submitOwnerRecovery(action: 'send_reset_email' | 'server_reset_password') {
+    if (!tenantId || !recoveryForm.targetUserId) return;
+    setRecoveryBusy(true);
+    setError('');
+    setRecoveryMessage('');
+    try {
+      const result = await apiFetch(`/admin/platform/tenants/${encodeURIComponent(tenantId)}/owner-recovery`, {
+        method: 'POST',
+        body: JSON.stringify({
+          action,
+          targetUserId: recoveryForm.targetUserId,
+          reason: recoveryForm.reason,
+          confirmation: recoveryForm.confirmation,
+          productionOperationConfirmation: recoveryForm.productionOperationConfirmation,
+          newPassword: action === 'server_reset_password' ? recoveryForm.newPassword : undefined,
+        }),
+      });
+      await loadRecovery();
+      setRecoveryMessage(`Recovery ${result.status || 'accepted'}. Request ${result.requestId || 'recorded'}. No secrets were returned.`);
+      setRecoveryForm((current) => ({
+        ...current,
+        confirmation: false,
+        productionOperationConfirmation: '',
+        newPassword: '',
+      }));
+    } catch (recoveryError: any) {
+      setError(recoveryError?.message || 'Tenant owner recovery could not be completed.');
+    } finally {
+      setRecoveryBusy(false);
+    }
+  }
+
   if (allowed === null) return <PlatformShell><div className="card">Loading protected Tenant 360...</div></PlatformShell>;
   if (!allowed) {
     return (
@@ -253,6 +304,7 @@ export default function Tenant360Page() {
           <div className="button-row">
             <a className="button" href="#commercial" data-testid="tenant-360-commercial-tab-link">Commercial</a>
             <Link className="button secondary" href={`/platform?tenantId=${encodeURIComponent(tenantId)}#lookup`}>Support mode</Link>
+            <a className="button secondary" href="#owner-recovery" data-testid="tenant-360-owner-recovery-link">Owner recovery</a>
             <a className="button secondary" href="#audit">Audit</a>
           </div>
           {error ? <div className="alert warning" role="alert">{error}</div> : null}
@@ -401,6 +453,83 @@ export default function Tenant360Page() {
                   <p key={event.id}><strong>{event.type}</strong> - {formatDate(event.createdAt)}<br />{event.message}</p>
                 ))}
                 {!data.commercial?.auditHistory?.length ? <p className="muted">No commercial audit events recorded yet.</p> : null}
+              </div>
+            </section>
+
+            <section id="owner-recovery" className="platform-admin-section card" data-testid="tenant-360-owner-recovery">
+              <div className="platform-admin-section-copy">
+                <div className="platform-admin-section-copy__eyebrow">Access recovery</div>
+                <h2>Tenant owner password recovery</h2>
+                <p>Last-resort owner recovery is platform-admin only, reason-gated, confirmation-gated, and audited. Tokens, passwords, and hashes are never shown here.</p>
+              </div>
+              <div className="platform-admin-metric-grid">
+                <Metric label="System email" value={recovery?.email?.canSend ? 'Ready' : 'Needs attention'} detail={recovery?.email?.guidance || 'Email readiness unknown'} testId="tenant-360-recovery-email-readiness" />
+                <Metric label="Owners" value={String(recovery?.owners?.length || 0)} detail="Tenant OWNER users only" />
+                <Metric label="Secrets returned" value={recovery?.secretsReturned === false ? 'No' : 'Unknown'} />
+              </div>
+              <div className="form-grid">
+                <label>
+                  Owner
+                  <select className="input" data-testid="tenant-360-recovery-owner" value={recoveryForm.targetUserId} onChange={(event) => setRecoveryForm((current) => ({ ...current, targetUserId: event.target.value }))}>
+                    {(recovery?.owners || []).map((owner: any) => (
+                      <option key={owner.id} value={owner.id}>{owner.email} - {owner.active ? 'active' : 'inactive'} - {owner.emailVerified ? 'verified' : 'unverified'}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Reason
+                  <input className="input" data-testid="tenant-360-recovery-reason" value={recoveryForm.reason} onChange={(event) => setRecoveryForm((current) => ({ ...current, reason: event.target.value }))} placeholder="Customer owner requested access recovery" />
+                </label>
+                <label className="check-row">
+                  <input data-testid="tenant-360-recovery-confirm" type="checkbox" checked={recoveryForm.confirmation} onChange={(event) => setRecoveryForm((current) => ({ ...current, confirmation: event.target.checked }))} />
+                  Confirm this recovery request for the selected tenant owner.
+                </label>
+              </div>
+              <div className="button-row">
+                <button
+                  className="button"
+                  type="button"
+                  data-testid="tenant-360-recovery-send-email"
+                  disabled={recoveryBusy || !recoveryForm.confirmation || recoveryForm.reason.trim().length < 12 || !recoveryForm.targetUserId}
+                  onClick={() => void submitOwnerRecovery('send_reset_email')}
+                >
+                  {recoveryBusy ? 'Requesting...' : 'Send reset email'}
+                </button>
+              </div>
+              <div className="card platform-admin-card-stack" data-testid="tenant-360-recovery-last-resort">
+                <div className="platform-admin-card-stack__header">
+                  <div>
+                    <strong>Last-resort server reset</strong>
+                    <p className="muted">Use only when system email is unavailable and the production operation has been explicitly approved. The temporary password is never displayed after submission.</p>
+                  </div>
+                  <span className="platform-admin-chip">Audited</span>
+                </div>
+                <div className="form-grid">
+                  <label>
+                    Production confirmation phrase
+                    <input className="input" data-testid="tenant-360-recovery-production-confirmation" value={recoveryForm.productionOperationConfirmation} onChange={(event) => setRecoveryForm((current) => ({ ...current, productionOperationConfirmation: event.target.value }))} placeholder="CONFIRM_PRODUCTION_TENANT_OWNER_RECOVERY" />
+                  </label>
+                  <label>
+                    Temporary password
+                    <input className="input" data-testid="tenant-360-recovery-new-password" type="password" value={recoveryForm.newPassword} onChange={(event) => setRecoveryForm((current) => ({ ...current, newPassword: event.target.value }))} autoComplete="new-password" />
+                  </label>
+                </div>
+                <button
+                  className="button secondary"
+                  type="button"
+                  data-testid="tenant-360-recovery-server-reset"
+                  disabled={recoveryBusy || !recoveryForm.confirmation || recoveryForm.reason.trim().length < 12 || recoveryForm.productionOperationConfirmation !== 'CONFIRM_PRODUCTION_TENANT_OWNER_RECOVERY' || recoveryForm.newPassword.length < 10}
+                  onClick={() => void submitOwnerRecovery('server_reset_password')}
+                >
+                  {recoveryBusy ? 'Resetting...' : 'Run audited server reset'}
+                </button>
+              </div>
+              {recoveryMessage ? <div className="alert success" role="status" data-testid="tenant-360-recovery-result">{recoveryMessage}</div> : null}
+              <div className="platform-admin-list" data-testid="tenant-360-recovery-audit">
+                {(recovery?.recentRequests || []).map((event: any) => (
+                  <p key={event.id}><strong>{event.type}</strong> - {formatDate(event.createdAt)}<br />{event.message}</p>
+                ))}
+                {!recovery?.recentRequests?.length ? <p className="muted">No recent owner recovery requests for this tenant.</p> : null}
               </div>
             </section>
 

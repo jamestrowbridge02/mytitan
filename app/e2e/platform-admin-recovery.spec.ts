@@ -1051,6 +1051,18 @@ test.describe("platform backend admin recovery", () => {
     });
     const platformToken = String((await platformLogin.json())?.token || "");
     const headers = { Authorization: `Bearer ${platformToken}`, "Content-Type": "application/json" };
+    const unconfirmedWrite = await requestLocalApi(request, `/admin/platform/tenants/${tenantId}/support-mode`, {
+      method: "POST",
+      headers,
+      data: {
+        reason: "E2E finance write-mode support investigation",
+        durationMinutes: 5,
+        viewRole: "finance",
+        accessMode: "write",
+      },
+    });
+    expect(unconfirmedWrite.status()).toBe(400);
+
     const started = await requestLocalApi(request, `/admin/platform/tenants/${tenantId}/support-mode`, {
       method: "POST",
       headers,
@@ -1059,6 +1071,7 @@ test.describe("platform backend admin recovery", () => {
         durationMinutes: 5,
         viewRole: "finance",
         accessMode: "write",
+        confirmation: true,
       },
     });
     expect(started.ok()).toBeTruthy();
@@ -1072,5 +1085,85 @@ test.describe("platform backend admin recovery", () => {
       headers,
     });
     expect(exited.ok()).toBeTruthy();
+  });
+
+  test("tenant owner recovery is platform-only, reason-gated, audited, and token-free", async ({ page, request }) => {
+    const recoverySecretPattern = /reset-password\?token=|"token"\s*:|passwordHash|\$2[aby]\$|MyTitanOwnerTemp|MyTitanE2EAdmin/i;
+    const platformLogin = await requestLocalApi(request, "/auth/login", {
+      method: "POST",
+      data: { email: fixtureRefs.platformAdminEmail, password: fixtureRefs.platformAdminPassword },
+    });
+    expect(platformLogin.ok()).toBeTruthy();
+    const platformToken = String((await platformLogin.json())?.token || "");
+    const headers = { Authorization: `Bearer ${platformToken}`, "Content-Type": "application/json" };
+
+    const status = await requestLocalApi(request, `/admin/platform/tenants/${tenantId}/owner-recovery`, { headers });
+    expect(status.ok()).toBeTruthy();
+    const statusBody = await status.json();
+    expect(statusBody.secretsReturned).toBe(false);
+    expect(JSON.stringify(statusBody)).not.toMatch(recoverySecretPattern);
+    const owner = statusBody.owners.find((row: any) => row.email === fixtureRefs.workspaceAdminEmail) || statusBody.owners[0];
+    expect(owner?.role).toBe("OWNER");
+
+    const tenantLogin = await requestLocalApi(request, "/auth/login", {
+      method: "POST",
+      data: { email: fixtureRefs.workspaceAdminEmail, password: fixtureRefs.workspaceAdminPassword },
+    });
+    expect(tenantLogin.ok()).toBeTruthy();
+    const tenantToken = String((await tenantLogin.json())?.token || "");
+    const tenantDenied = await requestLocalApi(request, `/admin/platform/tenants/${tenantId}/owner-recovery`, {
+      headers: { Authorization: `Bearer ${tenantToken}` },
+    });
+    expect([401, 403]).toContain(tenantDenied.status());
+
+    const missingReason = await requestLocalApi(request, `/admin/platform/tenants/${tenantId}/owner-recovery`, {
+      method: "POST",
+      headers,
+      data: { action: "send_reset_email", targetUserId: owner.id, reason: "short", confirmation: true },
+    });
+    expect(missingReason.status()).toBe(400);
+
+    const resetRequest = await requestLocalApi(request, `/admin/platform/tenants/${tenantId}/owner-recovery`, {
+      method: "POST",
+      headers,
+      data: {
+        action: "send_reset_email",
+        targetUserId: owner.id,
+        reason: "E2E owner requested audited access recovery",
+        confirmation: true,
+      },
+    });
+    expect([200, 201]).toContain(resetRequest.status());
+    const resetBody = await resetRequest.json();
+    expect(String(resetBody.requestId || "")).not.toHaveLength(0);
+    expect(resetBody.secretsReturned).toBe(false);
+    expect(JSON.stringify(resetBody)).not.toMatch(recoverySecretPattern);
+
+    const refusedServerReset = await requestLocalApi(request, `/admin/platform/tenants/${tenantId}/owner-recovery`, {
+      method: "POST",
+      headers,
+      data: {
+        action: "server_reset_password",
+        targetUserId: owner.id,
+        reason: "E2E owner requested audited access recovery",
+        confirmation: true,
+        newPassword: "MyTitanOwnerTemp!2026",
+      },
+    });
+    expect(refusedServerReset.status()).toBe(400);
+    expect(JSON.stringify(await refusedServerReset.json())).not.toMatch(/MyTitanOwnerTemp|passwordHash|\$2[aby]\$/i);
+
+    const after = await requestLocalApi(request, `/admin/platform/tenants/${tenantId}/owner-recovery`, { headers });
+    const afterBody = await after.json();
+    expect(afterBody.recentRequests.some((row: any) => row.type === "tenant_owner_password_recovery_requested")).toBe(true);
+    expect(JSON.stringify(afterBody)).not.toMatch(recoverySecretPattern);
+
+    await loginAs(page, request, fixtureRefs.platformAdminEmail, fixtureRefs.platformAdminPassword);
+    await page.goto(`/platform/tenants/${tenantId}`, { waitUntil: "networkidle" });
+    await expect(page.getByTestId("tenant-360-owner-recovery")).toBeVisible();
+    await expect(page.getByTestId("tenant-360-recovery-send-email")).toBeVisible();
+    await expect(page.getByTestId("tenant-360-recovery-server-reset")).toBeVisible();
+    await expect(page.locator("body")).not.toContainText("reset-password?token=");
+    await expect(page.locator("body")).not.toContainText("passwordHash");
   });
 });
