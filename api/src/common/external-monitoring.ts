@@ -15,6 +15,11 @@ export type ExternalMonitoringSnapshot = HostStatusSnapshot & {
   externalMonitorStatus: string | null;
   externalMonitorDetail: string | null;
   externalMonitorProvider: string | null;
+  externalMonitorName: string | null;
+  externalMonitorMarketingUrl: string | null;
+  externalMonitorAppUrl: string | null;
+  externalMonitorApiHealthUrl: string | null;
+  externalMonitorAlertRecipient: string | null;
 };
 
 export function getExternalMonitoringSnapshot(): ExternalMonitoringSnapshot {
@@ -39,5 +44,10 @@ export function getExternalMonitoringSnapshot(): ExternalMonitoringSnapshot {
     externalMonitorStatus: snapshot.values.EXTERNAL_MONITOR_STATUS || null,
     externalMonitorDetail: snapshot.values.EXTERNAL_MONITOR_DETAIL || null,
     externalMonitorProvider: snapshot.values.EXTERNAL_MONITOR_PROVIDER || null,
+    externalMonitorName: snapshot.values.EXTERNAL_MONITOR_NAME || null,
+    externalMonitorMarketingUrl: snapshot.values.EXTERNAL_MONITOR_MARKETING_URL || null,
+    externalMonitorAppUrl: snapshot.values.EXTERNAL_MONITOR_APP_URL || null,
+    externalMonitorApiHealthUrl: snapshot.values.EXTERNAL_MONITOR_API_HEALTH_URL || null,
+    externalMonitorAlertRecipient: snapshot.values.EXTERNAL_MONITOR_ALERT_RECIPIENT || null,
   };
 }

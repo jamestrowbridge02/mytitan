@@ -123,6 +123,22 @@ async function main() {
   });
   assert.equal(ready.status, 'ready');
   assert.equal(ready.canSave, true);
+
+  service.findBillingCatalogOverride = async (kind, code, interval) => {
+    if (kind === 'subscription_price' && code === 'ENTERPRISE' && interval === 'ANNUAL') return enterpriseAnnual;
+    return null;
+  };
+  service.priceIdFor = () => null;
+  service.formatStripeMoney = BillingService.prototype.formatStripeMoney;
+  const subscriptionReadiness = await service.verifySubscriptionPricing();
+  const enterpriseAnnualReadiness = subscriptionReadiness.prices.find((row) => row.planCode === 'ENTERPRISE' && row.interval === 'ANNUAL');
+  assert.equal(enterpriseAnnualReadiness.status, 'mismatch');
+  assert.match(enterpriseAnnualReadiness.detail, /The Stripe Price exists and belongs to product prod_/);
+  assert.match(enterpriseAnnualReadiness.detail, /MyTitan has not stored the Product ID for this mapping yet/);
+  assert.equal(enterpriseAnnualReadiness.safeNextAction, 'Use Product ID from verified Stripe Price');
+  assert.equal(enterpriseAnnualReadiness.canAdoptProductFromVerifiedPrice, true);
+  assert.equal(JSON.stringify(enterpriseAnnualReadiness).includes(product.id), false);
+
   assert.equal(service.getMutationCount(), 0, 'diagnostics must not mutate Stripe products or prices');
   assert.notEqual(ready.message, 'Verification failed');
 

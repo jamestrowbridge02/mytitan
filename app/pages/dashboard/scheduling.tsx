@@ -314,7 +314,7 @@ export default function SchedulingPage() {
               <p className="operator-section__subtitle">Switch the active day to review remaining capacity and assignment pressure.</p>
             </div>
           </div>
-          <input className="input" type="date" value={date} onChange={(event) => setDate(event.target.value)} />
+          <input className="input" data-testid="scheduling-planning-date" type="date" value={date} onChange={(event) => setDate(event.target.value)} />
         </section>
 
         <section className="card operator-section" data-testid="scheduling-capacity-grid">

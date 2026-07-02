@@ -116,6 +116,7 @@ external_monitor_name="$(read_env_value MYTITAN_EXTERNAL_UPTIME_MONITOR_NAME 2>/
 external_monitor_url="$(read_env_value MYTITAN_EXTERNAL_UPTIME_MONITOR_URL 2>/dev/null || true)"
 external_monitor_state="$(read_env_value MYTITAN_EXTERNAL_UPTIME_MONITOR_STATE 2>/dev/null || true)"
 external_monitor_provider="$(read_env_value MYTITAN_EXTERNAL_UPTIME_MONITOR_PROVIDER 2>/dev/null || true)"
+external_monitor_alert_recipient="$(read_env_value MYTITAN_EXTERNAL_UPTIME_ALERT_RECIPIENT 2>/dev/null || true)"
 if [[ -n "${external_monitor_name}" || -n "${external_monitor_url}" || -n "${external_monitor_provider}" ]]; then
   case "$(printf '%s' "${external_monitor_state}" | tr '[:upper:]' '[:lower:]')" in
     healthy)
@@ -157,3 +158,8 @@ echo "TLS_DETAIL:${tls_detail}"
 echo "EXTERNAL_MONITOR_STATUS:${external_monitor_status}"
 echo "EXTERNAL_MONITOR_DETAIL:${external_monitor_detail}"
 echo "EXTERNAL_MONITOR_PROVIDER:${external_monitor_provider:+configured}"
+echo "EXTERNAL_MONITOR_NAME:${external_monitor_name:+configured}"
+echo "EXTERNAL_MONITOR_MARKETING_URL:${marketing_url%/}"
+echo "EXTERNAL_MONITOR_APP_URL:${app_url%/}/login"
+echo "EXTERNAL_MONITOR_API_HEALTH_URL:${api_url%/}/health"
+echo "EXTERNAL_MONITOR_ALERT_RECIPIENT:${external_monitor_alert_recipient:+configured}"

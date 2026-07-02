@@ -41,14 +41,14 @@ async function main() {
     );
     for (const price of readiness.prices || []) {
       console.log(
-        `${price.planCode} interval=${price.interval} status=${price.status} expected="${price.displayExpectedPrice || 'n/a'}" observed="${price.displayObservedPrice || 'n/a'}" active=${price.active ? 'yes' : 'no'}`,
+        `${price.planCode} interval=${price.interval} status=${price.status} expected="${price.displayExpectedPrice || 'n/a'}" observed="${price.displayObservedPrice || 'n/a'}" active=${price.active ? 'yes' : 'no'} product="${price.observedProductIdMasked || 'n/a'}" localProduct="${price.localProductIdMasked || 'n/a'}" detail="${String(price.detail || '').replace(/\s+/g, ' ').trim()}"`,
       );
     }
     console.log(`SUMMARY ${String(readiness.message || '').replace(/\s+/g, ' ').trim()}`);
 
     const nextActions = (readiness.prices || [])
       .filter((price) => price.status !== 'ready')
-      .map((price) => `${price.planCode} ${price.interval} ${String(price.action || '').replace(/\s+/g, ' ').trim()}`);
+      .map((price) => `${price.planCode} ${price.interval} ${String(price.action || price.safeNextAction || '').replace(/\s+/g, ' ').trim()}`);
     for (const action of nextActions) {
       console.log(`ACTION ${action}`);
     }

@@ -276,12 +276,13 @@ function summarizeSubscriptionPriceIssues(output: string) {
   const actionLines = lines.filter((line) => line.startsWith('ACTION ')).map((line) => line.slice('ACTION '.length).trim());
   if (!issueLines.length) return '';
   return issueLines.map((line) => {
-    const match = line.match(/^([A-Z0-9_]+)\s+interval=(MONTHLY|ANNUAL)\s+status=([a-z_]+)\s+expected="([^"]*)"\s+observed="([^"]*)"\s+active=([a-z]+)/i);
+    const match = line.match(/^([A-Z0-9_]+)\s+interval=(MONTHLY|ANNUAL)\s+status=([a-z_]+)\s+expected="([^"]*)"\s+observed="([^"]*)"\s+active=([a-z]+)(?:\s+product="([^"]*)")?(?:\s+localProduct="([^"]*)")?(?:\s+detail="([^"]*)")?/i);
     if (!match) return line;
-    const [, planCode, interval, status, expected, observed, active] = match;
+    const [, planCode, interval, status, expected, observed, active, product, localProduct, detail] = match;
     const action = actionLines.find((entry) => entry.startsWith(`${planCode} ${interval} `)) || '';
     const cleanedAction = action.replace(`${planCode} ${interval} `, '').trim();
-    return `${planCode} ${interval}: ${status}; expected ${expected || 'n/a'}, observed ${observed || 'n/a'}, active=${active}. ${cleanedAction || 'Run the dry-run verifier and remap only after operator approval.'}`;
+    const productDetail = product || localProduct ? ` product=${product || 'n/a'}, localProduct=${localProduct || 'n/a'}.` : '';
+    return `${planCode} ${interval}: ${status}; expected ${expected || 'n/a'}, observed ${observed || 'n/a'}, active=${active}.${productDetail} ${detail || cleanedAction || 'Run the dry-run verifier and remap only after operator approval.'}`;
   }).join(' ');
 }
 
@@ -670,6 +671,7 @@ export async function getInternalMonitoringSnapshot(
         lastBackupAt: backup.lastBackupAt,
         artifact: backup.lastBackupArtifact,
         sizeBytes: backup.lastBackupSizeBytes,
+        encryptionStatus: backup.encryptionStatus,
         scheduleStatus: backup.scheduleStatus,
         createEvidenceCommand: 'bash ./scripts/backup.sh && bash ./scripts/backup-readiness-status.sh',
       },

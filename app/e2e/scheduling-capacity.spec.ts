@@ -37,7 +37,7 @@ test.describe("scheduling capacity planning", () => {
     }
 
     await page.goto("/dashboard/scheduling");
-    await page.locator('input[type="date"]').fill(seededDate);
+    await page.getByTestId("scheduling-planning-date").fill(seededDate);
     await expect(page.getByTestId("scheduling-pressure-list")).toContainText(/Overloaded/i);
     await expect(page.getByTestId("scheduling-pressure-list")).toContainText(/Unavailable|Available/i);
     await expect(page.getByTestId("scheduling-capacity-grid")).toContainText(/Unavailable/i);

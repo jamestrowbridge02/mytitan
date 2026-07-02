@@ -4054,6 +4054,8 @@ export class BillingService {
                   : plan.pricesCents.MONTHLY,
               expectedCurrency: String(monthlyOverride?.currency || expectedCurrency).trim().toUpperCase() || expectedCurrency,
               configuredPriceId: String(monthlyOverride?.stripePriceId || this.priceIdFor(plan.code, 'MONTHLY') || '').trim() || null,
+              configuredProductId: String(monthlyOverride?.stripeProductId || '').trim() || null,
+              localMappingRequiresProductId: Boolean(monthlyOverride),
               envName: this.buildSubscriptionPriceEnvName(plan.code, 'MONTHLY'),
             },
             {
@@ -4066,6 +4068,8 @@ export class BillingService {
                   : plan.pricesCents.ANNUAL,
               expectedCurrency: String(annualOverride?.currency || expectedCurrency).trim().toUpperCase() || expectedCurrency,
               configuredPriceId: String(annualOverride?.stripePriceId || this.priceIdFor(plan.code, 'ANNUAL') || '').trim() || null,
+              configuredProductId: String(annualOverride?.stripeProductId || '').trim() || null,
+              localMappingRequiresProductId: Boolean(annualOverride),
               envName: this.buildSubscriptionPriceEnvName(plan.code, 'ANNUAL'),
             },
           ];
@@ -4085,6 +4089,8 @@ export class BillingService {
           observedAmountCents: null,
           observedCurrency: null,
           observedInterval: null,
+          observedProductIdMasked: null,
+          localProductIdMasked: this.maskStripeId(row.configuredProductId),
           displayExpectedPrice: this.formatStripeMoney(row.expectedAmountCents, row.expectedCurrency),
           displayObservedPrice: null,
           detail: `Stripe is not configured. ${row.envName} cannot be verified yet.`,
@@ -4106,6 +4112,8 @@ export class BillingService {
             observedAmountCents: null,
             observedCurrency: null,
             observedInterval: null,
+            observedProductIdMasked: null,
+            localProductIdMasked: this.maskStripeId(row.configuredProductId),
             displayExpectedPrice,
             displayObservedPrice: null,
             detail: `${row.envName} is missing, so this plan price cannot be verified.`,
@@ -4133,9 +4141,11 @@ export class BillingService {
             observedAmountCents: null,
             observedCurrency: null,
             observedInterval: null,
+            observedProductIdMasked: null,
+            localProductIdMasked: this.maskStripeId(row.configuredProductId),
             displayExpectedPrice,
             displayObservedPrice: null,
-            detail: `The configured Stripe price could not be read safely${retrieveError ? `: ${retrieveError}` : '.'}`,
+            detail: `Price not found or not accessible with the configured MyTitan Billing Stripe credential${retrieveError ? `: ${this.redactStripeText(retrieveError)}` : '.'}`,
             action:
               `Check ${row.envName}, confirm the Stripe price still exists, and remap it to a GBP ${row.interval === 'ANNUAL' ? 'annual' : 'monthly'} price for ${row.planName} at ${row.expectedAmountCents} pence.`,
           };
@@ -4145,13 +4155,57 @@ export class BillingService {
         const observedAmountCents = Number.isFinite(Number(price.unit_amount)) ? Number(price.unit_amount) : null;
         const observedInterval =
           price.recurring?.interval === 'year' ? 'ANNUAL' : price.recurring?.interval === 'month' ? 'MONTHLY' : null;
+        const observedProductId =
+          price?.product && typeof price.product === 'string'
+            ? price.product
+            : String(price?.product?.id || '').trim() || null;
+        const observedProductIdMasked = this.maskStripeId(observedProductId);
+        const localProductIdMasked = this.maskStripeId(row.configuredProductId);
         const active = Boolean(price.active);
+        const displayObservedPrice = this.formatStripeMoney(observedAmountCents, observedCurrency);
+        const localProductMissing = Boolean(row.localMappingRequiresProductId && observedProductId && !row.configuredProductId);
+        const productMismatch = Boolean(row.configuredProductId && observedProductId && row.configuredProductId !== observedProductId);
         const matches =
           active &&
+          !localProductMissing &&
+          !productMismatch &&
           observedCurrency === row.expectedCurrency &&
           observedAmountCents === row.expectedAmountCents &&
           observedInterval === row.interval;
-        const displayObservedPrice = this.formatStripeMoney(observedAmountCents, observedCurrency);
+
+        let detail = 'Configured Stripe price matches the public plan amount, currency, interval, and local product mapping.';
+        let action = 'No change required.';
+        if (!matches) {
+          const observedParts = [
+            `expected=${this.formatStripeMoney(row.expectedAmountCents, row.expectedCurrency) || `${row.expectedCurrency} ${row.expectedAmountCents}`}`,
+            `observed=${displayObservedPrice || 'n/a'}`,
+            `expectedInterval=${row.interval}`,
+            `observedInterval=${observedInterval || 'unknown'}`,
+            `active=${active ? 'yes' : 'no'}`,
+          ];
+          if (localProductMissing) {
+            detail = `The Stripe Price exists and belongs to product ${observedProductIdMasked}. MyTitan has not stored the Product ID for this mapping yet. ${observedParts.join(' ')}.`;
+            action = 'Use Product ID from verified Stripe Price';
+          } else if (productMismatch) {
+            detail = `Product mismatch: the Stripe Price belongs to ${observedProductIdMasked}, but MyTitan has stored ${localProductIdMasked}. ${observedParts.join(' ')}.`;
+            action = 'Replace the local Product ID with the Product ID from the verified Stripe Price, then dry-run validate.';
+          } else if (!active) {
+            detail = `The mapped Stripe price is inactive. ${observedParts.join(' ')}.`;
+            action = `Reactivate the Stripe price in Stripe or remap ${row.envName} to an active GBP ${row.interval === 'ANNUAL' ? 'annual' : 'monthly'} price for ${row.planName}.`;
+          } else if (observedCurrency !== row.expectedCurrency) {
+            detail = `Currency mismatch: expected ${row.expectedCurrency}, Stripe returned ${observedCurrency || 'unknown'}. ${observedParts.join(' ')}.`;
+            action = `Use a ${row.expectedCurrency} Stripe price for ${row.planName}, then dry-run validate.`;
+          } else if (observedAmountCents !== row.expectedAmountCents) {
+            detail = `Amount mismatch: expected ${this.formatStripeMoney(row.expectedAmountCents, row.expectedCurrency) || row.expectedAmountCents}, Stripe returned ${displayObservedPrice || 'n/a'}.`;
+            action = `Create or remap a GBP ${row.interval === 'ANNUAL' ? 'annual' : 'monthly'} Stripe price for ${row.planName} at ${row.expectedAmountCents} pence, then update ${row.envName}.`;
+          } else if (observedInterval !== row.interval) {
+            detail = `Interval mismatch: expected ${row.interval}, Stripe returned ${observedInterval || 'unknown'}. ${observedParts.join(' ')}.`;
+            action = `Remap ${row.envName} to a ${row.interval === 'ANNUAL' ? 'yearly' : 'monthly'} Stripe price for ${row.planName}.`;
+          } else {
+            detail = `Configured Stripe price does not match the expected ${row.expectedCurrency} ${row.interval === 'ANNUAL' ? 'annual' : 'monthly'} mapping. ${observedParts.join(' ')}.`;
+            action = `Create or remap a GBP ${row.interval === 'ANNUAL' ? 'annual' : 'monthly'} Stripe price for ${row.planName} at ${row.expectedAmountCents} pence, then update ${row.envName}.`;
+          }
+        }
 
         return {
           ...row,
@@ -4160,14 +4214,14 @@ export class BillingService {
           observedAmountCents,
           observedCurrency,
           observedInterval,
+          observedProductIdMasked,
+          localProductIdMasked,
           displayExpectedPrice,
           displayObservedPrice,
-          detail: matches
-            ? 'Configured Stripe price matches the public plan amount, currency, and interval.'
-            : `Configured Stripe price does not match the expected ${row.expectedCurrency} ${row.interval === 'ANNUAL' ? 'annual' : 'monthly'} amount.`,
-          action: matches
-            ? 'No change required.'
-            : `Create or remap a GBP ${row.interval === 'ANNUAL' ? 'annual' : 'monthly'} Stripe price for ${row.planName} at ${row.expectedAmountCents} pence, then update ${row.envName}.`,
+          detail: this.redactStripeText(detail),
+          action: this.redactStripeText(action),
+          safeNextAction: this.redactStripeText(action),
+          canAdoptProductFromVerifiedPrice: localProductMissing || productMismatch,
         };
       }),
     );

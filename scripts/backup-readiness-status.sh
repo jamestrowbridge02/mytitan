@@ -5,6 +5,7 @@ BASE="${MYTITAN_BASE_DIR:-/opt/mytitan}"
 BACKUP_DIR="${BASE}/backups"
 RESTORE_MARKER="${BACKUP_DIR}/.last-restore-preview"
 BACKUP_MARKER="${BACKUP_DIR}/.last-successful-backup"
+SCHEDULER_MARKER="${BACKUP_DIR}/.backup-scheduler-ready"
 NOW_EPOCH="$(date -u +%s)"
 RECENT_BACKUP_SECONDS="${MYTITAN_BACKUP_MAX_AGE_SECONDS:-129600}"
 RESTORE_DRILL_MAX_DAYS="${MYTITAN_RESTORE_DRILL_MAX_DAYS:-90}"
@@ -34,12 +35,33 @@ backup_age_seconds=$((NOW_EPOCH - latest_backup_epoch))
 
 schedule_status="needs_schedule"
 schedule_detail="No recent recurring backup cadence was detected from the visible artifacts."
+backup_timer_marker_at=""
+if [[ -f "${SCHEDULER_MARKER}" ]]; then
+  marker_status="$(sed -n 's/^BACKUP_TIMER_STATUS://p' "${SCHEDULER_MARKER}" | head -n 1 | sed 's/^ *//')"
+  backup_timer_marker_at="$(sed -n 's/^BACKUP_TIMER_ENABLED_AT://p' "${SCHEDULER_MARKER}" | head -n 1 | sed 's/^ *//')"
+  if [[ "${marker_status}" == "ready" ]]; then
+    schedule_status="ready"
+    schedule_detail="Host marker confirms mytitan-backup.timer was installed and enabled${backup_timer_marker_at:+ at ${backup_timer_marker_at}}."
+  fi
+fi
+if command -v systemctl >/dev/null 2>&1; then
+  backup_timer_enabled="$(systemctl is-enabled mytitan-backup.timer 2>&1 || true)"
+  backup_timer_active="$(systemctl is-active mytitan-backup.timer 2>&1 || true)"
+  if [[ "${backup_timer_enabled}" == "enabled" && "${backup_timer_active}" == "active" ]]; then
+    schedule_status="ready"
+    schedule_detail="mytitan-backup.timer is enabled and active on this host."
+  elif printf '%s %s' "${backup_timer_enabled}" "${backup_timer_active}" | grep -qiE 'Failed to connect to bus|System has not been booted|Operation not permitted'; then
+    schedule_detail="systemctl cannot inspect mytitan-backup.timer through the current service manager connection."
+  else
+    schedule_detail="mytitan-backup.timer is not enabled and active. Run sudo ENABLE_TIMERS=1 /opt/mytitan/scripts/install-backup-scheduler.sh."
+  fi
+fi
 recent_artifacts=()
 while IFS= read -r path; do
   recent_artifacts+=("${path}")
 done < <(ls -1t "${BACKUP_DIR}"/*.enc 2>/dev/null | head -n 3 || true)
 
-if [[ "${#recent_artifacts[@]}" -ge 2 ]]; then
+if [[ "${schedule_status}" != "ready" && "${#recent_artifacts[@]}" -ge 2 ]]; then
   first_epoch="$(stat -c %Y "${recent_artifacts[0]}")"
   second_epoch="$(stat -c %Y "${recent_artifacts[1]}")"
   delta=$((first_epoch - second_epoch))
@@ -105,9 +127,11 @@ fi
 echo "LAST_BACKUP_AT:${latest_backup_at}"
 echo "LAST_BACKUP_ARTIFACT:${latest_backup_name}"
 echo "LAST_BACKUP_SIZE_BYTES:${latest_backup_size_bytes}"
+echo "BACKUP_ENCRYPTION_STATUS:encrypted_aes_256_cbc_pbkdf2"
 echo "LAST_BACKUP_MARKER_AT:${marker_at:-unknown}"
 echo "SCHEDULE_STATUS:${schedule_status}"
 echo "SCHEDULE_DETAIL:${schedule_detail}"
+echo "BACKUP_TIMER_MARKER_AT:${backup_timer_marker_at:-unknown}"
 echo "LAST_RESTORE_DRILL_AT:${restore_at:-unknown}"
 echo "LAST_RESTORE_DRILL_ARTIFACT:${restore_artifact:-unknown}"
 echo "LAST_RESTORE_DRILL_SHA256:${restore_sha256:-unknown}"
