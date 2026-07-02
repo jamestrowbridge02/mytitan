@@ -116,6 +116,8 @@ type ToastState = {
 };
 
 type StatusFilterKey = 'ALL' | 'UNASSIGNED' | 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED';
+type CalendarPlanningMode = 'bookings' | 'rota';
+type BookingMode = 'LOCATION' | 'EMPLOYEE' | 'HYBRID';
 
 type WeeklyScheduleSlot = {
   start?: string | null;
@@ -585,6 +587,7 @@ export default function CalendarPage() {
   const [error, setError] = useState('');
   const [requestId, setRequestId] = useState<string | undefined>(undefined);
   const [statusFilter, setStatusFilter] = useStickyOperatorView<StatusFilterKey>('mytitan_calendar_status_view_v1', 'ALL');
+  const [planningMode, setPlanningMode] = useStickyOperatorView<CalendarPlanningMode>('mytitan_calendar_planning_mode_v1', 'bookings');
   const [search, setSearch] = useState('');
   const [selectedTechId, setSelectedTechId] = useState('ALL');
   const [selectedLocationId, setSelectedLocationId] = useState('ALL');
@@ -600,6 +603,7 @@ export default function CalendarPage() {
   const [highlightedConflictIds, setHighlightedConflictIds] = useState<string[]>([]);
   const schedulingEnabled = isSchedulingIntelligenceV1Enabled();
   const [scheduleData, setScheduleData] = useState<ScheduleResponse | null>(null);
+  const [bookingMode, setBookingMode] = useState<BookingMode>('LOCATION');
   const [scheduleError, setScheduleError] = useState('');
   const [scheduleLoading, setScheduleLoading] = useState(false);
   const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -822,6 +826,38 @@ export default function CalendarPage() {
     () => Boolean(data?.blocks?.some((block) => !block.technician?.id)),
     [data],
   );
+  const missingCoverRows = useMemo(() => {
+    const rows: Array<{ id: string; label: string; detail: string }> = [];
+    for (const block of data?.blocks || []) {
+      const dayKey = formatDateKey(new Date(block.startsAt));
+      if (!block.technician?.id) {
+        rows.push({
+          id: `${block.id}-unassigned`,
+          label: getBookingTitle(block),
+          detail: 'No staff member is assigned.',
+        });
+        continue;
+      }
+      if (schedulingEnabled) {
+        const available = availabilityMap.get(block.technician.id)?.[dayKey];
+        if (available === 0) {
+          rows.push({
+            id: `${block.id}-no-cover`,
+            label: getBookingTitle(block),
+            detail: `${block.technician.name || block.technician.email} has no rota cover that day.`,
+          });
+        }
+      }
+      if ((bookingMode === 'LOCATION' || bookingMode === 'HYBRID') && !block.location?.id) {
+        rows.push({
+          id: `${block.id}-no-location`,
+          label: getBookingTitle(block),
+          detail: 'No location is assigned for a location-based booking.',
+        });
+      }
+    }
+    return rows.slice(0, 8);
+  }, [availabilityMap, bookingMode, data?.blocks, schedulingEnabled]);
   const technicians = useMemo(() => {
     const base = data?.technicians || [];
     if (!hasUnassigned) return base;
@@ -844,8 +880,9 @@ export default function CalendarPage() {
       { label: viewMode === 'month' ? 'Month' : viewMode === 'day' ? 'Day' : 'Week range', value: formatViewRangeLabel(days, viewMode) || '-', hint: 'Current planning window' },
       { label: 'Bookings', value: String(bookingCount), hint: warningCount ? `${warningCount} with warnings` : 'No schedule warnings' },
       { label: 'Technicians', value: String(activeTechs), hint: hasUnassigned ? 'Includes unassigned lane' : 'Assigned lanes only' },
+      { label: 'Missing cover', value: String(missingCoverRows.length), hint: missingCoverRows.length ? 'Needs staff or location attention' : 'No cover gaps found' },
     ];
-  }, [data?.blocks, days, hasUnassigned, technicians, viewMode]);
+  }, [data?.blocks, days, hasUnassigned, missingCoverRows.length, technicians, viewMode]);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 900);
@@ -913,6 +950,15 @@ export default function CalendarPage() {
         if (isActive) {
           setData(mergeCalendarResponses(responses, range.from, range.to));
         }
+        apiFetch('/bookings/settings')
+          .then((settings: any) => {
+            if (!isActive) return;
+            const mode = String(settings?.bookingWorkflow?.bookingMode || '').toUpperCase();
+            setBookingMode(mode === 'EMPLOYEE' || mode === 'HYBRID' ? mode : 'LOCATION');
+          })
+          .catch(() => {
+            if (isActive) setBookingMode('LOCATION');
+          });
       } catch (err: any) {
         if (isActive) {
           setError(err?.message || 'Failed to load calendar');
@@ -1410,11 +1456,16 @@ export default function CalendarPage() {
 
   const visibleTechnicians = useMemo(() => {
     if (viewMode === 'month') return [] as CalendarTechnician[];
-    if (!showTechnicianOverlay) return [{ id: '__all__', name: 'All scheduled work', email: 'Location-first lane' }];
+    if (planningMode === 'rota') {
+      if (!isMobile) return technicians;
+      const techId = selectedTechId === 'ALL' ? technicians[0]?.id ?? '__unassigned__' : selectedTechId;
+      return technicians.filter((tech) => tech.id === techId);
+    }
+    if (!showTechnicianOverlay) return [{ id: '__all__', name: 'All scheduled work', email: 'Location booking lane' }];
     if (!isMobile) return technicians;
     const techId = selectedTechId === 'ALL' ? technicians[0]?.id ?? '__unassigned__' : selectedTechId;
     return technicians.filter((tech) => tech.id === techId);
-  }, [isMobile, selectedTechId, showTechnicianOverlay, technicians, viewMode]);
+  }, [isMobile, planningMode, selectedTechId, showTechnicianOverlay, technicians, viewMode]);
   const visibleQueue = useMemo(() => {
     return [...filteredBlocks]
       .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime())
@@ -1464,32 +1515,38 @@ export default function CalendarPage() {
               viewMode === 'month'
                 ? 'Month view for workload overview, quick reassignment, and clear empty days.'
                 : viewMode === 'day'
-                ? 'Day view for focused dispatching, schedule overlays, and precise timing changes.'
-                : 'Location-first week view with optional technician overlay, drag readiness, and conflict visibility.'
+                ? 'Day view for focused dispatching, staff cover, and precise timing changes.'
+                : bookingMode === 'EMPLOYEE'
+                  ? 'Staff rota week view with employee availability and cover gaps.'
+                  : bookingMode === 'HYBRID'
+                    ? 'Hybrid week view with location bookings and staff rota cover.'
+                    : 'Location bookings week view with location availability and cover gaps.'
             }
             actions={[
               { label: 'Bookings', href: '/dashboard/bookings', variant: 'secondary' },
               { label: 'Today', onClick: () => setFocusDate(startOfDay(new Date())) },
             ]}
             shortcuts={[
-              'Location first',
-              dragEnabled ? 'Drag changes gated' : 'Read-only calendar',
-              'No route optimisation claims',
+              bookingMode === 'EMPLOYEE' ? 'Employee-based' : bookingMode === 'HYBRID' ? 'Hybrid booking' : 'Location-based',
+              planningMode === 'rota' ? 'Staff rota' : 'Location bookings',
+              dragEnabled ? 'Timing changes gated' : 'Planning view',
             ]}
             stats={calendarStats}
           />
 
           <section className="operator-quickRail" data-testid="calendar-click-to-action-rail">
-            <div className="operator-actionTile" data-testid="calendar-v1-readonly-status">
+            <div className="operator-actionTile" data-testid="calendar-planning-mode-status">
               <div className="operator-actionTile__body">
-                <h3>{dragEnabled ? 'Calendar changes gated' : 'Calendar read-only'}</h3>
+                <h3>{planningMode === 'rota' ? 'Staff rota view' : 'Location bookings view'}</h3>
                 <p>
-                  {dragEnabled
-                    ? 'Read access is available now. Timing changes stay behind the separate calendar change flag.'
-                    : 'View booking timing, assignment, location, and status without changing production records from this surface.'}
+                  {bookingMode === 'EMPLOYEE'
+                    ? 'Employee-based booking uses staff availability first.'
+                    : bookingMode === 'HYBRID'
+                      ? 'Hybrid booking shows both location demand and staff cover.'
+                      : 'Location-based booking uses location availability first.'}
                 </p>
               </div>
-              <span className="button secondary">{dragEnabled ? 'Changes gated' : 'Read only'}</span>
+              <span className="button secondary">{bookingMode === 'EMPLOYEE' ? 'Employee-based' : bookingMode === 'HYBRID' ? 'Hybrid' : 'Location-based'}</span>
             </div>
             <Link className="operator-actionTile" href="/dashboard/bookings?view=today">
               <div className="operator-actionTile__body">
@@ -1518,11 +1575,32 @@ export default function CalendarPage() {
             <div className="operator-section__header">
               <div>
                 <h2 className="operator-section__title">
-                  {viewMode === 'month' ? 'Monthly planner' : viewMode === 'day' ? 'Daily planner' : 'Weekly planner'}
+                  {planningMode === 'rota'
+                    ? viewMode === 'month' ? 'Monthly rota' : viewMode === 'day' ? 'Daily staff rota' : 'Weekly staff rota'
+                    : viewMode === 'month' ? 'Monthly bookings' : viewMode === 'day' ? 'Daily bookings' : 'Weekly bookings'}
                 </h2>
                 <p className="operator-section__subtitle">{formatViewRangeLabel(days, viewMode)}</p>
               </div>
               <div className="operator-inline-actions" style={{ flexWrap: 'wrap' }}>
+                <div style={{ display: 'inline-flex', border: '1px solid rgba(148, 163, 184, 0.3)', borderRadius: 999, padding: 4, gap: 4 }} data-testid="calendar-planning-mode-toggle">
+                  {([
+                    ['bookings', 'Location bookings'],
+                    ['rota', 'Staff rota'],
+                  ] as Array<[CalendarPlanningMode, string]>).map(([mode, label]) => (
+                    <button
+                      key={mode}
+                      className={planningMode === mode ? 'button primary operator-compact-button' : 'button secondary operator-compact-button'}
+                      type="button"
+                      data-testid={`calendar-planning-mode-${mode}`}
+                      onClick={() => {
+                        setPlanningMode(mode);
+                        if (mode === 'rota') setShowTechnicianOverlay(true);
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
                 <div style={{ display: 'inline-flex', border: '1px solid rgba(148, 163, 184, 0.3)', borderRadius: 999, padding: 4, gap: 4 }}>
                   {(['day', 'week', 'month'] as CalendarViewMode[]).map((mode) => (
                     <button
@@ -1553,7 +1631,7 @@ export default function CalendarPage() {
                     onChange={(event) => setShowTechnicianOverlay(event.target.checked)}
                     data-testid="calendar-technician-overlay-toggle"
                   />
-                  Technician overlay
+                  Staff overlay
                 </label>
               </div>
             </div>
@@ -1638,6 +1716,32 @@ export default function CalendarPage() {
         {schedulingEnabled && scheduleError ? (
           <p className="muted" style={{ marginTop: 6, fontSize: 12 }}>Schedule overlay: {scheduleError}</p>
         ) : null}
+        <section className="operator-grid operator-grid--two" style={{ marginTop: 12 }} data-testid="calendar-booking-mode-summary">
+          <article className="mt-surface-note" data-testid="calendar-booking-basis">
+            <strong>{bookingMode === 'EMPLOYEE' ? 'Employee-based booking' : bookingMode === 'HYBRID' ? 'Hybrid booking' : 'Location-based booking'}</strong>
+            <p className="muted" style={{ margin: '6px 0 0 0' }}>
+              {bookingMode === 'EMPLOYEE'
+                ? 'Calendar prioritises employee and staff availability.'
+                : bookingMode === 'HYBRID'
+                  ? 'Calendar shows location demand alongside staff rota coverage.'
+                  : 'Calendar prioritises location availability and flags missing staff cover.'}
+            </p>
+          </article>
+          <article className="mt-surface-note" data-testid="calendar-missing-cover">
+            <strong>Missing cover</strong>
+            {missingCoverRows.length ? (
+              <div style={{ display: 'grid', gap: 6, marginTop: 8 }}>
+                {missingCoverRows.map((row) => (
+                  <p key={row.id} className="muted" style={{ margin: 0 }}>
+                    {row.label}: {row.detail}
+                  </p>
+                ))}
+              </div>
+            ) : (
+              <p className="muted" style={{ margin: '6px 0 0 0' }}>No missing staff cover in this view.</p>
+            )}
+          </article>
+        </section>
         {visibleQueue.length ? (
           <div style={{ marginTop: 12 }}>
             <OperatorDataTable columns="minmax(220px, 1.5fr) minmax(170px, 1fr) minmax(130px, 0.8fr) minmax(150px, auto)">

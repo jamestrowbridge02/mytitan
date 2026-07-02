@@ -43,7 +43,7 @@ export const NAV_GROUPS: NavGroup[] = [
     title: "Get Paid",
     items: [
       { title: "Get Paid", sidebarTitle: "Payments", description: "Money owed, overdue balances, and finance control", href: "/dashboard/finance", icon: "revenue" },
-      { title: "Payment Setup", description: "Connect tenant-owned payment providers and bank transfer details", href: "/dashboard/settings/payments", icon: "billing" },
+      { title: "Payment Setup", description: "Manage how this workspace takes customer payments", href: "/dashboard/settings/payments", icon: "billing" },
       { title: "Quotes", description: "Send prices with a cleaner approval path", href: "/dashboard/quotes", icon: "quotes" },
       { title: "Revenue", description: "Track invoices, cash collection, and follow-up", href: "/dashboard/revenue", icon: "revenue" },
       { title: "Billing", description: "Workspace commercial state, plan continuity, and pack readiness", href: "/dashboard/billing", icon: "billing" },

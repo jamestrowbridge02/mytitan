@@ -673,6 +673,14 @@ export class TenantService {
       },
     });
 
+    const companyName = typeof dto.companyName === 'string' ? dto.companyName.trim() : '';
+    if (companyName) {
+      await db.company.update({
+        where: { id: tenantId },
+        data: { name: companyName },
+      });
+    }
+
     await this.audit.log(tenantId, 'tenant.settings.update', 'Tenant settings updated', userId);
     const safeUpdated = this.sanitizeTenantSettings(updated);
     return {

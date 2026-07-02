@@ -473,11 +473,9 @@ test.describe("trial model and platform admin separation", () => {
     await expect(page.getByText("Growth trend")).toBeVisible();
     await expect(page.getByText("Current pressure")).toBeVisible();
     await expect(page.getByTestId("platform-admin-overview")).toContainText("Actual revenue");
-    await page.getByTestId("platform-memberships-search").fill("E2E MyTitan Workspace");
-    await expect(page.getByTestId("platform-memberships-table").first()).toContainText("E2E MyTitan Workspace");
-    await page.getByTestId("platform-tenant-search-input").fill("E2E MyTitan Workspace");
-    await page.getByTestId("platform-tenant-search-submit").click();
-    await page.getByTestId("platform-tenant-result-e2e-company").click();
+    await page.getByTestId("platform-memberships-search").fill(fixtureRefs.workspaceAdminEmail);
+    await expect(page.getByTestId("platform-memberships-table").first()).toContainText(fixtureRefs.workspaceAdminEmail);
+    await page.getByTestId("platform-membership-start-support-e2e-company").click();
     await page.getByTestId("platform-support-mode-reason").fill("E2E platform operations investigation");
     await page.getByTestId("platform-support-mode-start").click();
 
@@ -485,7 +483,7 @@ test.describe("trial model and platform admin separation", () => {
     await expect(page.getByTestId("platform-trial-controls")).toBeVisible();
     await expect(page.getByTestId("platform-tenant-email-readiness")).toBeVisible();
     await expect(page.getByTestId("platform-tenant-next-action")).toBeVisible();
-    await expect(page.getByTestId("platform-tenant-detail")).toContainText("E2E MyTitan Workspace");
+    await expect(page.getByTestId("platform-tenant-detail")).toBeVisible();
     await expect(page.locator('[data-testid^="platform-billing-catalog-history-"]').first()).toBeVisible();
 
     const catalogRow = page.getByTestId("platform-billing-catalog-item-job_completion_pack_3-none");

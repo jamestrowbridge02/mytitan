@@ -317,7 +317,7 @@ export default function LaunchControlPage() {
       area: "Billing",
       state: billing?.stripeConfigured ? ("ready" as LaunchState) : ("needs_setup" as LaunchState),
       detail: billing?.stripeConfigured
-        ? "Your MyTitan subscription billing is ready."
+        ? "Your subscription billing is ready."
         : "Choose a plan and add payment details.",
       href: "/dashboard/billing",
     },

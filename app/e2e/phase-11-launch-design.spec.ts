@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 import { fixtureRefs, hasDashboardAuth, installApiProxy, loginAs, requestLocalApi } from "./utils";
 
+const SHARED_E2E_WORKSPACE_NAME = "__E2E MyTitan Workspace";
+
 test.describe("Phase 11 launch design and Stripe action acceptance", () => {
   test.skip(!hasDashboardAuth(), "Seed the E2E fixtures before running Phase 11 coverage.");
 
@@ -363,6 +365,63 @@ test.describe("Phase 11 launch design and Stripe action acceptance", () => {
         headers,
         data: { themeMode: originalMode },
       });
+    }
+  });
+
+  test("business information prepopulates, saves, and is reused from tenant settings", async ({ page, request }) => {
+    const token = await loginAs(page, request, fixtureRefs.workspaceAdminEmail, fixtureRefs.workspaceAdminPassword);
+    const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+    const current = await requestLocalApi(request, "/tenant/settings", { headers });
+    expect(current.ok()).toBeTruthy();
+    const original = await current.json();
+    const nextName = `E2E Business ${Date.now()}`;
+    const nextTradingName = `${nextName} Trading`;
+
+    try {
+      await page.goto("/dashboard/settings?tab=general&section=business-profile", { waitUntil: "networkidle" });
+      await expect(page.getByTestId("settings-business-name")).toHaveValue(String(original.companyName || ""));
+      await page.getByTestId("settings-business-name").fill(nextName);
+      await page.getByTestId("settings-trading-name").fill(nextTradingName);
+      await expect(page.getByTestId("settings-business-save")).toContainText("Save business details");
+      await page.getByTestId("settings-business-save").click();
+      await expect(page.getByTestId("operator-notice-success")).toContainText(/Settings saved/i);
+      await expect(page.getByTestId("settings-business-source-state")).toContainText("Saved details are reused");
+
+      await page.reload({ waitUntil: "networkidle" });
+      await page.goto("/dashboard/settings?tab=general&section=business-profile", { waitUntil: "networkidle" });
+      await expect(page.getByTestId("settings-business-name")).toHaveValue(nextName);
+      await expect(page.getByTestId("settings-trading-name")).toHaveValue(nextTradingName);
+
+      const readback = await requestLocalApi(request, "/tenant/settings", { headers });
+      expect(readback.ok()).toBeTruthy();
+      const body = await readback.json();
+      expect(body.companyName).toBe(nextName);
+      expect(body.tradingName).toBe(nextTradingName);
+    } finally {
+      const restore = await requestLocalApi(request, "/tenant/settings", {
+        method: "PATCH",
+        headers,
+        data: Object.fromEntries(Object.entries({
+          companyName: SHARED_E2E_WORKSPACE_NAME,
+          tradingName: original.tradingName,
+          registeredBusinessName: original.registeredBusinessName,
+          companyNumber: original.companyNumber,
+          taxRegistrationNumber: original.taxRegistrationNumber,
+          businessAddressLine1: original.businessAddressLine1,
+          businessAddressLine2: original.businessAddressLine2,
+          businessCity: original.businessCity,
+          businessPostcode: original.businessPostcode,
+          businessCountry: original.businessCountry,
+          contactPhone: original.contactPhone,
+          contactEmail: original.contactEmail,
+          websiteUrl: original.websiteUrl,
+          supportPhone: original.supportPhone,
+        }).filter(([, value]) => value !== null && value !== undefined)),
+      });
+      expect(restore.ok()).toBeTruthy();
+      const restored = await requestLocalApi(request, "/tenant/settings", { headers });
+      expect(restored.ok()).toBeTruthy();
+      expect((await restored.json()).companyName).toBe(SHARED_E2E_WORKSPACE_NAME);
     }
   });
 });

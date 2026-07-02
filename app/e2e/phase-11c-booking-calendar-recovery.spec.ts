@@ -10,8 +10,8 @@ function localDateTimeInput(date: Date) {
   return `${year}-${month}-${day}T${hour}:${minute}`;
 }
 
-test.describe("Phase 11C booking visibility and Calendar V2 recovery", () => {
-  test("unassigned bookings remain visible in a selected location and Calendar V2 refreshes without reload", async ({ page, request }) => {
+test.describe("Phase 11C booking visibility and calendar recovery", () => {
+  test("unassigned bookings remain visible in a selected location and calendar refreshes without reload", async ({ page, request }) => {
     await installApiProxy(page, request);
     const token = await loginAs(page, request, fixtureRefs.workspaceAdminEmail, fixtureRefs.workspaceAdminPassword);
     const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
@@ -54,6 +54,13 @@ test.describe("Phase 11C booking visibility and Calendar V2 recovery", () => {
     await expect(page.getByTestId("calendar-v2-workspace")).toHaveAttribute("data-calendar-version", "2");
     await expect(page.getByTestId(`calendar-booking-${created.id}`)).toBeVisible();
     await expect(page.getByTestId("calendar-empty-state")).toHaveCount(0);
+    await expect(page.getByTestId("calendar-planning-mode-toggle")).toContainText("Location bookings");
+    await expect(page.getByTestId("calendar-planning-mode-toggle")).toContainText("Staff rota");
+    await expect(page.getByTestId("calendar-booking-basis")).toContainText(/Location-based booking|Employee-based booking|Hybrid booking/);
+    await expect(page.getByTestId("calendar-missing-cover")).toContainText("No staff member is assigned.");
+    await page.getByTestId("calendar-planning-mode-rota").click();
+    await expect(page.getByTestId("calendar-planning-mode-status")).toContainText("Staff rota view");
+    await expect(page.getByTestId("calendar-time-grid")).toBeVisible();
 
     const secondStart = new Date(start.getTime() + 2 * 60 * 60 * 1000);
     const secondEnd = new Date(secondStart.getTime() + 60 * 60 * 1000);
@@ -76,6 +83,36 @@ test.describe("Phase 11C booking visibility and Calendar V2 recovery", () => {
     });
     await expect(page.getByTestId(`calendar-booking-${secondBooking.id}`)).toBeVisible();
     expect(page.url()).toContain(`/dashboard/calendar?day=${day}`);
+  });
+
+  test("booking mode controls calendar display copy", async ({ page, request }) => {
+    await installApiProxy(page, request);
+    const token = await loginAs(page, request, fixtureRefs.workspaceAdminEmail, fixtureRefs.workspaceAdminPassword);
+    const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+    const current = await requestLocalApi(request, "/booking/settings", { headers });
+    expect(current.ok()).toBeTruthy();
+    const currentBody = await current.json();
+    const originalMode = currentBody?.bookingWorkflow?.bookingMode || "LOCATION";
+
+    try {
+      const updated = await requestLocalApi(request, "/bookings/settings", {
+        method: "POST",
+        headers,
+        data: { bookingMode: "EMPLOYEE" },
+      });
+      expect(updated.ok()).toBeTruthy();
+
+      await page.goto("/dashboard/calendar", { waitUntil: "networkidle" });
+      await expect(page.getByTestId("calendar-booking-basis")).toContainText("Employee-based booking");
+      await page.getByTestId("calendar-planning-mode-rota").click();
+      await expect(page.getByTestId("calendar-planning-mode-status")).toContainText("Employee-based booking uses staff availability first.");
+    } finally {
+      await requestLocalApi(request, "/bookings/settings", {
+        method: "POST",
+        headers,
+        data: { bookingMode: originalMode },
+      });
+    }
   });
 
   test("operational refresh coalesces simultaneous mutation signals", async ({ page, request }) => {

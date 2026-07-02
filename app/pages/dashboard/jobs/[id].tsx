@@ -808,8 +808,8 @@ export default function JobDetailPage() {
       ? "Payment is already settled for this job."
       : hasPaymentDue
       ? paymentRequestState?.request
-        ? "The customer payment request is tracked here. Provider checkout only appears when the tenant-owned provider is ready."
-        : "Prepare a customer payment request from this job. It will stay manual unless a tenant-owned provider is verified."
+        ? "The customer payment request is tracked here. Online checkout appears when payment setup is ready."
+        : "Prepare a customer payment request from this job. It stays manual until online payment setup is ready."
       : !invoiceIssued && job?.status === "COMPLETED"
       ? "Issue the invoice from this completed job once it has been sent."
       : "The next payment step stays on this job.";

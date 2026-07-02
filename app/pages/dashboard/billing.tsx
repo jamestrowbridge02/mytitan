@@ -488,7 +488,7 @@ export default function BillingPage() {
                 <strong>Open your MyTitan billing history.</strong>
                 <span className="mt-linkCard__action">Open invoices</span>
               </Link>
-              <Link href="/dashboard/billing?section=plan-and-payments" className="mt-guided-setup-card mt-linkCard" data-testid="billing-setup-payment-method">
+              <Link href="/dashboard/billing?section=payment-method" className="mt-guided-setup-card mt-linkCard" data-testid="billing-setup-payment-method">
                 <span className="mt-guided-setup-card__eyebrow">MyTitan payment method</span>
                 <strong>Manage the payment method for MyTitan billing.</strong>
                 <span className="mt-linkCard__action">Open payment method</span>
@@ -559,6 +559,44 @@ export default function BillingPage() {
                     Checkout and subscription management are unavailable until Stripe is configured on the server.
                   </p>
                 ) : null}
+              </section>
+
+              <section className="billing-ops-panel billing-ops-panel--neutral" data-testid="billing-payment-method-target" {...getSectionProps('payment-method')}>
+                <div className="billing-ops-panel__header">
+                  <div className="billing-ops-heading">
+                    <span className="billing-ops-icon" aria-hidden="true">•</span>
+                    <div>
+                      <strong>Payment method</strong>
+                      <p className="muted billing-page-panel__text billing-page-panel__text--last">
+                        {hasActiveSubscription && !actionBlocked
+                          ? 'Open Stripe billing management to update the saved payment method.'
+                          : 'Payment method changes become available when the owner can manage an active subscription.'}
+                      </p>
+                    </div>
+                  </div>
+                  <OperatorStatusBadge label={hasActiveSubscription && !actionBlocked ? 'Available' : 'Unavailable'} tone={hasActiveSubscription && !actionBlocked ? 'success' : 'warning'} />
+                </div>
+                {hasActiveSubscription && !actionBlocked ? (
+                  <button
+                    className="button secondary"
+                    type="button"
+                    onClick={() => void openPortal()}
+                    disabled={loading === 'portal'}
+                    data-testid="billing-open-payment-method"
+                  >
+                    {loading === 'portal' ? 'Opening Stripe...' : 'Open payment method'}
+                  </button>
+                ) : (
+                  <p className="muted billing-page-panel__text" data-testid="billing-payment-method-unavailable">
+                    {verificationBlocked
+                      ? 'Verify the owner email, then return here to manage the payment method.'
+                      : !canManageSubscription
+                        ? 'Ask the workspace owner to manage the payment method.'
+                        : !stripeConfigured
+                          ? 'Subscription billing management is unavailable right now.'
+                          : 'Start or reactivate a subscription before changing the payment method.'}
+                  </p>
+                )}
               </section>
 
               <section className="billing-ops-panel billing-ops-panel--attention">
@@ -1361,7 +1399,7 @@ export default function BillingPage() {
               </section>
 
               {showPlanChoices ? (
-            <section className="operator-section billing-ops-section">
+            <section className="operator-section billing-ops-section" data-testid="billing-plan-choices-section" {...getSectionProps('plan-choices')}>
               <div className="operator-section__header billing-ops-section__header">
                 <div>
                   <h2 className="operator-section__title">Plan choices</h2>
@@ -1451,7 +1489,52 @@ export default function BillingPage() {
                 ))}
               </div>
             </section>
-          ) : null}
+          ) : (
+            <section className="operator-section billing-ops-section" data-testid="billing-plan-choices-section" {...getSectionProps('plan-choices')}>
+              <div className="operator-section__header billing-ops-section__header">
+                <div>
+                  <h2 className="operator-section__title">Plan choices</h2>
+                  <p className="operator-section__subtitle">Plan choices are not available in this environment.</p>
+                </div>
+                <OperatorStatusBadge label="Unavailable" tone="warning" />
+              </div>
+            </section>
+              )}
+
+              <section className="operator-section billing-ops-section" data-testid="billing-invoices-section" {...getSectionProps('mytitan-invoices')}>
+                <div className="operator-section__header billing-ops-section__header">
+                  <div>
+                    <h2 className="operator-section__title">MyTitan invoices</h2>
+                    <p className="operator-section__subtitle">
+                      {hasActiveSubscription && !actionBlocked
+                        ? 'Open Stripe billing management to view invoices and receipts.'
+                        : 'Invoice history becomes available through billing management when the owner can manage the subscription.'}
+                    </p>
+                  </div>
+                  <OperatorStatusBadge label={hasActiveSubscription && !actionBlocked ? 'Available' : 'Unavailable'} tone={hasActiveSubscription && !actionBlocked ? 'success' : 'warning'} />
+                </div>
+                {hasActiveSubscription && !actionBlocked ? (
+                  <button
+                    className="button secondary"
+                    type="button"
+                    onClick={() => void openPortal()}
+                    disabled={loading === 'portal'}
+                    data-testid="billing-open-invoices"
+                  >
+                    {loading === 'portal' ? 'Opening Stripe...' : 'Open invoices'}
+                  </button>
+                ) : (
+                  <p className="muted billing-page-panel__text" data-testid="billing-invoices-unavailable">
+                    {verificationBlocked
+                      ? 'Verify the owner email, then return here to open billing history.'
+                      : !canManageSubscription
+                        ? 'Ask the workspace owner to open billing history.'
+                        : !stripeConfigured
+                          ? 'Subscription billing management is unavailable right now.'
+                          : 'Start or reactivate a subscription before invoice history is available.'}
+                  </p>
+                )}
+              </section>
         </div>
       </div>
     </DashboardShell>

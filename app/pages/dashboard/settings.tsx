@@ -817,6 +817,10 @@ export default function SettingsPage() {
   }, []);
 
   useEffect(() => {
+    formRef.current = form;
+  }, [form]);
+
+  useEffect(() => {
     if (settings) {
       const nextForm = { ...settings };
       formRef.current = nextForm;
@@ -1997,7 +2001,7 @@ export default function SettingsPage() {
               <h3 style={{ marginTop: 0 }}>Business details</h3>
               <p className="muted settings-premium-muted">Set the business identity and contact details operators and customers rely on every day.</p>
               <label className="settings-premium-label">Business name</label>
-              <input className="input settings-premium-input" value={form.companyName || ''} onChange={(e) => setForm({ ...form, companyName: e.target.value })} />
+              <input className="input settings-premium-input" data-testid="settings-business-name" value={form.companyName || ''} onChange={(e) => setForm({ ...form, companyName: e.target.value })} />
               <div className="two-col">
                 <div>
                   <label className="settings-premium-label">Registered business name</label>
@@ -2108,6 +2112,20 @@ export default function SettingsPage() {
               </div>
               <label className="settings-premium-label">Support phone</label>
               <input className="input settings-premium-input" value={form.supportPhone || ''} onChange={(e) => setForm({ ...form, supportPhone: e.target.value })} />
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginTop: 14 }}>
+                <button
+                  className="button settings-premium-button"
+                  type="button"
+                  data-testid="settings-business-save"
+                  disabled={savingSettings || !settingsDirty}
+                  onClick={saveSettings}
+                >
+                  {savingSettings ? 'Saving...' : settingsDirty ? 'Save business details' : 'Business details saved'}
+                </button>
+                <span className="muted settings-premium-muted" data-testid="settings-business-source-state">
+                  Saved details are reused on invoices, job outputs, booking confirmations, and customer pages.
+                </span>
+              </div>
             </div>
 
             <div className="card settings-premium-card" style={{ marginBottom: 12 }}>
@@ -2568,7 +2586,7 @@ export default function SettingsPage() {
                 </div>
               </div>
               <p className="muted settings-premium-muted" style={{ marginBottom: 0 }}>
-                Payment provider setup is managed from Settings → Payments so tenant-owned customer collection stays separate from MyTitan subscription billing.
+                Manage how this workspace takes customer payments.
               </p>
             </div>
 
