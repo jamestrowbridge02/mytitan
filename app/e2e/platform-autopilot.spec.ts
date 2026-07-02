@@ -21,7 +21,7 @@ test.describe("platform Autopilot", () => {
     await expect(page.getByTestId("autopilot-card-api")).toContainText(/healthy|degraded|attention needed|down/i);
     await expect(page.getByTestId("autopilot-availability-targets")).toContainText(/Runtime availability|Public endpoint availability|Operational readiness|Launch readiness/i);
     await expect(page.getByTestId("autopilot-availability-calculation")).toContainText(/required runtime checks healthy/i);
-    await expect(page.getByTestId("autopilot-booking-calendar-health")).toContainText(/Booking visibility|Calendar V2 route|Connected Tools actions|Public portal support wording/i);
+    await expect(page.getByTestId("autopilot-booking-calendar-health")).toContainText(/Booking visibility|Calendar route|Connected Tools actions|Public portal support wording/i);
     await expect(page.getByTestId("autopilot-manual-actions")).toContainText(/Stripe Connect|External uptime|Legal review|Tax compliance|Data residency/i);
     await expect(page.getByTestId("autopilot-alert-queue")).toBeVisible();
     await expect(page.locator("body")).not.toContainText(/platformSecretEncrypted|webhookSecretEncrypted|STRIPE_CONNECT_PLATFORM_SECRET|STRIPE_CONNECT_WEBHOOK_SECRET|sk_live_|whsec_/);

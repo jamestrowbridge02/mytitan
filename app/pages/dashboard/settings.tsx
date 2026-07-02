@@ -858,7 +858,7 @@ export default function SettingsPage() {
       },
       {
         key: 'booking-setup',
-        title: 'Booking setup',
+        title: 'Bookings',
         why: 'Customers need a truthful route into your availability and service flow.',
         href: '/dashboard/settings?tab=bookings&section=booking-setup',
         completed: Boolean(form.bookingPublicEnabled),

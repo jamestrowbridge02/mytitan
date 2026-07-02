@@ -76,6 +76,7 @@ async function createTradeAccount(request: any, token: string, overrides: Record
       contactName: "Trade Contact",
       contactEmail: `trade-${unique}@example.test`,
       contactPhone: "02070000000",
+      status: "ACTIVE",
       ...overrides,
     },
   });
@@ -360,10 +361,11 @@ test.describe("booking public flow", () => {
     await expect(page.getByText(/Logo saved/)).toBeVisible();
     await page.goto("/dashboard/booking/settings", { waitUntil: "networkidle" });
 
-    await expect(page.getByRole("heading", { name: "Booking pages that feel ready to share" })).toBeVisible();
-    await expect(page.getByTestId("booking-public-link")).toContainText("/portal/booking/");
+    await expect(page.getByRole("heading", { name: "Bookings" }).first()).toBeVisible();
+    await expect(page.getByTestId("booking-public-link")).toContainText("Public booking link is ready");
+    await expect(page.getByTestId("booking-public-link")).not.toContainText("/portal/booking/");
     await expect(page.getByText("Add this link to your website booking button.", { exact: false })).toBeVisible();
-    await expect(page.getByTestId("booking-setup-progress")).toContainText(/Open next step|Booking setup/i);
+    await expect(page.getByTestId("booking-setup-progress")).toContainText(/Open next step|Bookings/i);
 
     await page.getByRole("button", { name: "Copy link" }).click();
     await expect(page.getByRole("button", { name: "Copy link" })).toBeVisible();
@@ -503,6 +505,41 @@ test.describe("booking public flow", () => {
     const publicService = await createService(request, token, { category: "Public repairs", visibility: "PUBLIC" });
     const tradeService = await createService(request, token, { category: "Trade repairs", visibility: "TRADE" });
     const internalService = await createService(request, token, { category: "Workshop only", visibility: "INTERNAL" });
+    const tradeAccount = await createTradeAccount(request, token);
+    const hiddenLocationName = `Hidden Public Location ${Date.now()}`;
+    const hiddenLocationResponse = await requestLocalApi(request, "/locations", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      data: {
+        code: `HID-${Date.now()}`,
+        name: hiddenLocationName,
+        kind: "BRANCH",
+        addressLine1: "Private Yard",
+        city: "Chichester",
+        country: "United Kingdom",
+        timezone: "Europe/London",
+        metadataJson: {
+          publicVisible: false,
+          tradeVisible: true,
+          privateVisible: true,
+        },
+        hours: [1, 2, 3, 4, 5].map((weekday) => ({
+          weekday,
+          startMinute: 9 * 60,
+          endMinute: 17 * 60,
+          isClosed: false,
+        })),
+      },
+    });
+    expect(hiddenLocationResponse.ok()).toBeTruthy();
+    const hiddenLocations = await hiddenLocationResponse.json();
+    const hiddenLocation = Array.isArray(hiddenLocations)
+      ? hiddenLocations.find((location: any) => location?.name === hiddenLocationName)
+      : hiddenLocations;
+    expect(hiddenLocation?.id).toBeTruthy();
     const settingsResponse = await requestLocalApi(request, "/bookings/settings", {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -517,6 +554,17 @@ test.describe("booking public flow", () => {
     expect(ids.has(publicService.id)).toBeTruthy();
     expect(ids.has(tradeService.id)).toBeFalsy();
     expect(ids.has(internalService.id)).toBeFalsy();
+    expect((config.locations || []).some((location: any) => location.id === hiddenLocation.id)).toBeFalsy();
+
+    const tradeConfigResponse = await requestLocalApi(
+      request,
+      `/public/booking/${publicToken}/config?tradeAccountId=${encodeURIComponent(String(tradeAccount.id || ""))}&customerEmail=${encodeURIComponent(String(tradeAccount.contactEmail || ""))}`,
+    );
+    expect(tradeConfigResponse.ok()).toBeTruthy();
+    const tradeConfig = await tradeConfigResponse.json();
+    const tradeIds = new Set((tradeConfig.services || []).map((service: any) => service.id));
+    expect(tradeIds.has(tradeService.id)).toBeTruthy();
+    expect((tradeConfig.locations || []).some((location: any) => location.id === hiddenLocation.id)).toBeTruthy();
   });
 
   test("public booking deposit guidance stays truthful when customer payments belong to the business setup", async ({ request }) => {

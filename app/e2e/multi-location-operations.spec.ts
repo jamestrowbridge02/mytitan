@@ -43,6 +43,8 @@ test.describe("multi-location operations", () => {
     const row = page.getByTestId("location-list").locator(".integration-card", { hasText: name }).first();
     await row.getByRole("button", { name: "Edit" }).evaluate((element: HTMLButtonElement) => element.click());
     await expect(createCard.getByTestId("location-save-state")).toContainText("Saved");
+    await expect(createCard.getByTestId("location-visibility-controls")).toBeVisible();
+    await createCard.getByTestId("location-public-visible").click();
     await createCard.getByTestId("location-image-input").setInputFiles({
       name: "location.png",
       mimeType: "image/png",
@@ -56,6 +58,7 @@ test.describe("multi-location operations", () => {
     await createCard.getByTestId("location-name-input").fill(updatedName);
     await page.getByTestId("location-save").evaluate((element: HTMLButtonElement) => element.click());
     await expect(page.getByTestId("location-list")).toContainText(updatedName);
+    await expect(page.getByTestId("location-list").locator(".integration-card", { hasText: updatedName })).toContainText("Eye slashed public");
   });
 
   test("operator can assign a location membership", async ({ page, request }) => {

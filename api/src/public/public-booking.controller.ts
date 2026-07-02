@@ -61,6 +61,8 @@ export class PublicBookingController {
     @Query('serviceId') serviceId?: string,
     @Query('locationId') locationId?: string,
     @Query('staffUserId') staffUserId?: string,
+    @Query('tradeAccountId') tradeAccountId?: string,
+    @Query('customerEmail') customerEmail?: string,
   ) {
     if (!isMarketplaceEnabled()) {
       throw new ServiceUnavailableException('Feature is not enabled.');
@@ -74,6 +76,8 @@ export class PublicBookingController {
       serviceId,
       locationId,
       staffUserId,
+      tradeAccountId,
+      customerEmail,
     });
   }
 

@@ -54,6 +54,12 @@ export class BookingsService {
   ) {}
   private readonly logger = new Logger(BookingsService.name);
 
+  private resolveBookingMode(workflow: { locationFirstScheduling?: boolean; technicianAssignmentRequired?: boolean }) {
+    if (workflow.locationFirstScheduling === false && workflow.technicianAssignmentRequired === true) return 'EMPLOYEE';
+    if (workflow.locationFirstScheduling !== false && workflow.technicianAssignmentRequired === true) return 'HYBRID';
+    return 'LOCATION';
+  }
+
   private normalizeFolderConfig(input: any, index = 0) {
     const key = String(input?.key || input?.displayName || '').trim();
     if (!key) return null;
@@ -150,7 +156,7 @@ export class BookingsService {
   private getBookingWorkflowSettings(settings?: { businessConfigJson?: unknown } | null) {
     const config = settings?.businessConfigJson && typeof settings.businessConfigJson === 'object' ? (settings.businessConfigJson as any) : {};
     const workflow = config.bookingWorkflow && typeof config.bookingWorkflow === 'object' ? config.bookingWorkflow : {};
-    return {
+    const normalized = {
       autoCreateJobFromBooking: workflow.autoCreateJobFromBooking === true,
       autoAssignWorkflow: workflow.autoAssignWorkflow === true,
       manualReviewMode: workflow.manualReviewMode !== false,
@@ -161,6 +167,12 @@ export class BookingsService {
       technicianAssignmentRequired: workflow.technicianAssignmentRequired === true,
       locationRequiredForBooking: workflow.locationRequiredForBooking === true,
     };
+    return {
+      ...normalized,
+      bookingMode: ['LOCATION', 'EMPLOYEE', 'HYBRID'].includes(String(workflow.bookingMode || '').toUpperCase())
+        ? String(workflow.bookingMode).toUpperCase()
+        : this.resolveBookingMode(normalized),
+    };
   }
 
   private hasBookingWorkflowUpdate(dto: UpdateBookingSettingsDto | UpdateBookingProSettingsDto) {
@@ -168,6 +180,7 @@ export class BookingsService {
       typeof dto.autoCreateJobFromBooking === 'boolean' ||
       typeof dto.autoAssignWorkflow === 'boolean' ||
       typeof dto.manualReviewMode === 'boolean' ||
+      typeof dto.bookingMode === 'string' ||
       typeof dto.locationFirstScheduling === 'boolean' ||
       typeof dto.autoPopulateJobSheetFromBooking === 'boolean' ||
       typeof dto.autoCreateInvoiceDraftOnCompletion === 'boolean' ||
@@ -183,8 +196,19 @@ export class BookingsService {
     const settings = await db.tenantSetting.findUnique({ where: { tenantId }, select: { businessConfigJson: true } });
     const config = settings?.businessConfigJson && typeof settings.businessConfigJson === 'object' ? (settings.businessConfigJson as any) : {};
     const currentWorkflow = this.getBookingWorkflowSettings(settings);
+    const mode = ['LOCATION', 'EMPLOYEE', 'HYBRID'].includes(String(dto.bookingMode || '').toUpperCase())
+      ? String(dto.bookingMode).toUpperCase()
+      : null;
+    const modeWorkflow = mode === 'LOCATION'
+      ? { bookingMode: mode, locationFirstScheduling: true, technicianAssignmentRequired: false }
+      : mode === 'EMPLOYEE'
+        ? { bookingMode: mode, locationFirstScheduling: false, technicianAssignmentRequired: true }
+        : mode === 'HYBRID'
+          ? { bookingMode: mode, locationFirstScheduling: true, technicianAssignmentRequired: true }
+          : {};
     const bookingWorkflow = {
       ...currentWorkflow,
+      ...modeWorkflow,
       ...(typeof dto.autoCreateJobFromBooking === 'boolean' ? { autoCreateJobFromBooking: dto.autoCreateJobFromBooking } : {}),
       ...(typeof dto.autoAssignWorkflow === 'boolean' ? { autoAssignWorkflow: dto.autoAssignWorkflow } : {}),
       ...(typeof dto.manualReviewMode === 'boolean' ? { manualReviewMode: dto.manualReviewMode } : {}),
@@ -195,6 +219,7 @@ export class BookingsService {
       ...(typeof dto.technicianAssignmentRequired === 'boolean' ? { technicianAssignmentRequired: dto.technicianAssignmentRequired } : {}),
       ...(typeof dto.locationRequiredForBooking === 'boolean' ? { locationRequiredForBooking: dto.locationRequiredForBooking } : {}),
     };
+    bookingWorkflow.bookingMode = this.resolveBookingMode(bookingWorkflow);
     await db.tenantSetting.update({
       where: { tenantId },
       data: { businessConfigJson: { ...config, bookingWorkflow } },
@@ -203,6 +228,13 @@ export class BookingsService {
 
   private normalizeBookingServiceConfig(input: any) {
     const raw = input && typeof input === 'object' ? input : {};
+    const storedVisibility = ['PUBLIC', 'TRADE', 'INTERNAL'].includes(String(raw.visibility || '').toUpperCase())
+      ? String(raw.visibility).toUpperCase()
+      : 'PUBLIC';
+    const publicVisible = typeof raw.publicVisible === 'boolean' ? raw.publicVisible : storedVisibility === 'PUBLIC';
+    const tradeVisible = typeof raw.tradeVisible === 'boolean' ? raw.tradeVisible : storedVisibility === 'PUBLIC' || storedVisibility === 'TRADE';
+    const privateVisible = typeof raw.privateVisible === 'boolean' ? raw.privateVisible : tradeVisible;
+    const visibility = publicVisible ? 'PUBLIC' : tradeVisible || privateVisible ? 'TRADE' : 'INTERNAL';
     const discountPriceCents = Number(raw.discountPriceCents);
     const depositValue = Number(raw.depositValue);
     const depositType = ['NONE', 'FIXED', 'PERCENTAGE'].includes(String(raw.depositType || '').toUpperCase())
@@ -242,9 +274,10 @@ export class BookingsService {
 
     return {
       category: String(raw.category || 'Services').trim() || 'Services',
-      visibility: ['PUBLIC', 'TRADE', 'INTERNAL'].includes(String(raw.visibility || '').toUpperCase())
-        ? String(raw.visibility).toUpperCase()
-        : 'PUBLIC',
+      visibility,
+      publicVisible,
+      tradeVisible,
+      privateVisible,
       discountPriceCents: Number.isFinite(discountPriceCents) && discountPriceCents >= 0 ? discountPriceCents : null,
       depositType,
       depositValue: Number.isFinite(depositValue) && depositValue >= 0 ? depositValue : 0,
@@ -271,6 +304,9 @@ export class BookingsService {
     return this.normalizeBookingServiceConfig({
       category: dto.category,
       visibility: dto.visibility,
+      publicVisible: dto.publicVisible,
+      tradeVisible: dto.tradeVisible,
+      privateVisible: dto.privateVisible,
       discountPriceCents: dto.discountPriceCents,
       depositType: dto.depositType,
       depositValue: dto.depositValue,
@@ -291,6 +327,25 @@ export class BookingsService {
       requireVehicleRegistration: dto.requireVehicleRegistration,
       requireLockingWheelNut: dto.requireLockingWheelNut,
     });
+  }
+
+  private serviceVisibleForAudience(config: ReturnType<BookingsService['normalizeBookingServiceConfig']>, tradeMatched: boolean) {
+    return tradeMatched ? config.tradeVisible || config.privateVisible : config.publicVisible;
+  }
+
+  private normalizeLocationVisibility(location: any) {
+    const meta = location?.metadataJson && typeof location.metadataJson === 'object' && !Array.isArray(location.metadataJson)
+      ? location.metadataJson
+      : {};
+    const publicVisible = meta.publicVisible !== false;
+    const tradeVisible = meta.tradeVisible !== false;
+    const privateVisible = meta.privateVisible !== false;
+    return { publicVisible, tradeVisible, privateVisible };
+  }
+
+  private locationVisibleForAudience(location: any, tradeMatched: boolean) {
+    const visibility = this.normalizeLocationVisibility(location);
+    return tradeMatched ? visibility.tradeVisible || visibility.privateVisible : visibility.publicVisible;
   }
 
   private getServicePricingSnapshot(service: any, input?: {
@@ -388,6 +443,9 @@ export class BookingsService {
       customerNotes: config.customerNotes,
       category: config.category,
       visibility: config.visibility,
+      publicVisible: config.publicVisible,
+      tradeVisible: config.tradeVisible,
+      privateVisible: config.privateVisible,
       tradeAccountDepositWaived,
       publicBundleEligible: config.publicBundleEligible,
       publicBundleAddOn: config.publicBundleAddOn,
@@ -1480,11 +1538,13 @@ export class BookingsService {
     if (isBookingProV1Enabled()) {
       const proServices = await db.service.findMany({
         where: { companyId: tenantId, isActive: true },
-        select: { id: true },
+        select: { id: true, bookingConfigJson: true },
         orderBy: { name: 'asc' },
       });
       if (proServices.length > 0) {
-        return proServices.map((service: any) => String(service.id));
+        return proServices
+          .filter((service: any) => this.serviceVisibleForAudience(this.normalizeBookingServiceConfig(service.bookingConfigJson), false))
+          .map((service: any) => String(service.id));
       }
     }
 
@@ -1552,6 +1612,8 @@ export class BookingsService {
       serviceId: string;
       locationId?: string;
       staffUserId?: string;
+      tradeAccountId?: string;
+      customerEmail?: string;
       daysAhead?: number;
     },
   ) {
@@ -1564,7 +1626,10 @@ export class BookingsService {
     for (let offset = 1; offset <= daysAhead; offset += 1) {
       const candidate = new Date(Date.UTC(targetDate.getUTCFullYear(), targetDate.getUTCMonth(), targetDate.getUTCDate() + offset));
       const candidateDate = this.formatDateKey(candidate);
-      const slots = await this.getAvailableSlots(token, candidateDate, input.serviceId, input.locationId, input.staffUserId);
+      const slots = await this.getAvailableSlots(token, candidateDate, input.serviceId, input.locationId, input.staffUserId, {
+        tradeAccountId: input.tradeAccountId,
+        customerEmail: input.customerEmail,
+      });
       if (Array.isArray(slots) && slots[0]?.startsAt) {
         return {
           date: candidateDate,
@@ -1692,9 +1757,7 @@ export class BookingsService {
       : [];
     const visibleProServices = proServices.filter((service: any) => {
       const config = this.normalizeBookingServiceConfig(service.bookingConfigJson);
-      if (config.visibility === 'INTERNAL') return false;
-      if (config.visibility === 'TRADE' && !tradeAccountMatch) return false;
-      return true;
+      return this.serviceVisibleForAudience(config, Boolean(tradeAccountMatch));
     });
     const services = proServices.length > 0
       ? visibleProServices.map((service: any) => ({
@@ -1711,7 +1774,7 @@ export class BookingsService {
           where: { tenantId: settings.tenantId, active: true },
           orderBy: { name: 'asc' },
         });
-    const locations = await db.location.findMany({
+    const allLocations = await db.location.findMany({
       where: { companyId: settings.tenantId, isActive: true },
       select: {
         id: true,
@@ -1735,6 +1798,9 @@ export class BookingsService {
       },
       orderBy: { name: 'asc' },
     });
+    const locations = allLocations
+      .filter((location: any) => this.locationVisibleForAudience(location, Boolean(tradeAccountMatch)))
+      .map((location: any) => ({ ...location, ...this.normalizeLocationVisibility(location) }));
     const staff = proEnabled
       ? await db.user.findMany({
           where: { companyId: settings.tenantId, role: { in: ['OWNER', 'ADMIN', 'STAFF', 'TECHNICIAN'] } },
@@ -1819,6 +1885,9 @@ export class BookingsService {
             locationId: service.locationId || null,
             category: this.normalizeBookingServiceConfig(service.bookingConfigJson).category,
             visibility: this.normalizeBookingServiceConfig(service.bookingConfigJson).visibility,
+            publicVisible: this.normalizeBookingServiceConfig(service.bookingConfigJson).publicVisible,
+            tradeVisible: this.normalizeBookingServiceConfig(service.bookingConfigJson).tradeVisible,
+            privateVisible: this.normalizeBookingServiceConfig(service.bookingConfigJson).privateVisible,
             requireCustomerPhone: this.normalizeBookingServiceConfig(service.bookingConfigJson).requireCustomerPhone,
             requireVehicleRegistration: this.normalizeBookingServiceConfig(service.bookingConfigJson).requireVehicleRegistration,
             requireLockingWheelNut: this.normalizeBookingServiceConfig(service.bookingConfigJson).requireLockingWheelNut,
@@ -1856,6 +1925,7 @@ export class BookingsService {
         locationFirstScheduling: bookingWorkflow.locationFirstScheduling,
         locationRequiredForBooking: bookingWorkflow.locationRequiredForBooking,
         providerSelectionEnabled: bookingWorkflow.technicianAssignmentRequired,
+        bookingMode: bookingWorkflow.bookingMode,
       },
       questions: publicQuestions,
       businessHours: hours,
@@ -1872,7 +1942,14 @@ export class BookingsService {
     };
   }
 
-  async getAvailableSlots(token: string, date: string, serviceId: string, locationId?: string, staffUserId?: string) {
+  async getAvailableSlots(
+    token: string,
+    date: string,
+    serviceId: string,
+    locationId?: string,
+    staffUserId?: string,
+    input?: { tradeAccountId?: string; customerEmail?: string },
+  ) {
     const db = this.prisma as any;
     const settings = await db.tenantSetting.findFirst({ where: { bookingPublicToken: token } });
     if (!settings || !settings.bookingPublicEnabled) {
@@ -1899,12 +1976,29 @@ export class BookingsService {
     if (blackout) {
       return [];
     }
+    const tradeAccountMatch = await this.findVerifiedTradeAccountMatch(settings.tenantId, {
+      tradeAccountId: input?.tradeAccountId,
+      email: input?.customerEmail,
+    });
 
     if (isBookingProV1Enabled()) {
       const proService = await db.service.findFirst({
         where: { id: serviceId, companyId: settings.tenantId, isActive: true },
       });
       if (proService) {
+        const config = this.normalizeBookingServiceConfig(proService.bookingConfigJson);
+        if (!this.serviceVisibleForAudience(config, Boolean(tradeAccountMatch))) {
+          return [];
+        }
+        if (locationId) {
+          const location = await db.location.findFirst({
+            where: { id: locationId, companyId: settings.tenantId, isActive: true },
+            select: { id: true, metadataJson: true },
+          });
+          if (!location || !this.locationVisibleForAudience(location, Boolean(tradeAccountMatch))) {
+            return [];
+          }
+        }
         return this.computeProSlots(settings.tenantId, {
           date,
           serviceId,
@@ -1995,6 +2089,8 @@ export class BookingsService {
       serviceId: string;
       locationId?: string;
       staffUserId?: string;
+      tradeAccountId?: string;
+      customerEmail?: string;
     },
   ) {
     const db = this.prisma as any;
@@ -2010,7 +2106,10 @@ export class BookingsService {
       });
     }
 
-    const slots = await this.getAvailableSlots(token, query.date, query.serviceId, query.locationId, query.staffUserId);
+    const slots = await this.getAvailableSlots(token, query.date, query.serviceId, query.locationId, query.staffUserId, {
+      tradeAccountId: query.tradeAccountId,
+      customerEmail: query.customerEmail,
+    });
     const nextAvailable = slots.length
       ? null
       : await this.findNextAvailablePublicSlot(token, {
@@ -2018,6 +2117,8 @@ export class BookingsService {
           serviceId: query.serviceId,
           locationId: query.locationId,
           staffUserId: query.staffUserId,
+          tradeAccountId: query.tradeAccountId,
+          customerEmail: query.customerEmail,
         });
 
     return {
@@ -2068,10 +2169,6 @@ export class BookingsService {
         });
     if (!proService && !legacyService) throw new BadRequestException('Service not found');
     const serviceConfig = proService ? this.normalizeBookingServiceConfig(proService.bookingConfigJson) : null;
-    if (serviceConfig?.visibility === 'INTERNAL') {
-      throw new BadRequestException('Service not found');
-    }
-
     const workspacePaymentCollection = await this.getWorkspacePaymentCollection(settings.tenantId);
     const bookingWorkflow = this.getBookingWorkflowSettings(settings);
     if (bookingWorkflow.locationRequiredForBooking && !dto.locationId) {
@@ -2082,8 +2179,17 @@ export class BookingsService {
       tradeAccountId: dto.tradeAccountId,
       email: dto.customerEmail,
     });
-    if (serviceConfig?.visibility === 'TRADE' && !tradeAccountMatch) {
-      throw new BadRequestException('This service is only available through the trade booking portal');
+    if (serviceConfig && !this.serviceVisibleForAudience(serviceConfig, Boolean(tradeAccountMatch))) {
+      throw new BadRequestException(tradeAccountMatch ? 'Service not found' : 'This service is not available for public booking');
+    }
+    if (dto.locationId) {
+      const selectedLocation = await db.location.findFirst({
+        where: { id: dto.locationId, companyId: settings.tenantId, isActive: true },
+        select: { id: true, metadataJson: true },
+      });
+      if (!selectedLocation || !this.locationVisibleForAudience(selectedLocation, Boolean(tradeAccountMatch))) {
+        throw new BadRequestException(tradeAccountMatch ? 'Location not found' : 'This location is not available for public booking');
+      }
     }
     const configuredQuestions = await db.bookingQuestion.findMany({
       where: { companyId: settings.tenantId, isActive: true },
@@ -2131,6 +2237,9 @@ export class BookingsService {
         const service = lineServiceMap.get(line.serviceId);
         if (!service) throw new BadRequestException('Service not found');
         const config = this.normalizeBookingServiceConfig(service.bookingConfigJson);
+        if (!this.serviceVisibleForAudience(config, Boolean(tradeAccountMatch))) {
+          throw new BadRequestException(`${service.name} is not available for this booking route`);
+        }
         if (publicBundlesEnabled && !config.publicBundleEligible) {
           throw new BadRequestException(`${service.name} is not available for public service bundles`);
         }
@@ -2169,13 +2278,18 @@ export class BookingsService {
         )
       : Number(proService?.durationMinutes ?? legacyService?.durationMinutes ?? 60);
     const endsAt = new Date(startsAt.getTime() + durationMinutes * 60000);
-    const daySlots = await this.getAvailableSlots(token, startsAt.toISOString().slice(0, 10), dto.serviceId, dto.locationId, requestedStaffUserId);
+    const daySlots = await this.getAvailableSlots(token, startsAt.toISOString().slice(0, 10), dto.serviceId, dto.locationId, requestedStaffUserId, {
+      tradeAccountId: dto.tradeAccountId,
+      customerEmail: dto.customerEmail,
+    });
     if (!daySlots.some((slot) => slot.startsAt === startsAt.toISOString())) {
       const nextAvailable = await this.findNextAvailablePublicSlot(token, {
         date: startsAt.toISOString().slice(0, 10),
         serviceId: dto.serviceId,
         locationId: dto.locationId,
         staffUserId: requestedStaffUserId,
+        tradeAccountId: dto.tradeAccountId,
+        customerEmail: dto.customerEmail,
       });
       throw new BadRequestException({
         message: 'That time was just taken. Please choose another available slot.',
@@ -2307,6 +2421,8 @@ export class BookingsService {
           serviceId: dto.serviceId,
           locationId: dto.locationId,
           staffUserId: dto.staffUserId,
+          tradeAccountId: dto.tradeAccountId,
+          customerEmail: dto.customerEmail,
         });
         throw new BadRequestException({
           message: 'That time was just taken. Please choose another available slot.',

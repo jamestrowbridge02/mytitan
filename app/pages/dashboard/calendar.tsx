@@ -1482,14 +1482,14 @@ export default function CalendarPage() {
           <section className="operator-quickRail" data-testid="calendar-click-to-action-rail">
             <div className="operator-actionTile" data-testid="calendar-v1-readonly-status">
               <div className="operator-actionTile__body">
-                <h3>{dragEnabled ? 'Calendar V2 changes gated' : 'Calendar V1 read-only'}</h3>
+                <h3>{dragEnabled ? 'Calendar changes gated' : 'Calendar read-only'}</h3>
                 <p>
                   {dragEnabled
-                    ? 'Read access is provided by Calendar V1. Timing changes stay behind the separate Calendar V2 drag flag.'
+                    ? 'Read access is available now. Timing changes stay behind the separate calendar change flag.'
                     : 'View booking timing, assignment, location, and status without changing production records from this surface.'}
                 </p>
               </div>
-              <span className="button secondary">{dragEnabled ? 'V2 enabled' : 'Read only'}</span>
+              <span className="button secondary">{dragEnabled ? 'Changes gated' : 'Read only'}</span>
             </div>
             <Link className="operator-actionTile" href="/dashboard/bookings?view=today">
               <div className="operator-actionTile__body">

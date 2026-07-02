@@ -37,4 +37,46 @@ test.describe("booking settings ownership", () => {
     expect(settings).not.toHaveProperty("bookingPublicToken");
     expect(settings).not.toHaveProperty("bookingIcsToken");
   });
+
+  test("booking settings use one Bookings label with preview, basis, and eye visibility controls", async ({ page, request }) => {
+    const login = await requestLocalApi(request, "/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: { email: "e2e.operator@mytitan.local", password: "MyTitanE2E!2026" },
+    });
+    expect(login.ok()).toBeTruthy();
+    const auth = await login.json();
+    await requestLocalApi(request, "/bookings/settings", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${String(auth?.token || "")}`,
+        "Content-Type": "application/json",
+      },
+      data: {
+        publicEnabled: true,
+        bookingMode: "LOCATION",
+        businessHours: [1, 2, 3, 4, 5].map((dayOfWeek) => ({
+          dayOfWeek,
+          startMinute: 9 * 60,
+          endMinute: 17 * 60,
+        })),
+      },
+    });
+
+    await installApiProxy(page, request);
+    await loginAs(page, request, "e2e.operator@mytitan.local", "MyTitanE2E!2026");
+    await page.goto("/dashboard/booking/settings", { waitUntil: "networkidle" });
+
+    await expect(page.getByRole("heading", { name: "Bookings" }).first()).toBeVisible();
+    await expect(page.getByTestId("booking-setup-progress")).not.toContainText(/Booking Pro|Booking setup|Calendar V2/i);
+    await expect(page.getByTestId("booking-public-preview")).toContainText(/Open public link|Copy public booking link|Customer preview/i);
+    await expect(page.getByTestId("booking-public-link")).not.toContainText(/\/portal\/booking\/|bookingPublicToken|token=/i);
+    await expect(page.getByTestId("booking-mode-location")).toBeVisible();
+    await expect(page.getByTestId("booking-mode-employee")).toBeVisible();
+    await expect(page.getByTestId("booking-mode-hybrid")).toBeVisible();
+    await expect(page.getByTestId("booking-service-public-visible")).toContainText(/Eye open|Eye slashed/i);
+    await page.getByTestId("booking-service-public-visible").click();
+    await expect(page.getByTestId("booking-service-public-visible")).toContainText("Eye slashed public");
+    await expect(page.getByTestId("booking-service-trade-visible")).toContainText(/trade\/private/i);
+  });
 });

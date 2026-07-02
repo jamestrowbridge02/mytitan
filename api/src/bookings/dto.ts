@@ -67,6 +67,10 @@ export class UpdateBookingSettingsDto {
   manualReviewMode?: boolean;
 
   @IsOptional()
+  @IsIn(['LOCATION', 'EMPLOYEE', 'HYBRID'])
+  bookingMode?: 'LOCATION' | 'EMPLOYEE' | 'HYBRID';
+
+  @IsOptional()
   @IsBoolean()
   locationFirstScheduling?: boolean;
 
@@ -172,6 +176,18 @@ export class UpsertBookingServiceDto {
   @IsOptional()
   @IsIn(['PUBLIC', 'TRADE', 'INTERNAL'])
   visibility?: 'PUBLIC' | 'TRADE' | 'INTERNAL';
+
+  @IsOptional()
+  @IsBoolean()
+  publicVisible?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  tradeVisible?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  privateVisible?: boolean;
 
   @IsString()
   durationMinutes!: string;
@@ -374,6 +390,10 @@ export class UpdateBookingProSettingsDto {
   @IsOptional()
   @IsBoolean()
   manualReviewMode?: boolean;
+
+  @IsOptional()
+  @IsIn(['LOCATION', 'EMPLOYEE', 'HYBRID'])
+  bookingMode?: 'LOCATION' | 'EMPLOYEE' | 'HYBRID';
 
   @IsOptional()
   @IsBoolean()

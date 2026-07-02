@@ -126,7 +126,7 @@ export default function GuidedEverywherePage() {
 
       {action === 'book_appointment' ? (
         <div className="card">
-          <h2 style={{ marginTop: 0 }}>Guided booking setup</h2>
+          <h2 style={{ marginTop: 0 }}>Guided Bookings</h2>
           <label>Customer name<HelpTip text="Optional for first pass. You can add details later." /></label>
           <input className="input" value={booking.customerName} onChange={(e) => setBooking({ ...booking, customerName: e.target.value })} />
           <label>Start time (ISO)<HelpTip text="Use local datetime converted to ISO format." /></label>
@@ -135,7 +135,7 @@ export default function GuidedEverywherePage() {
           <input className="input" placeholder="2026-03-01T10:30:00.000Z" value={booking.endsAt} onChange={(e) => setBooking({ ...booking, endsAt: e.target.value })} />
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="button" type="button" onClick={createBooking}>Book now</button>
-            <Link className="button secondary" href="/dashboard/bookings">Open full booking setup</Link>
+            <Link className="button secondary" href="/dashboard/bookings">Open Bookings</Link>
             <Link className="button secondary" href="/dashboard">Skip</Link>
           </div>
         </div>

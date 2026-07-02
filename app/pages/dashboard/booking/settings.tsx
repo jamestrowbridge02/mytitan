@@ -14,6 +14,7 @@ type BookingSettingsPayload = {
     autoCreateJobFromBooking?: boolean;
     autoAssignWorkflow?: boolean;
     manualReviewMode?: boolean;
+    bookingMode?: "LOCATION" | "EMPLOYEE" | "HYBRID";
     locationFirstScheduling?: boolean;
     autoPopulateJobSheetFromBooking?: boolean;
     autoCreateInvoiceDraftOnCompletion?: boolean;
@@ -164,6 +165,9 @@ type BookingService = {
   locationId?: string | null;
   category?: string | null;
   visibility?: "PUBLIC" | "TRADE" | "INTERNAL";
+  publicVisible?: boolean;
+  tradeVisible?: boolean;
+  privateVisible?: boolean;
   durationMinutes?: number | null;
   standardPriceCents?: number | null;
   priceCents?: number | null;
@@ -201,6 +205,9 @@ type ServiceDraft = {
   locationId: string;
   category: string;
   visibility: "PUBLIC" | "TRADE" | "INTERNAL";
+  publicVisible: boolean;
+  tradeVisible: boolean;
+  privateVisible: boolean;
   durationMinutes: string;
   price: string;
   discountPrice: string;
@@ -233,6 +240,9 @@ const EMPTY_SERVICE_DRAFT: ServiceDraft = {
   locationId: "",
   category: "Services",
   visibility: "PUBLIC",
+  publicVisible: true,
+  tradeVisible: true,
+  privateVisible: true,
   durationMinutes: "60",
   price: "",
   discountPrice: "",
@@ -308,6 +318,9 @@ function formatMoney(value?: number | null) {
 }
 
 function buildServiceDraft(service: BookingService): ServiceDraft {
+  const publicVisible = typeof service.publicVisible === "boolean" ? service.publicVisible : (service.visibility || "PUBLIC") === "PUBLIC";
+  const tradeVisible = typeof service.tradeVisible === "boolean" ? service.tradeVisible : ["PUBLIC", "TRADE"].includes(service.visibility || "PUBLIC");
+  const privateVisible = typeof service.privateVisible === "boolean" ? service.privateVisible : tradeVisible;
   return {
     id: service.id,
     name: service.name || "",
@@ -318,6 +331,9 @@ function buildServiceDraft(service: BookingService): ServiceDraft {
     locationId: service.locationId || "",
     category: service.category || "Services",
     visibility: service.visibility || "PUBLIC",
+    publicVisible,
+    tradeVisible,
+    privateVisible,
     durationMinutes: String(service.durationMinutes || 60),
     price: centsToMoney(service.standardPriceCents ?? service.priceCents ?? 0),
     discountPrice: centsToMoney(service.discountPriceCents),
@@ -379,6 +395,45 @@ export default function BookingProSettingsPage() {
   const [savingArea, setSavingArea] = useState("");
   const { notice, showError, showSuccess, clearNotice } = useOperatorNotice();
 
+  const bookingMode = useMemo(() => {
+    if (!locationFirstScheduling && technicianAssignmentRequired) return "EMPLOYEE";
+    if (locationFirstScheduling && technicianAssignmentRequired) return "HYBRID";
+    return "LOCATION";
+  }, [locationFirstScheduling, technicianAssignmentRequired]);
+
+  function setBookingMode(mode: "LOCATION" | "EMPLOYEE" | "HYBRID") {
+    if (mode === "LOCATION") {
+      setLocationFirstScheduling(true);
+      setTechnicianAssignmentRequired(false);
+      return;
+    }
+    if (mode === "EMPLOYEE") {
+      setLocationFirstScheduling(false);
+      setTechnicianAssignmentRequired(true);
+      return;
+    }
+    setLocationFirstScheduling(true);
+    setTechnicianAssignmentRequired(true);
+  }
+
+  function setServiceAudienceVisibility(key: "publicVisible" | "tradeVisible", visible: boolean) {
+    setServiceDraft((current) => {
+      const next = {
+        ...current,
+        [key]: visible,
+      };
+      if (key === "publicVisible" && visible) {
+        next.tradeVisible = true;
+        next.privateVisible = true;
+      }
+      if (key === "tradeVisible") {
+        next.privateVisible = visible;
+      }
+      const visibility = next.publicVisible ? "PUBLIC" : next.tradeVisible || next.privateVisible ? "TRADE" : "INTERNAL";
+      return { ...next, visibility };
+    });
+  }
+
   async function load() {
     if (!enabled) return;
     try {
@@ -414,7 +469,7 @@ export default function BookingProSettingsPage() {
       setPreferredProvider(String(data?.paymentCollection?.customerCollection?.preferredProvider || "MANUAL"));
       setRequestedProviders(Array.isArray(data?.paymentCollection?.customerCollection?.requestedProviders) ? data.paymentCollection!.customerCollection!.requestedProviders! : []);
     } catch (err: any) {
-      showError(err?.message || "Failed to load booking setup");
+      showError(err?.message || "Failed to load Bookings");
     }
   }
 
@@ -510,6 +565,7 @@ export default function BookingProSettingsPage() {
           autoCreateJobFromBooking,
           autoAssignWorkflow,
           manualReviewMode,
+          bookingMode,
           locationFirstScheduling,
           autoPopulateJobSheetFromBooking,
           autoCreateInvoiceDraftOnCompletion,
@@ -584,6 +640,9 @@ export default function BookingProSettingsPage() {
         locationId: serviceDraft.locationId || undefined,
         category: serviceDraft.category.trim() || "Services",
         visibility: serviceDraft.visibility,
+        publicVisible: serviceDraft.publicVisible,
+        tradeVisible: serviceDraft.tradeVisible,
+        privateVisible: serviceDraft.privateVisible,
         durationMinutes: serviceDraft.durationMinutes || "60",
         priceCents: moneyToCents(serviceDraft.price) || "0",
         discountPriceCents: moneyToCents(serviceDraft.discountPrice) || undefined,
@@ -779,8 +838,8 @@ export default function BookingProSettingsPage() {
     return (
       <DashboardShell>
         <div className="card">
-          <h1>Booking Setup</h1>
-          <p className="muted" style={{ marginBottom: 0 }}>Feature is disabled.</p>
+          <h1>Bookings</h1>
+          <p className="muted" style={{ marginBottom: 0 }}>Bookings are not enabled for this workspace.</p>
         </div>
       </DashboardShell>
     );
@@ -792,10 +851,10 @@ export default function BookingProSettingsPage() {
         <section className="card operator-page booking-setup-hero" data-testid="booking-setup-progress">
           <div className="operator-page__hero">
             <div className="operator-page__copy">
-              <div className="operator-page__eyebrow">Booking setup</div>
-              <h1 className="operator-page__title">Booking pages that feel ready to share</h1>
+              <div className="operator-page__eyebrow">Bookings</div>
+              <h1 className="operator-page__title">Bookings</h1>
               <p className="muted operator-page__subtitle">
-                Move from link to live customer experience: publish the page, add services, set hours, choose payment guidance, then test the journey.
+                Publish the customer booking journey, choose how availability is calculated, and control what public and trade visitors can book.
               </p>
             </div>
             <div className="booking-setup-hero__next">
@@ -806,10 +865,10 @@ export default function BookingProSettingsPage() {
                   rel={nextSetupStep.href.startsWith('http') ? 'noreferrer' : undefined}
                   style={{ color: 'inherit', textDecoration: 'none' }}
                 >
-                  <strong>{nextSetupStep?.title || 'Booking setup'}</strong>
+                  <strong>{nextSetupStep?.title || 'Bookings'}</strong>
                 </Link>
               ) : (
-                <strong>{nextSetupStep?.title || 'Booking setup'}</strong>
+                <strong>{nextSetupStep?.title || 'Bookings'}</strong>
               )}
               <p className="muted">{nextSetupStep?.detail || 'Review your public booking page.'}</p>
               {nextSetupStep?.href ? (
@@ -912,21 +971,21 @@ export default function BookingProSettingsPage() {
             <div>
               <div className="operator-kicker">Your booking link</div>
               <div className="operator-row__subtitle" style={{ marginTop: 6 }} data-testid="booking-public-link">
-                {settings?.publicUrl || "Enable public bookings to generate your live link."}
+                {settings?.publicUrl ? "Public booking link is ready. Use the buttons below to preview, open, or copy it." : "Enable public bookings to generate your live link."}
               </div>
               <p className="operator-note" style={{ marginTop: 8 }}>
                 Add this link to your website booking button. Customers choose a location, service, and real open time before sending a booking request.
               </p>
               {settings?.publicUrl ? (
-                <div className="operator-inline-actions" style={{ marginTop: 12 }}>
+                <div className="operator-inline-actions" style={{ marginTop: 12 }} data-testid="booking-public-preview">
                   <Link className="button" href={settings.publicUrl} target="_blank" rel="noreferrer" data-testid="open-public-booking-page">
-                    Open public booking page
+                    Open public link
                   </Link>
                   <button className="button secondary" type="button" onClick={() => void copyLink()} data-testid="copy-public-booking-link">
                     Copy public booking link
                   </button>
-                  <Link className="button secondary" href={settings.publicUrl} target="_blank" rel="noreferrer">
-                    Preview public booking page
+                  <Link className="button secondary" href={settings.publicUrl} target="_blank" rel="noreferrer" data-testid="preview-public-booking-page">
+                    Customer preview
                   </Link>
                 </div>
               ) : null}
@@ -942,6 +1001,23 @@ export default function BookingProSettingsPage() {
             <div className="operator-guidance" data-testid="booking-workflow-controls">
               <strong>Workflow after a booking</strong>
               <p>Choose how bookings move into work. Location is first; technician assignment stays optional unless you deliberately require it.</p>
+              <div className="operator-inline-actions" style={{ marginTop: 10 }} data-testid="booking-mode-controls" aria-label="Booking basis">
+                {([
+                  ["LOCATION", "Location-based"],
+                  ["EMPLOYEE", "Employee-based"],
+                  ["HYBRID", "Hybrid"],
+                ] as const).map(([mode, label]) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    className={`button ${bookingMode === mode ? "" : "secondary"}`}
+                    data-testid={`booking-mode-${mode.toLowerCase()}`}
+                    onClick={() => setBookingMode(mode)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
               <div className="operator-formGrid" style={{ marginTop: 10 }}>
                 <label className="toggle-row">
                   <input type="checkbox" checked={autoCreateJobFromBooking} onChange={(event) => setAutoCreateJobFromBooking(event.target.checked)} />
@@ -955,10 +1031,7 @@ export default function BookingProSettingsPage() {
                   <input type="checkbox" checked={manualReviewMode} onChange={(event) => setManualReviewMode(event.target.checked)} />
                   Keep manual review available for exceptions
                 </label>
-                <label className="toggle-row">
-                  <input type="checkbox" checked={locationFirstScheduling} onChange={(event) => setLocationFirstScheduling(event.target.checked)} />
-                  Schedule by location first, then technician
-                </label>
+                <div className="operator-note">Current booking basis: {bookingMode === "LOCATION" ? "location-based" : bookingMode === "EMPLOYEE" ? "employee/technician-based" : "hybrid"}.</div>
                 <label className="toggle-row">
                   <input type="checkbox" checked={autoPopulateJobSheetFromBooking} onChange={(event) => setAutoPopulateJobSheetFromBooking(event.target.checked)} />
                   Create job sheet automatically from booking data
@@ -1377,7 +1450,7 @@ export default function BookingProSettingsPage() {
               <div className="operator-row__main">
                 <div className="operator-row__title">Public service bundles</div>
                 <div className="operator-row__subtitle">
-                  Let customers add eligible services to one booking. Off keeps the public page on the existing single-service flow.
+                  Let customers add eligible services to one booking. Off keeps each public booking focused on one selected service.
                 </div>
               </div>
               <div className="operator-row__actions">
@@ -1412,13 +1485,31 @@ export default function BookingProSettingsPage() {
                   {!folders.some((folder) => folder.key === serviceDraft.category) ? <option value={serviceDraft.category}>{serviceDraft.category}</option> : null}
                 </select>
               </div>
-              <div>
+              <div data-testid="booking-service-visibility-controls">
                 <label>Booking visibility</label>
-                <select className="input" value={serviceDraft.visibility} onChange={(event) => setServiceDraft((current) => ({ ...current, visibility: event.target.value as ServiceDraft["visibility"] }))}>
-                  <option value="PUBLIC">Public and trade</option>
-                  <option value="TRADE">Trade portal only</option>
-                  <option value="INTERNAL">Internal only</option>
-                </select>
+                <div className="operator-inline-actions" style={{ marginTop: 8 }}>
+                  <button
+                    className={`button ${serviceDraft.publicVisible ? "" : "secondary"}`}
+                    type="button"
+                    data-testid="booking-service-public-visible"
+                    aria-pressed={serviceDraft.publicVisible}
+                    onClick={() => setServiceAudienceVisibility("publicVisible", !serviceDraft.publicVisible)}
+                  >
+                    {serviceDraft.publicVisible ? "Eye open" : "Eye slashed"} public
+                  </button>
+                  <button
+                    className={`button ${serviceDraft.tradeVisible ? "" : "secondary"}`}
+                    type="button"
+                    data-testid="booking-service-trade-visible"
+                    aria-pressed={serviceDraft.tradeVisible}
+                    onClick={() => setServiceAudienceVisibility("tradeVisible", !serviceDraft.tradeVisible)}
+                  >
+                    {serviceDraft.tradeVisible ? "Eye open" : "Eye slashed"} trade/private
+                  </button>
+                </div>
+                <p className="operator-note" style={{ marginTop: 8 }}>
+                  Public customers only see public-visible services. Trade/private routes can still use trade-visible services.
+                </p>
               </div>
               <div>
                 <label>Location</label>
@@ -1791,7 +1882,7 @@ export default function BookingProSettingsPage() {
                   : 'Workspace owners and admins are the fallback for internal alerts'}
               </div>
               <p className="operator-note" style={{ marginTop: 8 }}>
-                Internal updates are managed in Email & Notifications settings so booking setup can stay focused on the public booking flow.
+                Internal updates are managed in Email & Notifications settings so Bookings can stay focused on the public booking flow.
               </p>
             </div>
             <div className="operator-inline-actions">

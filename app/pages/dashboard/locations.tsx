@@ -27,6 +27,9 @@ function createLocationForm(defaults?: GeoDefaults | null) {
     slotMinutes: 30,
     arrivalInstructions: '',
     parkingInstructions: '',
+    publicVisible: true,
+    tradeVisible: true,
+    privateVisible: true,
     metadataJson: {} as Record<string, unknown>,
     defaultAssigneeId: '',
     staffUserIds: [] as string[],
@@ -136,6 +139,9 @@ export default function LocationsPage() {
         slotMinutes: Math.max(5, Number(form.slotMinutes || 30)),
         arrivalInstructions: normalize(form.arrivalInstructions) || null,
         parkingInstructions: normalize(form.parkingInstructions) || null,
+        publicVisible: form.publicVisible !== false,
+        tradeVisible: form.tradeVisible !== false,
+        privateVisible: form.privateVisible !== false,
       },
     };
   }
@@ -367,6 +373,9 @@ export default function LocationsPage() {
       slotMinutes: Number(metadata.slotMinutes || 30),
       arrivalInstructions: String(metadata.arrivalInstructions || ''),
       parkingInstructions: String(metadata.parkingInstructions || ''),
+      publicVisible: metadata.publicVisible !== false,
+      tradeVisible: metadata.tradeVisible !== false,
+      privateVisible: metadata.privateVisible !== false,
       metadataJson: metadata,
       defaultAssigneeId: location.defaultAssigneeId || '',
       staffUserIds: Array.isArray(location.memberships) ? location.memberships.filter((membership: any) => membership.active).map((membership: any) => membership.userId) : [],
@@ -549,6 +558,30 @@ export default function LocationsPage() {
               <input className="input" type="number" min={0} value={form.bookingCutoffMins} onChange={(e) => setForm({ ...form, bookingCutoffMins: Number(e.target.value || 0) })} />
               <label>Booking slot length mins</label>
               <input className="input" type="number" min={5} step={5} value={form.slotMinutes} onChange={(e) => setForm({ ...form, slotMinutes: Number(e.target.value || 30) })} />
+              <label>Booking visibility</label>
+              <div data-testid="location-visibility-controls" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button
+                  className={`button ${form.publicVisible !== false ? '' : 'secondary'}`}
+                  type="button"
+                  data-testid="location-public-visible"
+                  aria-pressed={form.publicVisible !== false}
+                  onClick={() => setForm({ ...form, publicVisible: !(form.publicVisible !== false) })}
+                >
+                  {form.publicVisible !== false ? 'Eye open' : 'Eye slashed'} public
+                </button>
+                <button
+                  className={`button ${form.tradeVisible !== false ? '' : 'secondary'}`}
+                  type="button"
+                  data-testid="location-trade-visible"
+                  aria-pressed={form.tradeVisible !== false}
+                  onClick={() => {
+                    const nextVisible = !(form.tradeVisible !== false);
+                    setForm({ ...form, tradeVisible: nextVisible, privateVisible: nextVisible });
+                  }}
+                >
+                  {form.tradeVisible !== false ? 'Eye open' : 'Eye slashed'} trade/private
+                </button>
+              </div>
               <label>Arrival instructions</label>
               <textarea className="input" value={form.arrivalInstructions} onChange={(e) => setForm({ ...form, arrivalInstructions: e.target.value })} />
               <label>Parking instructions</label>
@@ -689,6 +722,9 @@ export default function LocationsPage() {
                     TZ: {loc.timezone || '—'} • Lead: {Number(loc.bookingLeadTimeMins || 0)} mins • Staff: {loc.memberships?.filter((membership: any) => membership.active).length || 0}
                   </p>
                 ) : null}
+                <p className="muted" style={{ margin: '6px 0 0 0' }} data-testid="location-visibility-state">
+                  {(loc.metadataJson?.publicVisible === false ? 'Eye slashed public' : 'Eye open public')} • {(loc.metadataJson?.tradeVisible === false ? 'Eye slashed trade/private' : 'Eye open trade/private')}
+                </p>
               </div>
               <div className="integration-actions">
                 <span className={`badge ${loc.isActive ? '' : 'warn'}`}>{loc.isActive ? 'Active' : 'Archived'}</span>

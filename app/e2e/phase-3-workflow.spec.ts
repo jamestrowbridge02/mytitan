@@ -74,7 +74,9 @@ test.describe("Phase 3 workflow excellence", () => {
     await expect(controls).toBeVisible();
     await expect(controls).toContainText("Create the job automatically after confirmation");
     await expect(controls).toContainText("Auto-assign using location and service rules");
-    await expect(controls).toContainText("Schedule by location first, then technician");
+    await expect(controls).toContainText("Location-based");
+    await expect(controls).toContainText("Employee-based");
+    await expect(controls).toContainText("Hybrid");
     await expect(page.getByText("External monitor intentionally deferred")).toHaveCount(0);
     await expect(page.getByText("Platform health")).toHaveCount(0);
   });

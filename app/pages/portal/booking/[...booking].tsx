@@ -353,7 +353,8 @@ export default function PublicBookingJourneyPage() {
     () => availableServices.filter((service) => !selectedCategory || String(service.category || "Services") === selectedCategory),
     [availableServices, selectedCategory],
   );
-  const locationReady = locations.length === 0 || Boolean(locationId);
+  const locationStepRequired = bookingWorkflow.locationRequiredForBooking || bookingWorkflow.locationFirstScheduling !== false;
+  const locationReady = !locationStepRequired || locations.length === 0 || Boolean(locationId);
   const displayTimezone = selectedLocation?.timezone || availabilityTimezone || tenant?.timezone || "UTC";
   const selectedOptionsTotalCents = computeSelectedOptionsTotal(selectedServiceDetails, selectedOptions);
   const bundleBaseTotalCents = selectedBundleDetails.reduce(
@@ -578,6 +579,8 @@ export default function PublicBookingJourneyPage() {
       const params = new URLSearchParams({ date: weekDate, serviceId: availabilityServiceId });
       if (locationId) params.set("locationId", locationId);
       if (bookingWorkflow.providerSelectionEnabled && selectedStaff) params.set("staffUserId", selectedStaff);
+      if (queryTradeAccountIdValue) params.set("tradeAccountId", queryTradeAccountIdValue);
+      if (queryCustomerEmail.trim()) params.set("customerEmail", queryCustomerEmail.trim());
       const res = await fetch(`${API_BASE}/public/booking/${tokenValue}/slots?${params.toString()}`);
       const data = await res.json().catch(() => ({ slots: [] }));
       if (!res.ok) throw new Error("We could not check live availability right now.");
@@ -598,10 +601,14 @@ export default function PublicBookingJourneyPage() {
         setError("We could not check live availability right now. Try again in a moment.");
       })
       .finally(() => setLoadingSlots(false));
-  }, [bookingWorkflow.providerSelectionEnabled, date, locationId, primaryBundleService?.id, publicBundlesEnabled, routeStage, selectedService, selectedStaff, tokenValue]);
+  }, [bookingWorkflow.providerSelectionEnabled, date, locationId, primaryBundleService?.id, publicBundlesEnabled, queryCustomerEmail, queryTradeAccountIdValue, routeStage, selectedService, selectedStaff, tokenValue]);
 
   useEffect(() => {
     if (loadingConfig || !tokenValue) return;
+    if (routeStage === "location" && !locationStepRequired) {
+      navigateToStage("category");
+      return;
+    }
     if (routeStage !== "location" && !locationReady) {
       navigateToStage("location");
       return;
@@ -618,7 +625,7 @@ export default function PublicBookingJourneyPage() {
       navigateToStage("availability");
       return;
     }
-  }, [loadingConfig, locationReady, routeStage, selectedCategory, selectionReady, slotReady, tokenValue]);
+  }, [loadingConfig, locationReady, locationStepRequired, routeStage, selectedCategory, selectionReady, slotReady, tokenValue]);
 
   function toggleOption(key: string, checked: boolean) {
     setSelectedOptions((current) => {

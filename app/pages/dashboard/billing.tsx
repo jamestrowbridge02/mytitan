@@ -1349,14 +1349,14 @@ export default function BillingPage() {
                     <div>
                       <strong>Settings live elsewhere</strong>
                       <p className="muted" style={{ margin: '6px 0 0 0' }}>
-                        Use Billing for the current MyTitan commercial state. Change customer sender setup in Settings and payment defaults in Booking setup.
+                        Use Billing for the current MyTitan commercial state. Change customer sender setup in Settings and payment defaults in Bookings.
                       </p>
                     </div>
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <Link className="button secondary" href="/dashboard/settings?tab=messages">Open Email settings</Link>
-                  <Link className="button secondary" href="/dashboard/booking/settings">Open Booking setup</Link>
+                  <Link className="button secondary" href="/dashboard/booking/settings">Open Bookings</Link>
                 </div>
               </section>
 

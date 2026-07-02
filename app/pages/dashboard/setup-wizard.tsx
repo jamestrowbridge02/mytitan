@@ -642,7 +642,7 @@ export default function SetupWizard() {
           <h2>You&apos;re ready</h2>
           <p className="muted">Your workspace basics are ready. Now run the first full path: create or receive the booking, complete the job, send the result, and follow up for payment.</p>
           <div style={{ display: "grid", gap: 12 }}>
-            <Link className="button" href="/dashboard/booking/settings">Open booking setup</Link>
+            <Link className="button" href="/dashboard/booking/settings">Open Bookings</Link>
             <Link className="button secondary" href="/dashboard/jobs/new?guided=1">Create your first job</Link>
             <Link className="button secondary" href="/dashboard/work">Open work queue</Link>
             <Link className="button secondary" href="/dashboard/jobs">Open jobs workspace</Link>

@@ -491,7 +491,7 @@ export default function SettingsOperationsPage() {
         state: bookingSettings?.publicUrl && bookingSettings?.publicEnabled ? "ready" : "needs_setup",
         detail: bookingSettings?.publicUrl && bookingSettings?.publicEnabled ? "A public booking route is ready to share once services and hours are confirmed." : "Publish the booking page from Settings before sharing it externally.",
         href: "/dashboard/booking/settings",
-        action: "Manage booking setup",
+        action: "Manage Bookings",
       },
       {
         key: "backup",
@@ -636,7 +636,7 @@ export default function SettingsOperationsPage() {
           actions={[
             { label: "Workspace settings", href: "/dashboard/settings", variant: "secondary" },
             { label: "Manage notifications", href: "/dashboard/settings?tab=messages", variant: "secondary" },
-            { label: "Manage booking setup", href: "/dashboard/booking/settings" },
+            { label: "Manage Bookings", href: "/dashboard/booking/settings" },
           ]}
           stats={canViewPlatformDiagnostics ? [
             { label: canViewPlatformDiagnostics ? "Health score" : "Business readiness", value: canViewPlatformDiagnostics ? String(monitoring?.overall.score || 0) : String(readinessRows.length), hint: canViewPlatformDiagnostics ? monitoring?.overall.summary || "Recent internal checks" : "Tenant business setup checks only" },

@@ -50,7 +50,7 @@ const supportPlaybooks = [
   {
     key: "calendar-not-updating",
     title: "Calendar not updating",
-    symptoms: "Calendar V2 does not show moved, cancelled, or newly confirmed work.",
+    symptoms: "Calendar does not show moved, cancelled, or newly confirmed work.",
     checks: "Check operational refresh, booking mutation event, location scope, and browser cache state.",
     repair: "Run safe refresh and verify the booking source record before changing data.",
     escalation: "Escalate to Scheduling with affected date, location, and booking id.",

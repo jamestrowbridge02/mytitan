@@ -202,7 +202,7 @@ export default function BookingProCalendarPage() {
   };
 
   if (!enabled) {
-    return <DashboardShell><div className="card"><h1>Booking Pro Calendar</h1><p className="muted">Feature is disabled.</p></div></DashboardShell>;
+    return <DashboardShell><div className="card"><h1>Booking Calendar</h1><p className="muted">Bookings are not enabled for this workspace.</p></div></DashboardShell>;
   }
 
   return (
