@@ -56,6 +56,9 @@ describe_url_check() {
 app_url="$(read_env_value APP_PUBLIC_URL 2>/dev/null || true)"
 api_url="$(read_env_value API_PUBLIC_URL 2>/dev/null || true)"
 marketing_url="$(read_env_value MARKETING_PUBLIC_URL 2>/dev/null || true)"
+app_url="${app_url:-https://app.mytitan.co.uk}"
+api_url="${api_url:-https://api.mytitan.co.uk}"
+marketing_url="${marketing_url:-https://mytitan.co.uk}"
 if [[ -z "${marketing_url}" && -n "${app_url}" ]]; then
   marketing_url="$(printf '%s' "${app_url}" | sed -E 's#://app\.#://#')"
 fi
@@ -77,19 +80,34 @@ if command -v systemctl >/dev/null 2>&1; then
   fi
 fi
 
+app_check_status="$(check_url "${app_url%/}/login")"
+api_check_status="$(check_url "${api_url%/}/health")"
+marketing_check_status="$(check_url "${marketing_url%/}")"
+if [[ "${nginx_status}" == "unknown" && "${app_check_status}" == "ready" && "${api_check_status}" == "ready" && "${marketing_check_status}" == "ready" ]]; then
+  nginx_status="ready"
+  nginx_detail="Public gateway checks for mytitan.co.uk, app.mytitan.co.uk, and api.mytitan.co.uk/health are reachable."
+fi
+
 tls_status="unknown"
 tls_detail="APP_PUBLIC_URL is not configured."
 tls_expiry="unknown"
-if [[ -n "${app_url}" ]]; then
-  app_host="$(url_host "${app_url}")"
-  tls_expiry="$( (openssl s_client -connect "${app_host}:443" -servername "${app_host}" </dev/null 2>/dev/null || true) | openssl x509 -noout -enddate 2>/dev/null | sed 's/^notAfter=//' || true)"
-  if [[ -n "${tls_expiry}" ]]; then
+tls_hosts=()
+for tls_url in "${marketing_url}" "${app_url}" "${api_url}"; do
+  tls_host="$(url_host "${tls_url}")"
+  [[ -n "${tls_host}" ]] && tls_hosts+=("${tls_host}")
+done
+tls_expiries=()
+for tls_host in "${tls_hosts[@]}"; do
+  expiry="$( (openssl s_client -connect "${tls_host}:443" -servername "${tls_host}" </dev/null 2>/dev/null || true) | openssl x509 -noout -enddate 2>/dev/null | sed 's/^notAfter=//' || true)"
+  [[ -n "${expiry}" ]] && tls_expiries+=("${tls_host}=${expiry}")
+done
+if [[ "${#tls_expiries[@]}" -gt 0 ]]; then
     tls_status="ready"
-    tls_detail="The public app TLS certificate returned an expiry date."
-  else
-    tls_status="unknown"
-    tls_detail="Could not read the public app TLS certificate expiry."
-  fi
+    tls_expiry="$(IFS='; '; printf '%s' "${tls_expiries[*]}")"
+    tls_detail="Public TLS certificate expiry was read for ${#tls_expiries[@]} host(s)."
+else
+  tls_status="unknown"
+  tls_detail="Could not read public TLS certificate expiry for mytitan.co.uk, app.mytitan.co.uk, or api.mytitan.co.uk."
 fi
 
 external_monitor_status="not_configured"
@@ -125,9 +143,12 @@ fi
 
 echo "STATUS:ready"
 echo "DETAIL:Host-visible public URL, nginx, and TLS checks ran without exposing secrets."
-describe_url_check "${app_url%/}/login" "APP"
-describe_url_check "${api_url%/}/health" "API"
-describe_url_check "${marketing_url%/}" "MARKETING"
+echo "APP_STATUS:${app_check_status}"
+echo "APP_URL:${app_url%/}/login"
+echo "API_STATUS:${api_check_status}"
+echo "API_URL:${api_url%/}/health"
+echo "MARKETING_STATUS:${marketing_check_status}"
+echo "MARKETING_URL:${marketing_url%/}"
 echo "NGINX_STATUS:${nginx_status}"
 echo "NGINX_DETAIL:${nginx_detail}"
 echo "TLS_STATUS:${tls_status}"

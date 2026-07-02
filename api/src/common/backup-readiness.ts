@@ -3,6 +3,7 @@ import { readHostStatusScript, type HostStatusSnapshot } from './host-status';
 export type BackupReadinessSnapshot = HostStatusSnapshot & {
   lastBackupAt: string | null;
   lastBackupArtifact: string | null;
+  lastBackupSizeBytes: number | null;
   lastRestoreDrillAt: string | null;
   scheduleStatus: string | null;
   scheduleDetail: string | null;
@@ -20,6 +21,7 @@ export function getBackupReadinessSnapshot(): BackupReadinessSnapshot {
     ...snapshot,
     lastBackupAt: snapshot.values.LAST_BACKUP_AT || null,
     lastBackupArtifact: snapshot.values.LAST_BACKUP_ARTIFACT || null,
+    lastBackupSizeBytes: Number.isFinite(Number(snapshot.values.LAST_BACKUP_SIZE_BYTES)) ? Number(snapshot.values.LAST_BACKUP_SIZE_BYTES) : null,
     lastRestoreDrillAt: snapshot.values.LAST_RESTORE_DRILL_AT || null,
     scheduleStatus: snapshot.values.SCHEDULE_STATUS || null,
     scheduleDetail: snapshot.values.SCHEDULE_DETAIL || null,

@@ -29,6 +29,7 @@ fi
 latest_backup_epoch="$(stat -c %Y "${latest_backup}")"
 latest_backup_at="$(date -u -d "@${latest_backup_epoch}" +%Y-%m-%dT%H:%M:%SZ)"
 latest_backup_name="$(basename "${latest_backup}")"
+latest_backup_size_bytes="$(stat -c %s "${latest_backup}")"
 backup_age_seconds=$((NOW_EPOCH - latest_backup_epoch))
 
 schedule_status="needs_schedule"
@@ -103,6 +104,7 @@ fi
 
 echo "LAST_BACKUP_AT:${latest_backup_at}"
 echo "LAST_BACKUP_ARTIFACT:${latest_backup_name}"
+echo "LAST_BACKUP_SIZE_BYTES:${latest_backup_size_bytes}"
 echo "LAST_BACKUP_MARKER_AT:${marker_at:-unknown}"
 echo "SCHEDULE_STATUS:${schedule_status}"
 echo "SCHEDULE_DETAIL:${schedule_detail}"

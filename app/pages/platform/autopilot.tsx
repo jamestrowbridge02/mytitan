@@ -19,6 +19,7 @@ type AutopilotCard = {
   responseTimeMs?: number | null;
   availabilityPercentage?: number;
   availabilityRole?: "runtime_required" | "operational_readiness" | "optional_external";
+  evidence?: Record<string, any>;
 };
 
 const supportPlaybooks = [
@@ -342,9 +343,31 @@ function HealthCard({ card }: { card?: AutopilotCard }) {
       <p className="muted">{card.detail}</p>
       {card.impact ? <p><strong>Impact:</strong> {card.impact}</p> : null}
       {card.nextAction ? <p><strong>Next action:</strong> {card.nextAction}</p> : null}
+      <EvidenceList evidence={card.evidence} />
       <p className="muted">Last checked: {formatDate(card.checkedAt)}{card.responseTimeMs != null ? ` · ${card.responseTimeMs} ms` : ""}{card.availabilityPercentage != null ? ` · ${card.availabilityPercentage}% available` : ""}</p>
     </article>
   );
+}
+
+function EvidenceList({ evidence }: { evidence?: Record<string, any> }) {
+  if (!evidence || !Object.keys(evidence).length) return null;
+  return (
+    <div className="platform-admin-card-stack">
+      {Object.entries(evidence).map(([key, value]) => (
+        <p className="muted" key={key}><strong>{key.replace(/([A-Z])/g, " $1").replace(/_/g, " ")}:</strong> {formatEvidenceValue(value)}</p>
+      ))}
+    </div>
+  );
+}
+
+function formatEvidenceValue(value: any): string {
+  if (value == null || value === "") return "not available";
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) return value.map(formatEvidenceValue).join(", ");
+  if (typeof value === "object") {
+    return Object.entries(value).map(([key, nested]) => `${key}=${formatEvidenceValue(nested)}`).join("; ");
+  }
+  return String(value);
 }
 
 function Metric({ label, value }: { label: string; value: string }) {

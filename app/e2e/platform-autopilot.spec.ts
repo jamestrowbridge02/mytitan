@@ -59,6 +59,65 @@ test.describe("platform Autopilot", () => {
     }));
     expect(calculation.denominator).toBe(7);
     expect(body.monitoring?.externalMonitoring?.status || "not_configured").toMatch(/not_configured|configured|verifying|ready|healthy|degraded|unknown/);
+    expect(calculation.requiredKeys).not.toContain("external_uptime_monitor");
+    expect(calculation.excludedKeys).toEqual(expect.arrayContaining(["scheduler", "backups", "restore-drill", "billing", "job-packs"]));
+    expect(String(body.monitoring?.externalMonitoring?.summary || "")).toMatch(/does not replace it|External uptime monitoring/i);
+  });
+
+  test("runtime diagnostics expose Redis and gateway evidence without secrets", async ({ request }) => {
+    const token = await apiLogin(request, fixtureRefs.platformAdminEmail, fixtureRefs.platformAdminPassword);
+    const response = await requestLocalApi(request, "/admin/platform/autopilot?force=1", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(response.ok()).toBeTruthy();
+    const body = await response.json();
+    const services = new Map((body.monitoring?.services || []).map((row: any) => [row.key, row]));
+    const redis = services.get("redis") as any;
+    expect(redis).toEqual(expect.objectContaining({
+      detail: expect.stringMatching(/PONG|Redis/i),
+      responseTimeMs: expect.any(Number),
+    }));
+    if (redis?.state === "healthy") {
+      expect(redis.evidence).toEqual(expect.objectContaining({
+        response: "PONG",
+        latencyMs: expect.any(Number),
+        lastChecked: expect.any(String),
+      }));
+    }
+    expect(services.get("web-gateway")).toEqual(expect.objectContaining({
+      evidence: expect.objectContaining({
+        app: expect.any(Object),
+        api: expect.any(Object),
+        marketing: expect.any(Object),
+      }),
+    }));
+    const tls = services.get("tls") as any;
+    expect(tls?.evidence).toHaveProperty("tlsStatus");
+    expect(JSON.stringify(body)).not.toMatch(/sk_live_|whsec_|bookingPublicToken|smtpPasswordEncrypted|platformSecretEncrypted|webhookSecretEncrypted/);
+  });
+
+  test("Autopilot sentinels report booking and trade blockers with safe actions", async ({ request }) => {
+    const token = await apiLogin(request, fixtureRefs.platformAdminEmail, fixtureRefs.platformAdminPassword);
+    const run = await requestLocalApi(request, "/admin/platform/autopilot/sentinels/run", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      data: {},
+    });
+    expect(run.ok()).toBeTruthy();
+    const body = await run.json();
+    const byKey = new Map((body.results || []).map((row: any) => [row.key, row]));
+    expect(byKey.get("booking_visibility")).toEqual(expect.objectContaining({
+      detail: expect.stringMatching(/tenant ownership|Masked orphan sample|ownership evidence/i),
+      nextAction: expect.stringMatching(/No action required|audited repair|do not auto-assign/i),
+    }));
+    expect(byKey.get("public_booking_availability")).toEqual(expect.objectContaining({
+      detail: expect.stringMatching(/Root cause:|token=redacted|publishedServices|bookingHours|routeStatus/i),
+      nextAction: expect.stringMatching(/publication|public services|booking hours|public route/i),
+    }));
+    expect(byKey.get("trade_portal_access")).toEqual(expect.objectContaining({
+      detail: expect.stringMatching(/without returning tokens|No-token state is acceptable|scoped trade account access/i),
+      nextAction: expect.stringMatching(/No action required|unpublished by design|audited trade account invite/i),
+    }));
   });
 
   test("safe self-heal requires platform admin confirmation and writes before-after audit evidence", async ({ request }) => {

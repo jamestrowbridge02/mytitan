@@ -63,6 +63,13 @@ export class PlatformAutopilotService implements OnModuleInit, OnModuleDestroy {
     return new Date().toISOString();
   }
 
+  private maskId(value: unknown) {
+    const text = String(value || '').trim();
+    if (!text) return 'unknown';
+    if (text.length <= 8) return `${text.slice(0, 2)}••`;
+    return `${text.slice(0, 4)}••••${text.slice(-4)}`;
+  }
+
   private async probe(url: string, accepted = [200, 301, 302, 307, 308]) {
     const startedAt = Date.now();
     try {
@@ -121,12 +128,17 @@ export class PlatformAutopilotService implements OnModuleInit, OnModuleDestroy {
     const checkedAt = this.now();
     const appBase = String(process.env.APP_PUBLIC_URL || 'http://app:3001').replace(/\/$/, '');
     const apiBase = String(process.env.API_PUBLIC_URL || 'http://127.0.0.1:3000').replace(/\/$/, '');
-    const [calendar, integrations, portal, bookings, orphanBookings, settings, emailReadiness, tradeAccess] = await Promise.all([
+    const [calendar, integrations, portal, bookings, orphanRows, settings, emailReadiness, tradeAccess] = await Promise.all([
       this.probe(`${appBase}/dashboard/calendar`),
       this.probe(`${appBase}/dashboard/integrations`),
       this.probe(`${appBase}/portal/job/invalid-autopilot-token`, [200, 404]),
       db.booking.count(),
-      db.booking.count({ where: { companyId: null } }).catch(() => -1),
+      db.booking.findMany({
+        where: { companyId: null },
+        select: { id: true, createdAt: true, customerEmail: true, customerPhone: true, serviceId: true, proServiceId: true, locationId: true },
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+      }).catch(() => null),
       db.tenantSetting.findMany({
         select: {
           tenantId: true,
@@ -143,9 +155,41 @@ export class PlatformAutopilotService implements OnModuleInit, OnModuleDestroy {
     ]);
 
     const publicBookingTenant = settings.find((row: any) => row.bookingPublicEnabled && row.bookingPublicToken);
+    const orphanBookings = Array.isArray(orphanRows) ? orphanRows.length : -1;
+    const orphanSample = Array.isArray(orphanRows)
+      ? orphanRows.map((row: any) => this.maskId(row.id)).join(', ')
+      : 'unavailable';
+    const repairableOrphans = Array.isArray(orphanRows)
+      ? orphanRows.filter((row: any) => {
+          const linkedRefs = [row.serviceId, row.proServiceId, row.locationId].filter(Boolean);
+          return linkedRefs.length > 0 && Boolean(row.customerEmail || row.customerPhone);
+        }).length
+      : 0;
+    const publicTenantId = publicBookingTenant?.tenantId || null;
+    const [publishedServiceCount, openHourCount] = publicTenantId
+      ? await Promise.all([
+          db.service.count({
+            where: {
+              companyId: publicTenantId,
+              isActive: true,
+              NOT: { bookingConfigJson: { path: ['visibility'], equals: 'INTERNAL' } },
+            },
+          }).catch(() => -1),
+          db.bookingBusinessHour.count({ where: { tenantId: publicTenantId } }).catch(() => -1),
+        ])
+      : [0, 0];
     const publicBooking = publicBookingTenant
       ? await this.probe(`${apiBase}/public/booking/${encodeURIComponent(publicBookingTenant.bookingPublicToken)}`)
       : { ok: false, status: 0, responseTimeMs: 0, text: '' };
+    const publicBookingRootCause = !publicBookingTenant
+      ? 'No tenant currently has both public booking enabled and a published token.'
+      : publishedServiceCount <= 0
+        ? 'Published booking token exists, but no public service is published.'
+        : openHourCount <= 0
+          ? 'Published booking token and services exist, but booking hours are missing.'
+          : !publicBooking.ok
+            ? `Published booking route returned HTTP ${publicBooking.status || 0}.`
+            : 'Published token, public service, booking hours, and route are all verified.';
     const emptyHrefDetected = /href=(["'])\1/i.test(integrations.text);
     const supportWordingDetected = /\bcontact support\b/i.test(portal.text);
     const themeRowsValid = settings.every((row: any) => ['light', 'dark', 'system', ''].includes(String(row.themeMode || '').toLowerCase()));
@@ -156,12 +200,14 @@ export class PlatformAutopilotService implements OnModuleInit, OnModuleDestroy {
         key: 'booking_visibility',
         label: 'Booking visibility',
         status: orphanBookings === 0 ? 'healthy' : 'attention_needed',
-        summary: orphanBookings === 0 ? `${bookings} bookings remain tenant-owned.` : 'One or more bookings are missing tenant ownership.',
-        detail: 'Checks persisted booking ownership and the visibility invariant used by selected-location queries.',
-        safeFixAction: 'refresh_booking_visibility',
+        summary: orphanBookings === 0 ? `${bookings} bookings remain tenant-owned.` : `${orphanBookings < 0 ? 'Unknown number of' : orphanBookings} booking(s) are missing tenant ownership.`,
+        detail: orphanBookings === 0
+          ? 'Checks persisted booking ownership and the visibility invariant used by selected-location queries.'
+          : `Masked orphan sample: ${orphanSample}. ${repairableOrphans > 0 ? `${repairableOrphans} row(s) have partial ownership evidence and require audited review before repair.` : 'No provable tenant ownership was found in the sampled rows.'}`,
+        safeFixAction: repairableOrphans > 0 ? 'refresh_booking_visibility' : null,
         owner: 'Bookings',
         impact: 'Hidden or cross-tenant booking results.',
-        nextAction: orphanBookings === 0 ? 'No action required.' : 'Inspect orphaned records; do not auto-assign tenant ownership.',
+        nextAction: orphanBookings === 0 ? 'No action required.' : repairableOrphans > 0 ? 'Review masked orphan rows and run an audited repair only after matching tenant ownership from linked service/location/customer evidence.' : 'Inspect orphaned records manually; do not auto-assign tenant ownership.',
         checkedAt,
       },
       {
@@ -182,11 +228,11 @@ export class PlatformAutopilotService implements OnModuleInit, OnModuleDestroy {
         label: 'Public booking availability',
         status: publicBookingTenant ? (publicBooking.ok ? 'healthy' : 'attention_needed') : 'degraded',
         summary: publicBookingTenant ? (publicBooking.ok ? 'Public booking route is reachable.' : 'Public booking route needs attention.') : 'No published booking tenant is available for a live probe.',
-        detail: 'Uses one published tenant token without returning it to clients.',
+        detail: `Uses one published tenant token without returning it to clients. Root cause: ${publicBookingRootCause} Evidence: tenant=${publicTenantId ? this.maskId(publicTenantId) : 'none'}, token=redacted, publishedServices=${publishedServiceCount}, bookingHours=${openHourCount}, routeStatus=${publicBooking.status || 0}.`,
         failedRoute: publicBooking.ok ? null : '/public/booking/:token',
         owner: 'Bookings',
         impact: 'Customers may not be able to begin booking.',
-        nextAction: publicBooking.ok ? 'No action required.' : 'Review booking publication, hours, and public route health.',
+        nextAction: publicBooking.ok ? 'No action required.' : 'Verify booking publication, public services, booking hours, and the public route; do not expose or rotate tokens unless the operator confirms.',
         checkedAt,
       },
       {
@@ -286,10 +332,12 @@ export class PlatformAutopilotService implements OnModuleInit, OnModuleDestroy {
         label: 'Trade portal access',
         status: tradeAccess > 0 ? 'healthy' : 'degraded',
         summary: tradeAccess > 0 ? 'Trade portal access tokens exist for active account workflows.' : 'No active trade portal access token is available for a live probe.',
-        detail: 'Counts scoped trade portal access records without returning tokens.',
+        detail: tradeAccess > 0
+          ? 'Counts scoped trade portal access records without returning tokens.'
+          : 'No-token state is acceptable only before trade portal publication. If trade portal access is expected, invite or publish a scoped trade account access record and verify without exposing the token.',
         owner: 'Trade accounts',
         impact: 'Trade customers may be unable to access their portal.',
-        nextAction: tradeAccess > 0 ? 'No action required.' : 'Verify trade account invitation and portal publication.',
+        nextAction: tradeAccess > 0 ? 'No action required.' : 'Decide whether trade portal is unpublished by design; otherwise create an audited trade account invite and verify the portal route.',
         checkedAt,
       },
       {

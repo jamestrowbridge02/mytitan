@@ -31,6 +31,7 @@ type InternalMonitoringServiceSnapshot = {
   degradedMinutes: number;
   lastRecoveredAt: string | null;
   lastStableAt: string | null;
+  evidence?: Record<string, unknown>;
 };
 
 type InternalMonitoringIncident = {
@@ -55,6 +56,7 @@ type InternalMonitoringCacheFile = {
     lastSuccessfulCheckAt: string | null;
     responseTimeMs: number | null;
     availabilityRole?: AvailabilityRole;
+    evidence?: Record<string, unknown>;
   }>;
   recentSnapshots: Array<{
     checkedAt: string;
@@ -268,6 +270,21 @@ function parseStatusLine(output: string, prefix: string) {
   };
 }
 
+function summarizeSubscriptionPriceIssues(output: string) {
+  const lines = output.split('\n').map((value) => value.trim()).filter(Boolean);
+  const issueLines = lines.filter((line) => /^([A-Z0-9_]+)\s+interval=(MONTHLY|ANNUAL)\s+status=(?!ready\b)/i.test(line));
+  const actionLines = lines.filter((line) => line.startsWith('ACTION ')).map((line) => line.slice('ACTION '.length).trim());
+  if (!issueLines.length) return '';
+  return issueLines.map((line) => {
+    const match = line.match(/^([A-Z0-9_]+)\s+interval=(MONTHLY|ANNUAL)\s+status=([a-z_]+)\s+expected="([^"]*)"\s+observed="([^"]*)"\s+active=([a-z]+)/i);
+    if (!match) return line;
+    const [, planCode, interval, status, expected, observed, active] = match;
+    const action = actionLines.find((entry) => entry.startsWith(`${planCode} ${interval} `)) || '';
+    const cleanedAction = action.replace(`${planCode} ${interval} `, '').trim();
+    return `${planCode} ${interval}: ${status}; expected ${expected || 'n/a'}, observed ${observed || 'n/a'}, active=${active}. ${cleanedAction || 'Run the dry-run verifier and remap only after operator approval.'}`;
+  }).join(' ');
+}
+
 function summarizeScriptState(status: string, kind: 'notification' | 'billing' | 'job_pack') {
   const normalized = String(status || '').trim().toLowerCase();
   if (kind === 'notification') {
@@ -391,7 +408,7 @@ async function probeRedis(redis: RedisService) {
         }
       });
     });
-    return { ok: true };
+    return { pong: 'PONG', host, port, tls: useTls };
   });
 }
 
@@ -431,6 +448,7 @@ function buildServiceSnapshot(input: {
   historyStates: InternalMonitoringState[];
   lastRecoveredAt?: string | null;
   availabilityRole?: AvailabilityRole;
+  evidence?: Record<string, unknown>;
 }) {
   const lastSuccessfulCheckAt =
     input.state === 'healthy'
@@ -455,6 +473,7 @@ function buildServiceSnapshot(input: {
     degradedMinutes: summarizeDegradedMinutes(input.historyStates, Math.round(CACHE_TTL_MS / 1000)),
     lastRecoveredAt: input.lastRecoveredAt || null,
     lastStableAt: lastSuccessfulCheckAt,
+    evidence: input.evidence || undefined,
   } satisfies InternalMonitoringServiceSnapshot;
 }
 
@@ -555,7 +574,7 @@ export async function getInternalMonitoringSnapshot(
       state: redisProbe.ok ? 'healthy' : redis.getRedisUrl() ? 'degraded' : 'attention_needed',
       summary: redisProbe.ok ? 'Redis is ready' : redis.getRedisUrl() ? 'Redis visibility is reduced' : 'Redis is not configured',
       detail: redisProbe.ok
-        ? 'A lightweight Redis ping succeeded.'
+        ? `Redis responded ${String((redisProbe as any).value?.pong || 'PONG')} in ${redisProbe.durationMs} ms.`
         : redis.getRedisUrl()
           ? 'A lightweight Redis ping did not confirm readiness from this runtime.'
           : 'Declare REDIS_URL before treating Redis-backed queues as ready.',
@@ -564,6 +583,14 @@ export async function getInternalMonitoringSnapshot(
       responseTimeMs: redisProbe.durationMs,
       historyStates: [],
       availabilityRole: 'runtime_required',
+      evidence: redisProbe.ok ? {
+        response: String((redisProbe as any).value?.pong || 'PONG'),
+        latencyMs: redisProbe.durationMs,
+        host: String((redisProbe as any).value?.host || 'configured'),
+        port: Number((redisProbe as any).value?.port || 6379),
+        tls: Boolean((redisProbe as any).value?.tls),
+        lastChecked: checkedAt,
+      } : undefined,
     }),
     buildServiceSnapshot({
       key: 'web-gateway',
@@ -572,13 +599,19 @@ export async function getInternalMonitoringSnapshot(
       summary: external.nginxStatus === 'ready' ? 'Web gateway is visible' : external.nginxStatus === 'unknown' ? 'Web gateway visibility is reduced' : 'Web gateway needs attention',
       detail:
         external.nginxStatus === 'ready'
-          ? 'The host-visible web gateway check reports healthy service state.'
+          ? external.nginxDetail || 'The host-visible web gateway check reports healthy service state.'
           : external.nginxDetail || external.detail || 'The host-visible web gateway check is not available from this runtime.',
       checkedAt,
       previous: previousByKey.get('web-gateway') || null,
       responseTimeMs: null,
       historyStates: [],
       availabilityRole: 'runtime_required',
+      evidence: {
+        app: { url: external.appUrl, status: external.appStatus },
+        api: { url: external.apiUrl, status: external.apiStatus },
+        marketing: { url: external.marketingUrl, status: external.marketingStatus },
+        gatewayStatus: external.nginxStatus,
+      },
     }),
     buildServiceSnapshot({
       key: 'tls',
@@ -594,6 +627,11 @@ export async function getInternalMonitoringSnapshot(
       responseTimeMs: null,
       historyStates: [],
       availabilityRole: 'runtime_required',
+      evidence: {
+        tlsStatus: external.tlsStatus,
+        tlsExpiry: external.tlsExpiry,
+        detail: external.tlsDetail,
+      },
     }),
     buildServiceSnapshot({
       key: 'scheduler',
@@ -622,24 +660,38 @@ export async function getInternalMonitoringSnapshot(
           : backup.status === 'unknown'
             ? 'Backup visibility is reduced'
             : 'Backup readiness needs attention',
-      detail: backup.detail,
+      detail: `${backup.detail}${backup.lastBackupAt ? ` Latest backup: ${backup.lastBackupAt}, artifact=${backup.lastBackupArtifact || 'unknown'}, size=${backup.lastBackupSizeBytes ?? 'unknown'} bytes.` : ' Run bash ./scripts/backup.sh, then bash ./scripts/backup-readiness-status.sh to create backup evidence.'}`,
       checkedAt,
       previous: previousByKey.get('backups') || null,
       responseTimeMs: null,
       historyStates: [],
       availabilityRole: 'operational_readiness',
+      evidence: {
+        lastBackupAt: backup.lastBackupAt,
+        artifact: backup.lastBackupArtifact,
+        sizeBytes: backup.lastBackupSizeBytes,
+        scheduleStatus: backup.scheduleStatus,
+        createEvidenceCommand: 'bash ./scripts/backup.sh && bash ./scripts/backup-readiness-status.sh',
+      },
     }),
     buildServiceSnapshot({
       key: 'restore-drill',
       label: 'Restore drill',
       state: backup.restoreStatus === 'ready' ? 'healthy' : backup.restoreStatus ? 'attention_needed' : 'degraded',
       summary: backup.restoreStatus === 'ready' ? 'Restore drill is current' : 'Restore drill needs attention',
-      detail: backup.restoreDetail || 'Restore drill visibility is limited in this runtime.',
+      detail: backup.restoreStatus === 'ready'
+        ? `${backup.restoreDetail || 'Restore drill marker is present.'} Last drill: ${backup.lastRestoreDrillAt || 'unknown'}.`
+        : `${backup.restoreDetail || 'Restore drill visibility is limited in this runtime.'} Run bash ./scripts/restore-test.sh, then bash ./scripts/backup-readiness-status.sh to create restore evidence.`,
       checkedAt,
       previous: previousByKey.get('restore-drill') || null,
       responseTimeMs: null,
       historyStates: [],
       availabilityRole: 'operational_readiness',
+      evidence: {
+        lastRestoreDrillAt: backup.lastRestoreDrillAt,
+        restoreStatus: backup.restoreStatus,
+        createEvidenceCommand: 'bash ./scripts/restore-test.sh && bash ./scripts/backup-readiness-status.sh',
+      },
     }),
     (() => {
       const normalizedOutput = notificationProbe.ok ? String(notificationProbe.value || '') : '';
@@ -672,13 +724,19 @@ export async function getInternalMonitoringSnapshot(
         summary: summary.summary,
         detail:
           billingProbe.ok
-            ? parsed.line || 'Subscription price verification completed.'
+            ? [parsed.line || 'Subscription price verification completed.', summarizeSubscriptionPriceIssues(billingOutput)].filter(Boolean).join(' ')
             : 'Subscription price verification could not complete from this runtime.',
         checkedAt,
         previous: previousByKey.get('billing') || null,
         responseTimeMs: billingProbe.durationMs,
         historyStates: [],
         availabilityRole: 'operational_readiness',
+        evidence: {
+          statusLine: parsed.line || null,
+          mismatchSummary: summarizeSubscriptionPriceIssues(billingOutput) || null,
+          dryRun: true,
+          syncRequiresOperatorApproval: true,
+        },
       });
     })(),
     (() => {
@@ -770,6 +828,7 @@ export async function getInternalMonitoringSnapshot(
       lastSuccessfulCheckAt: service.lastSuccessfulCheckAt,
       responseTimeMs: service.responseTimeMs,
       availabilityRole: service.availabilityRole,
+      evidence: service.evidence,
     })),
     recentSnapshots: nextRecentSnapshots,
     incidents: nextIncidents.slice(-MAX_INCIDENTS),
@@ -894,6 +953,7 @@ function hydrateSnapshotFromCache(
           .sort((left, right) => left.occurredAt.localeCompare(right.occurredAt))
           .at(-1)?.occurredAt || null,
       lastStableAt: service.lastSuccessfulCheckAt,
+      evidence: service.evidence,
     };
   });
   const overall = summarizeOverallState(services);
