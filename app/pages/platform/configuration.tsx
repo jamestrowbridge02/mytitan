@@ -509,12 +509,21 @@ function InfrastructureCard({ title, testId, status, source, requiredConfig, own
         <StatusCard label="Last checked" value={formatTimestamp(lastChecked)} />
       </div>
       <div className="platform-admin-list">
-        <p><strong>Required config</strong></p>
+        <p><strong>Configuration entered</strong></p>
         <p>{requiredConfig}</p>
-        <p><strong>Next action</strong></p>
-        <p>{nextAction}</p>
-        <p><strong>Redacted diagnostics</strong></p>
+        <p><strong>MyTitan saved mapping</strong></p>
+        <p>Source of truth: {source}. Last checked: {formatTimestamp(lastChecked)}.</p>
+        <p><strong>Provider result</strong></p>
         <p>{diagnostics}</p>
+        <p><strong>Verification checklist</strong></p>
+        <p>{status === "ready" || status === "healthy" ? "OK Provider or evidence state is ready." : "WARN Provider or evidence state needs review."}</p>
+        <p>{source && source !== "missing" ? "OK Source of truth is recorded." : "FAIL Source of truth is missing."}</p>
+        <p><strong>Problems found</strong></p>
+        <p>{status === "ready" || status === "healthy" ? "No blocking problem reported by this card." : diagnostics || "Manual evidence required before this card can be considered ready."}</p>
+        <p><strong>Recommended fix</strong></p>
+        <p>{nextAction}</p>
+        <p><strong>Audit/change history</strong></p>
+        <p>Use the provider-specific action buttons and Platform Admin audit trail for write history. Manual evidence is required where no live provider integration exists.</p>
       </div>
       {children}
     </section>

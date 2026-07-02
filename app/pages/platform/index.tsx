@@ -1132,6 +1132,14 @@ export default function PlatformAdminPage() {
   };
 
   const saveBillingCatalogItem = async (item: any, mode: 'validate' | 'save' = 'save') => {
+    if (mode === 'save') {
+      const reason = String(item.changeNotes || '').trim();
+      if (!reason) {
+        setError('A change reason is required before saving a billing catalog mapping.');
+        return;
+      }
+      if (!window.confirm('Save this billing catalog mapping locally? Stripe products and prices will not be changed.')) return;
+    }
     setBillingCatalogLoading(true);
     try {
       const response = await apiFetch('/admin/platform/billing-catalog', {
@@ -1163,6 +1171,7 @@ export default function PlatformAdminPage() {
 
   const revealBillingCatalogItem = async (key: string) => {
     try {
+      if (!window.confirm('Reveal full Stripe identifiers for this mapping? This action is audited.')) return;
       const response = await apiFetch(`/admin/platform/billing-catalog/${encodeURIComponent(key)}/reveal`);
       setRevealedCatalogIds((current) => ({ ...current, [key]: response?.item || {} }));
     } catch (err: any) {
@@ -1185,6 +1194,7 @@ export default function PlatformAdminPage() {
 
   const rollbackBillingCatalogItem = async (item: any) => {
     const reason = catalogDrafts[`${item.kind}:${item.code}:${item.interval || 'none'}`]?.changeNotes || 'Rollback requested from platform catalog admin';
+    if (!window.confirm('Rollback this billing catalog mapping locally using the latest rollback target? Stripe products and prices will not be changed.')) return;
     setBillingCatalogLoading(true);
     try {
       await apiFetch(`/admin/platform/billing-catalog/${encodeURIComponent(item.key)}/rollback`, {
@@ -1197,6 +1207,23 @@ export default function PlatformAdminPage() {
     } finally {
       setBillingCatalogLoading(false);
     }
+  };
+
+  const adoptVerifiedProductFromPrice = async (item: any, draft: any) => {
+    const reason = String(draft.changeNotes || '').trim();
+    if (!reason) {
+      setError('A change reason is required before adopting the Product ID from a verified Stripe Price.');
+      return;
+    }
+    if (!window.confirm('Use the Product ID from the verified Stripe Price and save this local mapping? Stripe products and prices will not be changed.')) return;
+    await saveBillingCatalogItem({ ...draft, stripeProductId: '', useVerifiedProductFromPrice: true }, 'save');
+  };
+
+  const copyDiagnosticRequestId = async (requestId?: string | null) => {
+    if (!requestId || !navigator?.clipboard?.writeText) return;
+    await navigator.clipboard.writeText(requestId);
+    setCopiedCatalogField(`request:${requestId}`);
+    window.setTimeout(() => setCopiedCatalogField((current) => (current === `request:${requestId}` ? '' : current)), 1500);
   };
 
   const copyCatalogIdentifier = async (value: string | null | undefined, key: string, field: 'price' | 'product') => {
@@ -2446,7 +2473,14 @@ export default function PlatformAdminPage() {
                 const draftKey = `${item.kind}:${item.code}:${item.interval || 'none'}`;
                 const draft = catalogDrafts[draftKey] || item;
                 const revealed = revealedCatalogIds[item.key] || {};
-                const verificationPreview = draft.verificationPreview || null;
+                const verificationPreview = draft.verificationPreview || item.diagnostic || null;
+                const diagnosticChecks = verificationPreview?.checks || {};
+                const problemsFound = diagnosticProblems(diagnosticChecks);
+                const canAdoptVerifiedProduct = Boolean(
+                  verificationPreview?.providerState?.canAdoptProductFromVerifiedPrice &&
+                  String(draft.stripePriceId || '').trim() &&
+                  !String(draft.stripeProductId || '').trim(),
+                );
                 return (
                   <div
                     key={draftKey}
@@ -2508,22 +2542,48 @@ export default function PlatformAdminPage() {
                       <label>Notes / change reason</label>
                       <textarea className="input" rows={2} value={draft.changeNotes || ''} onChange={(event) => setCatalogDrafts((current) => ({ ...current, [draftKey]: { ...draft, changeNotes: event.target.value } }))} />
                     </div>
-                    <div className="platform-admin-list" style={{ marginTop: 12 }}>
-                      <div>Status: {item.verificationLabel || item.verificationStatus}</div>
-                      <div>Expected price: {item.expectedAmountDisplay || formatMoney(item.expectedAmountCents || 0, item.currency || 'GBP')}</div>
-                      {item.kind === 'job_pack' ? <div>Expected pack: {item.jobCount} jobs · lookup key {item.expectedLookupKey || item.lookupKey || item.code}</div> : null}
-                      {item.kind === 'job_pack' ? <div>Checkout readiness: {item.checkoutReadiness || 'setup_required'} · webhook grants {item.webhookGrantReadiness || 'setup_required'}</div> : null}
-                      {item.missingPriceId ? <div>Missing price ID</div> : null}
-                      {item.missingProductId ? <div>Missing product ID</div> : null}
-                      {item.amountMismatch ? <div>Amount mismatch</div> : null}
-                      {item.currencyMismatch ? <div>Currency mismatch</div> : null}
-                      {item.inactiveMapping ? <div>Inactive product or price</div> : null}
-                      {verificationPreview?.observed?.observedAmountDisplay ? <div>Observed Stripe price: {verificationPreview.observed.observedAmountDisplay}</div> : null}
-                      <div>Safe next action: {item.nextAction || 'Review this mapping before checkout is considered ready.'}</div>
-                      <div>Price ID: {revealed.stripePriceId || item.stripePriceIdMasked || 'Not stored'}</div>
-                      <div>Product ID: {revealed.stripeProductId || item.stripeProductIdMasked || 'Not stored'}</div>
-                      <div>{verificationPreview?.message || item.verificationMessage || 'No verification note stored yet.'}</div>
-                      {item.mismatchWarning ? <div>Verification detail: {item.mismatchWarning}</div> : null}
+                    <div className="platform-admin-list" style={{ marginTop: 12 }} data-testid={`platform-billing-catalog-diagnostics-${item.code}-${item.interval || 'none'}`}>
+                      <DiagnosticSection title="Configuration entered">
+                        <div>Price ID: {draft.stripePriceId ? 'entered, hidden until reveal' : item.stripePriceIdMasked || 'Not entered'}</div>
+                        <div>Product ID: {draft.stripeProductId ? 'entered, hidden until reveal' : item.stripeProductIdMasked || 'Not entered'}</div>
+                        <div>Lookup key: {draft.lookupKey || item.lookupKey || 'Not entered'}</div>
+                        <div>Expected price: {draft.expectedAmount || item.expectedAmountDisplay || formatMoney(item.expectedAmountCents || 0, item.currency || 'GBP')} {draft.currency || item.currency || 'GBP'}</div>
+                      </DiagnosticSection>
+                      <DiagnosticSection title="MyTitan saved mapping">
+                        <div>Status: {item.verificationLabel || item.verificationStatus}</div>
+                        <div>Price ID: {revealed.stripePriceId || item.stripePriceIdMasked || 'Not stored'}</div>
+                        <div>Product ID: {revealed.stripeProductId || item.stripeProductIdMasked || 'Not stored'}</div>
+                        <div>Local completeness: {verificationPreview?.localMappingComplete ?? (!item.missingPriceId && !item.missingProductId) ? 'complete' : 'incomplete'}</div>
+                      </DiagnosticSection>
+                      <DiagnosticSection title="Stripe provider result">
+                        <div>{verificationPreview?.message || item.verificationMessage || 'No provider verification has been run for this draft yet.'}</div>
+                        {verificationPreview?.observed?.observedAmountDisplay ? <div>Observed Stripe price: {verificationPreview.observed.observedAmountDisplay}</div> : null}
+                        {verificationPreview?.observed?.observedCurrency ? <div>Observed currency: {verificationPreview.observed.observedCurrency}</div> : null}
+                        {verificationPreview?.observed?.observedProductIdMasked ? <div>Observed product: {verificationPreview.observed.observedProductIdMasked}</div> : null}
+                        {verificationPreview?.providerState?.priceProductIdMasked ? <div>Price belongs to product: {verificationPreview.providerState.priceProductIdMasked}</div> : null}
+                        {verificationPreview?.requestId ? <div>Request ID: {verificationPreview.requestId}</div> : null}
+                      </DiagnosticSection>
+                      <DiagnosticSection title="Verification checklist">
+                        {catalogDiagnosticRows(diagnosticChecks).map((row) => (
+                          <div key={row.key} className="platform-admin-readiness-row">
+                            <strong>{statusIcon(row.check?.status)} {row.label}</strong>
+                            <span>{row.check?.message || 'Not checked yet.'}</span>
+                            <span className="muted">{row.check?.technicalDetail || 'No redacted technical detail yet.'}</span>
+                            <span className="muted">Next action: {row.check?.operatorAction || 'Dry-run validate again.'}</span>
+                          </div>
+                        ))}
+                      </DiagnosticSection>
+                      <DiagnosticSection title="Problems found">
+                        {problemsFound.length ? problemsFound.map((problem) => <div key={problem}>{problem}</div>) : <div>No failed diagnostic checks reported.</div>}
+                      </DiagnosticSection>
+                      <DiagnosticSection title="Recommended fix">
+                        <div>{verificationPreview?.safeNextAction || item.safeNextAction || item.nextAction || 'Review this mapping before checkout is considered ready.'}</div>
+                      </DiagnosticSection>
+                      <DiagnosticSection title="Audit/change history">
+                        <div>Last verified: {formatDateTime(item.lastVerifiedAt)}</div>
+                        <div>Change reason: {item.changeNotes || 'No saved change reason yet.'}</div>
+                        <div>Writes require confirmation, a reason, and an audit event. Stripe products and prices are never mutated here.</div>
+                      </DiagnosticSection>
                     </div>
                     <div className="platform-admin-list" style={{ marginTop: 12 }} data-testid={`platform-billing-catalog-history-${item.code}-${item.interval || 'none'}`}>
                       <strong>Change history</strong>
@@ -2543,7 +2603,15 @@ export default function PlatformAdminPage() {
                     </div>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
                       <button className="button secondary" type="button" onClick={() => void saveBillingCatalogItem(draft, 'validate')} data-testid={`platform-billing-catalog-validate-${item.code}-${item.interval || 'none'}`}>Dry-run validate</button>
+                      {canAdoptVerifiedProduct ? (
+                        <button className="button secondary" type="button" onClick={() => void adoptVerifiedProductFromPrice(item, draft)} data-testid={`platform-billing-catalog-adopt-product-${item.code}-${item.interval || 'none'}`}>Use product from verified Stripe price</button>
+                      ) : null}
                       <button className="button secondary" type="button" onClick={() => void revealBillingCatalogItem(item.key)} data-testid={`platform-billing-catalog-reveal-${item.code}-${item.interval || 'none'}`}>Reveal IDs</button>
+                      {verificationPreview?.requestId ? (
+                        <button className="button secondary" type="button" onClick={() => void copyDiagnosticRequestId(verificationPreview.requestId)} data-testid={`platform-billing-catalog-copy-request-${item.code}-${item.interval || 'none'}`}>
+                          {copiedCatalogField === `request:${verificationPreview.requestId}` ? 'Copied request ID' : 'Copy request ID'}
+                        </button>
+                      ) : null}
                       {revealed.stripePriceId ? (
                         <button
                           className="button secondary"
@@ -3462,6 +3530,48 @@ function ReadinessPanel({ title, rows }: { title: string; rows: Array<{ label: s
 
 function StatusPill({ children, tone }: { children: React.ReactNode; tone: Exclude<SemanticTone, 'revenue' | 'info'> | 'info' }) {
   return <span className={`platform-admin-status-pill platform-admin-status-pill--${tone}`}>{children}</span>;
+}
+
+function DiagnosticSection({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div style={{ marginTop: 10 }}>
+      <strong>{title}</strong>
+      <div style={{ display: 'grid', gap: 6, marginTop: 6 }}>{children}</div>
+    </div>
+  );
+}
+
+function catalogDiagnosticRows(checks: Record<string, any>) {
+  const labels: Record<string, string> = {
+    credentialValid: 'Credential valid',
+    stripeReachable: 'Stripe reachable',
+    priceIdProvided: 'Price ID provided',
+    priceFound: 'Price found',
+    productIdProvided: 'Product ID provided',
+    productFound: 'Product found',
+    priceBelongsToProduct: 'Price belongs to product',
+    lookupKeyMatches: 'Lookup key matches',
+    currencyMatches: 'Currency matches',
+    amountMatches: 'Amount matches',
+    activeMatches: 'Active state matches',
+    localMappingComplete: 'Local mapping complete',
+    runtimeLoaded: 'Runtime loaded',
+    canSave: 'Can save',
+  };
+  return Object.keys(labels).map((key) => ({ key, label: labels[key], check: checks?.[key] || null }));
+}
+
+function diagnosticProblems(checks: Record<string, any>) {
+  return catalogDiagnosticRows(checks)
+    .filter((row) => row.check?.status === 'fail' || row.check?.status === 'warning')
+    .map((row) => `${row.label}: ${row.check.message}`);
+}
+
+function statusIcon(status?: string) {
+  if (status === 'pass') return 'OK';
+  if (status === 'fail') return 'FAIL';
+  if (status === 'warning') return 'WARN';
+  return 'WAIT';
 }
 
 function LegendItem({ tone, label }: { tone: SemanticTone; label: string }) {

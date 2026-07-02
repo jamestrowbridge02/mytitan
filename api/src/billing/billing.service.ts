@@ -198,6 +198,26 @@ export class BillingService {
     return `${raw.slice(0, 6)}••••${raw.slice(-4)}`;
   }
 
+  private redactStripeText(value?: string | null) {
+    return String(value || '')
+      .replace(/\b(price|prod|sk|rk|pk|whsec)_[A-Za-z0-9_]{6,}\b/g, (match) => this.maskStripeId(match) || '[redacted_stripe_id]')
+      .slice(0, 500);
+  }
+
+  private buildCatalogDiagnosticCheck(
+    status: 'pass' | 'fail' | 'warning' | 'not_checked',
+    message: string,
+    technicalDetail: string,
+    operatorAction: string,
+  ) {
+    return {
+      status,
+      message,
+      technicalDetail: this.redactStripeText(technicalDetail),
+      operatorAction,
+    };
+  }
+
   private buildCatalogOverrideKey(kind: string, code: string, interval?: string | null) {
     return [kind, code, interval || 'none'].join(':').toLowerCase();
   }
@@ -4381,129 +4401,189 @@ export class BillingService {
     if (input.expectedAmountCents != null && (!Number.isFinite(input.expectedAmountCents) || !Number.isInteger(input.expectedAmountCents) || input.expectedAmountCents <= 0)) {
       throw new BadRequestException('Expected amount must be greater than £0.00. Enter £19.00.');
     }
+    const requestId = crypto.randomUUID();
+    const runtimeStatus = this.platformBillingStripeConfig.getRuntimeStatus();
+    const checks: Record<string, any> = {
+      credentialValid: this.buildCatalogDiagnosticCheck('not_checked', 'Stripe credential has not been checked yet.', 'credential_check=pending', 'Run dry-run validation.'),
+      stripeReachable: this.buildCatalogDiagnosticCheck('not_checked', 'Stripe reachability has not been checked yet.', 'stripe_reachable=pending', 'Run dry-run validation.'),
+      priceIdProvided: this.buildCatalogDiagnosticCheck(input.stripePriceId ? 'pass' : 'fail', input.stripePriceId ? 'A Stripe Price ID was entered.' : 'No Stripe Price ID has been entered for this mapping.', `priceId=${this.maskStripeId(input.stripePriceId) || 'missing'}`, 'Enter the Stripe Price ID for this row.'),
+      priceFound: this.buildCatalogDiagnosticCheck('not_checked', 'Stripe Price has not been fetched yet.', 'price_lookup=pending', 'Run dry-run validation.'),
+      productIdProvided: this.buildCatalogDiagnosticCheck(input.stripeProductId ? 'pass' : 'fail', input.stripeProductId ? 'A Stripe Product ID was entered.' : 'MyTitan has not stored the Product ID for this mapping yet.', `productId=${this.maskStripeId(input.stripeProductId) || 'missing'}`, 'Use Product ID from verified Stripe Price or enter the matching Product ID.'),
+      productFound: this.buildCatalogDiagnosticCheck('not_checked', 'Stripe Product has not been fetched yet.', 'product_lookup=pending', 'Run dry-run validation.'),
+      priceBelongsToProduct: this.buildCatalogDiagnosticCheck('not_checked', 'Price/product relationship has not been checked yet.', 'relationship=pending', 'Run dry-run validation.'),
+      lookupKeyMatches: this.buildCatalogDiagnosticCheck('not_checked', 'Lookup key has not been checked yet.', `expectedLookupKey=${input.lookupKey || 'none'}`, 'Run dry-run validation.'),
+      currencyMatches: this.buildCatalogDiagnosticCheck('not_checked', 'Currency has not been checked yet.', `expectedCurrency=${input.currency || 'none'}`, 'Run dry-run validation.'),
+      amountMatches: this.buildCatalogDiagnosticCheck('not_checked', 'Amount has not been checked yet.', `expectedAmountCents=${input.expectedAmountCents ?? 'none'}`, 'Run dry-run validation.'),
+      activeMatches: this.buildCatalogDiagnosticCheck(input.active === false ? 'warning' : 'pass', input.active === false ? 'This local mapping is intentionally inactive.' : 'This local mapping is marked active.', `localActive=${input.active !== false}`, input.active === false ? 'Set Active if this mapping should be checkout-ready.' : 'No action required.'),
+      localMappingComplete: this.buildCatalogDiagnosticCheck(input.stripePriceId && input.stripeProductId ? 'pass' : 'fail', input.stripePriceId && input.stripeProductId ? 'MyTitan has both local Stripe identifiers for this mapping.' : 'MyTitan is missing one or more local Stripe identifiers for this mapping.', `priceId=${this.maskStripeId(input.stripePriceId) || 'missing'} productId=${this.maskStripeId(input.stripeProductId) || 'missing'}`, 'Store both the Stripe Price ID and matching Product ID after confirmation.'),
+      runtimeLoaded: this.buildCatalogDiagnosticCheck(runtimeStatus.runtimeLoaded ? 'pass' : 'warning', runtimeStatus.runtimeLoaded ? 'MyTitan Billing Stripe runtime credentials are loaded.' : 'MyTitan Billing Stripe runtime credentials are not fully loaded.', `runtimeLoaded=${runtimeStatus.runtimeLoaded} mode=${runtimeStatus.mode}`, 'Reload or configure MyTitan Billing Stripe credentials before trusting provider validation.'),
+      canSave: this.buildCatalogDiagnosticCheck('not_checked', 'Save eligibility has not been resolved yet.', 'canSave=pending', 'Resolve failed checks before saving.'),
+    };
+    const finish = (
+      status: string,
+      message: string,
+      safeNextAction: string,
+      observed: Record<string, any> | null,
+      providerState: Record<string, any> = {},
+    ) => {
+      checks.canSave = this.buildCatalogDiagnosticCheck(
+        status === 'ready' ? 'pass' : 'fail',
+        status === 'ready' ? 'This mapping can be saved after operator confirmation and a reason.' : 'This mapping should not be saved as ready yet.',
+        `status=${status}`,
+        status === 'ready' ? 'Save mapping with confirmation and reason.' : safeNextAction,
+      );
+      return {
+        status,
+        message: this.redactStripeText(message),
+        observed,
+        checks,
+        safeNextAction,
+        requestId,
+        providerState,
+        localState: {
+          kind: input.kind,
+          code: input.code,
+          interval: input.interval,
+          priceIdProvided: Boolean(input.stripePriceId),
+          productIdProvided: Boolean(input.stripeProductId),
+          priceIdMasked: this.maskStripeId(input.stripePriceId),
+          productIdMasked: this.maskStripeId(input.stripeProductId),
+          expectedLookupKey: input.lookupKey,
+          expectedAmountCents: input.expectedAmountCents,
+          expectedAmountDisplay: input.expectedAmountCents != null ? formatCurrencyMinorUnits(input.expectedAmountCents, input.currency || 'GBP') : null,
+          currency: input.currency,
+          active: input.active !== false,
+        },
+        runtimeState: runtimeStatus,
+        localMappingComplete: Boolean(input.stripePriceId && input.stripeProductId),
+        canSave: status === 'ready',
+      };
+    };
 
     if (input.active === false) {
-      return {
-        status: 'inactive',
-        message: 'This mapping is intentionally inactive and will not be treated as checkout-ready.',
-        observed: null,
-      };
+      return finish('inactive', 'This mapping is intentionally inactive and will not be treated as checkout-ready.', 'Set the mapping to Active only if this row should be checkout-ready.', null);
     }
     if (!input.stripePriceId && !input.stripeProductId) {
-      return {
-        status: 'needs_mapping',
-        message: 'Stripe product and price IDs are still missing for this row.',
-        observed: null,
-      };
+      return finish('needs_mapping', 'Stripe product and price IDs are still missing for this row.', 'Enter the Stripe Price ID and matching Product ID, then dry-run validate.', null);
     }
     if (!this.isStripeConfigured()) {
-      return {
-        status: 'verification_failed',
-        message: 'Stripe verification is unavailable in this runtime, so save remains audit-safe but unverified.',
-        observed: null,
-      };
+      checks.credentialValid = this.buildCatalogDiagnosticCheck('fail', 'MyTitan Billing Stripe credentials are not configured for provider validation.', 'stripe_configured=false', 'Configure MyTitan Billing Stripe credentials, then dry-run validate again.');
+      checks.stripeReachable = this.buildCatalogDiagnosticCheck('not_checked', 'Stripe was not contacted because credentials are unavailable.', 'stripe_request=not_sent', 'Configure credentials before provider validation.');
+      return finish('verification_failed', 'Stripe verification is unavailable in this runtime, so save remains audit-safe but unverified.', 'Configure MyTitan Billing Stripe credentials, then dry-run validate again.', null);
     }
 
     const stripe = this.requireStripe();
     let price: any = null;
     let product: any = null;
+    checks.credentialValid = this.buildCatalogDiagnosticCheck('pass', 'MyTitan Billing Stripe credential is available for dry-run validation.', 'credential=present', 'No action required.');
 
     if (input.stripePriceId) {
       try {
         price = await stripe.prices.retrieve(input.stripePriceId, { expand: ['product'] });
+        checks.stripeReachable = this.buildCatalogDiagnosticCheck('pass', 'Stripe responded to the dry-run price lookup.', `price=${this.maskStripeId(input.stripePriceId)}`, 'No action required.');
+        checks.priceFound = this.buildCatalogDiagnosticCheck('pass', 'The Stripe Price exists.', `price=${this.maskStripeId(price?.id || input.stripePriceId)}`, 'No action required.');
       } catch (error) {
-        return {
-          status: 'verification_failed',
-          message: `Stripe price could not be verified safely: ${error instanceof Error ? error.message : String(error)}`,
-          observed: null,
-        };
+        checks.stripeReachable = this.buildCatalogDiagnosticCheck('warning', 'Stripe was contacted but the price lookup did not succeed.', `error=${error instanceof Error ? error.message : String(error)}`, 'Check the Price ID and dry-run validate again.');
+        checks.priceFound = this.buildCatalogDiagnosticCheck('fail', 'Price not found or not accessible with the configured MyTitan Billing Stripe credential.', `price=${this.maskStripeId(input.stripePriceId)} error=${error instanceof Error ? error.message : String(error)}`, 'Enter an existing Stripe Price ID from the MyTitan Billing Stripe account.');
+        return finish('verification_failed', 'Price not found or not accessible with the configured MyTitan Billing Stripe credential.', 'Enter an existing Stripe Price ID from the MyTitan Billing Stripe account, then dry-run validate again.', null);
       }
+    }
+    const priceProductId = price?.product ? (typeof price.product === 'string' ? price.product : price.product.id) : null;
+    if (input.stripeProductId && priceProductId && priceProductId !== input.stripeProductId) {
+      const observedMismatch = {
+        observedAmountCents: Number(price?.unit_amount ?? 0) || null,
+        observedAmountDisplay: price ? formatCurrencyMinorUnits(Number(price?.unit_amount ?? 0) || 0, String(price?.currency || input.currency || 'GBP').trim().toUpperCase() || 'GBP') : null,
+        observedCurrency: String(price?.currency || '').trim().toUpperCase() || null,
+        observedLookupKey: String(price?.lookup_key || '').trim() || null,
+        observedProductName: typeof price.product === 'object' ? String(price.product?.name || '').trim() || null : null,
+        observedProductIdMasked: this.maskStripeId(priceProductId),
+      };
+      checks.priceBelongsToProduct = this.buildCatalogDiagnosticCheck('fail', `Product mismatch: the Stripe Price belongs to ${this.maskStripeId(priceProductId)}, but MyTitan has stored ${this.maskStripeId(input.stripeProductId)}.`, `priceProduct=${this.maskStripeId(priceProductId)} localProduct=${this.maskStripeId(input.stripeProductId)}`, 'Replace the local Product ID with the Product ID from the verified Stripe Price, then dry-run validate.');
+      return finish('verification_failed', `Product mismatch: the Stripe Price belongs to ${this.maskStripeId(priceProductId)}, but MyTitan has stored ${this.maskStripeId(input.stripeProductId)}.`, 'Replace the local Product ID with the Product ID from the verified Stripe Price, then dry-run validate.', observedMismatch, {
+        priceIdMasked: this.maskStripeId(price?.id || input.stripePriceId),
+        priceProductIdMasked: this.maskStripeId(priceProductId),
+        localProductIdMasked: this.maskStripeId(input.stripeProductId),
+        canAdoptProductFromVerifiedPrice: true,
+      });
     }
     if (input.stripeProductId) {
       try {
         product = await stripe.products.retrieve(input.stripeProductId);
+        checks.stripeReachable = this.buildCatalogDiagnosticCheck('pass', 'Stripe responded to the dry-run product lookup.', `product=${this.maskStripeId(input.stripeProductId)}`, 'No action required.');
+        checks.productFound = this.buildCatalogDiagnosticCheck('pass', 'The Stripe Product exists.', `product=${this.maskStripeId(product?.id || input.stripeProductId)}`, 'No action required.');
       } catch (error) {
-        return {
-          status: 'verification_failed',
-          message: `Stripe product could not be verified safely: ${error instanceof Error ? error.message : String(error)}`,
-          observed: null,
-        };
+        checks.productFound = this.buildCatalogDiagnosticCheck('fail', 'Product not found or not accessible with the configured MyTitan Billing Stripe credential.', `product=${this.maskStripeId(input.stripeProductId)} error=${error instanceof Error ? error.message : String(error)}`, 'Enter an existing Stripe Product ID from the same MyTitan Billing Stripe account.');
+        return finish('verification_failed', 'Product not found or not accessible with the configured MyTitan Billing Stripe credential.', 'Enter an existing Stripe Product ID from the same MyTitan Billing Stripe account, then dry-run validate again.', null, {
+          priceIdMasked: this.maskStripeId(price?.id || input.stripePriceId),
+          priceProductIdMasked: this.maskStripeId(priceProductId),
+        });
       }
     } else if (price?.product && typeof price.product === 'object') {
       product = price.product;
+      checks.productFound = this.buildCatalogDiagnosticCheck('pass', 'The Stripe Price returned its Product from Stripe.', `product=${this.maskStripeId(product?.id)}`, 'Use Product ID from verified Stripe Price.');
+    } else if (!input.stripeProductId) {
+      checks.productFound = this.buildCatalogDiagnosticCheck('not_checked', 'Stripe Product was not fetched separately because no local Product ID was entered.', `priceProduct=${this.maskStripeId(priceProductId) || 'unknown'}`, 'Use Product ID from verified Stripe Price or enter a Product ID.');
     }
 
+    const observed = {
+      observedAmountCents: Number(price?.unit_amount ?? 0) || null,
+      observedAmountDisplay: price ? formatCurrencyMinorUnits(Number(price?.unit_amount ?? 0) || 0, String(price?.currency || input.currency || 'GBP').trim().toUpperCase() || 'GBP') : null,
+      observedCurrency: String(price?.currency || '').trim().toUpperCase() || null,
+      observedLookupKey: String(price?.lookup_key || '').trim() || null,
+      observedProductName: String(product?.name || '').trim() || null,
+      observedProductIdMasked: this.maskStripeId(product?.id || priceProductId),
+    };
+    if (priceProductId && !input.stripeProductId) {
+      checks.priceBelongsToProduct = this.buildCatalogDiagnosticCheck('pass', 'The Stripe Price exists and belongs to a Stripe Product.', `price=${this.maskStripeId(price?.id)} product=${this.maskStripeId(priceProductId)}`, 'Use Product ID from verified Stripe Price.');
+      checks.localMappingComplete = this.buildCatalogDiagnosticCheck('fail', `The Stripe Price exists and belongs to product ${this.maskStripeId(priceProductId)}. MyTitan has not stored the Product ID for this mapping yet.`, `price=${this.maskStripeId(price?.id)} product=${this.maskStripeId(priceProductId)} localProductId=missing`, 'Use Product ID from verified Stripe Price.');
+      return finish(
+        'verification_failed',
+        `The Stripe Price exists and belongs to product ${this.maskStripeId(priceProductId)}. MyTitan has not stored the Product ID for this mapping yet.`,
+        'Use Product ID from verified Stripe Price',
+        observed,
+        { priceIdMasked: this.maskStripeId(price?.id || input.stripePriceId), priceProductIdMasked: this.maskStripeId(priceProductId), canAdoptProductFromVerifiedPrice: true },
+      );
+    }
     if (price?.active === false || product?.active === false) {
-      return {
-        status: 'inactive',
-        message: 'The mapped Stripe product or price is inactive.',
-        observed: {
-          observedAmountCents: Number(price?.unit_amount ?? 0) || null,
-          observedCurrency: String(price?.currency || '').trim().toUpperCase() || null,
-          observedLookupKey: String(price?.lookup_key || '').trim() || null,
-        },
-      };
+      checks.activeMatches = this.buildCatalogDiagnosticCheck('fail', 'The mapped Stripe product or price is inactive.', `priceActive=${price?.active !== false} productActive=${product?.active !== false}`, 'Reactivate the Stripe object in Stripe or map an active Product and Price.');
+      return finish('inactive', 'The mapped Stripe product or price is inactive.', 'Reactivate the Stripe object in Stripe or map an active Product and Price.', observed, { priceIdMasked: this.maskStripeId(price?.id || input.stripePriceId), productIdMasked: this.maskStripeId(product?.id || input.stripeProductId) });
     }
     if (input.currency && price && String(price.currency || '').trim().toUpperCase() !== input.currency) {
-      return {
-        status: 'currency_mismatch',
-        message: 'The mapped Stripe price currency does not match the expected catalog currency.',
-        observed: {
-          observedAmountCents: Number(price?.unit_amount ?? 0) || null,
-          observedCurrency: String(price?.currency || '').trim().toUpperCase() || null,
-          observedLookupKey: String(price?.lookup_key || '').trim() || null,
-        },
-      };
+      checks.currencyMatches = this.buildCatalogDiagnosticCheck('fail', `Currency mismatch: expected ${input.currency}, Stripe returned ${String(price.currency || '').trim().toUpperCase() || 'unknown'}.`, `expected=${input.currency} actual=${String(price.currency || '').trim().toUpperCase() || 'unknown'}`, 'Use a Stripe Price in the expected currency or change the expected currency intentionally.');
+      return finish('currency_mismatch', `Currency mismatch: expected ${input.currency}, Stripe returned ${String(price.currency || '').trim().toUpperCase() || 'unknown'}.`, 'Use a Stripe Price in the expected currency or change the expected currency intentionally.', observed);
     }
+    checks.currencyMatches = this.buildCatalogDiagnosticCheck(price ? 'pass' : 'not_checked', price ? 'Stripe Price currency matches the expected catalog currency.' : 'Currency was not checked because no Price was fetched.', `expected=${input.currency || 'none'} actual=${String(price?.currency || '').trim().toUpperCase() || 'none'}`, 'No action required.');
     if (input.expectedAmountCents != null && price && Number(price.unit_amount ?? -1) !== input.expectedAmountCents) {
-      return {
-        status: 'amount_mismatch',
-        message: `The mapped Stripe price amount does not match the expected catalog amount (${formatCurrencyMinorUnits(input.expectedAmountCents, input.currency || 'GBP')}).`,
-        observed: {
-          observedAmountCents: Number(price?.unit_amount ?? 0) || null,
-          observedAmountDisplay: formatCurrencyMinorUnits(Number(price?.unit_amount ?? 0) || 0, String(price?.currency || input.currency || 'GBP').trim().toUpperCase() || 'GBP'),
-          observedCurrency: String(price?.currency || '').trim().toUpperCase() || null,
-          observedLookupKey: String(price?.lookup_key || '').trim() || null,
-        },
-      };
+      const expected = formatCurrencyMinorUnits(input.expectedAmountCents, input.currency || 'GBP');
+      const actual = formatCurrencyMinorUnits(Number(price?.unit_amount ?? 0) || 0, String(price?.currency || input.currency || 'GBP').trim().toUpperCase() || 'GBP');
+      checks.amountMatches = this.buildCatalogDiagnosticCheck('fail', `Amount mismatch: expected ${expected}, Stripe returned ${actual}.`, `expected=${input.expectedAmountCents} actual=${Number(price.unit_amount ?? -1)}`, 'Use a Stripe Price with the expected amount or update the catalog amount intentionally.');
+      return finish('amount_mismatch', `Amount mismatch: expected ${expected}, Stripe returned ${actual}.`, 'Use a Stripe Price with the expected amount or update the catalog amount intentionally.', observed);
     }
+    checks.amountMatches = this.buildCatalogDiagnosticCheck(price ? 'pass' : 'not_checked', price ? 'Stripe Price amount matches the expected catalog amount.' : 'Amount was not checked because no Price was fetched.', `expected=${input.expectedAmountCents ?? 'none'} actual=${Number(price?.unit_amount ?? -1)}`, 'No action required.');
     if (input.lookupKey && price && String(price.lookup_key || '').trim() && String(price.lookup_key || '').trim() !== input.lookupKey) {
-      return {
-        status: 'verification_failed',
-        message: 'The mapped Stripe price lookup key does not match the expected lookup key.',
-        observed: {
-          observedAmountCents: Number(price?.unit_amount ?? 0) || null,
-          observedCurrency: String(price?.currency || '').trim().toUpperCase() || null,
-          observedLookupKey: String(price?.lookup_key || '').trim() || null,
-        },
-      };
+      checks.lookupKeyMatches = this.buildCatalogDiagnosticCheck('fail', `Lookup key mismatch: expected ${input.lookupKey}, Stripe returned ${String(price.lookup_key || '').trim()}.`, `expected=${input.lookupKey} actual=${String(price.lookup_key || '').trim()}`, 'Use the expected Stripe lookup key or update the local mapping intentionally.');
+      return finish('verification_failed', `Lookup key mismatch: expected ${input.lookupKey}, Stripe returned ${String(price.lookup_key || '').trim()}.`, 'Use the expected Stripe lookup key or update the local mapping intentionally.', observed);
     }
+    checks.lookupKeyMatches = this.buildCatalogDiagnosticCheck(price ? 'pass' : 'not_checked', price ? 'Stripe lookup key is compatible with this mapping.' : 'Lookup key was not checked because no Price was fetched.', `expected=${input.lookupKey || 'none'} actual=${String(price?.lookup_key || '').trim() || 'none'}`, 'No action required.');
     if (input.stripeProductId && price?.product) {
-      const priceProductId = typeof price.product === 'string' ? price.product : price.product.id;
       if (priceProductId && priceProductId !== input.stripeProductId) {
-        return {
-          status: 'verification_failed',
-          message: 'The mapped Stripe price belongs to a different Stripe product.',
-          observed: {
-            observedAmountCents: Number(price?.unit_amount ?? 0) || null,
-            observedCurrency: String(price?.currency || '').trim().toUpperCase() || null,
-            observedLookupKey: String(price?.lookup_key || '').trim() || null,
-          },
-        };
+        checks.priceBelongsToProduct = this.buildCatalogDiagnosticCheck('fail', `Product mismatch: the Stripe Price belongs to ${this.maskStripeId(priceProductId)}, but MyTitan has stored ${this.maskStripeId(input.stripeProductId)}.`, `priceProduct=${this.maskStripeId(priceProductId)} localProduct=${this.maskStripeId(input.stripeProductId)}`, 'Replace the local Product ID with the Product ID from the verified Stripe Price, then dry-run validate.');
+        return finish('verification_failed', `Product mismatch: the Stripe Price belongs to ${this.maskStripeId(priceProductId)}, but MyTitan has stored ${this.maskStripeId(input.stripeProductId)}.`, 'Replace the local Product ID with the Product ID from the verified Stripe Price, then dry-run validate.', observed, {
+          priceIdMasked: this.maskStripeId(price?.id || input.stripePriceId),
+          priceProductIdMasked: this.maskStripeId(priceProductId),
+          localProductIdMasked: this.maskStripeId(input.stripeProductId),
+          canAdoptProductFromVerifiedPrice: true,
+        });
       }
     }
+    checks.priceBelongsToProduct = this.buildCatalogDiagnosticCheck(price && input.stripeProductId ? 'pass' : 'not_checked', price && input.stripeProductId ? 'The Stripe Price belongs to the stored local Product ID.' : 'Price/product relationship was not checked.', `priceProduct=${this.maskStripeId(priceProductId)} localProduct=${this.maskStripeId(input.stripeProductId)}`, 'No action required.');
+    checks.productIdProvided = this.buildCatalogDiagnosticCheck(input.stripeProductId ? 'pass' : 'fail', input.stripeProductId ? 'A Stripe Product ID was entered.' : 'MyTitan has not stored the Product ID for this mapping yet.', `productId=${this.maskStripeId(input.stripeProductId) || 'missing'}`, 'Use Product ID from verified Stripe Price or enter the matching Product ID.');
+    checks.localMappingComplete = this.buildCatalogDiagnosticCheck(input.stripePriceId && input.stripeProductId ? 'pass' : 'fail', input.stripePriceId && input.stripeProductId ? 'MyTitan has both local Stripe identifiers for this mapping.' : 'MyTitan is missing one or more local Stripe identifiers for this mapping.', `priceId=${this.maskStripeId(input.stripePriceId) || 'missing'} productId=${this.maskStripeId(input.stripeProductId) || 'missing'}`, 'Store both the Stripe Price ID and matching Product ID after confirmation.');
 
-    return {
-      status: 'ready',
-      message: 'Validated against Stripe safely before saving.',
-      observed: {
-        observedAmountCents: Number(price?.unit_amount ?? 0) || null,
-        observedAmountDisplay: formatCurrencyMinorUnits(Number(price?.unit_amount ?? 0) || 0, String(price?.currency || input.currency || 'GBP').trim().toUpperCase() || 'GBP'),
-        observedCurrency: String(price?.currency || '').trim().toUpperCase() || null,
-        observedLookupKey: String(price?.lookup_key || '').trim() || null,
-        observedProductName: String(product?.name || '').trim() || null,
-      },
-    };
+    return finish('ready', 'Validated against Stripe safely before saving.', 'Save mapping with confirmation and reason.', observed, {
+      priceIdMasked: this.maskStripeId(price?.id || input.stripePriceId),
+      productIdMasked: this.maskStripeId(product?.id || input.stripeProductId || priceProductId),
+    });
   }
 
   private async buildPlatformBillingCatalogHistoryEntries(historyRows: any[]) {
@@ -4593,6 +4673,11 @@ export class BillingService {
         source: row ? 'override' : 'environment',
         mismatchWarning: statusMeta.status !== 'ready' ? (row?.verificationMessage || statusMeta.label) : null,
         nextAction: statusMeta.nextAction,
+        diagnostic: row?.metadataJson?.verification || null,
+        providerState: row?.metadataJson?.verification?.providerState || null,
+        localState: row?.metadataJson?.verification?.localState || null,
+        runtimeState: row?.metadataJson?.verification?.runtimeState || null,
+        safeNextAction: row?.metadataJson?.verification?.safeNextAction || statusMeta.nextAction,
         history,
       };
     };
@@ -4729,12 +4814,37 @@ export class BillingService {
       throw new BadRequestException('Catalog code is required');
     }
     const stripePriceId = String(input.stripePriceId || '').trim() || null;
-    const stripeProductId = String(input.stripeProductId || '').trim() || null;
+    let stripeProductId = String(input.stripeProductId || '').trim() || null;
     const lookupKey = String(input.lookupKey || '').trim() || null;
     const currency = String(input.currency || '').trim().toUpperCase() || null;
     const active = input.active !== false;
     const expectedAmountCents = this.resolveCatalogExpectedAmountCents(input, currency);
     const mode = String(input.mode || (input.dryRun === true ? 'validate' : 'save')).trim().toLowerCase();
+    if (mode === 'save' && input.useVerifiedProductFromPrice === true) {
+      if (!stripePriceId) {
+        throw new BadRequestException('A Stripe Price ID is required before adopting the Product ID from the verified Stripe Price.');
+      }
+      if (!String(input.changeNotes || '').trim()) {
+        throw new BadRequestException('A change reason is required before saving a billing catalog mapping.');
+      }
+      if (!this.isStripeConfigured()) {
+        throw new BadRequestException('MyTitan Billing Stripe credentials must be configured before adopting a Product ID from Stripe.');
+      }
+      try {
+        const price = await this.requireStripe().prices.retrieve(stripePriceId, { expand: ['product'] });
+        const priceProductId = price?.product ? (typeof price.product === 'string' ? price.product : price.product.id) : null;
+        if (!priceProductId) {
+          throw new BadRequestException('The verified Stripe Price did not return a Product ID to adopt.');
+        }
+        if (stripeProductId && stripeProductId !== priceProductId) {
+          throw new BadRequestException(`Product mismatch: the Stripe Price belongs to ${this.maskStripeId(priceProductId)}, but MyTitan has stored ${this.maskStripeId(stripeProductId)}.`);
+        }
+        stripeProductId = priceProductId;
+      } catch (error) {
+        if (error instanceof BadRequestException) throw error;
+        throw new BadRequestException(`Product adoption failed during dry-run Stripe validation: ${this.redactStripeText(error instanceof Error ? error.message : String(error))}`);
+      }
+    }
     const verification = await this.verifyPlatformBillingCatalogCandidate({
       kind,
       code,

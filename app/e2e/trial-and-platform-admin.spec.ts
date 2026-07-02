@@ -494,6 +494,10 @@ test.describe("trial model and platform admin separation", () => {
     await expect(catalogRow).toContainText("Expected price: £25.00");
     await expect(catalogRow).toContainText(/Price ID:\s*price_.*••••/);
     await expect(catalogRow).toContainText(/Product ID:\s*prod_.*••••/);
+    page.once("dialog", async (dialog) => {
+      expect(dialog.message()).toMatch(/Reveal full Stripe identifiers/);
+      await dialog.accept();
+    });
     await page.getByTestId("platform-billing-catalog-reveal-job_completion_pack_3-none").click();
     await expect(catalogRow).toContainText(/Price ID:\s*price_[A-Za-z0-9_]{8,}/);
     await expect(catalogRow).toContainText(/Product ID:\s*prod_[A-Za-z0-9_]{8,}/);
