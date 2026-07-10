@@ -117,6 +117,7 @@ type ToastState = {
 
 type StatusFilterKey = 'ALL' | 'UNASSIGNED' | 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED';
 type CalendarPlanningMode = 'bookings' | 'rota';
+type OperationsLens = 'bookings' | 'rota' | 'availability' | 'capacity' | 'assets' | 'fleet' | 'map';
 type BookingMode = 'LOCATION' | 'EMPLOYEE' | 'HYBRID';
 
 type WeeklyScheduleSlot = {
@@ -252,6 +253,16 @@ const SCHEDULE_WARNING_CODES: BookingWarning['code'][] = [
   'OUTSIDE_WORKING_HOURS',
   'OVER_CAPACITY',
   'TIME_OFF',
+];
+
+const OPERATIONS_LENSES: Array<{ key: OperationsLens; label: string; detail: string }> = [
+  { key: 'bookings', label: 'Bookings', detail: 'Scheduled work by time, customer, service, status, location, and staff.' },
+  { key: 'rota', label: 'Staff rota', detail: 'Shifts, leave, unavailable periods, and cover gaps from schedule data.' },
+  { key: 'availability', label: 'Availability', detail: 'Business hours, staff availability, leave, bookings, and remaining slots.' },
+  { key: 'capacity', label: 'Capacity', detail: 'Available hours, booked hours, remaining hours, and utilisation.' },
+  { key: 'assets', label: 'Assets', detail: 'Asset requirements are surfaced when linked to jobs or bookings.' },
+  { key: 'fleet', label: 'Fleet', detail: 'Fleet readiness is available when vehicles or mobile assets are configured.' },
+  { key: 'map', label: 'Live map', detail: 'Map view stays unavailable until a maps provider is configured.' },
 ];
 
 function getStatusColor(status?: string) {
@@ -588,6 +599,7 @@ export default function CalendarPage() {
   const [requestId, setRequestId] = useState<string | undefined>(undefined);
   const [statusFilter, setStatusFilter] = useStickyOperatorView<StatusFilterKey>('mytitan_calendar_status_view_v1', 'ALL');
   const [planningMode, setPlanningMode] = useStickyOperatorView<CalendarPlanningMode>('mytitan_calendar_planning_mode_v1', 'bookings');
+  const [operationsLens, setOperationsLens] = useStickyOperatorView<OperationsLens>('mytitan_calendar_operations_lens_v1', 'bookings');
   const [search, setSearch] = useState('');
   const [selectedTechId, setSelectedTechId] = useState('ALL');
   const [selectedLocationId, setSelectedLocationId] = useState('ALL');
@@ -879,10 +891,58 @@ export default function CalendarPage() {
     return [
       { label: viewMode === 'month' ? 'Month' : viewMode === 'day' ? 'Day' : 'Week range', value: formatViewRangeLabel(days, viewMode) || '-', hint: 'Current planning window' },
       { label: 'Bookings', value: String(bookingCount), hint: warningCount ? `${warningCount} with warnings` : 'No schedule warnings' },
-      { label: 'Technicians', value: String(activeTechs), hint: hasUnassigned ? 'Includes unassigned lane' : 'Assigned lanes only' },
+      { label: 'Staff', value: String(activeTechs), hint: hasUnassigned ? 'Includes unassigned lane' : 'Assigned lanes only' },
       { label: 'Missing cover', value: String(missingCoverRows.length), hint: missingCoverRows.length ? 'Needs staff or location attention' : 'No cover gaps found' },
     ];
   }, [data?.blocks, days, hasUnassigned, missingCoverRows.length, technicians, viewMode]);
+
+  const operationIssueRows = useMemo(() => {
+    const rows: Array<{ id: string; label: string; detail: string; href: string; severity: 'warning' | 'critical' }> = [];
+    for (const block of data?.blocks || []) {
+      const title = getBookingTitle(block);
+      const href = `/dashboard/bookings/${block.id}`;
+      if (!block.technician?.id) {
+        rows.push({
+          id: `${block.id}-unassigned-work`,
+          label: title,
+          detail: 'Unassigned work needs a staff owner before dispatch.',
+          href,
+          severity: 'critical',
+        });
+      }
+      for (const warning of block.warnings || []) {
+        if (warning.code === 'OVERLAP') {
+          rows.push({ id: `${block.id}-overlap-${warning.id}`, label: title, detail: 'Double booking detected for the selected staff lane.', href, severity: 'critical' });
+        } else if (warning.code === 'OUTSIDE_WORKING_HOURS') {
+          rows.push({ id: `${block.id}-outside-hours-${warning.day}`, label: title, detail: `Booking sits outside rota or business hours on ${warning.day}.`, href, severity: 'warning' });
+        } else if (warning.code === 'OVER_CAPACITY') {
+          rows.push({ id: `${block.id}-over-capacity-${warning.day}`, label: title, detail: `Capacity exceeded on ${warning.day}: ${formatHours(warning.bookedMinutes)} booked against ${formatHours(warning.capacityMinutes)} available.`, href, severity: 'critical' });
+        } else if (warning.code === 'TIME_OFF') {
+          rows.push({ id: `${block.id}-time-off-${warning.startsAt}`, label: title, detail: 'Booking conflicts with staff leave or unavailable time.', href, severity: 'critical' });
+        }
+      }
+      if ((bookingMode === 'LOCATION' || bookingMode === 'HYBRID') && !block.location?.id) {
+        rows.push({ id: `${block.id}-missing-location`, label: title, detail: 'Location-based booking has no location assigned.', href, severity: 'warning' });
+      }
+    }
+    return rows.slice(0, 12);
+  }, [bookingMode, data?.blocks]);
+
+  const capacitySummary = useMemo(() => {
+    let available = 0;
+    let booked = 0;
+    for (const bucket of availabilityMap.values()) {
+      for (const value of Object.values(bucket)) available += value;
+    }
+    for (const bucket of bookedMinutesMap.values()) {
+      for (const value of Object.values(bucket)) booked += value;
+    }
+    const remaining = Math.max(available - booked, 0);
+    const utilization = available > 0 ? Math.round((booked / Math.max(1, available)) * 100) : 0;
+    return { available, booked, remaining, utilization };
+  }, [availabilityMap, bookedMinutesMap]);
+
+  const selectedLens = OPERATIONS_LENSES.find((lens) => lens.key === operationsLens) || OPERATIONS_LENSES[0];
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 900);
@@ -1572,6 +1632,73 @@ export default function CalendarPage() {
             </Link>
           </section>
 
+          <section className="card operator-section" data-testid="operations-command-lenses">
+            <div className="operator-section__header">
+              <div>
+                <h2 className="operator-section__title">Operations command centre</h2>
+                <p className="operator-section__subtitle">
+                  {selectedLens.detail}
+                </p>
+              </div>
+              <Link className="button secondary operator-compact-button" href="/dashboard/scheduling">
+                Manage availability
+              </Link>
+            </div>
+            <div className="operator-grid operator-grid--four" style={{ marginTop: 12 }}>
+              {OPERATIONS_LENSES.map((lens) => {
+                const unavailable = lens.key === 'map';
+                return (
+                  <button
+                    key={lens.key}
+                    type="button"
+                    className={operationsLens === lens.key ? 'button primary' : 'button secondary'}
+                    data-testid={`operations-lens-${lens.key}`}
+                    onClick={() => {
+                      setOperationsLens(lens.key);
+                      if (lens.key === 'rota' || lens.key === 'availability' || lens.key === 'capacity') {
+                        setPlanningMode('rota');
+                        setShowTechnicianOverlay(true);
+                        if (viewMode === 'month') setViewMode('week');
+                      }
+                      if (lens.key === 'bookings') {
+                        setPlanningMode('bookings');
+                      }
+                    }}
+                  >
+                    {lens.label}
+                    {unavailable ? ' - setup required' : ''}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="operator-grid operator-grid--three" style={{ marginTop: 12 }}>
+              <article className="mt-surface-note" data-testid="operations-capacity-summary">
+                <strong>Capacity</strong>
+                <p className="muted" style={{ margin: '6px 0 0 0' }}>
+                  {formatHours(capacitySummary.booked)} booked from {formatHours(capacitySummary.available)} available. {formatHours(capacitySummary.remaining)} remaining. Utilisation {capacitySummary.utilization}%.
+                </p>
+              </article>
+              <article className="mt-surface-note" data-testid="operations-assets-foundation">
+                <strong>Assets and fleet</strong>
+                <p className="muted" style={{ margin: '6px 0 0 0' }}>
+                  Asset and fleet lenses are ready to surface linked job assets when configured. They do not invent availability without asset records.
+                </p>
+                <Link className="button secondary operator-compact-button" href="/dashboard/assets" style={{ marginTop: 8 }}>
+                  Open assets
+                </Link>
+              </article>
+              <article className="mt-surface-note" data-testid="operations-route-foundation">
+                <strong>Route foundations</strong>
+                <p className="muted" style={{ margin: '6px 0 0 0' }}>
+                  Provider-neutral directions links are available from job/site data. Traffic-aware optimisation remains unavailable until a maps provider is configured.
+                </p>
+                <Link className="button secondary operator-compact-button" href="/dashboard/enterprise#maps" style={{ marginTop: 8 }}>
+                  Review maps readiness
+                </Link>
+              </article>
+            </div>
+          </section>
+
           <div className="card operator-section">
             <div className="operator-section__header">
               <div>
@@ -1742,6 +1869,30 @@ export default function CalendarPage() {
               <p className="muted" style={{ margin: '6px 0 0 0' }}>No missing staff cover in this view.</p>
             )}
           </article>
+        </section>
+        <section className="card operator-section" style={{ marginTop: 12 }} data-testid="operations-actionable-warnings">
+          <div className="operator-section__header">
+            <div>
+              <h2 className="operator-section__title">Actionable warnings</h2>
+              <p className="operator-section__subtitle">Missing cover, unassigned work, double bookings, rota conflicts, and capacity issues link to the affected booking.</p>
+            </div>
+            <Link className="button secondary operator-compact-button" href="/dashboard/scheduling">
+              Open scheduling
+            </Link>
+          </div>
+          {operationIssueRows.length ? (
+            <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
+              {operationIssueRows.map((row) => (
+                <Link key={row.id} className="operator-mini-card mt-linkCard" href={row.href} data-testid={`operations-warning-${row.id}`}>
+                  <strong>{row.label}</strong>
+                  <span className="muted">{row.detail}</span>
+                  <span className={row.severity === 'critical' ? 'badge warn' : 'badge'}>{row.severity === 'critical' ? 'Needs action' : 'Review'}</span>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <p className="muted" style={{ margin: '12px 0 0 0' }}>No actionable scheduling warnings in this view.</p>
+          )}
         </section>
         {visibleQueue.length ? (
           <div style={{ marginTop: 12 }}>
