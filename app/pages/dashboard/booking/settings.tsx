@@ -28,6 +28,9 @@ type BookingSettingsPayload = {
   publishedServiceCount?: number;
   nextAvailableSlot?: string | null;
   businessHours: Array<{ dayOfWeek: number; startMinute: number; endMinute: number }>;
+  bookingHoursSource?: "BUSINESS" | "CUSTOM";
+  bookingHoursResolvedSource?: "BUSINESS" | "LOCATION" | "CUSTOM";
+  bookingHoursSourceLabel?: string;
   blackoutDates: Array<{ date: string; reason?: string | null }>;
   services: BookingService[];
   folderImages?: Record<string, string>;
@@ -317,6 +320,49 @@ function formatMoney(value?: number | null) {
   return `£${(value / 100).toFixed(2)}`;
 }
 
+function VisibilityEyeIcon({ hidden = false }: { hidden?: boolean }) {
+  return (
+    <svg aria-hidden="true" className="visibility-eye-icon" viewBox="0 0 24 24" focusable="false">
+      <path d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12Z" />
+      <circle cx="12" cy="12" r="3" />
+      {hidden ? <path className="visibility-eye-icon__slash" d="M4 4l16 16" /> : null}
+    </svg>
+  );
+}
+
+function VisibilityIconButton({
+  pressed,
+  visibleLabel,
+  hiddenLabel,
+  shortLabel,
+  testId,
+  onClick,
+}: {
+  pressed: boolean;
+  visibleLabel: string;
+  hiddenLabel: string;
+  shortLabel: string;
+  testId: string;
+  onClick: () => void;
+}) {
+  const label = pressed ? visibleLabel : hiddenLabel;
+  return (
+    <button
+      className={`visibility-icon-button ${pressed ? "is-visible" : "is-hidden"}`}
+      type="button"
+      data-testid={testId}
+      aria-label={label}
+      title={label}
+      aria-pressed={pressed}
+      onClick={onClick}
+    >
+      <VisibilityEyeIcon hidden={!pressed} />
+      <span>{shortLabel}</span>
+      <span className="visually-hidden">{label}</span>
+    </button>
+  );
+}
+
 function buildServiceDraft(service: BookingService): ServiceDraft {
   const publicVisible = typeof service.publicVisible === "boolean" ? service.publicVisible : (service.visibility || "PUBLIC") === "PUBLIC";
   const tradeVisible = typeof service.tradeVisible === "boolean" ? service.tradeVisible : ["PUBLIC", "TRADE"].includes(service.visibility || "PUBLIC");
@@ -379,6 +425,7 @@ export default function BookingProSettingsPage() {
   const [publicBundlesEnabled, setPublicBundlesEnabled] = useState(false);
   const [startHour, setStartHour] = useState("09:00");
   const [endHour, setEndHour] = useState("17:00");
+  const [bookingHoursSource, setBookingHoursSource] = useState<"BUSINESS" | "CUSTOM">("BUSINESS");
   const [blackoutDates, setBlackoutDates] = useState<Array<{ date: string; reason?: string | null }>>([]);
   const [newBlackoutDate, setNewBlackoutDate] = useState("");
   const [newBlackoutReason, setNewBlackoutReason] = useState("");
@@ -462,6 +509,7 @@ export default function BookingProSettingsPage() {
       setTechnicianAssignmentRequired(Boolean(data?.bookingWorkflow?.technicianAssignmentRequired));
       setBlackoutDates(Array.isArray(data?.blackoutDates) ? data.blackoutDates : []);
       const hours = Array.isArray(data?.businessHours) ? data.businessHours : [];
+      setBookingHoursSource(data?.bookingHoursSource === "CUSTOM" ? "CUSTOM" : "BUSINESS");
       const weekdayHours = hours.filter((entry) => Number(entry.dayOfWeek) >= 1 && Number(entry.dayOfWeek) <= 5);
       const source = weekdayHours[0] || hours[0] || null;
       setStartHour(formatMinutes(source?.startMinute, "09:00"));
@@ -571,7 +619,8 @@ export default function BookingProSettingsPage() {
           autoCreateInvoiceDraftOnCompletion,
           autoSendInvoiceOnCompletion,
           technicianAssignmentRequired,
-          businessHours,
+          bookingHoursSource,
+          ...(bookingHoursSource === "CUSTOM" ? { businessHours } : { resetBookingHoursToBusiness: true }),
           blackoutDates,
         }),
       });
@@ -1050,14 +1099,45 @@ export default function BookingProSettingsPage() {
                 </label>
               </div>
             </div>
+            <div className="operator-row" data-testid="booking-hours-source">
+              <div className="operator-row__main">
+                <div className="operator-row__title">Booking hours source</div>
+                <div className="operator-row__subtitle">
+                  Current source: {bookingHoursSource === "CUSTOM" ? "Custom booking hours" : settings?.bookingHoursSourceLabel || "Business hours"}
+                </div>
+              </div>
+              <div className="operator-row__actions">
+                <label className="toggle-row">
+                  <input
+                    type="radio"
+                    name="booking-hours-source"
+                    checked={bookingHoursSource === "BUSINESS"}
+                    onChange={() => setBookingHoursSource("BUSINESS")}
+                  />
+                  Use business hours
+                </label>
+                <label className="toggle-row">
+                  <input
+                    type="radio"
+                    name="booking-hours-source"
+                    checked={bookingHoursSource === "CUSTOM"}
+                    onChange={() => setBookingHoursSource("CUSTOM")}
+                  />
+                  Custom booking hours
+                </label>
+                <button className="button secondary operator-compact-button" type="button" onClick={() => setBookingHoursSource("BUSINESS")}>
+                  Reset to business hours
+                </button>
+              </div>
+            </div>
             <div className="operator-formGrid">
               <div>
                 <label>Weekday start</label>
-                <input className="input" type="time" value={startHour} onChange={(event) => setStartHour(event.target.value)} />
+                <input className="input" type="time" value={startHour} disabled={bookingHoursSource !== "CUSTOM"} onChange={(event) => setStartHour(event.target.value)} />
               </div>
               <div>
                 <label>Weekday end</label>
-                <input className="input" type="time" value={endHour} onChange={(event) => setEndHour(event.target.value)} />
+                <input className="input" type="time" value={endHour} disabled={bookingHoursSource !== "CUSTOM"} onChange={(event) => setEndHour(event.target.value)} />
               </div>
             </div>
             <div>
@@ -1488,24 +1568,22 @@ export default function BookingProSettingsPage() {
               <div data-testid="booking-service-visibility-controls">
                 <label>Booking visibility</label>
                 <div className="operator-inline-actions" style={{ marginTop: 8 }}>
-                  <button
-                    className={`button ${serviceDraft.publicVisible ? "" : "secondary"}`}
-                    type="button"
-                    data-testid="booking-service-public-visible"
-                    aria-pressed={serviceDraft.publicVisible}
+                  <VisibilityIconButton
+                    pressed={serviceDraft.publicVisible}
+                    visibleLabel="Visible publicly"
+                    hiddenLabel="Hidden from public"
+                    shortLabel="Public"
+                    testId="booking-service-public-visible"
                     onClick={() => setServiceAudienceVisibility("publicVisible", !serviceDraft.publicVisible)}
-                  >
-                    {serviceDraft.publicVisible ? "Eye open" : "Eye slashed"} public
-                  </button>
-                  <button
-                    className={`button ${serviceDraft.tradeVisible ? "" : "secondary"}`}
-                    type="button"
-                    data-testid="booking-service-trade-visible"
-                    aria-pressed={serviceDraft.tradeVisible}
+                  />
+                  <VisibilityIconButton
+                    pressed={serviceDraft.tradeVisible}
+                    visibleLabel="Trade-visible"
+                    hiddenLabel="Hidden from trade/private"
+                    shortLabel="Trade"
+                    testId="booking-service-trade-visible"
                     onClick={() => setServiceAudienceVisibility("tradeVisible", !serviceDraft.tradeVisible)}
-                  >
-                    {serviceDraft.tradeVisible ? "Eye open" : "Eye slashed"} trade/private
-                  </button>
+                  />
                 </div>
                 <p className="operator-note" style={{ marginTop: 8 }}>
                   Public customers only see public-visible services. Trade/private routes can still use trade-visible services.

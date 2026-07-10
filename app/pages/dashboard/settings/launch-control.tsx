@@ -120,6 +120,17 @@ type BookingSettings = {
   publicUrl?: string | null;
 };
 
+type InstallDiagnostics = {
+  manifestReachable: boolean;
+  iconsReachable: boolean;
+  iconCount: number;
+  serviceWorkerState: string;
+  installed: boolean;
+  installEligible: boolean;
+  limitation: string;
+  nextAction: string;
+};
+
 type TenantSettings = {
   businessConfigJson?: Record<string, any> | null;
 };
@@ -231,6 +242,17 @@ export default function LaunchControlPage() {
   const [error, setError] = useState("");
   const [viewMode, setViewMode] = useState<"basic" | "advanced">("basic");
   const [canaryConfirmed, setCanaryConfirmed] = useState(false);
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const [installDiagnostics, setInstallDiagnostics] = useState<InstallDiagnostics>({
+    manifestReachable: false,
+    iconsReachable: false,
+    iconCount: 0,
+    serviceWorkerState: "Not checked",
+    installed: false,
+    installEligible: false,
+    limitation: "Checking browser support",
+    nextAction: "Checking installability",
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -275,6 +297,91 @@ export default function LaunchControlPage() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let cancelled = false;
+    const isIos = /iphone|ipad|ipod/i.test(window.navigator.userAgent);
+
+    const refreshDiagnostics = async (promptEvent: any = installPrompt) => {
+      const installed =
+        window.matchMedia?.("(display-mode: standalone)")?.matches ||
+        window.matchMedia?.("(display-mode: window-controls-overlay)")?.matches ||
+        Boolean((window.navigator as any).standalone);
+      const next: InstallDiagnostics = {
+        manifestReachable: false,
+        iconsReachable: false,
+        iconCount: 0,
+        serviceWorkerState: "Not registered",
+        installed,
+        installEligible: Boolean(promptEvent),
+        limitation: "",
+        nextAction: "",
+      };
+      try {
+        const manifest = await fetch("/site.webmanifest", { cache: "no-store" });
+        next.manifestReachable = manifest.ok;
+        if (manifest.ok) {
+          const manifestJson = await manifest.json();
+          const icons = Array.isArray(manifestJson.icons) ? manifestJson.icons : [];
+          next.iconCount = icons.length;
+          const iconChecks = await Promise.all(
+            icons.map((icon: any) => fetch(String(icon.src || ""), { method: "HEAD", cache: "no-store" }).then((res) => res.ok).catch(() => false)),
+          );
+          next.iconsReachable = iconChecks.length > 0 && iconChecks.every(Boolean);
+        }
+      } catch {
+        next.manifestReachable = false;
+      }
+
+      if ("serviceWorker" in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations().catch(() => []);
+        next.serviceWorkerState = registrations.length ? registrations.map((registration) => registration.active?.state || registration.installing?.state || "registered").join(", ") : "Not registered";
+      } else {
+        next.serviceWorkerState = "Unsupported";
+      }
+
+      if (next.installed) {
+        next.limitation = "MyTitan is already running as an installed app.";
+        next.nextAction = "Open from the installed app shortcut.";
+      } else if (next.installEligible) {
+        next.limitation = "Native install prompt is available in this browser.";
+        next.nextAction = "Install MyTitan.";
+      } else if (isIos) {
+        next.limitation = "iOS Safari does not expose a native install prompt button.";
+        next.nextAction = "Use Share, then Add to Home Screen.";
+      } else {
+        next.limitation = "This browser has not exposed an install prompt yet.";
+        next.nextAction = "Use Chrome or Edge over HTTPS, or open the browser install menu.";
+      }
+      if (!cancelled) setInstallDiagnostics(next);
+    };
+
+    const handleBeforeInstallPrompt = (event: Event) => {
+      event.preventDefault();
+      setInstallPrompt(event);
+      void refreshDiagnostics(event);
+    };
+    const handleInstalled = () => {
+      setInstallPrompt(null);
+      void refreshDiagnostics(null);
+    };
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    window.addEventListener("appinstalled", handleInstalled);
+    void refreshDiagnostics();
+    return () => {
+      cancelled = true;
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+      window.removeEventListener("appinstalled", handleInstalled);
+    };
+  }, [installPrompt]);
+
+  async function installApp() {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    await installPrompt.userChoice.catch(() => null);
+    setInstallPrompt(null);
+  }
 
   const canViewMonitoring = Boolean(me?.platformAdmin || me?.role === "OWNER" || me?.role === "ADMIN");
   const canViewPlatformDiagnostics = Boolean(me?.platformAdmin);
@@ -500,6 +607,52 @@ export default function LaunchControlPage() {
 
         {error ? <p role="alert" style={{ color: "#ff8a8a", marginTop: 0 }}>{error}</p> : null}
         {!ops && !monitoring && !error ? <LoadingState title="Loading launch view" description="Checking billing, launch blockers, app access, and public setup truth." /> : null}
+
+        <section className="card operator-section" data-testid="installable-app-diagnostics">
+          <div className="operator-section__header">
+            <div>
+              <h2 className="operator-section__title">Installable app</h2>
+              <p className="operator-section__subtitle">Install MyTitan on supported browsers without caching authenticated, API, or payment responses.</p>
+            </div>
+            <OperatorStatusBadge
+              label={installDiagnostics.installed ? "Installed" : installDiagnostics.installEligible ? "Install available" : "Check browser"}
+              tone={installDiagnostics.installed || installDiagnostics.installEligible ? "success" : "warning"}
+              compact
+            />
+          </div>
+          <div className="booking-summary-grid">
+            <article className="booking-lifecycle-card">
+              <strong>Manifest</strong>
+              <p>{installDiagnostics.manifestReachable ? "Reachable" : "Not reachable"}</p>
+              <p>{installDiagnostics.iconCount} icons checked; {installDiagnostics.iconsReachable ? "all required icons reachable" : "one or more icons need attention"}.</p>
+            </article>
+            <article className="booking-lifecycle-card">
+              <strong>Service worker</strong>
+              <p>{installDiagnostics.serviceWorkerState}</p>
+              <p>Authenticated pages, API responses, and payment routes are not treated as offline data.</p>
+            </article>
+            <article className="booking-lifecycle-card">
+              <strong>Browser</strong>
+              <p>{installDiagnostics.limitation}</p>
+              <p>{installDiagnostics.nextAction}</p>
+            </article>
+          </div>
+          <div className="operator-inline-actions" style={{ marginTop: 16 }}>
+            <button
+              className="button"
+              type="button"
+              data-testid="installable-app-install-action"
+              disabled={!installPrompt || installDiagnostics.installed}
+              onClick={() => void installApp()}
+              title={installDiagnostics.nextAction}
+            >
+              Install MyTitan
+            </button>
+            <Link className="button secondary" href="/site.webmanifest" target="_blank" rel="noreferrer">
+              Open manifest
+            </Link>
+          </div>
+        </section>
 
         {canViewPlatformDiagnostics && monitoring ? (
           <section className="card operator-section" data-testid="launch-control-health-summary">

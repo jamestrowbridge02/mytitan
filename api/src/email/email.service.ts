@@ -108,6 +108,7 @@ type EmailContextOptions = {
 type TenantMailPresentation = {
   companyName: string | null;
   logoUrl: string | null;
+  contactEmail: string | null;
   emailSenderName: string | null;
   emailReplyTo: string | null;
   smtpHost: string | null;
@@ -502,6 +503,7 @@ export class EmailService {
       return {
         companyName: null,
         logoUrl: null,
+        contactEmail: null,
         emailSenderName: null,
         emailReplyTo: null,
         smtpHost: null,
@@ -515,6 +517,7 @@ export class EmailService {
       select: {
         companyName: true,
         logoUrl: true,
+        contactEmail: true,
         emailSenderName: true,
         emailReplyTo: true,
         smtpHost: true,
@@ -526,6 +529,7 @@ export class EmailService {
     return {
       companyName: tenant?.companyName || null,
       logoUrl: tenant?.logoUrl || null,
+      contactEmail: tenant?.contactEmail || null,
       emailSenderName: tenant?.emailSenderName || null,
       emailReplyTo: tenant?.emailReplyTo || null,
       smtpHost: tenant?.smtpHost || null,
@@ -612,7 +616,8 @@ export class EmailService {
     const overrideReplyToEmail = this.normalizeEmail(overrides?.replyToEmail || '');
     const overrideFromName = String(overrides?.fromName || '').replace(/[\r\n"]/g, '').trim();
     const fromEmail = this.normalizeEmail(user);
-    const replyToEmail = overrideReplyToEmail || this.normalizeEmail(tenant.emailReplyTo || '');
+    const inheritedReplyTo = this.normalizeEmail(tenant.emailReplyTo || '') || this.normalizeEmail(tenant.contactEmail || '');
+    const replyToEmail = overrideReplyToEmail || inheritedReplyTo;
     const secure = port === 465 || port === 587;
 
     return {
@@ -622,7 +627,7 @@ export class EmailService {
       user,
       password,
       fromEmail,
-      fromName: overrideFromName || String(tenant.emailSenderName || '').trim() || null,
+      fromName: overrideFromName || String(tenant.emailSenderName || tenant.companyName || '').trim() || null,
       replyToEmail: replyToEmail || null,
       source: host ? 'environment' : 'missing',
     };
@@ -636,6 +641,7 @@ export class EmailService {
         : {
             companyName: null,
             logoUrl: null,
+            contactEmail: null,
             emailSenderName: null,
             emailReplyTo: null,
             smtpHost: null,
@@ -649,7 +655,7 @@ export class EmailService {
       senderName: tenant.emailSenderName || null,
       replyToEmail:
         ownership === 'workspace'
-          ? this.normalizeEmail(tenant.emailReplyTo || '') || null
+          ? this.normalizeEmail(tenant.emailReplyTo || '') || this.normalizeEmail(tenant.contactEmail || '') || null
           : this.normalizeEmail(process.env.REPLY_TO_EMAIL || process.env.SUPPORT_EMAIL || '') || null,
     };
   }
@@ -1033,10 +1039,14 @@ export class EmailService {
         fallback,
         effective: {
           ...fallback,
+          fromName: workspace.fromName || fallback.fromName,
+          replyToEmail: workspace.replyToEmail || fallback.replyToEmail,
           senderOwnership: 'system',
           usingFallback: true,
           notice: this.fallbackNotice(),
-          guidance: 'Customer emails can be sent by MyTitan until you add your own sending email.',
+          guidance: workspace.replyToEmail
+            ? 'Customer emails will be sent by MyTitan with your business email as Reply-To until your sending domain is verified.'
+            : 'Customer emails can be sent by MyTitan until you add your own sending email.',
         },
       };
     }

@@ -103,6 +103,14 @@ export class UpdateBookingSettingsDto {
   }>;
 
   @IsOptional()
+  @IsIn(['BUSINESS', 'CUSTOM'])
+  bookingHoursSource?: 'BUSINESS' | 'CUSTOM';
+
+  @IsOptional()
+  @IsBoolean()
+  resetBookingHoursToBusiness?: boolean;
+
+  @IsOptional()
   @IsArray()
   blackoutDates?: Array<{
     date: string;

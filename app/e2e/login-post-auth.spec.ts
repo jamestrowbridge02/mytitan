@@ -28,7 +28,7 @@ test.describe("login post-auth stability", () => {
     const manifestResponse = await request.get(`${process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:3001"}/site.webmanifest`);
     expect(manifestResponse.ok()).toBeTruthy();
     const manifest = await manifestResponse.json();
-    expect(String(manifest?.start_url || "")).toBe("/");
+    expect(String(manifest?.start_url || "")).toBe("/dashboard");
     expect(String(manifest?.scope || "")).toBe("/");
     expect(JSON.stringify(manifest)).not.toMatch(/localhost|127\.0\.0\.1|0\.0\.0\.0|api:3000|app:3001|marketing:3002/i);
 

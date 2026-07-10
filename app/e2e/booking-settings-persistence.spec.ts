@@ -74,9 +74,9 @@ test.describe("booking settings ownership", () => {
     await expect(page.getByTestId("booking-mode-location")).toBeVisible();
     await expect(page.getByTestId("booking-mode-employee")).toBeVisible();
     await expect(page.getByTestId("booking-mode-hybrid")).toBeVisible();
-    await expect(page.getByTestId("booking-service-public-visible")).toContainText(/Eye open|Eye slashed/i);
+    await expect(page.getByTestId("booking-service-public-visible")).toHaveAttribute("aria-label", "Visible publicly");
     await page.getByTestId("booking-service-public-visible").click();
-    await expect(page.getByTestId("booking-service-public-visible")).toContainText("Eye slashed public");
-    await expect(page.getByTestId("booking-service-trade-visible")).toContainText(/trade\/private/i);
+    await expect(page.getByTestId("booking-service-public-visible")).toHaveAttribute("aria-label", "Hidden from public");
+    await expect(page.getByTestId("booking-service-trade-visible")).toHaveAttribute("aria-label", "Trade-visible");
   });
 });

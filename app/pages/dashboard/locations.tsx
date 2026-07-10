@@ -37,6 +37,49 @@ function createLocationForm(defaults?: GeoDefaults | null) {
   };
 }
 
+function VisibilityEyeIcon({ hidden = false }: { hidden?: boolean }) {
+  return (
+    <svg aria-hidden="true" className="visibility-eye-icon" viewBox="0 0 24 24" focusable="false">
+      <path d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12Z" />
+      <circle cx="12" cy="12" r="3" />
+      {hidden ? <path className="visibility-eye-icon__slash" d="M4 4l16 16" /> : null}
+    </svg>
+  );
+}
+
+function VisibilityIconButton({
+  pressed,
+  visibleLabel,
+  hiddenLabel,
+  shortLabel,
+  testId,
+  onClick,
+}: {
+  pressed: boolean;
+  visibleLabel: string;
+  hiddenLabel: string;
+  shortLabel: string;
+  testId: string;
+  onClick: () => void;
+}) {
+  const label = pressed ? visibleLabel : hiddenLabel;
+  return (
+    <button
+      className={`visibility-icon-button ${pressed ? 'is-visible' : 'is-hidden'}`}
+      type="button"
+      data-testid={testId}
+      aria-label={label}
+      title={label}
+      aria-pressed={pressed}
+      onClick={onClick}
+    >
+      <VisibilityEyeIcon hidden={!pressed} />
+      <span>{shortLabel}</span>
+      <span className="visually-hidden">{label}</span>
+    </button>
+  );
+}
+
 export default function LocationsPage() {
   const enabled = isLocationsV1Enabled();
   const advancedEnabled = isLocationsAdvancedV1Enabled();
@@ -560,27 +603,25 @@ export default function LocationsPage() {
               <input className="input" type="number" min={5} step={5} value={form.slotMinutes} onChange={(e) => setForm({ ...form, slotMinutes: Number(e.target.value || 30) })} />
               <label>Booking visibility</label>
               <div data-testid="location-visibility-controls" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <button
-                  className={`button ${form.publicVisible !== false ? '' : 'secondary'}`}
-                  type="button"
-                  data-testid="location-public-visible"
-                  aria-pressed={form.publicVisible !== false}
+                <VisibilityIconButton
+                  pressed={form.publicVisible !== false}
+                  visibleLabel="Visible publicly"
+                  hiddenLabel="Hidden from public"
+                  shortLabel="Public"
+                  testId="location-public-visible"
                   onClick={() => setForm({ ...form, publicVisible: !(form.publicVisible !== false) })}
-                >
-                  {form.publicVisible !== false ? 'Eye open' : 'Eye slashed'} public
-                </button>
-                <button
-                  className={`button ${form.tradeVisible !== false ? '' : 'secondary'}`}
-                  type="button"
-                  data-testid="location-trade-visible"
-                  aria-pressed={form.tradeVisible !== false}
+                />
+                <VisibilityIconButton
+                  pressed={form.tradeVisible !== false}
+                  visibleLabel="Trade-visible"
+                  hiddenLabel="Hidden from trade/private"
+                  shortLabel="Trade"
+                  testId="location-trade-visible"
                   onClick={() => {
                     const nextVisible = !(form.tradeVisible !== false);
                     setForm({ ...form, tradeVisible: nextVisible, privateVisible: nextVisible });
                   }}
-                >
-                  {form.tradeVisible !== false ? 'Eye open' : 'Eye slashed'} trade/private
-                </button>
+                />
               </div>
               <label>Arrival instructions</label>
               <textarea className="input" value={form.arrivalInstructions} onChange={(e) => setForm({ ...form, arrivalInstructions: e.target.value })} />
@@ -722,8 +763,15 @@ export default function LocationsPage() {
                     TZ: {loc.timezone || '—'} • Lead: {Number(loc.bookingLeadTimeMins || 0)} mins • Staff: {loc.memberships?.filter((membership: any) => membership.active).length || 0}
                   </p>
                 ) : null}
-                <p className="muted" style={{ margin: '6px 0 0 0' }} data-testid="location-visibility-state">
-                  {(loc.metadataJson?.publicVisible === false ? 'Eye slashed public' : 'Eye open public')} • {(loc.metadataJson?.tradeVisible === false ? 'Eye slashed trade/private' : 'Eye open trade/private')}
+                <p className="muted visibility-state-row" style={{ margin: '6px 0 0 0' }} data-testid="location-visibility-state">
+                  <span className={`visibility-state-pill ${loc.metadataJson?.publicVisible === false ? 'is-hidden' : 'is-visible'}`}>
+                    <VisibilityEyeIcon hidden={loc.metadataJson?.publicVisible === false} />
+                    {loc.metadataJson?.publicVisible === false ? 'Hidden from public' : 'Visible publicly'}
+                  </span>
+                  <span className={`visibility-state-pill ${loc.metadataJson?.tradeVisible === false ? 'is-hidden' : 'is-visible'}`}>
+                    <VisibilityEyeIcon hidden={loc.metadataJson?.tradeVisible === false} />
+                    {loc.metadataJson?.tradeVisible === false ? 'Hidden from trade/private' : 'Trade-visible'}
+                  </span>
                 </p>
               </div>
               <div className="integration-actions">

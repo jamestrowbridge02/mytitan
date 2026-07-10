@@ -2,8 +2,8 @@
   "name": "MyTitan",
   "short_name": "MyTitan",
   "description": "MyTitan helps service businesses run bookings, jobs, customers, approvals, scheduling, and billing in one place.",
-  "id": "/",
-  "start_url": "/",
+  "id": "/dashboard",
+  "start_url": "/dashboard",
   "scope": "/",
   "icons": [
     {
@@ -37,5 +37,17 @@
   "display_override": ["standalone", "minimal-ui", "browser"],
   "orientation": "portrait-primary",
   "prefer_related_applications": false,
-  "categories": ["business", "productivity"]
+  "categories": ["business", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "url": "/dashboard"
+    },
+    {
+      "name": "Bookings",
+      "short_name": "Bookings",
+      "url": "/dashboard/bookings"
+    }
+  ]
 }

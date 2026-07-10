@@ -12055,3 +12055,181 @@ html[data-theme="dark"] .stripe-action-result {
 html[data-theme="dark"] .stripe-action-result span {
   color: var(--text-secondary);
 }
+
+/* Launch contrast hardening: keep operational surfaces readable in light, dark and system modes. */
+:root {
+  --mt-page-bg: var(--bg, #f8fafc);
+  --mt-card-bg: var(--card, #ffffff);
+  --mt-surface-bg: var(--surface, #ffffff);
+  --mt-input-bg: #ffffff;
+  --mt-text-primary: var(--text-primary, #0f172a);
+  --mt-text-secondary: var(--text-secondary, #334155);
+  --mt-text-muted: var(--text-muted, #475569);
+  --mt-border: var(--border, #cbd5e1);
+  --mt-focus: var(--focus, #2563eb);
+  --mt-disabled-bg: #e2e8f0;
+  --mt-disabled-text: #475569;
+  --mt-link: #1d4ed8;
+  --mt-success: #047857;
+  --mt-warning: #a16207;
+  --mt-error: #b91c1c;
+}
+
+html[data-theme="dark"] {
+  --mt-page-bg: #020617;
+  --mt-card-bg: #0f172a;
+  --mt-surface-bg: #111827;
+  --mt-input-bg: #0b1220;
+  --mt-text-primary: #f8fafc;
+  --mt-text-secondary: #e2e8f0;
+  --mt-text-muted: #cbd5e1;
+  --mt-border: #475569;
+  --mt-focus: #93c5fd;
+  --mt-disabled-bg: #1e293b;
+  --mt-disabled-text: #cbd5e1;
+  --mt-link: #93c5fd;
+  --mt-success: #86efac;
+  --mt-warning: #fde68a;
+  --mt-error: #fecaca;
+}
+
+[data-shell="app"],
+.customer-workspace,
+.trade-portal-shell,
+.public-booking-shell {
+  color: var(--mt-text-primary);
+}
+
+[data-shell="app"] .card,
+[data-shell="app"] .operator-section,
+[data-shell="app"] .operator-row,
+[data-shell="app"] [role="dialog"],
+[data-shell="app"] .dropdown-menu,
+.customer-workspace .card,
+.trade-portal-shell .card {
+  background-color: var(--mt-card-bg);
+  color: var(--mt-text-primary);
+  border-color: var(--mt-border);
+}
+
+[data-shell="app"] .muted,
+[data-shell="app"] .operator-note,
+[data-shell="app"] .operator-row__subtitle,
+[data-shell="app"] .operator-section__subtitle,
+.customer-workspace .muted,
+.trade-portal-shell .muted {
+  color: var(--mt-text-muted);
+}
+
+[data-shell="app"] .input,
+[data-shell="app"] input,
+[data-shell="app"] select,
+[data-shell="app"] textarea,
+.customer-workspace .input,
+.trade-portal-shell .input {
+  background-color: var(--mt-input-bg);
+  color: var(--mt-text-primary);
+  border-color: var(--mt-border);
+}
+
+[data-shell="app"] select option,
+.customer-workspace select option,
+.trade-portal-shell select option {
+  background-color: var(--mt-input-bg);
+  color: var(--mt-text-primary);
+}
+
+[data-shell="app"] .input::placeholder,
+[data-shell="app"] input::placeholder,
+[data-shell="app"] textarea::placeholder {
+  color: var(--mt-text-muted);
+  opacity: 1;
+}
+
+[data-shell="app"] .input:disabled,
+[data-shell="app"] input:disabled,
+[data-shell="app"] select:disabled,
+[data-shell="app"] textarea:disabled,
+[data-shell="app"] .button:disabled {
+  background-color: var(--mt-disabled-bg);
+  color: var(--mt-disabled-text);
+  border-color: var(--mt-border);
+  opacity: 1;
+}
+
+[data-shell="app"] a {
+  color: var(--mt-link);
+}
+
+[data-shell="app"] .input:focus-visible,
+[data-shell="app"] input:focus-visible,
+[data-shell="app"] select:focus-visible,
+[data-shell="app"] textarea:focus-visible,
+[data-shell="app"] .button:focus-visible,
+[data-shell="app"] button:focus-visible,
+.visibility-icon-button:focus-visible {
+  outline: 3px solid var(--mt-focus);
+  outline-offset: 2px;
+}
+
+[data-shell="app"] input:-webkit-autofill,
+[data-shell="app"] textarea:-webkit-autofill,
+[data-shell="app"] select:-webkit-autofill {
+  -webkit-text-fill-color: var(--mt-text-primary);
+  box-shadow: 0 0 0 1000px var(--mt-input-bg) inset;
+  caret-color: var(--mt-text-primary);
+}
+
+.visibility-icon-button,
+.visibility-state-pill {
+  align-items: center;
+  border: 1px solid var(--mt-border);
+  border-radius: 999px;
+  display: inline-flex;
+  font-weight: 700;
+  gap: 0.45rem;
+  min-height: 2.5rem;
+}
+
+.visibility-icon-button {
+  background: var(--mt-surface-bg);
+  color: var(--mt-text-primary);
+  cursor: pointer;
+  padding: 0.45rem 0.75rem;
+}
+
+.visibility-icon-button.is-visible,
+.visibility-state-pill.is-visible {
+  border-color: #2563eb;
+  color: #1d4ed8;
+}
+
+.visibility-icon-button.is-hidden,
+.visibility-state-pill.is-hidden {
+  color: var(--mt-text-muted);
+}
+
+.visibility-eye-icon {
+  fill: none;
+  flex: 0 0 auto;
+  height: 1.1rem;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+  width: 1.1rem;
+}
+
+.visibility-eye-icon__slash {
+  stroke-width: 2.5;
+}
+
+.visibility-state-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.visibility-state-pill {
+  padding: 0.25rem 0.6rem;
+}

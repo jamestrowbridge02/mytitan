@@ -58,7 +58,7 @@ test.describe("multi-location operations", () => {
     await createCard.getByTestId("location-name-input").fill(updatedName);
     await page.getByTestId("location-save").evaluate((element: HTMLButtonElement) => element.click());
     await expect(page.getByTestId("location-list")).toContainText(updatedName);
-    await expect(page.getByTestId("location-list").locator(".integration-card", { hasText: updatedName })).toContainText("Eye slashed public");
+    await expect(page.getByTestId("location-list").locator(".integration-card", { hasText: updatedName })).toContainText("Hidden from public");
   });
 
   test("operator can assign a location membership", async ({ page, request }) => {

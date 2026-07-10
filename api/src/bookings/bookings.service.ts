@@ -1498,22 +1498,131 @@ export class BookingsService {
     return this.conversion.convert(companyId, userId, bookingId);
   }
 
-  private async ensureBusinessHours(tenantId: string) {
-    const db = this.prisma as any;
-    const existing = await db.bookingBusinessHour.findMany({ where: { tenantId } });
-    if (existing.length) return existing;
-
-    const defaults = [
+  private defaultBusinessHours() {
+    return [
       { dayOfWeek: 1, startMinute: 9 * 60, endMinute: 17 * 60 },
       { dayOfWeek: 2, startMinute: 9 * 60, endMinute: 17 * 60 },
       { dayOfWeek: 3, startMinute: 9 * 60, endMinute: 17 * 60 },
       { dayOfWeek: 4, startMinute: 9 * 60, endMinute: 17 * 60 },
       { dayOfWeek: 5, startMinute: 9 * 60, endMinute: 17 * 60 },
     ];
-    await db.bookingBusinessHour.createMany({
-      data: defaults.map((entry) => ({ tenantId, ...entry })),
+  }
+
+  private normalizeLocationHours(hours: any[]) {
+    return hours
+      .filter((entry: any) => !entry.isClosed)
+      .map((entry: any) => ({
+        dayOfWeek: Number(entry.weekday),
+        startMinute: Number(entry.startMinute ?? 9 * 60),
+        endMinute: Number(entry.endMinute ?? 17 * 60),
+      }))
+      .filter((entry) => Number.isFinite(entry.dayOfWeek) && entry.endMinute > entry.startMinute);
+  }
+
+  private getExplicitBookingHoursMode(settings?: { businessConfigJson?: unknown } | null) {
+    const config = settings?.businessConfigJson && typeof settings.businessConfigJson === 'object' && !Array.isArray(settings.businessConfigJson)
+      ? settings.businessConfigJson as any
+      : {};
+    if (config.bookingHoursSource === 'BUSINESS') return 'BUSINESS';
+    if (config.bookingHoursSource === 'CUSTOM') return 'CUSTOM';
+    return null;
+  }
+
+  private hoursDiffer(left: any[], right: any[]) {
+    const normalize = (hours: any[]) => hours
+      .map((entry: any) => ({
+        dayOfWeek: Number(entry.dayOfWeek),
+        startMinute: Number(entry.startMinute),
+        endMinute: Number(entry.endMinute),
+      }))
+      .filter((entry) => Number.isFinite(entry.dayOfWeek) && entry.endMinute > entry.startMinute)
+      .sort((a, b) => a.dayOfWeek - b.dayOfWeek);
+    return JSON.stringify(normalize(left)) !== JSON.stringify(normalize(right));
+  }
+
+  private async updateBookingHoursMode(tenantId: string, mode: 'BUSINESS' | 'CUSTOM') {
+    const db = this.prisma as any;
+    const settings = await db.tenantSetting.findUnique({ where: { tenantId }, select: { businessConfigJson: true } });
+    const config = settings?.businessConfigJson && typeof settings.businessConfigJson === 'object' && !Array.isArray(settings.businessConfigJson)
+      ? settings.businessConfigJson as any
+      : {};
+    await db.tenantSetting.update({
+      where: { tenantId },
+      data: { businessConfigJson: { ...config, bookingHoursSource: mode } },
     });
-    return db.bookingBusinessHour.findMany({ where: { tenantId } });
+  }
+
+  private async findInheritedBusinessHours(tenantId: string, locationId?: string | null) {
+    const db = this.prisma as any;
+    if (locationId) {
+      const locationHours = await db.locationBusinessHour.findMany({
+        where: { companyId: tenantId, locationId },
+        orderBy: { weekday: 'asc' },
+      });
+      const normalized = this.normalizeLocationHours(locationHours);
+      if (normalized.length) {
+        return { hours: normalized, source: 'LOCATION' as const };
+      }
+    }
+
+    const tenantSettings = await db.tenantSetting.findUnique({
+      where: { tenantId },
+      select: { defaultLocationId: true },
+    }).catch(() => null);
+    const activeLocations = await db.location.findMany({
+      where: { companyId: tenantId, isActive: true },
+      select: {
+        id: true,
+        businessHours: {
+          select: { weekday: true, startMinute: true, endMinute: true, isClosed: true },
+          orderBy: { weekday: 'asc' },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    }).catch(() => []);
+
+    const orderedLocations = [
+      ...activeLocations.filter((location: any) => tenantSettings?.defaultLocationId && location.id === tenantSettings.defaultLocationId),
+      ...activeLocations.filter((location: any) => !tenantSettings?.defaultLocationId || location.id !== tenantSettings.defaultLocationId),
+    ];
+    for (const location of orderedLocations) {
+      const normalized = this.normalizeLocationHours(location.businessHours || []);
+      if (normalized.length) {
+        return { hours: normalized, source: location.id === locationId ? 'LOCATION' as const : 'BUSINESS' as const };
+      }
+    }
+
+    return { hours: this.defaultBusinessHours(), source: 'BUSINESS' as const };
+  }
+
+  private async resolveBookingHours(tenantId: string, input: { locationId?: string | null } = {}) {
+    const db = this.prisma as any;
+    const [settings, customHours] = await Promise.all([
+      db.tenantSetting.findUnique({ where: { tenantId }, select: { businessConfigJson: true } }),
+      db.bookingBusinessHour.findMany({ where: { tenantId }, orderBy: { dayOfWeek: 'asc' } }),
+    ]);
+    const explicitMode = this.getExplicitBookingHoursMode(settings);
+    const inherited = await this.findInheritedBusinessHours(tenantId, input.locationId);
+    const customHoursDiffer = customHours.length > 0 && this.hoursDiffer(customHours, inherited.hours);
+    if ((explicitMode === 'CUSTOM' || (!explicitMode && customHoursDiffer)) && customHours.length > 0) {
+      return {
+        mode: 'CUSTOM' as const,
+        source: 'CUSTOM' as const,
+        sourceLabel: 'Custom booking hours',
+        hours: customHours,
+      };
+    }
+
+    return {
+      mode: 'BUSINESS' as const,
+      source: inherited.source,
+      sourceLabel: inherited.source === 'LOCATION' ? 'Location hours' : 'Business hours',
+      hours: inherited.hours,
+    };
+  }
+
+  private async ensureBusinessHours(tenantId: string) {
+    return (await this.resolveBookingHours(tenantId)).hours;
   }
 
   private async ensureBookingTokens(tenantId: string) {
@@ -1663,7 +1772,7 @@ export class BookingsService {
   async getSettings(tenantId: string) {
     const db = this.prisma as any;
     const settings = await this.ensureBookingTokens(tenantId);
-    const hours = await this.ensureBusinessHours(tenantId);
+    const resolvedHours = await this.resolveBookingHours(tenantId);
     const blackouts = await db.bookingBlackoutDate.findMany({ where: { tenantId }, orderBy: { date: 'asc' } });
     const workspaceState = await this.getWorkspaceBookingState(settings);
     const activeLocationCount = await db.location.count({ where: { companyId: tenantId, isActive: true } }).catch(() => 0);
@@ -1678,7 +1787,10 @@ export class BookingsService {
       },
       publicUrl: settings?.bookingPublicToken ? buildAppUrl(`/portal/booking/${settings.bookingPublicToken}`) : null,
       icsUrl: settings?.bookingIcsToken ? buildApiUrl(`/public/ics/${settings.bookingIcsToken}`) : null,
-      businessHours: hours,
+      businessHours: resolvedHours.hours,
+      bookingHoursSource: resolvedHours.mode,
+      bookingHoursResolvedSource: resolvedHours.source,
+      bookingHoursSourceLabel: resolvedHours.sourceLabel,
       blackoutDates: blackouts,
       slotMinutes: 30,
       ...workspaceState,
@@ -1700,7 +1812,10 @@ export class BookingsService {
 
     await this.updateBookingWorkflowSettings(tenantId, dto);
 
-    if (Array.isArray(dto.businessHours)) {
+    if (dto.resetBookingHoursToBusiness === true || dto.bookingHoursSource === 'BUSINESS') {
+      await db.bookingBusinessHour.deleteMany({ where: { tenantId } });
+      await this.updateBookingHoursMode(tenantId, 'BUSINESS');
+    } else if (Array.isArray(dto.businessHours)) {
       await db.bookingBusinessHour.deleteMany({ where: { tenantId } });
       await db.bookingBusinessHour.createMany({
         data: dto.businessHours.map((entry) => ({
@@ -1710,6 +1825,7 @@ export class BookingsService {
           endMinute: Number(entry.endMinute),
         })),
       });
+      await this.updateBookingHoursMode(tenantId, 'CUSTOM');
     }
 
     if (Array.isArray(dto.blackoutDates)) {
@@ -1746,7 +1862,7 @@ export class BookingsService {
       tradeAccountId: input?.tradeAccountId,
       email: input?.customerEmail,
     });
-    const hours = await this.ensureBusinessHours(settings.tenantId);
+    const resolvedHours = await this.resolveBookingHours(settings.tenantId);
     const blackouts = await db.bookingBlackoutDate.findMany({ where: { tenantId: settings.tenantId } });
     const proEnabled = isBookingProV1Enabled();
     const proServices = proEnabled
@@ -1928,7 +2044,10 @@ export class BookingsService {
         bookingMode: bookingWorkflow.bookingMode,
       },
       questions: publicQuestions,
-      businessHours: hours,
+      businessHours: resolvedHours.hours,
+      bookingHoursSource: resolvedHours.mode,
+      bookingHoursResolvedSource: resolvedHours.source,
+      bookingHoursSourceLabel: resolvedHours.sourceLabel,
       blackoutDates: blackouts,
       slotMinutes: 30,
       paymentCollection,
@@ -2015,27 +2134,16 @@ export class BookingsService {
       throw new BadRequestException('Service not found');
     }
 
-    const hours = await this.ensureBusinessHours(settings.tenantId);
     const activeLocation = locationId
       ? await db.location.findFirst({ where: { id: locationId, companyId: settings.tenantId, isActive: true } })
       : null;
+    const resolvedHours = await this.resolveBookingHours(settings.tenantId, { locationId: activeLocation?.id || locationId || null });
+    const hours = resolvedHours.hours;
     const dayOfWeek = targetDate.getUTCDay();
     let dayHours = hours.find((entry) => entry.dayOfWeek === dayOfWeek);
     let leadTimeMins = 0;
     let staffCapacity = Number(service.capacity || 1);
     if (isLocationsAdvancedV1Enabled() && activeLocation) {
-      const locationHours = await db.locationBusinessHour.findFirst({
-        where: { companyId: settings.tenantId, locationId: activeLocation.id, weekday: dayOfWeek },
-      });
-      if (locationHours) {
-        dayHours = locationHours.isClosed
-          ? null
-          : {
-              dayOfWeek,
-              startMinute: Number(locationHours.startMinute ?? 9 * 60),
-              endMinute: Number(locationHours.endMinute ?? 17 * 60),
-            };
-      }
       leadTimeMins = Number(activeLocation.bookingLeadTimeMins || 0);
       const staffCount = await db.locationStaffAssignment.count({ where: { companyId: settings.tenantId, locationId: activeLocation.id } });
       if (staffCount > 0) {
@@ -2553,27 +2661,16 @@ export class BookingsService {
     });
     if (blackout) return [];
 
-    const hours = await this.ensureBusinessHours(tenantId);
     const activeLocation = input.locationId
       ? await db.location.findFirst({ where: { id: input.locationId, companyId: tenantId, isActive: true } })
       : null;
+    const resolvedHours = await this.resolveBookingHours(tenantId, { locationId: activeLocation?.id || input.locationId || null });
+    const hours = resolvedHours.hours;
     const dayOfWeek = targetDate.getUTCDay();
     let dayHours = hours.find((entry: any) => entry.dayOfWeek === dayOfWeek);
     let leadTimeMins = 0;
     let staffCapacity = Number(service.capacity || 1);
     if (isLocationsAdvancedV1Enabled() && activeLocation) {
-      const locationHours = await db.locationBusinessHour.findFirst({
-        where: { companyId: tenantId, locationId: activeLocation.id, weekday: dayOfWeek },
-      });
-      if (locationHours) {
-        dayHours = locationHours.isClosed
-          ? null
-          : {
-              dayOfWeek,
-              startMinute: Number(locationHours.startMinute ?? 9 * 60),
-              endMinute: Number(locationHours.endMinute ?? 17 * 60),
-            };
-      }
       leadTimeMins = Number(activeLocation.bookingLeadTimeMins || 0);
       const staffCount = await db.locationStaffAssignment.count({ where: { companyId: tenantId, locationId: activeLocation.id } });
       if (staffCount > 0) {
@@ -3100,22 +3197,17 @@ export class BookingsService {
     });
     if (blackout) return [];
 
-    let startMinute = 9 * 60;
-    let endMinute = 17 * 60;
     let leadTimeMins = 0;
     const location = query.locationId
       ? await db.location.findFirst({ where: { id: query.locationId, companyId, isActive: true } })
       : null;
     if (location) leadTimeMins = Number(location.bookingLeadTimeMins || 0);
 
-    if (location) {
-      const locHours = await db.locationBusinessHour.findFirst({ where: { companyId, locationId: location.id, weekday } });
-      if (locHours?.isClosed) return [];
-      if (locHours && locHours.startMinute != null && locHours.endMinute != null) {
-        startMinute = Number(locHours.startMinute);
-        endMinute = Number(locHours.endMinute);
-      }
-    }
+    const resolvedHours = await this.resolveBookingHours(companyId, { locationId: location?.id || query.locationId || null });
+    const dayHours = resolvedHours.hours.find((entry: any) => Number(entry.dayOfWeek) === weekday);
+    if (!dayHours) return [];
+    let startMinute = Number(dayHours.startMinute);
+    let endMinute = Number(dayHours.endMinute);
 
     if (query.staffUserId) {
       const staff = await db.staffAvailability.findFirst({
