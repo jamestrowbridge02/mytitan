@@ -11,7 +11,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bodyParser: false });
 
   const sec = (process.env.MYTITAN_SECURITY_HEADERS || '').trim().toLowerCase();
-  const securityOn = sec === 'on' || sec === 'true' || sec === '1';
+  const securityOn = sec ? sec === 'on' || sec === 'true' || sec === '1' : process.env.NODE_ENV === 'production';
   if (securityOn) {
     // CSP can break embedded/portal flows; start with safe defaults.
     app.use(
