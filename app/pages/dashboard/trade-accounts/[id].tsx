@@ -865,6 +865,7 @@ export default function TradeAccountProfilePage() {
           </EntitySection>
 
           <EntitySection title="Business Profile" subtitle="Optional business identity, billing, and contact fields used in job output.">
+            <fieldset disabled={loading || profileSaving} style={{ border: 0, margin: 0, padding: 0 }}>
             <div className="two-col">
               <div>
                 <label htmlFor="crm-contact-name">Primary contact</label>
@@ -983,11 +984,12 @@ export default function TradeAccountProfilePage() {
               className="button"
               type="button"
               onClick={saveProfile}
-              disabled={profileSaving}
+              disabled={profileSaving || loading}
               data-testid="trade-account-save-button"
             >
               {profileSaving ? "Saving..." : "Save Business Profile"}
             </button>
+            </fieldset>
           </EntitySection>
 
           <EntitySection title="Trade portal access" subtitle="Invite named billing contacts with a time-limited link. Access can be revoked at any time.">
