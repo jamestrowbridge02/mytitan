@@ -222,6 +222,41 @@ export class BillingService {
     return [kind, code, interval || 'none'].join(':').toLowerCase();
   }
 
+  private enterpriseAnnualCandidateSecret() {
+    return crypto
+      .createHash('sha256')
+      .update(String(process.env.JWT_SECRET || process.env.MYTITAN_INTERNAL_TOKEN_SECRET || 'mytitan-enterprise-annual-candidate-v1'))
+      .digest();
+  }
+
+  private signEnterpriseAnnualCandidate(payload: Record<string, any>) {
+    const encoded = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
+    const signature = crypto.createHmac('sha256', this.enterpriseAnnualCandidateSecret()).update(encoded).digest('base64url');
+    return `${encoded}.${signature}`;
+  }
+
+  private verifyEnterpriseAnnualCandidateToken(token: string) {
+    const [encoded, signature] = String(token || '').split('.');
+    if (!encoded || !signature) {
+      throw new BadRequestException('Candidate token is invalid.');
+    }
+    const expected = crypto.createHmac('sha256', this.enterpriseAnnualCandidateSecret()).update(encoded).digest('base64url');
+    if (signature.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) {
+      throw new BadRequestException('Candidate token signature is invalid.');
+    }
+    let payload: Record<string, any>;
+    try {
+      payload = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'));
+    } catch {
+      throw new BadRequestException('Candidate token payload is invalid.');
+    }
+    const issuedAt = Number(payload.issuedAt || 0);
+    if (!issuedAt || Date.now() - issuedAt > 15 * 60 * 1000) {
+      throw new BadRequestException('Candidate token has expired. Refresh candidates and try again.');
+    }
+    return payload;
+  }
+
   private resolveCatalogExpectedAmountCents(input: Record<string, any>, currency: string | null) {
     const humanAmount = input.expectedAmount ?? input.expectedAmountDisplay ?? input.expectedAmountHuman;
     if (humanAmount != null && humanAmount !== '') {
@@ -4854,6 +4889,141 @@ export class BillingService {
         historyEvents: historyRows.length,
         mismatchWarnings,
       },
+    };
+  }
+
+  async discoverEnterpriseAnnualRepairCandidates() {
+    const expectedAmountCents = getPlanBasePriceCents('ENTERPRISE', 'ANNUAL');
+    const expectedCurrency = 'GBP';
+    const expectedInterval = 'year';
+    const requestId = crypto.randomUUID();
+    const key = this.buildCatalogOverrideKey('subscription_price', 'ENTERPRISE', 'ANNUAL');
+    const overview = await this.getPlatformBillingCatalogOverview();
+    const current = (overview.subscriptionItems || []).find((item: any) => item.key === key) || null;
+
+    if (!this.isStripeConfigured()) {
+      return {
+        requestId,
+        status: 'external_provider_required',
+        reason: 'mytitan_billing_stripe_not_configured',
+        expected: { planCode: 'ENTERPRISE', interval: 'ANNUAL', amountCents: expectedAmountCents, amount: formatCurrencyMinorUnits(expectedAmountCents, expectedCurrency), currency: expectedCurrency },
+        current,
+        candidates: [],
+        safeNextAction: 'Configure MyTitan Billing Stripe credentials, then refresh Enterprise Annual candidates.',
+      };
+    }
+
+    const stripe = this.requireStripe();
+    const prices = await stripe.prices.list({
+      active: true,
+      currency: expectedCurrency.toLowerCase(),
+      limit: 100,
+      expand: ['data.product'],
+    });
+    const candidates = prices.data
+      .filter((price: any) => {
+        const product = price.product && typeof price.product === 'object' ? price.product : null;
+        return (
+          price.active === true &&
+          String(price.currency || '').toUpperCase() === expectedCurrency &&
+          price.recurring?.interval === expectedInterval &&
+          Number(price.unit_amount || 0) === expectedAmountCents &&
+          (!product || product.active !== false)
+        );
+      })
+      .map((price: any) => {
+        const product = price.product && typeof price.product === 'object' ? price.product : null;
+        const productId = product?.id || (typeof price.product === 'string' ? price.product : null);
+        return {
+          token: this.signEnterpriseAnnualCandidate({
+            priceId: price.id,
+            productId,
+            currency: expectedCurrency,
+            amountCents: expectedAmountCents,
+            interval: 'ANNUAL',
+            issuedAt: Date.now(),
+          }),
+          priceIdMasked: this.maskStripeId(price.id),
+          productIdMasked: this.maskStripeId(productId),
+          productName: String(product?.name || '').trim() || 'Unnamed Stripe product',
+          lookupKey: String(price.lookup_key || '').trim() || null,
+          amount: formatCurrencyMinorUnits(Number(price.unit_amount || 0), expectedCurrency),
+          currency: expectedCurrency,
+          recurringInterval: 'year',
+          active: price.active === true,
+          productActive: product ? product.active !== false : null,
+          createdAt: price.created ? new Date(price.created * 1000).toISOString() : null,
+        };
+      });
+
+    return {
+      requestId,
+      status: candidates.length ? 'candidates_found' : 'no_candidate_found',
+      reason: candidates.length ? 'matching_active_gbp_yearly_prices_found' : 'no_active_gbp_yearly_enterprise_amount_price_found',
+      expected: { planCode: 'ENTERPRISE', interval: 'ANNUAL', amountCents: expectedAmountCents, amount: formatCurrencyMinorUnits(expectedAmountCents, expectedCurrency), currency: expectedCurrency },
+      current,
+      candidates,
+      safeNextAction: candidates.length
+        ? 'Review redacted candidates, enter a change reason, confirm adoption, then adopt one verified candidate.'
+        : 'Create or identify an active GBP yearly Stripe Price for Enterprise Annual in Stripe, then refresh candidates. MyTitan will not create or mutate prices here.',
+    };
+  }
+
+  async adoptEnterpriseAnnualRepairCandidate(companyId: string, userId: string, input: Record<string, any>) {
+    const reason = String(input.reason || '').trim();
+    const confirmation = String(input.confirmation || '').trim();
+    if (!reason) {
+      throw new BadRequestException('A change reason is required before adopting an Enterprise Annual mapping.');
+    }
+    if (confirmation !== 'ADOPT ENTERPRISE ANNUAL') {
+      throw new BadRequestException('Confirmation must be ADOPT ENTERPRISE ANNUAL.');
+    }
+    const payload = this.verifyEnterpriseAnnualCandidateToken(String(input.candidateToken || ''));
+    const expectedAmountCents = getPlanBasePriceCents('ENTERPRISE', 'ANNUAL');
+    if (
+      payload.interval !== 'ANNUAL' ||
+      payload.currency !== 'GBP' ||
+      Number(payload.amountCents) !== expectedAmountCents ||
+      !String(payload.priceId || '').startsWith('price_') ||
+      !String(payload.productId || '').startsWith('prod_')
+    ) {
+      throw new BadRequestException('Candidate token does not match the Enterprise Annual repair constraints.');
+    }
+    const price = await this.requireStripe().prices.retrieve(String(payload.priceId), { expand: ['product'] });
+    const product = price.product && typeof price.product === 'object' ? (price.product as any) : null;
+    const productId = product?.id || (typeof price.product === 'string' ? price.product : null);
+    if (
+      price.active !== true ||
+      String(price.currency || '').toUpperCase() !== 'GBP' ||
+      price.recurring?.interval !== 'year' ||
+      Number(price.unit_amount || 0) !== expectedAmountCents ||
+      productId !== payload.productId ||
+      product?.active === false
+    ) {
+      throw new BadRequestException('Candidate no longer matches the Enterprise Annual repair constraints. Refresh candidates and try again.');
+    }
+    const saved = await this.upsertPlatformBillingCatalogOverride(companyId, userId, {
+      kind: 'subscription_price',
+      code: 'ENTERPRISE',
+      interval: 'ANNUAL',
+      lookupKey: 'ENTERPRISE',
+      stripePriceId: price.id,
+      stripeProductId: productId,
+      expectedAmountCents,
+      currency: 'GBP',
+      active: true,
+      changeNotes: reason,
+      mode: 'save',
+    });
+    await this.audit.log(companyId, 'billing.catalog_override.enterprise_annual_repair', `Adopted Enterprise Annual mapping candidate ${this.maskStripeId(price.id)}`, userId);
+    return {
+      ok: true,
+      requestId: saved?.verification?.requestId || crypto.randomUUID(),
+      status: saved?.verification?.status || saved?.item?.verificationStatus || 'saved',
+      priceIdMasked: this.maskStripeId(price.id),
+      productIdMasked: this.maskStripeId(productId),
+      message: 'Enterprise Annual mapping adopted locally. Stripe products and prices were not created, updated, archived, or deleted.',
+      saved,
     };
   }
 

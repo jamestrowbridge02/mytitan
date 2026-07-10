@@ -1031,6 +1031,25 @@ export class PlatformAdminController {
     return this.billing.verifyAllJobCompletionPacksDryRun(user.companyId, user.sub);
   }
 
+  @Get('billing-catalog/enterprise-annual/repair-candidates')
+  async enterpriseAnnualRepairCandidates(
+    @CurrentUser() user: JwtPayload,
+    @Req() req: Request & { requestId?: string },
+  ) {
+    await this.assertAccess(user, req, 'platform.billing_catalog.write');
+    return this.billing.discoverEnterpriseAnnualRepairCandidates();
+  }
+
+  @Post('billing-catalog/enterprise-annual/adopt-candidate')
+  async adoptEnterpriseAnnualRepairCandidate(
+    @CurrentUser() user: JwtPayload,
+    @Body() body: Record<string, any>,
+    @Req() req: Request & { requestId?: string },
+  ) {
+    await this.assertAccess(user, req, 'platform.billing_catalog.write');
+    return this.billing.adoptEnterpriseAnnualRepairCandidate(user.companyId, user.sub, body || {});
+  }
+
   @Post('billing-catalog/:overrideKey/rollback')
   async rollbackBillingCatalog(
     @CurrentUser() user: JwtPayload,

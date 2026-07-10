@@ -862,6 +862,9 @@ export default function PlatformAdminPage() {
   const [billingCatalogLoading, setBillingCatalogLoading] = useState(false);
   const [billingCatalog, setBillingCatalog] = useState<any>(null);
   const [billingCatalogVerifyResult, setBillingCatalogVerifyResult] = useState<any>(null);
+  const [enterpriseAnnualRepair, setEnterpriseAnnualRepair] = useState<any>(null);
+  const [enterpriseAnnualRepairLoading, setEnterpriseAnnualRepairLoading] = useState(false);
+  const [enterpriseAnnualRepairDraft, setEnterpriseAnnualRepairDraft] = useState({ candidateToken: '', reason: '', confirmation: '' });
   const [emailControlLoading, setEmailControlLoading] = useState(false);
   const [emailControl, setEmailControl] = useState<EmailControlResponse | null>(null);
   const [emailControlReason, setEmailControlReason] = useState('');
@@ -1189,6 +1192,51 @@ export default function PlatformAdminPage() {
       setError(err.message || 'Failed to dry-run verify job packs');
     } finally {
       setBillingCatalogLoading(false);
+    }
+  };
+
+  const refreshEnterpriseAnnualRepair = async () => {
+    setEnterpriseAnnualRepairLoading(true);
+    setError('');
+    try {
+      const response = await apiFetch('/admin/platform/billing-catalog/enterprise-annual/repair-candidates');
+      setEnterpriseAnnualRepair(response);
+      setEnterpriseAnnualRepairDraft({ candidateToken: '', reason: '', confirmation: '' });
+    } catch (err: any) {
+      setError(err.message || 'Failed to load Enterprise Annual repair candidates');
+    } finally {
+      setEnterpriseAnnualRepairLoading(false);
+    }
+  };
+
+  const adoptEnterpriseAnnualCandidate = async () => {
+    if (!enterpriseAnnualRepairDraft.candidateToken) {
+      setError('Choose a verified Enterprise Annual candidate before adoption.');
+      return;
+    }
+    if (!enterpriseAnnualRepairDraft.reason.trim()) {
+      setError('A change reason is required before adopting an Enterprise Annual mapping.');
+      return;
+    }
+    if (enterpriseAnnualRepairDraft.confirmation.trim() !== 'ADOPT ENTERPRISE ANNUAL') {
+      setError('Type ADOPT ENTERPRISE ANNUAL before adoption.');
+      return;
+    }
+    if (!window.confirm('Adopt this Enterprise Annual mapping locally? Stripe products and prices will not be changed.')) return;
+    setEnterpriseAnnualRepairLoading(true);
+    setError('');
+    try {
+      const response = await apiFetch('/admin/platform/billing-catalog/enterprise-annual/adopt-candidate', {
+        method: 'POST',
+        body: JSON.stringify(enterpriseAnnualRepairDraft),
+      });
+      setEnterpriseAnnualRepair((current: any) => ({ ...(current || {}), latestAdoption: response }));
+      await refreshBillingCatalog();
+      await refreshEnterpriseAnnualRepair();
+    } catch (err: any) {
+      setError(err.message || 'Failed to adopt Enterprise Annual mapping');
+    } finally {
+      setEnterpriseAnnualRepairLoading(false);
     }
   };
 
@@ -2459,6 +2507,77 @@ export default function PlatformAdminPage() {
                 ? 'Mappings are currently verification-ready. Use history and masked review to confirm nothing changed unexpectedly.'
                 : billingCatalog?.checkoutReadiness?.summary || 'One or more Stripe mappings still need attention before checkout can ever be considered ready.'}
             </p>
+          </div>
+          <div className="card platform-admin-card-stack platform-admin-card-stack--system" style={{ marginTop: 16 }} data-testid="enterprise-annual-repair-wizard">
+            <div className="platform-admin-card-heading">
+              <div>
+                <strong>Repair Enterprise Annual mapping</strong>
+                <p className="muted" style={{ margin: '6px 0 0 0' }}>
+                  Discover active GBP yearly Stripe prices at the expected Enterprise Annual amount, then adopt one locally after confirmation. Stripe products and prices are never created, updated, archived, or deleted here.
+                </p>
+              </div>
+              <button className="button secondary" type="button" disabled={enterpriseAnnualRepairLoading} onClick={() => void refreshEnterpriseAnnualRepair()} data-testid="enterprise-annual-refresh-candidates">
+                {enterpriseAnnualRepairLoading ? 'Checking…' : 'Find candidates'}
+              </button>
+            </div>
+            <div className="operator-grid operator-grid--three" style={{ marginTop: 12 }}>
+              <DiagnosticSection title="Expected mapping">
+                <div>Plan: Enterprise</div>
+                <div>Interval: Annual / yearly recurring</div>
+                <div>Amount: {enterpriseAnnualRepair?.expected?.amount || '£1,590.00'} GBP</div>
+              </DiagnosticSection>
+              <DiagnosticSection title="Current mapping">
+                <div>Status: {enterpriseAnnualRepair?.current?.verificationLabel || enterpriseAnnualRepair?.current?.verificationStatus || 'Load candidates to inspect current state'}</div>
+                <div>Price ID: {enterpriseAnnualRepair?.current?.stripePriceIdMasked || 'Masked or missing'}</div>
+                <div>Product ID: {enterpriseAnnualRepair?.current?.stripeProductIdMasked || 'Masked or missing'}</div>
+              </DiagnosticSection>
+              <DiagnosticSection title="Structured result">
+                <div>Status: {enterpriseAnnualRepair?.status || 'not_checked'}</div>
+                <div>Reason: {enterpriseAnnualRepair?.reason || 'Candidates have not been refreshed yet.'}</div>
+                <div>Request ID: {enterpriseAnnualRepair?.requestId || 'not generated yet'}</div>
+              </DiagnosticSection>
+            </div>
+            {enterpriseAnnualRepair?.safeNextAction ? (
+              <p className="muted" style={{ marginTop: 12 }}>Safe next action: {enterpriseAnnualRepair.safeNextAction}</p>
+            ) : null}
+            <div className="platform-admin-list" style={{ marginTop: 12 }} data-testid="enterprise-annual-candidate-list">
+              {(enterpriseAnnualRepair?.candidates || []).length ? (
+                enterpriseAnnualRepair.candidates.map((candidate: any, index: number) => (
+                  <label key={`${candidate.priceIdMasked}-${index}`} className="card platform-admin-card-stack" style={{ margin: 0 }}>
+                    <span className="check-row">
+                      <input
+                        type="radio"
+                        name="enterprise-annual-candidate"
+                        checked={enterpriseAnnualRepairDraft.candidateToken === candidate.token}
+                        onChange={() => setEnterpriseAnnualRepairDraft((current) => ({ ...current, candidateToken: candidate.token }))}
+                      />
+                      <strong>{candidate.productName}</strong>
+                    </span>
+                    <span className="muted">Price {candidate.priceIdMasked} · Product {candidate.productIdMasked} · {candidate.amount} {candidate.currency} · {candidate.recurringInterval}</span>
+                    <span className="muted">Lookup key: {candidate.lookupKey || 'none'} · Active: {candidate.active ? 'yes' : 'no'}</span>
+                  </label>
+                ))
+              ) : (
+                <p className="muted">No candidate prices loaded. Use Find candidates to read Stripe safely with the configured MyTitan Billing Stripe credential.</p>
+              )}
+            </div>
+            <div className="two-col" style={{ marginTop: 12 }}>
+              <label>Change reason<textarea className="input" rows={2} value={enterpriseAnnualRepairDraft.reason} onChange={(event) => setEnterpriseAnnualRepairDraft((current) => ({ ...current, reason: event.target.value }))} placeholder="Reason for adopting this Enterprise Annual mapping" /></label>
+              <label>Confirmation<input className="input" value={enterpriseAnnualRepairDraft.confirmation} onChange={(event) => setEnterpriseAnnualRepairDraft((current) => ({ ...current, confirmation: event.target.value }))} placeholder="ADOPT ENTERPRISE ANNUAL" /></label>
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+              <button className="button secondary" type="button" disabled={enterpriseAnnualRepairLoading || !enterpriseAnnualRepairDraft.candidateToken} onClick={() => void adoptEnterpriseAnnualCandidate()} data-testid="enterprise-annual-adopt-candidate">
+                Adopt verified candidate
+              </button>
+              <Link className="button secondary" href="/platform?section=billing-catalog&product=subscription_price:enterprise:annual">
+                Open catalog row
+              </Link>
+            </div>
+            {enterpriseAnnualRepair?.latestAdoption ? (
+              <p className="muted" style={{ marginTop: 12 }} data-testid="enterprise-annual-adoption-result">
+                Latest adoption: {enterpriseAnnualRepair.latestAdoption.status} · Request {enterpriseAnnualRepair.latestAdoption.requestId}
+              </p>
+            ) : null}
           </div>
           {[
             { key: 'subscriptions', title: 'Subscription plans', items: billingCatalog?.groups?.subscriptions || billingCatalog?.subscriptionItems || [] },
