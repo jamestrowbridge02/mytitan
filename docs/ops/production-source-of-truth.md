@@ -9,7 +9,8 @@ This host is consolidated around one active production worktree and one Docker C
 | Area | Active source of truth | Status |
 | --- | --- | --- |
 | Project path | `/opt/mytitan` | Active production worktree |
-| Git commit | `2787fe098321cbb5402b1d10f3288f722e507756` | Protected release baseline |
+| Git branch | `release/v1.0.0-clean` | Authoritative release branch |
+| Git commit | `31c5d03ceece22caa4fae1dabf1c1e9b5fe15df4` | Release candidate baseline |
 | Docker Compose project | `mytitan` | Active |
 | API container | `mytitan_api`, local port `127.0.0.1:3000` | Active |
 | App container | `mytitan_app`, local port `127.0.0.1:3001` | Active |
@@ -112,7 +113,7 @@ Tenant customer payments must remain separated from MyTitan Billing Stripe. Stri
 
 ## Data Safety Status
 
-Verified on 2026-06-30:
+Verified on 2026-07-10:
 
 - `admin@mytitan.co.uk` exists once, active, verified, and protected.
 - Wheel A&R exists as company `cmq4vib8k0ho83wsw12uaq0pc`.
