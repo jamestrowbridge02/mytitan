@@ -12,7 +12,7 @@ test.describe("integration platform foundation", () => {
     await expect(page.getByTestId("integrations-workspace-section")).toBeVisible();
     await expect(page.getByTestId("integration-admin-health")).toHaveCount(0);
     await expect(page.getByTestId("integration-owner-command")).toHaveCount(0);
-    await expect(page.getByTestId("integration-workspace-row-quickbooks")).toContainText(/Ready|Needs setup|Needs attention|Not available/i);
+    await expect(page.getByTestId("integration-workspace-row-quickbooks")).toContainText(/Connected|Setup required|Requires external account|Needs attention|Not available/i);
     await expect(page.locator("body")).not.toContainText(/OAuth verified|idempotency|provider mutation|metadata.only/i);
   });
 

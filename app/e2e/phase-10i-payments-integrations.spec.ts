@@ -13,9 +13,14 @@ test.describe("Phase 10I payments and integrations launch UX", () => {
     await page.goto("/dashboard/integrations", { waitUntil: "networkidle" });
 
     await expect(page.getByRole("heading", { name: "Connected tools", exact: true })).toBeVisible();
-    for (const group of ["Payments", "Accounting", "Calendar", "Communications", "Developer Tools"]) {
+    for (const group of ["Payments", "Accounting", "Calendar", "Communications", "Maps", "Storage", "Automation", "Identity", "Developer Tools"]) {
       await expect(page.getByRole("heading", { name: group, exact: true })).toBeVisible();
     }
+    await expect(page.getByTestId("connected-tools-group-communications")).toContainText(/Twilio SMS|WhatsApp Business/i);
+    await expect(page.getByTestId("connected-tools-group-maps")).toContainText(/Provider-neutral directions|Google Maps|Requires external account/i);
+    await expect(page.getByTestId("connected-tools-group-storage")).toContainText(/OneDrive|Google Drive|Dropbox|Not implemented/i);
+    await expect(page.getByTestId("connected-tools-group-automation")).toContainText(/Zapier|Make|n8n/i);
+    await expect(page.getByTestId("connected-tools-group-identity")).toContainText(/Google sign-in|Microsoft Entra ID|SAML/i);
 
     const body = await page.locator("body").innerText();
     expect(body).not.toMatch(/OAuth verified|tokens returned|explicit live flag|live provider mutation|idempotency|metadata.only|deployment setup needed|provider mutation/i);
@@ -30,11 +35,11 @@ test.describe("Phase 10I payments and integrations launch UX", () => {
     const stripeCard = page.getByTestId("integration-workspace-row-stripe");
     await expect(stripeCard).toBeVisible();
     const text = await stripeCard.innerText();
-    if (text.includes("Ready")) {
+    if (text.includes("Connected")) {
       expect(text).toContain("Customers can pay deposits online.");
       expect(text).toContain("Manage Stripe");
     } else {
-      expect(text).toMatch(/Needs setup|Needs attention/);
+      expect(text).toMatch(/Setup required|Needs attention/);
       expect(text).toContain("Fix Stripe setup");
     }
 

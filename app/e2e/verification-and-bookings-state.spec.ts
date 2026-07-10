@@ -467,7 +467,7 @@ test.describe("verification resend and bookings state", () => {
 
       await page.goto("/dashboard/integrations");
       const googleRow = page.getByTestId("integration-personal-row-google");
-      await expect(googleRow).toContainText("Ready");
+      await expect(googleRow).toContainText("Connected");
       await expect(googleRow).not.toContainText(/module disabled/i);
     } finally {
       await updateTenantSettings(request, token, {
