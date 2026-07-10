@@ -29,21 +29,18 @@ const steps = [
 ] as const;
 
 const phase6OnboardingPath = [
-  { key: "business", label: "Business profile", href: "/dashboard/setup-wizard?step=branding" },
-  { key: "locations", label: "Location", href: "/dashboard/locations" },
-  { key: "services", label: "Service folder and service", href: "/dashboard/setup-wizard?step=services" },
-  { key: "job_sheet", label: "Job sheet template", href: "/dashboard/setup-wizard?step=template" },
-  { key: "booking", label: "Weekly availability", href: "/dashboard/booking/settings" },
-  { key: "portal", label: "Portal settings", href: "/dashboard/portal" },
-  { key: "payments", label: "Payments", href: "/dashboard/settings/payments/stripe" },
-  { key: "team", label: "Team invite", href: "/dashboard/users" },
-  { key: "import", label: "Import data", href: "#phase6-import-wizard" },
-  { key: "golive", label: "Go-live checklist", href: "/dashboard/settings/launch-control" },
-  { key: "branding", label: "Logo and branding", href: "/dashboard/setup-wizard?step=branding" },
-  { key: "booking_link", label: "Public booking link", href: "/dashboard/booking/settings" },
-  { key: "customer_fields", label: "Customer fields", href: "/dashboard/settings?tab=customers" },
-  { key: "invoices", label: "Invoices", href: "/dashboard/settings?tab=finance" },
-  { key: "first_booking", label: "First booking", href: "/dashboard/bookings" },
+  { key: "business", label: "Business", href: "/dashboard/settings?tab=general&section=business-profile", state: "Business profile source of truth" },
+  { key: "brand", testId: "job_sheet", label: "Brand", href: "/dashboard/setup-wizard?step=template", state: "Logo and branding, plus job sheet template" },
+  { key: "locations", label: "Locations", href: "/dashboard/locations", state: "Location records and operational places" },
+  { key: "staff", testId: "team", label: "Staff", href: "/dashboard/users", state: "Team and access" },
+  { key: "opening_hours", label: "Opening hours", href: "/dashboard/booking/settings#hours", state: "Weekly availability" },
+  { key: "services", label: "Services", href: "/dashboard/setup-wizard?step=services", state: "Service folder and service catalogue" },
+  { key: "payments", label: "Payments", href: "/dashboard/settings/payments", state: "Payments and Invoices" },
+  { key: "email", label: "Email", href: "/dashboard/settings?tab=messages&section=notifications-email", state: "Sender and reply path" },
+  { key: "customer_portal", testId: "portal", label: "Customer portal", href: "/dashboard/portal", state: "Customer fields and self-service" },
+  { key: "trade_portal", testId: "import", label: "Trade portal", href: "#phase6-import-wizard", state: "Trade customer access and import preview" },
+  { key: "booking", label: "Booking", href: "/dashboard/booking/settings", state: "Public booking link and First booking path" },
+  { key: "launch", testId: "golive", label: "Launch", href: "/dashboard/settings/launch-control", state: "Final checklist" },
 ];
 
 const OPERATING_DAYS = [
@@ -333,18 +330,18 @@ export default function SetupWizard() {
             <p className="operator-eyebrow">Launch onboarding</p>
             <h1 style={{ marginTop: 0 }}>Get operational in 15 minutes</h1>
             <p className="muted">
-              Finish the essentials in one path: profile, locations, services, job sheet, bookings, portal, payments, team, import, and go-live.
+              Finish the essentials in one path. Each step opens the one place that owns that data, so setup can be saved now and resumed later without duplicate entry.
             </p>
           </div>
           <Link className="button secondary" href="/dashboard/settings/launch-control">Open go-live checklist</Link>
         </div>
         <div className="operator-grid operator-grid--five" style={{ marginTop: 14 }}>
           {phase6OnboardingPath.map((item, index) => (
-            <a className="operator-mini-card mt-linkCard" href={item.href} key={item.key} data-testid={`phase6-onboarding-step-${item.key}`}>
+            <a className="operator-mini-card mt-linkCard" href={item.href} key={item.key} data-testid={`phase6-onboarding-step-${item.testId || item.key}`}>
               <span className="operator-tag">Step {index + 1}</span>
               <strong>{item.label}</strong>
               <span className="mt-linkCard__action">Open action</span>
-              <span className="muted">Saved or complete status appears on the linked setup surface.</span>
+              <span className="muted">{item.state}. Saved or complete status appears on the linked setup surface.</span>
             </a>
           ))}
         </div>

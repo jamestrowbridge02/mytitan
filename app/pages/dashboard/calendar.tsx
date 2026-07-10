@@ -1507,6 +1507,7 @@ export default function CalendarPage() {
           className="operator-stack"
           data-testid={dragEnabled ? 'calendar-v2-workspace' : 'calendar-v1-workspace'}
           data-calendar-version={dragEnabled ? '2' : '1'}
+          data-calendar-experience="operations"
         >
           <OperatorPageHeader
             eyebrow="Scheduling"
@@ -1529,7 +1530,7 @@ export default function CalendarPage() {
             shortcuts={[
               bookingMode === 'EMPLOYEE' ? 'Employee-based' : bookingMode === 'HYBRID' ? 'Hybrid booking' : 'Location-based',
               planningMode === 'rota' ? 'Staff rota' : 'Location bookings',
-              dragEnabled ? 'Timing changes gated' : 'Planning view',
+              dragEnabled ? 'Timing changes require confirmation' : 'Planning view',
             ]}
             stats={calendarStats}
           />

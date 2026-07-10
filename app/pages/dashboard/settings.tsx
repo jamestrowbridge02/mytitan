@@ -201,6 +201,7 @@ const TAB_ALIASES: Record<string, TabKey> = {
 
 const SECTION_TAB_MAP: Record<string, TabKey> = {
   'business-profile': 'general',
+  'company-profile-hub': 'general',
   'workspace-layout': 'general',
   'job-sheet': 'jobs',
   'template-marketplace': 'jobs',
@@ -1657,6 +1658,23 @@ export default function SettingsPage() {
       { label: 'Plan', value: planCode || 'STANDARD', hint: 'Billing-controlled capability set' },
     ];
   }, [form.featureAI, form.featureAccounting, form.featureBookings, form.featurePayments, form.featureWhatsApp, planCode, themeMode]);
+  const companyProfileSections = useMemo(
+    () => [
+      { key: 'business', title: 'Business details', state: form.companyName ? 'Saved' : 'Needs business name', href: '/dashboard/settings?tab=general&section=business-profile' },
+      { key: 'brand', title: 'Brand', state: form.logoUrl || form.brandPrimaryColor ? 'Saved' : 'Add logo and colours', href: '/dashboard/settings?tab=general&section=workspace-layout' },
+      { key: 'locations', title: 'Locations', state: 'Managed in Locations', href: '/dashboard/locations' },
+      { key: 'staff', title: 'Staff', state: 'Managed in Team', href: '/dashboard/users' },
+      { key: 'opening-hours', title: 'Opening hours', state: 'Managed in Bookings', href: '/dashboard/booking/settings#hours' },
+      { key: 'services', title: 'Services', state: 'Managed in Services', href: '/dashboard/booking/settings#services' },
+      { key: 'payments', title: 'Payments', state: form.featurePayments || form.paymentsEnabled ? 'On' : 'Review setup', href: '/dashboard/settings/payments' },
+      { key: 'tax', title: 'Tax', state: form.taxRegistrationNumber || form.taxLabel ? 'Saved' : 'Add tax details', href: '/dashboard/settings?tab=general&section=business-profile' },
+      { key: 'booking', title: 'Booking', state: form.bookingPublicEnabled ? 'Public booking on' : 'Private until enabled', href: '/dashboard/booking/settings#workflow' },
+      { key: 'customer-portal', title: 'Customer portal', state: form.featureCustomerPortal ? 'On' : 'Review portal', href: '/dashboard/portal' },
+      { key: 'trade-portal', title: 'Trade portal', state: 'Managed in Trade accounts', href: '/dashboard/trade-accounts' },
+      { key: 'communication', title: 'Communication', state: form.emailReplyTo || form.contactEmail ? 'Reply path saved' : 'Add reply email', href: '/dashboard/settings?tab=messages&section=notifications-email' },
+    ],
+    [form.bookingPublicEnabled, form.companyName, form.contactEmail, form.emailReplyTo, form.featureCustomerPortal, form.featurePayments, form.logoUrl, form.paymentsEnabled, form.brandPrimaryColor, form.taxLabel, form.taxRegistrationNumber],
+  );
   const settingsPayload = useMemo(() => buildSettingsPayload(form), [form]);
   const baselineSettingsPayload = useMemo(() => buildSettingsPayload(settings || {}), [settings]);
   const settingsDirty = useMemo(
@@ -1997,6 +2015,39 @@ export default function SettingsPage() {
 
         {tab === 'general' && (
           <>
+            <div className="card settings-premium-card" style={{ marginBottom: 12 }} {...getSectionProps('company-profile-hub')} data-testid="company-profile-hub">
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                <div>
+                  <p className="operator-eyebrow">Single source of truth</p>
+                  <h3 style={{ marginTop: 0 }}>Company Profile</h3>
+                  <p className="muted settings-premium-muted">
+                    These saved settings prefill booking, invoices, job outputs, customer pages, trade pages, emails, and launch checks. Changes are saved through the tenant settings API and written to the audit log.
+                  </p>
+                </div>
+                <button
+                  className="button settings-premium-button"
+                  type="button"
+                  data-testid="company-profile-save"
+                  disabled={savingSettings || !settingsDirty}
+                  onClick={saveSettings}
+                >
+                  {savingSettings ? 'Saving...' : settingsDirty ? 'Save profile' : 'Profile saved'}
+                </button>
+              </div>
+              <div className="operator-grid operator-grid--three" style={{ marginTop: 14 }}>
+                {companyProfileSections.map((section) => (
+                  <a key={section.key} className="operator-mini-card mt-linkCard" href={section.href} data-testid={`company-profile-section-${section.key}`}>
+                    <strong>{section.title}</strong>
+                    <span className="muted">{section.state}</span>
+                    <span className="mt-linkCard__action">Open</span>
+                  </a>
+                ))}
+              </div>
+              <p className="muted settings-premium-muted" data-testid="company-profile-saved-state" style={{ marginBottom: 0 }}>
+                Saved state: {settingsDirty ? 'Unsaved changes waiting' : 'All profile changes saved'}.
+              </p>
+            </div>
+
             <div className="card settings-premium-card" style={{ marginBottom: 12 }} {...getSectionProps('business-profile')}>
               <h3 style={{ marginTop: 0 }}>Business details</h3>
               <p className="muted settings-premium-muted">Set the business identity and contact details operators and customers rely on every day.</p>
@@ -2141,8 +2192,8 @@ export default function SettingsPage() {
                   defaults: { ...(current.defaults || {}), commandCentreVersion: e.target.value === 'v1' ? 'v1' : 'v2' },
                 }))}
               >
-                <option value="v2">Command Centre V2</option>
-                <option value="v1">Command Centre V1</option>
+                <option value="v2">Live Work</option>
+                <option value="v1">Classic work board</option>
               </select>
 
               {[
@@ -3045,7 +3096,7 @@ export default function SettingsPage() {
                   {summaryEmailSettings.enabled ? 'Summary delivery is enabled for the selected schedule.' : 'Turn on summary emails to start delivery.'}
                 </p>
                 <p className="muted settings-premium-muted" data-testid="summary-email-sender-status" style={{ marginBottom: 6 }}>
-                  System sender: {summaryReadiness?.sender?.status === 'ready' ? 'Ready' : summaryReadiness?.sender?.status === 'failing' ? 'Configured but failing' : summaryReadiness?.sender?.status === 'misconfigured' ? 'Needs attention' : 'Not set up'}
+                  Summary sender: {summaryReadiness?.sender?.status === 'ready' ? 'Ready' : summaryReadiness?.sender?.status === 'failing' ? 'Configured but failing' : summaryReadiness?.sender?.status === 'misconfigured' ? 'Needs attention' : 'Not set up'}
                 </p>
                 <p className="muted settings-premium-muted" data-testid="summary-email-recipient-count" style={{ marginBottom: 0 }}>
                   Summary recipients today: {summaryReadiness?.recipientCount ?? 0}
@@ -3116,7 +3167,7 @@ export default function SettingsPage() {
               </div>
               <div style={{ marginTop: 12 }} data-testid="ops-alert-status-card">
                 <p className="muted settings-premium-muted" style={{ marginBottom: 6 }}>
-                  System sender: {opsAlertStatus?.systemSender?.status === 'ready' ? 'Ready' : opsAlertStatus?.systemSender?.status === 'failing' ? 'Configured but failing' : opsAlertStatus?.systemSender?.status === 'misconfigured' ? 'Needs attention' : 'Not set up'}
+                  Alert sender: {opsAlertStatus?.systemSender?.status === 'ready' ? 'Ready' : opsAlertStatus?.systemSender?.status === 'failing' ? 'Configured but failing' : opsAlertStatus?.systemSender?.status === 'misconfigured' ? 'Needs attention' : 'Not set up'}
                 </p>
                 <p className="muted settings-premium-muted" style={{ marginBottom: 6 }}>
                   Automatic owner/admin recipients: {opsAlertStatus?.ownerAdminRecipientCount ?? 0}
@@ -4249,7 +4300,7 @@ export default function SettingsPage() {
 
             <div className="card settings-premium-card">
               <h3 style={{ marginTop: 0 }}>Setup links</h3>
-              <p className="muted settings-premium-muted">Use Bookings for public availability and Integrations for provider calendars. Settings here should organize the experience, not hard-disable it.</p>
+              <p className="muted settings-premium-muted">Use Bookings for public availability and Integrations for connected calendars. Settings here should organize the experience, not hard-disable it.</p>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                 <button type="button" className="button secondary settings-premium-button" onClick={() => void router.push('/dashboard/bookings')}>
                   Open bookings
@@ -4417,7 +4468,7 @@ export default function SettingsPage() {
               </div>
 
               {!automationsEnabled ? (
-                <p className="muted settings-premium-muted">Automations are disabled for this runtime.</p>
+                <p className="muted settings-premium-muted">Automations are not available in this workspace yet.</p>
               ) : null}
 
               <div className="theme-preview" data-testid="automation-template-list" style={{ marginBottom: 14 }}>

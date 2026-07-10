@@ -52,9 +52,10 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     title: "Grow Business",
     items: [
-      { title: "Settings", description: "Branding, workflow, and workspace controls", href: "/dashboard/settings", icon: "settings" },
+      { title: "Company Profile", sidebarTitle: "Profile", description: "Business details, brand, hours, services, booking, portals, and communications", href: "/dashboard/settings?tab=general&section=company-profile-hub", icon: "settings" },
+      { title: "Settings", description: "Workspace controls and workflow preferences", href: "/dashboard/settings", icon: "settings" },
       { title: "Team", description: "Invite members and keep access deliberate", href: "/dashboard/users", icon: "team" },
-      { title: "Integrations", sidebarTitle: "Tools", description: "Connected tools and provider state", href: "/dashboard/integrations", icon: "integrations" },
+      { title: "Integrations", sidebarTitle: "Tools", description: "Connected tools and account health", href: "/dashboard/integrations", icon: "integrations" },
       { title: "Enterprise", description: "Readiness for integrations, offline, reports, growth, and trust", href: "/dashboard/enterprise", icon: "enterprise" },
     ],
   },

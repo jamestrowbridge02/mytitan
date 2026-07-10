@@ -509,8 +509,8 @@ export default function BookingProSettingsPage() {
         done: Boolean(weekdayHoursReady),
       },
       {
-        key: 'providers',
-        title: 'Providers',
+        key: 'team',
+        title: 'Team',
         detail: providerReady ? `${(settings?.staff || []).length} team member${(settings?.staff || []).length === 1 ? '' : 's'} available` : 'Add or schedule your team',
         done: providerReady,
         href: '/dashboard/settings/schedules',
@@ -1155,7 +1155,7 @@ export default function BookingProSettingsPage() {
         <section className="card operator-section">
           <div className="operator-section__header">
             <div>
-              <h2 className="operator-section__title">Working hours and providers</h2>
+              <h2 className="operator-section__title">Working hours and team</h2>
               <p className="operator-section__subtitle">Keep the customer view simple while still controlling who can be booked and when.</p>
             </div>
           </div>
@@ -1166,9 +1166,9 @@ export default function BookingProSettingsPage() {
               <p className="muted">These hours set the outer limit for public slots. Longer services only show when they fit before the end of the day.</p>
             </article>
             <article className="booking-setup-supportCard">
-              <div className="booking-setup-supportCard__eyebrow">Providers</div>
+              <div className="booking-setup-supportCard__eyebrow">Team</div>
               <strong>{(settings?.staff || []).length} team member{(settings?.staff || []).length === 1 ? '' : 's'}</strong>
-              <p className="muted">Assign a provider inside a service when one person should take that job, or leave it open for any available team member.</p>
+              <p className="muted">Assign a team member inside a service when one person should take that job, or leave it open for any available team member.</p>
               <Link className="button secondary" href="/dashboard/settings/schedules">
                 Open schedules
               </Link>
@@ -1650,7 +1650,7 @@ export default function BookingProSettingsPage() {
                 </select>
               </div>
               <div>
-                <label>Assigned provider</label>
+                <label>Assigned team member</label>
                 <select className="input" value={serviceDraft.assignedUserId} onChange={(event) => setServiceDraft((current) => ({ ...current, assignedUserId: event.target.value }))}>
                   <option value="">Any available team member</option>
                   {(settings?.staff || []).map((member) => (
