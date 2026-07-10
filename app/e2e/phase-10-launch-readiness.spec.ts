@@ -77,7 +77,7 @@ test.describe("Phase 10 launch readiness", () => {
     await expect(page.getByTestId("integrations-workspace-section")).toBeVisible();
     await expect(page.getByTestId("integration-advanced-details")).toHaveCount(0);
     await expect(page.getByTestId("integration-admin-health")).toHaveCount(0);
-    await expect(page.getByTestId("integration-workspace-row-sumup")).toHaveCount(0);
+    await expect(page.getByTestId("integration-workspace-row-sumup")).toContainText("Requires external account");
     await expect(page.getByText(/coming soon/i)).toHaveCount(0);
     await expect(page.locator("body")).not.toContainText("tokens returned:");
   });
