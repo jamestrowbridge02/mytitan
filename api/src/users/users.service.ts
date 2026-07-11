@@ -7,7 +7,7 @@ import { EmailService } from '../email/email.service';
 import { buildTeamInviteEmailTemplate } from '../email/email-templates';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { AcceptInviteDto, InviteUserDto, UpdateUserRoleDto } from './users.dto';
+import { AcceptInviteDto, InviteUserDto, UpdateUserRoleDto, UpdateUserWorkforceDto } from './users.dto';
 
 @Injectable()
 export class UsersService {
@@ -31,6 +31,15 @@ export class UsersService {
         id: true,
         email: true,
         role: true,
+        isActive: true,
+        isStaffMember: true,
+        isSchedulable: true,
+        isAssignable: true,
+        appearsOnRota: true,
+        appearsInBookingAssignment: true,
+        workforceAccessType: true,
+        defaultLocationId: true,
+        skillsJson: true,
         color: true,
         emailVerified: true,
         createdAt: true,
@@ -181,6 +190,60 @@ export class UsersService {
     });
 
     await this.audit.log(tenantId, 'user.role.update', `Changed role for ${updated.email} to ${dto.role}`, actorId);
+    return updated;
+  }
+
+  async updateWorkforce(tenantId: string, actorId: string, userId: string, dto: UpdateUserWorkforceDto) {
+    const db = this.prisma as any;
+    const user = await db.user.findFirst({ where: { id: userId, companyId: tenantId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const isStaffMember = Boolean(dto.isStaffMember);
+    const isSchedulable = isStaffMember && Boolean(dto.isSchedulable);
+    const isAssignable = isStaffMember && Boolean(dto.isAssignable);
+    const appearsOnRota = isSchedulable && Boolean(dto.appearsOnRota);
+    const appearsInBookingAssignment = isAssignable && Boolean(dto.appearsInBookingAssignment);
+    const workforceAccessType = dto.workforceAccessType || 'EMPLOYEE';
+
+    const updated = await db.user.update({
+      where: { id: userId },
+      data: {
+        isStaffMember,
+        isSchedulable,
+        isAssignable,
+        appearsOnRota,
+        appearsInBookingAssignment,
+        workforceAccessType,
+      },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        isActive: true,
+        isStaffMember: true,
+        isSchedulable: true,
+        isAssignable: true,
+        appearsOnRota: true,
+        appearsInBookingAssignment: true,
+        workforceAccessType: true,
+        defaultLocationId: true,
+        skillsJson: true,
+        color: true,
+        emailVerified: true,
+        createdAt: true,
+        lastActiveAt: true,
+        lastLoginAt: true,
+      },
+    });
+
+    await this.audit.log(
+      tenantId,
+      'user.workforce.update',
+      `Updated workforce settings for ${updated.email}`,
+      actorId,
+    );
     return updated;
   }
 }

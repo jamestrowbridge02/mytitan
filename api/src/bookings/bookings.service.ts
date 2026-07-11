@@ -1321,7 +1321,15 @@ export class BookingsService {
     }
 
     if (dto.assignedUserId) {
-      const assignee = await db.user.findFirst({ where: { id: dto.assignedUserId, companyId } });
+      const assignee = await db.user.findFirst({
+        where: {
+          id: dto.assignedUserId,
+          companyId,
+          isActive: true,
+          isAssignable: true,
+          appearsInBookingAssignment: true,
+        },
+      });
       if (!assignee) {
         throw new BadRequestException('Invalid assigned user for this company');
       }
@@ -1919,7 +1927,12 @@ export class BookingsService {
       .map((location: any) => ({ ...location, ...this.normalizeLocationVisibility(location) }));
     const staff = proEnabled
       ? await db.user.findMany({
-          where: { companyId: settings.tenantId, role: { in: ['OWNER', 'ADMIN', 'STAFF', 'TECHNICIAN'] } },
+          where: {
+            companyId: settings.tenantId,
+            isActive: true,
+            isSchedulable: true,
+            appearsInBookingAssignment: true,
+          },
           select: { id: true, email: true },
           orderBy: { email: 'asc' },
         })
@@ -2411,7 +2424,15 @@ export class BookingsService {
       ? await db.location.findFirst({ where: { id: dto.locationId, companyId: settings.tenantId, isActive: true }, select: { id: true, defaultAssigneeId: true } })
       : null;
     if (requestedStaffUserId) {
-      const staffUser = await db.user.findFirst({ where: { id: requestedStaffUserId, companyId: settings.tenantId } });
+      const staffUser = await db.user.findFirst({
+        where: {
+          id: requestedStaffUserId,
+          companyId: settings.tenantId,
+          isActive: true,
+          isAssignable: true,
+          appearsInBookingAssignment: true,
+        },
+      });
       if (!staffUser) throw new BadRequestException('Selected team member is not available for this workspace');
     }
     const resolvedPublicAssigneeId = bookingWorkflow.autoAssignWorkflow
@@ -3120,7 +3141,15 @@ export class BookingsService {
   async createProService(companyId: string, userId: string, dto: UpsertBookingServiceDto) {
     const db = this.prisma as any;
     if (dto.assignedUserId) {
-      const assignee = await db.user.findFirst({ where: { id: dto.assignedUserId, companyId } });
+      const assignee = await db.user.findFirst({
+        where: {
+          id: dto.assignedUserId,
+          companyId,
+          isActive: true,
+          isAssignable: true,
+          appearsInBookingAssignment: true,
+        },
+      });
       if (!assignee) throw new BadRequestException('Assigned provider was not found');
     }
     const service = await db.service.create({
@@ -3152,7 +3181,15 @@ export class BookingsService {
     const existing = await db.service.findFirst({ where: { id: serviceId, companyId } });
     if (!existing) throw new BadRequestException('Service not found');
     if (dto.assignedUserId) {
-      const assignee = await db.user.findFirst({ where: { id: dto.assignedUserId, companyId } });
+      const assignee = await db.user.findFirst({
+        where: {
+          id: dto.assignedUserId,
+          companyId,
+          isActive: true,
+          isAssignable: true,
+          appearsInBookingAssignment: true,
+        },
+      });
       if (!assignee) throw new BadRequestException('Assigned provider was not found');
     }
     const service = await db.service.update({
@@ -3353,7 +3390,12 @@ export class BookingsService {
         orderBy: { name: 'asc' },
       }),
       db.user.findMany({
-        where: { companyId, role: { in: ['OWNER', 'ADMIN', 'STAFF', 'TECHNICIAN'] } },
+        where: {
+          companyId,
+          isActive: true,
+          isSchedulable: true,
+          appearsInBookingAssignment: true,
+        },
         select: { id: true, email: true },
         orderBy: { email: 'asc' },
       }),

@@ -1,4 +1,4 @@
-import { IsEmail, IsIn, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsBoolean, IsEmail, IsIn, IsOptional, IsString, MinLength } from 'class-validator';
 import { ROLES } from '../common/constants';
 
 export class InviteUserDto {
@@ -21,4 +21,30 @@ export class AcceptInviteDto {
 export class UpdateUserRoleDto {
   @IsIn(ROLES)
   role!: (typeof ROLES)[number];
+}
+
+export class UpdateUserWorkforceDto {
+  @IsOptional()
+  @IsBoolean()
+  isStaffMember?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isSchedulable?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isAssignable?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  appearsOnRota?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  appearsInBookingAssignment?: boolean;
+
+  @IsOptional()
+  @IsIn(['EMPLOYEE', 'CONTRACTOR', 'GUEST'])
+  workforceAccessType?: 'EMPLOYEE' | 'CONTRACTOR' | 'GUEST';
 }

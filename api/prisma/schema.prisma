@@ -20,6 +20,12 @@ enum UserRole {
   READ_ONLY
 }
 
+enum WorkforceAccessType {
+  EMPLOYEE
+  CONTRACTOR
+  GUEST
+}
+
 enum TradeAccountStatus {
   ACTIVE
   ON_HOLD
@@ -570,6 +576,13 @@ model User {
   role                           UserRole                      @default(STAFF)
   tokenVersion                   Int                           @default(0)
   isActive                       Boolean                       @default(true)
+  isStaffMember                  Boolean                       @default(false)
+  isSchedulable                  Boolean                       @default(false)
+  isAssignable                   Boolean                       @default(false)
+  appearsOnRota                  Boolean                       @default(false)
+  appearsInBookingAssignment     Boolean                       @default(false)
+  workforceAccessType            WorkforceAccessType           @default(EMPLOYEE)
+  skillsJson                     Json?
   color                          String?
   onlyMyLocation                 Boolean                       @default(false)
   defaultLocationId              String?
@@ -625,6 +638,8 @@ model User {
 
   @@unique([companyId, email])
   @@index([companyId, role, isActive])
+  @@index([companyId, isActive, isSchedulable])
+  @@index([companyId, isActive, isAssignable])
 }
 
 model Location {

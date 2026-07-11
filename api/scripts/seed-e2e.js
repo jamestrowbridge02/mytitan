@@ -503,6 +503,17 @@ async function ensureWorkspaceUser(companyId, locationId, fixture) {
     existing?.passwordHash &&
     existing.emailVerified === true &&
     isMytitanStaffEmail(existing.email || fixture.email);
+  const isMytitanStaff = isMytitanStaffEmail(fixture.email);
+  const isFieldStaff = !isMytitanStaff && ["STAFF", "TECHNICIAN"].includes(String(fixture.role || ""));
+  const isExternalOperator = String(fixture.role || "") === "EXTERNAL_OPERATOR";
+  const workforceDefaults = {
+    isStaffMember: isFieldStaff || isExternalOperator,
+    isSchedulable: isFieldStaff,
+    isAssignable: isFieldStaff || isExternalOperator,
+    appearsOnRota: isFieldStaff,
+    appearsInBookingAssignment: isFieldStaff || isExternalOperator,
+    workforceAccessType: isExternalOperator ? "CONTRACTOR" : "EMPLOYEE",
+  };
   if (preserveProtectedStaffHash) {
     await recordProtectedMutationWarning(prisma, {
       action: "seed:e2e preserve staff password hash",
@@ -521,6 +532,7 @@ async function ensureWorkspaceUser(companyId, locationId, fixture) {
       emailVerified: fixture.emailVerified === false ? false : true,
       passwordHash,
       role: fixture.role,
+      ...workforceDefaults,
       defaultLocationId: locationId,
       lastActiveAt: new Date(),
       lastLoginAt: new Date(),
@@ -531,6 +543,7 @@ async function ensureWorkspaceUser(companyId, locationId, fixture) {
       emailVerified: fixture.emailVerified === false ? false : true,
       ...(preserveProtectedStaffHash ? {} : { passwordHash }),
       role: fixture.role,
+      ...workforceDefaults,
       defaultLocationId: locationId,
       lastActiveAt: new Date(),
     },
@@ -3942,7 +3955,7 @@ async function main() {
   });
   await ensureTechnicianCapacityException(FIXTURE.scheduling.exceptionUnavailable.id, {
     tenantId: company.id,
-    technicianId: operator.id,
+    technicianId: technicianUser.id,
     date: addMinutes(today, 24 * 60),
     type: "UNAVAILABLE",
     startTime: "08:00",

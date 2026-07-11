@@ -160,7 +160,9 @@ export class CalendarService {
     const [technicians, bookings] = await Promise.all([
       db.user.findMany({
         where: withCompanyId(tenantId, {
-          role: { in: ['OWNER', 'ADMIN', 'STAFF', 'TECHNICIAN'] },
+          isActive: true,
+          isSchedulable: true,
+          appearsOnRota: true,
         }),
         select: { id: true, email: true, color: true },
         orderBy: { email: 'asc' },
@@ -263,7 +265,9 @@ export class CalendarService {
     const db = this.prisma as any;
     const technicians = await db.user.findMany({
       where: withCompanyId(tenantId, {
-        role: { in: ['OWNER', 'ADMIN', 'STAFF', 'TECHNICIAN'] },
+        isActive: true,
+        isSchedulable: true,
+        appearsOnRota: true,
       }),
       select: { id: true, email: true },
       orderBy: { email: 'asc' },
@@ -354,7 +358,9 @@ export class CalendarService {
     const db = this.prisma as any;
     const technicians = await db.user.findMany({
       where: withCompanyId(tenantId, {
-        role: { in: ['OWNER', 'ADMIN', 'STAFF', 'TECHNICIAN'] },
+        isActive: true,
+        isSchedulable: true,
+        appearsOnRota: true,
       }),
       select: { id: true, email: true },
       orderBy: { email: 'asc' },
@@ -538,7 +544,9 @@ export class CalendarService {
     const db = this.prisma as any;
     const technicians = await db.user.findMany({
       where: withCompanyId(tenantId, {
-        role: { in: ['OWNER', 'ADMIN', 'STAFF', 'TECHNICIAN'] },
+        isActive: true,
+        isSchedulable: true,
+        appearsOnRota: true,
       }),
       select: { id: true, email: true },
       orderBy: { email: 'asc' },

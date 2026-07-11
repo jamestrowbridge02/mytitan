@@ -745,7 +745,7 @@ export class InventoryService {
 
   async assignTechnicianStock(tenantId: string, userId: string, dto: AssignTechnicianStockDto) {
     const [technician] = await Promise.all([
-      this.db().user.findFirst({ where: { id: dto.technicianId, companyId: tenantId, role: 'TECHNICIAN', isActive: true }, select: { id: true } }),
+      this.db().user.findFirst({ where: { id: dto.technicianId, companyId: tenantId, role: 'TECHNICIAN', isActive: true, isAssignable: true }, select: { id: true } }),
       this.resolveInventoryLocation(tenantId, dto.inventoryLocationId),
     ]);
     if (!technician) throw new BadRequestException('Technician not found');

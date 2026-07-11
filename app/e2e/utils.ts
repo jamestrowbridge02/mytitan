@@ -65,7 +65,7 @@ export const fixtureRefs = {
   portalRenewalPlanName: "Semi-Annual Compliance Review",
   pendingServicePlanRenewalId: "e2e-service-plan-renewal-portal-pending",
   openServicePlanRequestId: "e2e-service-plan-request-customer-open",
-  schedulingHealthyTechnicianEmail: "e2e.operator@mytitan.local",
+  schedulingHealthyTechnicianEmail: "e2e.technician@mytitan.local",
   schedulingOverloadedTechnicianEmail: "e2e.technician@mytitan.local",
   schedulingUnassignedJobId: "e2e-job-open",
   schedulingOverloadedReason: "Parts collection blocks most of the morning",

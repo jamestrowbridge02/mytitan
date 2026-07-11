@@ -8,7 +8,7 @@ import { assertPermission } from '../common/permissions';
 import { Roles } from '../common/roles.decorator';
 import { RolesGuard } from '../common/roles.guard';
 import { PrismaService } from '../prisma/prisma.service';
-import { AcceptInviteDto, InviteUserDto, UpdateUserRoleDto } from './users.dto';
+import { AcceptInviteDto, InviteUserDto, UpdateUserRoleDto, UpdateUserWorkforceDto } from './users.dto';
 import { UsersService } from './users.service';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -72,6 +72,25 @@ export class UsersController {
       action: 'users.updateRole',
     });
     return this.users.updateRole(user.companyId, user.sub, user.role, id, dto);
+  }
+
+  @Patch(':id/workforce')
+  @Roles('OWNER', 'ADMIN')
+  async updateWorkforce(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Body() dto: UpdateUserWorkforceDto,
+    @Req() req: { requestId?: string; headers?: Record<string, string | string[] | undefined> },
+  ) {
+    const requestId = String(req.requestId || req.headers?.['x-request-id'] || '').trim() || undefined;
+    await assertPermission({
+      user,
+      permission: 'users.role_assign',
+      audit: this.audit,
+      requestId,
+      action: 'users.updateWorkforce',
+    });
+    return this.users.updateWorkforce(user.companyId, user.sub, id, dto);
   }
 }
 

@@ -133,6 +133,39 @@ export default function UsersPage() {
     }
   }
 
+  async function updateWorkforce(user: any, patch: Record<string, boolean | string>) {
+    if (!canAssignRoles) return;
+    setError('');
+    setStatus('');
+    const next = {
+      isStaffMember: Boolean(user.isStaffMember),
+      isSchedulable: Boolean(user.isSchedulable),
+      isAssignable: Boolean(user.isAssignable),
+      appearsOnRota: Boolean(user.appearsOnRota),
+      appearsInBookingAssignment: Boolean(user.appearsInBookingAssignment),
+      workforceAccessType: user.workforceAccessType || 'EMPLOYEE',
+      ...patch,
+    };
+    if (!next.isStaffMember) {
+      next.isSchedulable = false;
+      next.isAssignable = false;
+      next.appearsOnRota = false;
+      next.appearsInBookingAssignment = false;
+    }
+    if (!next.isSchedulable) next.appearsOnRota = false;
+    if (!next.isAssignable) next.appearsInBookingAssignment = false;
+    try {
+      await apiFetch(`/users/${user.id}/workforce`, {
+        method: 'PATCH',
+        body: JSON.stringify(next),
+      });
+      setStatus('Workforce settings updated');
+      await load();
+    } catch (err: any) {
+      setError(err.message || 'Failed to update workforce settings');
+    }
+  }
+
   if (permissionsReady && !canManageTeam) {
     return (
       <DashboardShell>
@@ -161,6 +194,7 @@ export default function UsersPage() {
           eyebrow="Team"
           title="Team management"
           subtitle={adminControlsSubtitle}
+          info="System access controls who can sign in. Staff and scheduling switches control who appears on rota, availability, booking assignment, and work queues."
           stats={[
             { label: 'Members', value: String(users.length) },
             { label: 'Invites', value: canInviteMembers ? 'Enabled' : 'Hidden' },
@@ -282,6 +316,74 @@ export default function UsersPage() {
                     ))}
                   </select>
                 )}
+                {canAssignRoles ? (
+                  <div className="team-workforce-grid" data-testid={`team-workforce-controls-${user.id}`}>
+                    <label className="team-workforce-switch">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(user.isStaffMember)}
+                        onChange={(event) => updateWorkforce(user, { isStaffMember: event.target.checked })}
+                        data-testid={`team-workforce-staff-${user.id}`}
+                      />
+                      <span>
+                        Staff member
+                        <small>Can be included in operational workforce settings.</small>
+                      </span>
+                    </label>
+                    <label className="team-workforce-switch">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(user.isSchedulable)}
+                        disabled={!user.isStaffMember}
+                        onChange={(event) => updateWorkforce(user, { isSchedulable: event.target.checked })}
+                        data-testid={`team-workforce-schedulable-${user.id}`}
+                      />
+                      <span>
+                        Include in scheduling
+                        <small>Appears in availability and rota only when enabled.</small>
+                      </span>
+                    </label>
+                    <label className="team-workforce-switch">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(user.isAssignable)}
+                        disabled={!user.isStaffMember}
+                        onChange={(event) => updateWorkforce(user, { isAssignable: event.target.checked })}
+                        data-testid={`team-workforce-assignable-${user.id}`}
+                      />
+                      <span>
+                        Can be assigned jobs
+                        <small>Eligible for job and booking assignment.</small>
+                      </span>
+                    </label>
+                    <label className="team-workforce-switch">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(user.appearsOnRota)}
+                        disabled={!user.isSchedulable}
+                        onChange={(event) => updateWorkforce(user, { appearsOnRota: event.target.checked })}
+                        data-testid={`team-workforce-rota-${user.id}`}
+                      />
+                      <span>
+                        Show on rota
+                        <small>Visible in staff rota and capacity views.</small>
+                      </span>
+                    </label>
+                    <label className="team-workforce-switch">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(user.appearsInBookingAssignment)}
+                        disabled={!user.isAssignable}
+                        onChange={(event) => updateWorkforce(user, { appearsInBookingAssignment: event.target.checked })}
+                        data-testid={`team-workforce-booking-${user.id}`}
+                      />
+                      <span>
+                        Booking assignment
+                        <small>Visible in customer booking employee choices.</small>
+                      </span>
+                    </label>
+                  </div>
+                ) : null}
               </div>
             ))}
           </div>

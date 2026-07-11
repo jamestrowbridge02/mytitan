@@ -219,4 +219,77 @@ test.describe("Phase 10F/G checkout, global, and vertical foundations", () => {
     expect(JSON.stringify(restaurant)).not.toContain("full POS");
     expect(restaurant.includes).toContain("Staff rota readiness");
   });
+
+  test("system access stays separate from workforce scheduling eligibility", async ({ request }) => {
+    const token = await login(request);
+    const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+    const usersResponse = await requestLocalApi(request, "/users", { headers });
+    expect(usersResponse.ok()).toBeTruthy();
+    const users = await usersResponse.json();
+    const owner = users.find((user: any) => user.role === "OWNER");
+    const admin = users.find((user: any) => user.email === fixtureRefs.workspaceAdminEmail);
+    const technician = users.find((user: any) => user.email === fixtureRefs.technicianEmail);
+    const finance = users.find((user: any) => user.email === fixtureRefs.financeEmail);
+    expect(owner?.isSchedulable).toBeFalsy();
+    expect(admin?.isSchedulable).toBeFalsy();
+    expect(technician?.isSchedulable).toBeTruthy();
+
+    const from = new Date();
+    from.setUTCHours(0, 0, 0, 0);
+    const to = new Date(from.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const schedulesResponse = await requestLocalApi(
+      request,
+      `/calendar/schedules?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}`,
+      { headers },
+    );
+    expect(schedulesResponse.ok()).toBeTruthy();
+    let schedules = await schedulesResponse.json();
+    const rotaEmails = (schedules.technicians || []).map((row: any) => row.email);
+    expect(rotaEmails).not.toContain(owner?.email);
+    expect(rotaEmails).not.toContain(admin?.email);
+    expect(rotaEmails).toContain(fixtureRefs.technicianEmail);
+
+    expect(finance?.id).toBeTruthy();
+    try {
+      const enable = await requestLocalApi(request, `/users/${finance.id}/workforce`, {
+        method: "PATCH",
+        headers,
+        data: {
+          isStaffMember: true,
+          isSchedulable: true,
+          isAssignable: true,
+          appearsOnRota: true,
+          appearsInBookingAssignment: true,
+          workforceAccessType: "EMPLOYEE",
+        },
+      });
+      expect(enable.ok()).toBeTruthy();
+      const audit = await requestLocalApi(request, "/audit?type=user.workforce.update&pageSize=20", { headers });
+      expect(audit.ok()).toBeTruthy();
+      const auditBody = await audit.json();
+      expect((auditBody.items || []).some((entry: any) => String(entry.message || "").includes(fixtureRefs.financeEmail))).toBeTruthy();
+
+      const refreshed = await requestLocalApi(
+        request,
+        `/calendar/schedules?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}`,
+        { headers },
+      );
+      expect(refreshed.ok()).toBeTruthy();
+      schedules = await refreshed.json();
+      expect((schedules.technicians || []).map((row: any) => row.email)).toContain(fixtureRefs.financeEmail);
+    } finally {
+      await requestLocalApi(request, `/users/${finance.id}/workforce`, {
+        method: "PATCH",
+        headers,
+        data: {
+          isStaffMember: false,
+          isSchedulable: false,
+          isAssignable: false,
+          appearsOnRota: false,
+          appearsInBookingAssignment: false,
+          workforceAccessType: "EMPLOYEE",
+        },
+      });
+    }
+  });
 });

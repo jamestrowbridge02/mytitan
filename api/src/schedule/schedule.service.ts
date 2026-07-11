@@ -159,7 +159,8 @@ export class ScheduleService {
     const rows = await db.user.findMany({
       where: {
         companyId: tenantId,
-        role: { in: [...ASSIGNABLE_ROLES] },
+        isActive: true,
+        isAssignable: true,
       },
       select: { id: true, email: true, role: true },
       orderBy: [{ role: "asc" }, { email: "asc" }],
