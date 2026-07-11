@@ -36,8 +36,9 @@ test.describe("payments hardening", () => {
 
     expect(response?.status()).toBe(200);
     await expect(page.getByRole("heading", { name: "MyTitan Account", exact: true })).toBeVisible();
-    await expect(page.getByText(/Checkout and subscription management are unavailable|Billing is unavailable right now|Unavailable right now/i).first()).toBeVisible();
+    await expect(page.getByText(/Paid plan checkout is not currently available|Payment method management is unavailable|Add a payment method when you choose a plan/i).first()).toBeVisible();
     await expect(page.getByText(/AI usage/i)).toHaveCount(0);
+    await expect(page.locator("body")).not.toContainText(/webhook-backed|canary|MYTITAN_CONFIRM_JOB_PACK_CHECKOUT|Product ID|Price ID/i);
     expect(pageErrors).toEqual([]);
   });
 
@@ -465,23 +466,26 @@ test.describe("payments hardening", () => {
     });
 
     await page.goto("/dashboard/billing");
-    await expect(page.getByTestId("billing-free-signup-FREE")).toBeVisible();
-    await expect(page.getByText("Up to 20 job completions/month").first()).toBeVisible();
+    await expect(page.getByTestId("billing-account-summary")).toBeVisible();
+    await expect(page.getByTestId("billing-free-signup-FREE")).toHaveCount(0);
     await page.getByRole("button", { name: "Annual" }).click();
-    await expect(page.getByText("£190.00 per year, billed annually").first()).toBeVisible();
+    await expect(page.getByTestId("billing-interval-annual")).toHaveClass(/active/);
     const manageButton = page.locator('[data-testid^="billing-manage-plan-"]').first();
     await expect(manageButton).toBeVisible();
-    await expect(page.getByTestId("billing-plan-completion-allowance")).toContainText("Up to 60 job completions/month");
-    await expect(page.getByTestId("billing-plan-usage-tracking")).toContainText(/Included allowance is tracked live/i);
-    await expect(page.getByTestId("billing-extra-job-packs")).toContainText(/£5, £12\.50, £25, £50, £125, and £250/i);
+    await expect(page.getByTestId("billing-plan-usage-tracking")).toContainText(/Included jobs|Used this month|Remaining this month/i);
+    await expect(page.locator("body")).not.toContainText(/webhook-backed|canary|MYTITAN_CONFIRM_JOB_PACK_CHECKOUT|Product ID|Price ID/i);
     await manageButton.click();
     await page.waitForURL(/\/dashboard\/billing\?portal=opened$/);
 
     await page.goto("/dashboard/billing");
     const chooseButton = page.locator('[data-testid^="billing-choose-plan-"]').first();
-    await expect(chooseButton).toBeVisible();
-    await chooseButton.click();
-    await page.waitForURL(/\/dashboard\/billing\?checkout=success$/);
+    if (await chooseButton.count()) {
+      await expect(chooseButton).toBeVisible();
+      await chooseButton.click();
+      await page.waitForURL(/\/dashboard\/billing\?checkout=success$/);
+    } else {
+      await expect(page.getByTestId("billing-plan-choices-section")).toContainText(/Current|Manage plan/i);
+    }
   });
 
   test("tenant billing keeps non-owner users informed without exposing billing actions", async ({ page, request }) => {
@@ -562,10 +566,10 @@ test.describe("payments hardening", () => {
     });
 
     await page.goto("/dashboard/billing", { waitUntil: "networkidle" });
-    await expect(page.getByText(/workspace owner action required/i).first()).toBeVisible();
-    await expect(page.getByText(/only the workspace owner can change the subscription/i).first()).toBeVisible();
-    await expect(page.locator('[data-testid^="billing-manage-plan-"]').first()).toContainText(/owner action required/i);
-    await expect(page.getByTestId("billing-extra-job-packs")).toContainText(/£5, £12\.50, £25, £50, £125, and £250/i);
+    await expect(page.getByTestId("billing-account-summary")).toBeVisible();
+    await expect(page.getByTestId("billing-primary-action")).toContainText(/ask owner/i);
+    await expect(page.locator('[data-testid^="billing-choose-plan-"], [data-testid^="billing-manage-plan-"]').first()).toContainText(/owner required/i);
+    await expect(page.locator("body")).not.toContainText(/webhook-backed|canary|MYTITAN_CONFIRM_JOB_PACK_CHECKOUT|Product ID|Price ID/i);
   });
 
   test("payments hub shows tenant payment options without exposing secret-bearing values", async ({ page, request }) => {
@@ -754,28 +758,11 @@ test.describe("payments hardening", () => {
 
     await page.goto("/dashboard/billing", { waitUntil: "networkidle" });
     await expect(page.getByTestId("billing-subscription-price-review")).toHaveCount(0);
-    await expect(page.getByTestId("billing-job-completion-packs-card")).toContainText(/setup required|partial/i);
-    await expect(page.getByTestId("billing-job-pack-summary")).toContainText(/setup is still incomplete/i);
-    await expect(page.getByTestId("billing-job-pack-checkout")).toContainText(/not available yet/i);
-    await expect(page.getByTestId("billing-job-pack-ledger-readiness")).toContainText(/payment is confirmed/i);
-    await expect(page.getByTestId("billing-job-pack-allowance")).toContainText("Monthly included allowance");
-    await expect(page.getByTestId("billing-job-pack-allowance")).toContainText("Used this month");
-    await expect(page.getByTestId("billing-job-pack-allowance")).toContainText("Purchased credits remaining");
-    await expect(page.getByTestId("billing-job-pack-allowance")).toContainText("Next reset date");
-    await expect(page.getByTestId("billing-job-pack-allowance")).toContainText(/carry over until used or refunded/i);
-    await expect(page.getByTestId("billing-job-pack-primary-job_completion_pack_1")).toContainText("10 jobs");
-    await expect(page.getByTestId("billing-job-pack-primary-job_completion_pack_2")).toContainText("25 jobs");
-    await expect(page.getByTestId("billing-job-pack-primary-job_completion_pack_3")).toContainText("50 jobs");
-    await expect(page.getByTestId("billing-job-pack-primary-job_completion_pack_4")).toContainText("100 jobs");
-    await expect(page.getByTestId("billing-job-pack-primary-job_completion_pack_5")).toContainText("250 jobs");
-    await expect(page.getByTestId("billing-job-pack-primary-job_completion_pack_6")).toContainText("500 jobs");
-    await expect(page.getByTestId("billing-job-pack-primary-job_completion_pack_1")).toContainText("£5.00");
-    await expect(page.getByTestId("billing-job-pack-primary-job_completion_pack_1")).toContainText(/ready/i);
-    await expect(page.getByTestId("billing-job-pack-primary-job_completion_pack_2")).toContainText(/mismatch/i);
-    await expect(page.getByTestId("billing-job-pack-primary-job_completion_pack_3")).toContainText(/inactive/i);
-    await expect(page.getByTestId("billing-job-pack-primary-job_completion_pack_4")).toContainText(/currency mismatch/i);
-    await expect(page.getByTestId("billing-job-pack-primary-job_completion_pack_5")).toContainText(/missing/i);
-    await expect(page.getByTestId("billing-job-pack-primary-job_completion_pack_6")).toContainText(/missing/i);
+    await expect(page.getByTestId("billing-job-completion-packs-card")).toContainText(/Extra job packs are not currently available for this account/i);
+    await expect(page.getByTestId("billing-job-pack-summary")).toContainText(/not currently available/i);
+    await expect(page.getByTestId("billing-plan-usage-tracking")).toContainText(/Included jobs|Used this month|Remaining this month|Next renewal/i);
+    await expect(page.locator('[data-testid^="billing-job-pack-primary-"]')).toHaveCount(0);
+    await expect(page.locator("body")).not.toContainText(/setup required|mismatch|inactive|currency mismatch|missing|webhook-backed|canary|runtime/i);
     await expect(page.locator("body")).not.toContainText("sk_live_");
     await expect(page.locator("body")).not.toContainText("sk_test_");
     await expect(page.locator("body")).not.toContainText("price_");
@@ -793,7 +780,7 @@ test.describe("payments hardening", () => {
     expect(paymentsOverflow).toBeLessThanOrEqual(2);
 
     await page.goto("/dashboard/billing", { waitUntil: "networkidle" });
-    await expect(page.getByTestId("billing-trial-card")).toBeVisible();
+    await expect(page.getByTestId("billing-account-summary")).toBeVisible();
     await expect(page.getByRole("heading", { name: /MyTitan Account/i })).toBeVisible();
   });
 

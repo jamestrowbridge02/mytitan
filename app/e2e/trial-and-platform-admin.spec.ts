@@ -599,25 +599,25 @@ test.describe("trial model and platform admin separation", () => {
     await loginAs(page, request, "e2e.operator@mytitan.local", "MyTitanE2E!2026");
 
     await page.goto("/dashboard/billing", { waitUntil: "networkidle" });
-    await expect(page.getByTestId("billing-trial-card")).toBeVisible();
-    await expect(page.getByTestId("billing-trial-status")).toContainText(/trial active/i);
-    await expect(page.getByTestId("billing-trial-days")).toContainText(/remaining/i);
-    await expect(page.getByTestId("billing-trial-guidance")).toContainText(/upgrade before the trial ends/i);
-    await expect(page.getByText(/keep the workspace and billing flow running without interruption/i)).toBeVisible();
+    await expect(page.getByTestId("billing-account-summary")).toBeVisible();
+    await expect(page.getByTestId("billing-account-summary")).toContainText(/trial|plan|billing/i);
+    await expect(page.getByTestId("billing-plan-usage-tracking")).toBeVisible();
     await expect(page.getByTestId("billing-custom-pricing")).toHaveCount(0);
     await expect(page.getByText("Internal only", { exact: true })).toHaveCount(0);
     await expect(page.getByText("AI usage", { exact: true })).toHaveCount(0);
     await expect(page.getByTestId("billing-platform-catalog-link")).toHaveCount(0);
+    await expect(page.locator("body")).not.toContainText(/webhook-backed|canary|MYTITAN_CONFIRM_JOB_PACK_CHECKOUT|runtime|Product ID|Price ID/i);
   });
 
-  test("platform admin sees platform-only billing deep links into the catalog", async ({ page, request }) => {
+  test("platform admin sees platform-only billing catalog diagnostics in Platform Admin", async ({ page, request }) => {
     await installApiProxy(page, request);
     await loginAs(page, request, fixtureRefs.platformAdminEmail, fixtureRefs.platformAdminPassword);
 
     await page.goto("/dashboard/billing?section=job-packs", { waitUntil: "networkidle" });
-    await expect(page.getByTestId("billing-platform-catalog-link")).toBeVisible();
-    await page.getByTestId("billing-platform-catalog-link-job_completion_pack_1-none").click();
-    await page.waitForURL(/\/platform\?section=billing-catalog&product=/);
+    await expect(page.getByTestId("billing-platform-catalog-link")).toHaveCount(0);
+    await expect(page.locator("body")).not.toContainText(/webhook-backed|canary|MYTITAN_CONFIRM_JOB_PACK_CHECKOUT|runtime|Product ID|Price ID/i);
+
+    await page.goto("/platform?section=billing-catalog&product=job_pack%3Ajob_completion_pack_1%3Anone", { waitUntil: "networkidle" });
     await expect(page.getByTestId("platform-billing-catalog-item-job_completion_pack_1-none")).toBeVisible();
   });
 
@@ -642,15 +642,15 @@ test.describe("trial model and platform admin separation", () => {
 
       await page.goto("/dashboard/billing", { waitUntil: "networkidle" });
       await expect(page.getByRole("heading", { name: /mytitan account/i })).toBeVisible();
-      await expect(page.getByText(/verify your email to continue/i).first()).toBeVisible();
-      await expect(page.getByText(/resend the mytitan verification email/i).first()).toBeVisible();
+      await expect(page.getByTestId("billing-account-summary")).toBeVisible();
       await expect(page.getByText(/workspace cannot send verification emails yet|finish outbound email setup/i)).toHaveCount(0);
-      await expect(page.getByTestId("billing-resend-verification")).toBeVisible();
-      await page.getByTestId("billing-resend-verification").click();
+      await expect(page.locator("body")).not.toContainText(/webhook-backed|canary|MYTITAN_CONFIRM_JOB_PACK_CHECKOUT|runtime|Product ID|Price ID/i);
+      await expect(page.getByTestId("billing-primary-action")).toHaveText(/resend verification email/i);
+      await page.getByTestId("billing-primary-action").click();
       await expect(
         page.getByText(/verification email sent from mytitan|mytitan email is not set up yet|mytitan cannot send verification emails right now|this address cannot receive live verification email/i).first(),
       ).toBeVisible();
-      await expect(page.locator('[data-testid^="billing-choose-plan-"]').first()).toContainText(/verify email to continue/i);
+      await expect(page.locator('[data-testid^="billing-choose-plan-"]').first()).toContainText(/verify email first/i);
     } finally {
       await cleanupGeneratedWorkspace(request, signupJson.token);
     }

@@ -123,7 +123,7 @@ test.describe("pricing adjustments", () => {
     await loginAs(page, request, fixtureRefs.workspaceAdminEmail, fixtureRefs.workspaceAdminPassword);
     await page.goto("/dashboard/billing", { waitUntil: "networkidle" });
 
-    await expect(page.getByTestId("billing-trial-card")).toBeVisible();
+    await expect(page.getByTestId("billing-account-summary")).toBeVisible();
     await expect(page.getByTestId("billing-custom-pricing")).toHaveCount(0);
 
     const headers = await authHeaders(page);
@@ -156,7 +156,8 @@ test.describe("pricing adjustments", () => {
     await loginAs(page, request, fixtureRefs.financeEmail, fixtureRefs.financePassword);
     await page.goto("/dashboard/billing", { waitUntil: "networkidle" });
 
-    await expect(page.getByTestId("billing-trial-card")).toBeVisible();
+    await expect(page.getByTestId("billing-account-summary")).toBeVisible();
+    await expect(page.locator("body")).not.toContainText(/webhook-backed|canary|MYTITAN_CONFIRM_JOB_PACK_CHECKOUT|Product ID|Price ID/i);
 
     const headers = await authHeaders(page);
     const platformLookup = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/admin/platform/tenants?q=e2e`, { headers });

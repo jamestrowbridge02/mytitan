@@ -95,15 +95,17 @@ test.describe("settings operations readiness", () => {
     }
   });
 
-  test("billing pack deep links land on the exact pack card", async ({ page, request }) => {
+  test("billing pack deep links land on the job-pack section without exposing unavailable packs", async ({ page, request }) => {
     await installApiProxy(page, request);
     await loginAs(page, request, "e2e.operator@mytitan.local", "MyTitanE2E!2026");
 
     await page.goto("/dashboard/billing?section=job-packs&pack=50", { waitUntil: "networkidle" });
-    const packCard = page.getByTestId("billing-job-pack-primary-job_completion_pack_3");
-    await expect(packCard).toBeVisible();
-    await expect(packCard).toHaveAttribute("data-section-highlighted", "true");
-    const box = await packCard.boundingBox();
+    const jobPacks = page.getByTestId("billing-job-completion-packs-card");
+    await expect(jobPacks).toBeVisible();
+    await expect(page.getByTestId("billing-job-pack-primary-job_completion_pack_3")).toHaveCount(0);
+    await expect(jobPacks).toContainText(/Extra job packs are not currently available|extra jobs/i);
+    await expect(page.locator("body")).not.toContainText(/job_count_mismatch|inactive|currency_mismatch|Stripe product mapping|webhook-backed/i);
+    const box = await jobPacks.boundingBox();
     expect(box && box.y).toBeGreaterThan(40);
   });
 

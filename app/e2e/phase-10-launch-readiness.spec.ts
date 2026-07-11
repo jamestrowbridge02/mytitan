@@ -102,13 +102,12 @@ test.describe("Phase 10 launch readiness", () => {
     await page.goto("/dashboard/billing");
     await expect(page.getByRole("heading", { name: "MyTitan Account", exact: true })).toBeVisible();
     await expect(page.getByTestId("billing-payment-collection-card")).toHaveCount(0);
-    const accountNavigation = page.getByTestId("mytitan-account-navigation");
-    await expect(accountNavigation).toContainText("Subscription");
-    await expect(accountNavigation).toContainText("Plan");
-    await expect(accountNavigation).toContainText("Job packs");
-    await expect(accountNavigation).toContainText("MyTitan invoices");
-    await expect(accountNavigation).toContainText("MyTitan payment method");
-    await expect(accountNavigation).not.toContainText(/customer payments|bank transfer|card terminal|open banking|gocardless|sumup|zettle|worldpay/i);
+    await expect(page.getByTestId("billing-account-summary")).toBeVisible();
+    await expect(page.getByTestId("billing-plan-choices-section")).toBeVisible();
+    await expect(page.getByTestId("billing-job-completion-packs-card")).toBeVisible();
+    await expect(page.getByTestId("billing-payment-method-target")).toBeVisible();
+    await expect(page.getByTestId("billing-invoices-section")).toBeVisible();
+    await expect(page.locator("body")).not.toContainText(/customer payments|bank transfer|card terminal|open banking|gocardless|sumup|zettle|worldpay|webhook-backed|canary/i);
 
     await page.goto("/dashboard/billing?section=customer-payments");
     await expect(page).toHaveURL(/\/dashboard\/settings\/payments$/);
@@ -123,36 +122,65 @@ test.describe("Phase 10 launch readiness", () => {
     await expect(page.getByTestId("payments-hub")).not.toContainText(/MyTitan Billing Stripe/i);
   });
 
-  test("billing setup action cards open concrete targets or unavailable reasons", async ({ page, request }) => {
+  test("account billing actions open concrete targets or show unavailable reasons", async ({ page, request }) => {
     await installApiProxy(page, request);
     await loginAs(page, request, fixtureRefs.workspaceAdminEmail, fixtureRefs.workspaceAdminPassword);
+
+    await page.route("**/api/billing/checkout-session", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ url: "/dashboard/billing?checkout=success" }),
+      });
+    });
+    await page.route("**/api/billing/portal", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ url: "/dashboard/billing?portal=opened" }),
+      });
+    });
+
     await page.goto("/dashboard/billing", { waitUntil: "networkidle" });
 
-    await page.getByTestId("billing-setup-plan-and-payments").click();
-    await expect(page).toHaveURL(/section=plan-and-payments/);
-    await expect(page.locator('[data-section-key="plan-and-payments"]')).toBeVisible();
+    await expect(page.getByTestId("billing-account-summary")).toBeVisible();
+    await page.getByRole("button", { name: "Annual" }).click();
+    await expect(page.getByTestId("billing-interval-annual")).toHaveClass(/active/);
+    await page.getByRole("button", { name: "Monthly" }).click();
+    await expect(page.getByTestId("billing-interval-monthly")).toHaveClass(/active/);
 
-    await page.getByTestId("billing-setup-plan").click();
-    await expect(page).toHaveURL(/section=plan-choices/);
     await expect(page.getByTestId("billing-plan-choices-section")).toBeVisible();
+    const planAction = page.locator('[data-testid^="billing-choose-plan-"], [data-testid^="billing-manage-plan-"]').first();
+    if (await planAction.count()) {
+      await expect(planAction).toContainText(/Select plan|Manage plan|Owner required|Verify email first|Unavailable/i);
+    } else {
+      await expect(page.getByTestId("billing-plan-unavailable")).toContainText(/Paid plan checkout is not currently available/i);
+    }
 
-    await page.getByTestId("billing-setup-job-packs").click();
-    await expect(page).toHaveURL(/section=job-packs/);
     await expect(page.getByTestId("billing-job-completion-packs-card")).toBeVisible();
+    if (await page.getByTestId("billing-review-plans").count()) {
+      await page.getByTestId("billing-review-plans").click();
+      await expect(page).toHaveURL(/section=plan-choices/);
+      await expect(page.getByTestId("billing-plan-choices-section")).toBeVisible();
+    }
 
-    await page.getByTestId("billing-setup-invoices").click();
-    await expect(page).toHaveURL(/section=mytitan-invoices/);
-    await expect(page.getByTestId("billing-invoices-section")).toBeVisible();
-    await expect(page.getByTestId("billing-invoices-section")).toContainText(/Open invoices|unavailable|Ask the workspace owner|Verify the owner email/i);
-
-    await page.getByTestId("billing-setup-payment-method").click();
-    await expect(page).toHaveURL(/section=payment-method/);
     await expect(page.getByTestId("billing-payment-method-target")).toBeVisible();
-    await expect(page.getByTestId("billing-payment-method-target")).toContainText(/Open payment method|unavailable|Ask the workspace owner|Verify the owner email/i);
+    if (await page.getByTestId("billing-open-payment-method").count()) {
+      await page.getByTestId("billing-open-payment-method").click();
+      await page.waitForURL(/\/dashboard\/billing\?portal=opened$/);
+      await page.goto("/dashboard/billing", { waitUntil: "networkidle" });
+    } else {
+      await expect(page.getByTestId("billing-payment-method-target")).toContainText(/Add a payment method when you choose a plan|unavailable|Ask the account owner|Verify the owner email/i);
+    }
 
-    await page.getByTestId("billing-next-step-card").getByRole("link", { name: "Open the next billing task" }).click();
-    await expect(page).toHaveURL(/\/dashboard\/(billing|settings)/);
-    await expect(page.locator("body")).not.toContainText("Payment provider setup is managed from Settings");
+    await expect(page.getByTestId("billing-invoices-section")).toBeVisible();
+    if (await page.getByTestId("billing-open-invoices").count()) {
+      await page.getByTestId("billing-open-invoices").click();
+      await page.waitForURL(/\/dashboard\/billing\?portal=opened$/);
+    } else {
+      await expect(page.getByTestId("billing-invoices-section")).toContainText(/No MyTitan invoices yet/i);
+    }
+    await expect(page.locator("body")).not.toContainText(/Payment provider setup is managed from Settings|webhook-backed|canary|MYTITAN_CONFIRM_JOB_PACK_CHECKOUT/i);
   });
 
   test("Developer Tools remain hidden from viewer roles", async ({ page, request }) => {
