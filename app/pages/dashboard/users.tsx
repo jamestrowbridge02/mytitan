@@ -9,6 +9,7 @@ import {
   hasWorkspacePermission,
   normalizePermissionSnapshot,
 } from '../../lib/workspace-permissions';
+import { resolveWorkforceTerminology } from '../../lib/workforce-terminology';
 import { getResendVerificationMessage, getSafeVerificationError } from '../../lib/verification-resend';
 
 const ROLES = ['OWNER', ...ASSIGNABLE_WORKSPACE_ROLES];
@@ -18,7 +19,7 @@ const phase6RoleFoundations = [
   { key: 'admin', label: 'Admin', detail: 'Operational administration without platform controls.' },
   { key: 'finance', label: 'Finance', detail: 'Finance-only billing, invoices, credits, and reconciliation surfaces.' },
   { key: 'dispatcher', label: 'Dispatcher', detail: 'Location-first booking, calendar, scheduling, and customer workflow control.' },
-  { key: 'technician', label: 'Technician', detail: 'Technician-only field execution, offline packets, evidence upload, and completion.' },
+  { key: 'field_worker', label: 'Field worker', detail: 'Assigned-work execution, offline packets, evidence upload, and completion.' },
   { key: 'viewer', label: 'Viewer', detail: 'Read-only tenant visibility with governed modules hidden.' },
   { key: 'location_manager', label: 'Location manager', detail: 'Location-scoped operations foundation for larger teams.' },
   { key: 'commercial_read_only', label: 'Read-only commercial', detail: 'Commercial reporting visibility without operational mutation.' },
@@ -27,13 +28,14 @@ const phase6RoleFoundations = [
 const phase6PermissionSafeguards = [
   'Location-level permissions',
   'Finance-only permissions',
-  'Technician-only views',
+  'Assigned-work views',
   'Portal/support restrictions',
   'Audit role changes',
 ];
 
 export default function UsersPage() {
   const [users, setUsers] = useState<any[]>([]);
+  const [settings, setSettings] = useState<any>(null);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('DISPATCHER');
   const [permissions, setPermissions] = useState(() => emptyPermissionSnapshot());
@@ -47,8 +49,9 @@ export default function UsersPage() {
   const load = async () => {
     setError('');
     try {
-      const [list, me] = await Promise.all([apiFetch('/users'), apiFetch('/me')]);
+      const [list, me, tenantSettings] = await Promise.all([apiFetch('/users'), apiFetch('/me'), apiFetch('/tenant/settings')]);
       setUsers(Array.isArray(list) ? list : []);
+      setSettings(tenantSettings || null);
       setPermissions(normalizePermissionSnapshot(me?.permissions));
       setPermissionsReady(true);
       setEmailVerified(Boolean(me?.emailVerified));
@@ -72,6 +75,7 @@ export default function UsersPage() {
     if (canAssignRoles) return 'Review access and update roles for existing team members.';
     return 'Only owners and admins can manage team access.';
   }, [canAssignRoles, canInviteMembers]);
+  const workforceTerms = useMemo(() => resolveWorkforceTerminology(settings), [settings]);
 
   async function invite() {
     if (!canInviteMembers) return;
@@ -143,7 +147,14 @@ export default function UsersPage() {
       isAssignable: Boolean(user.isAssignable),
       appearsOnRota: Boolean(user.appearsOnRota),
       appearsInBookingAssignment: Boolean(user.appearsInBookingAssignment),
+      isPublicBookable: Boolean(user.isPublicBookable),
       workforceAccessType: user.workforceAccessType || 'EMPLOYEE',
+      displayName: user.displayName || '',
+      jobTitle: user.jobTitle || '',
+      department: user.department || '',
+      seniority: user.seniority || '',
+      employeeReference: user.employeeReference || '',
+      permissionProfile: user.permissionProfile || user.role || '',
       ...patch,
     };
     if (!next.isStaffMember) {
@@ -151,9 +162,11 @@ export default function UsersPage() {
       next.isAssignable = false;
       next.appearsOnRota = false;
       next.appearsInBookingAssignment = false;
+      next.isPublicBookable = false;
     }
     if (!next.isSchedulable) next.appearsOnRota = false;
     if (!next.isAssignable) next.appearsInBookingAssignment = false;
+    if (!next.isSchedulable || !next.appearsInBookingAssignment) next.isPublicBookable = false;
     try {
       await apiFetch(`/users/${user.id}/workforce`, {
         method: 'PATCH',
@@ -194,7 +207,7 @@ export default function UsersPage() {
           eyebrow="Team"
           title="Team management"
           subtitle={adminControlsSubtitle}
-          info="System access controls who can sign in. Staff and scheduling switches control who appears on rota, availability, booking assignment, and work queues."
+            info={`System access controls who can sign in. ${workforceTerms.plural} and scheduling switches control who appears on rota, availability, booking assignment, and work queues.`}
           stats={[
             { label: 'Members', value: String(users.length) },
             { label: 'Invites', value: canInviteMembers ? 'Enabled' : 'Hidden' },
@@ -247,7 +260,7 @@ export default function UsersPage() {
         ) : null}
 
         <div className="card" style={{ padding: 16, marginBottom: 20 }} data-testid="team-invite-card">
-          <h3>Invite team member</h3>
+          <h3>Invite {workforceTerms.singular.toLowerCase()}</h3>
           <p className="muted" style={{ marginTop: 0 }}>
             MyTitan sends the setup email for team access. The new user sets their own password from the secure link, and workspace customer-email settings are not used here.
           </p>
@@ -284,7 +297,7 @@ export default function UsersPage() {
         </div>
 
         {users.length === 0 ? (
-          <EmptyState title="No team members yet" subtitle="Invite your first user to get started." />
+          <EmptyState title={`No ${workforceTerms.plural.toLowerCase()} yet`} subtitle="Invite your first user to get started." />
         ) : (
           <div className="list">
             {users.map((user) => (
@@ -318,6 +331,26 @@ export default function UsersPage() {
                 )}
                 {canAssignRoles ? (
                   <div className="team-workforce-grid" data-testid={`team-workforce-controls-${user.id}`}>
+                    <label>
+                      Display name
+                      <input className="input" value={user.displayName || ''} onChange={(event) => updateWorkforce(user, { displayName: event.target.value })} data-testid={`team-profile-display-name-${user.id}`} />
+                    </label>
+                    <label>
+                      Job title
+                      <input className="input" value={user.jobTitle || ''} onChange={(event) => updateWorkforce(user, { jobTitle: event.target.value })} data-testid={`team-profile-job-title-${user.id}`} placeholder={`Junior ${workforceTerms.defaultFieldWorker}`} />
+                    </label>
+                    <label>
+                      Department
+                      <input className="input" value={user.department || ''} onChange={(event) => updateWorkforce(user, { department: event.target.value })} data-testid={`team-profile-department-${user.id}`} placeholder="Operations" />
+                    </label>
+                    <label>
+                      Seniority
+                      <input className="input" value={user.seniority || ''} onChange={(event) => updateWorkforce(user, { seniority: event.target.value })} data-testid={`team-profile-seniority-${user.id}`} placeholder="Junior" />
+                    </label>
+                    <label>
+                      Permission profile
+                      <input className="input" value={user.permissionProfile || ''} onChange={(event) => updateWorkforce(user, { permissionProfile: event.target.value })} data-testid={`team-access-permission-profile-${user.id}`} placeholder="Field worker" />
+                    </label>
                     <label className="team-workforce-switch">
                       <input
                         type="checkbox"
@@ -326,7 +359,7 @@ export default function UsersPage() {
                         data-testid={`team-workforce-staff-${user.id}`}
                       />
                       <span>
-                        Staff member
+                        {workforceTerms.singular}
                         <small>Can be included in operational workforce settings.</small>
                       </span>
                     </label>
@@ -382,6 +415,20 @@ export default function UsersPage() {
                         <small>Visible in customer booking employee choices.</small>
                       </span>
                     </label>
+                    <label className="team-workforce-switch">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(user.isPublicBookable)}
+                        disabled={!user.isSchedulable || !user.appearsInBookingAssignment}
+                        onChange={(event) => updateWorkforce(user, { isPublicBookable: event.target.checked })}
+                        data-testid={`team-workforce-public-bookable-${user.id}`}
+                      />
+                      <span>
+                        Publicly bookable
+                        <small>Visible when customers choose a {workforceTerms.publicBooking.toLowerCase()}.</small>
+                      </span>
+                    </label>
+                    {user.isPublicBookable && !user.isSchedulable ? <p className="muted">Public booking requires scheduling availability.</p> : null}
                   </div>
                 ) : null}
               </div>

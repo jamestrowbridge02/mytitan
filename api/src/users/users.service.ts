@@ -31,12 +31,19 @@ export class UsersService {
         id: true,
         email: true,
         role: true,
+        displayName: true,
+        jobTitle: true,
+        department: true,
+        seniority: true,
+        employeeReference: true,
+        permissionProfile: true,
         isActive: true,
         isStaffMember: true,
         isSchedulable: true,
         isAssignable: true,
         appearsOnRota: true,
         appearsInBookingAssignment: true,
+        isPublicBookable: true,
         workforceAccessType: true,
         defaultLocationId: true,
         skillsJson: true,
@@ -200,33 +207,53 @@ export class UsersService {
       throw new NotFoundException('User not found');
     }
 
-    const isStaffMember = Boolean(dto.isStaffMember);
-    const isSchedulable = isStaffMember && Boolean(dto.isSchedulable);
-    const isAssignable = isStaffMember && Boolean(dto.isAssignable);
-    const appearsOnRota = isSchedulable && Boolean(dto.appearsOnRota);
-    const appearsInBookingAssignment = isAssignable && Boolean(dto.appearsInBookingAssignment);
-    const workforceAccessType = dto.workforceAccessType || 'EMPLOYEE';
+    const isStaffMember = Object.prototype.hasOwnProperty.call(dto, 'isStaffMember') ? Boolean(dto.isStaffMember) : Boolean(user.isStaffMember);
+    const isSchedulable = isStaffMember && (Object.prototype.hasOwnProperty.call(dto, 'isSchedulable') ? Boolean(dto.isSchedulable) : Boolean(user.isSchedulable));
+    const isAssignable = isStaffMember && (Object.prototype.hasOwnProperty.call(dto, 'isAssignable') ? Boolean(dto.isAssignable) : Boolean(user.isAssignable));
+    const appearsOnRota = isSchedulable && (Object.prototype.hasOwnProperty.call(dto, 'appearsOnRota') ? Boolean(dto.appearsOnRota) : Boolean(user.appearsOnRota));
+    const appearsInBookingAssignment = isAssignable && (Object.prototype.hasOwnProperty.call(dto, 'appearsInBookingAssignment') ? Boolean(dto.appearsInBookingAssignment) : Boolean(user.appearsInBookingAssignment));
+    const isPublicBookable = isSchedulable && appearsInBookingAssignment && (Object.prototype.hasOwnProperty.call(dto, 'isPublicBookable') ? Boolean(dto.isPublicBookable) : Boolean(user.isPublicBookable));
+    const workforceAccessType = dto.workforceAccessType || user.workforceAccessType || 'EMPLOYEE';
+    const cleanText = (value: unknown, max = 80) => {
+      if (typeof value !== 'string') return undefined;
+      const trimmed = value.trim();
+      return trimmed ? trimmed.slice(0, max) : null;
+    };
 
     const updated = await db.user.update({
       where: { id: userId },
       data: {
+        ...(Object.prototype.hasOwnProperty.call(dto, 'displayName') ? { displayName: cleanText(dto.displayName) } : {}),
+        ...(Object.prototype.hasOwnProperty.call(dto, 'jobTitle') ? { jobTitle: cleanText(dto.jobTitle) } : {}),
+        ...(Object.prototype.hasOwnProperty.call(dto, 'department') ? { department: cleanText(dto.department) } : {}),
+        ...(Object.prototype.hasOwnProperty.call(dto, 'seniority') ? { seniority: cleanText(dto.seniority) } : {}),
+        ...(Object.prototype.hasOwnProperty.call(dto, 'employeeReference') ? { employeeReference: cleanText(dto.employeeReference, 40) } : {}),
+        ...(Object.prototype.hasOwnProperty.call(dto, 'permissionProfile') ? { permissionProfile: cleanText(dto.permissionProfile, 60) } : {}),
         isStaffMember,
         isSchedulable,
         isAssignable,
         appearsOnRota,
         appearsInBookingAssignment,
+        isPublicBookable,
         workforceAccessType,
       },
       select: {
         id: true,
         email: true,
         role: true,
+        displayName: true,
+        jobTitle: true,
+        department: true,
+        seniority: true,
+        employeeReference: true,
+        permissionProfile: true,
         isActive: true,
         isStaffMember: true,
         isSchedulable: true,
         isAssignable: true,
         appearsOnRota: true,
         appearsInBookingAssignment: true,
+        isPublicBookable: true,
         workforceAccessType: true,
         defaultLocationId: true,
         skillsJson: true,

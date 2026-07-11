@@ -25,6 +25,30 @@ export class UpdateUserRoleDto {
 
 export class UpdateUserWorkforceDto {
   @IsOptional()
+  @IsString()
+  displayName?: string;
+
+  @IsOptional()
+  @IsString()
+  jobTitle?: string;
+
+  @IsOptional()
+  @IsString()
+  department?: string;
+
+  @IsOptional()
+  @IsString()
+  seniority?: string;
+
+  @IsOptional()
+  @IsString()
+  employeeReference?: string;
+
+  @IsOptional()
+  @IsString()
+  permissionProfile?: string;
+
+  @IsOptional()
   @IsBoolean()
   isStaffMember?: boolean;
 
@@ -43,6 +67,10 @@ export class UpdateUserWorkforceDto {
   @IsOptional()
   @IsBoolean()
   appearsInBookingAssignment?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isPublicBookable?: boolean;
 
   @IsOptional()
   @IsIn(['EMPLOYEE', 'CONTRACTOR', 'GUEST'])
