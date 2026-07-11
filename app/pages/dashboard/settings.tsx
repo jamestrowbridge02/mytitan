@@ -1863,7 +1863,7 @@ export default function SettingsPage() {
         <div className="settings-premium-shell">
           <OperatorPageHeader
             eyebrow="Settings"
-            title="Workspace settings"
+            title="Settings"
             subtitle="Loading the current workspace configuration."
             stats={[]}
           />
@@ -1884,13 +1884,12 @@ export default function SettingsPage() {
       <OperatorNotice notice={notice} onDismiss={clearNotice} />
       <OperatorPageHeader
         eyebrow="Settings"
-        title="Workspace settings"
-        subtitle="Manage branding, workflow, customer setup, and workspace controls."
+        title="Settings"
+        info="Each setting has one edit home. Related pages show summaries and shortcuts only."
         actions={[
           { label: 'Review connected tools', href: '/dashboard/integrations?section=owner-command', variant: 'secondary' },
           { label: settings?.guidedSetupCompletedAt ? 'Review setup' : 'Finish setup', href: settings?.guidedSetupCompletedAt ? '/dashboard/settings?tab=jobs&section=template-marketplace' : '/dashboard/setup-wizard', variant: 'primary' },
         ]}
-        shortcuts={['Each important concept has one home here', 'Use setup when you want guided help instead of manual changes']}
         stats={stats}
       />
       <GuidedSetupProgress enabled={guidedSetupEnabled} incomplete={!settings?.guidedSetupCompletedAt} compact />
@@ -1953,10 +1952,7 @@ export default function SettingsPage() {
       </div>
       <div className="card settings-premium-card">
         <div style={{ marginBottom: 16 }}>
-          <h2 style={{ marginTop: 0, marginBottom: 6 }}>Choose the right home once</h2>
-          <p className="muted settings-premium-muted" style={{ marginBottom: 0 }}>
-            Keep changes in one place: payments in Billing, customer payment providers in Payments, sender setup in Email & Notifications, readiness in Operations / Monitoring, and launch truth in Launch Control.
-          </p>
+          <h2 style={{ marginTop: 0, marginBottom: 6 }}>Settings directory</h2>
         </div>
         <div className="settings-tab-grid" style={{ marginBottom: 16 }} data-testid="settings-directory-grid">
           {SETTINGS_DIRECTORY.filter((item) => ['business-details', 'jobs-forms', 'booking', 'email-notifications', 'payments-invoicing', 'operations-monitoring'].includes(item.key)).map((item) => (

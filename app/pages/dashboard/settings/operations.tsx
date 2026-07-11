@@ -634,7 +634,7 @@ export default function SettingsOperationsPage() {
           title={canViewPlatformDiagnostics ? "Platform operations" : "Business readiness"}
           subtitle={canViewPlatformDiagnostics ? "Internal platform health and release evidence." : "Finish the setup needed for bookings, messages, and customer payments."}
           actions={[
-            { label: "Workspace settings", href: "/dashboard/settings", variant: "secondary" },
+            { label: "Settings", href: "/dashboard/settings", variant: "secondary" },
             { label: "Manage notifications", href: "/dashboard/settings?tab=messages", variant: "secondary" },
             { label: "Manage Bookings", href: "/dashboard/booking/settings" },
           ]}

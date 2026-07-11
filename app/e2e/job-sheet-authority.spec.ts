@@ -59,18 +59,19 @@ test.describe("job sheet authority and settings IA", () => {
     await installApiProxy(page, request);
     await page.goto("/dashboard/settings?tab=workflow");
 
-    await expect(page.getByRole("heading", { name: "Workspace settings", exact: true })).toBeVisible();
+    await expect(page.locator("h1", { hasText: "Settings" })).toBeVisible();
     await expect(page.getByTestId("settings-tab-jobs")).toBeVisible();
     await expect(page.getByTestId("settings-tab-output")).toBeVisible();
     await expect(page.getByTestId("settings-tab-messages")).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Choose the right home once", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Settings directory", exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Setup", exact: true })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Settings", exact: true })).toBeVisible();
+    await expect(page.locator("h1", { hasText: "Settings" })).toBeVisible();
     await page.getByTestId("settings-tab-general").click();
     await expect(page.getByRole("heading", { name: "Dashboard & analytics layout", exact: true })).toBeVisible();
     await page.getByTestId("settings-tab-jobs").click();
     await expect(page.getByText("Job declaration")).toBeVisible();
-    await expect(page.getByText(/Keep changes in one place: payments in Billing/i)).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Settings directory", exact: true })).toBeVisible();
+    await expect(page.locator("body")).not.toContainText(/Keep changes in one place: payments in Billing/i);
   });
 
   test("legacy customer settings alias resolves to the single job output home", async ({ page, request }) => {
