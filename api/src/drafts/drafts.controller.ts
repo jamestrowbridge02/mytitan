@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } fro
 import { JwtAuthGuard } from '../auth/auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtPayload } from '../auth/auth.types';
+import { AuditService } from '../audit/audit.service';
 import { Roles } from '../common/roles.decorator';
 import { RolesGuard } from '../common/roles.guard';
 import { PrismaService } from '../prisma/prisma.service';
@@ -9,7 +10,10 @@ import { PrismaService } from '../prisma/prisma.service';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('drafts')
 export class DraftsController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+  ) {}
 
   @Get()
   @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
@@ -154,7 +158,14 @@ export class DraftsController {
   @Roles('OWNER', 'ADMIN', 'STAFF')
   async deleteJobDraft(@CurrentUser() user: JwtPayload, @Param('trade') trade: string) {
     const db = this.prisma as any;
-    await db.jobDraft.deleteMany({ where: { companyId: user.companyId, userId: user.sub, trade: String(trade || '').toUpperCase() } });
+    const normalizedTrade = String(trade || '').toUpperCase();
+    const existing = await db.jobDraft.findUnique({
+      where: { companyId_userId_trade: { companyId: user.companyId, userId: user.sub, trade: normalizedTrade } },
+    });
+    await db.jobDraft.deleteMany({ where: { companyId: user.companyId, userId: user.sub, trade: normalizedTrade } });
+    if (existing) {
+      await this.audit.log(user.companyId, 'work_draft_deleted', `Deleted ${normalizedTrade} job draft`, user.sub);
+    }
     return { ok: true };
   }
 
@@ -187,11 +198,22 @@ export class DraftsController {
     const db = this.prisma as any;
     const [kind, value] = String(id || '').split(':');
     if (kind === 'job' && value) {
-      await db.jobDraft.deleteMany({ where: { companyId: user.companyId, userId: user.sub, trade: value.toUpperCase() } });
+      const normalizedTrade = value.toUpperCase();
+      const existing = await db.jobDraft.findUnique({
+        where: { companyId_userId_trade: { companyId: user.companyId, userId: user.sub, trade: normalizedTrade } },
+      });
+      await db.jobDraft.deleteMany({ where: { companyId: user.companyId, userId: user.sub, trade: normalizedTrade } });
+      if (existing) {
+        await this.audit.log(user.companyId, 'work_draft_deleted', `Deleted ${normalizedTrade} job draft`, user.sub);
+      }
       return { ok: true };
     }
     if (kind === 'crm' && value) {
+      const existing = await db.crmDraft.findFirst({ where: { companyId: user.companyId, userId: user.sub, id: value } });
       await db.crmDraft.deleteMany({ where: { companyId: user.companyId, userId: user.sub, id: value } });
+      if (existing) {
+        await this.audit.log(user.companyId, 'work_draft_deleted', 'Deleted CRM note draft', user.sub);
+      }
       return { ok: true };
     }
     return { ok: true };

@@ -85,4 +85,42 @@ test.describe("guided job form draft persistence", () => {
     await guidedInput(page, "Job reference").fill("E2E-GUIDED-ERROR-001");
     await expect(page.getByTestId("jobs-guided-nav-top")).toContainText("Draft save failed. Keep this tab open and try again.");
   });
+
+  test("live work deletes an unsubmitted job draft only after confirmation and audits it", async ({ page, request }) => {
+    await installApiProxy(page, request);
+    const token = await loginAs(page, request, fixtureRefs.dispatcherEmail, fixtureRefs.dispatcherPassword);
+    expect(token).toBeTruthy();
+    const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+
+    const saved = await request.put(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/drafts/jobs`, {
+      headers,
+      data: {
+        trade: "WHEELS",
+        payload: { formData: { jobReference: "E2E-DRAFT-DELETE-001", siteLocation: "E2E HQ" } },
+      },
+    });
+    expect(saved.ok()).toBeTruthy();
+
+    await page.goto("/dashboard/work", { waitUntil: "networkidle" });
+    await expect(page.getByRole("heading", { name: "Live Work" })).toBeVisible();
+    await expect(page.getByTestId("start-work-draft-card").first()).toContainText("WHEELS draft");
+    await page.getByTestId("draft-delete-open").first().click();
+    await expect(page.getByTestId("draft-delete-confirmation")).toContainText(/unsubmitted draft/i);
+    await page.getByTestId("draft-delete-cancel").click();
+    await expect(page.getByTestId("start-work-draft-card").first()).toBeVisible();
+
+    await page.getByTestId("draft-delete-open").first().click();
+    await page.getByTestId("draft-delete-confirm").click();
+    await expect(page.getByTestId("draft-delete-confirmation")).toHaveCount(0);
+
+    const serverDraft = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/drafts/jobs/WHEELS`, { headers });
+    expect(serverDraft.ok()).toBeTruthy();
+    const deletedDraftText = (await serverDraft.text()).trim();
+    expect(deletedDraftText === "" || deletedDraftText === "null").toBeTruthy();
+
+    const audit = await request.get(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/audit?type=work_draft_deleted&pageSize=20`, { headers });
+    expect(audit.ok()).toBeTruthy();
+    const auditBody = await audit.json();
+    expect((auditBody.items || []).some((entry: any) => String(entry.message || "").includes("WHEELS"))).toBeTruthy();
+  });
 });

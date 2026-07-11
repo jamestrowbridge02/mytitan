@@ -288,14 +288,15 @@ test.describe("dashboard workflows", () => {
   test("live work operating home keeps priorities and quick actions connected", async ({ page, request }) => {
     await installApiProxy(page, request);
     await page.goto("/dashboard/work", { waitUntil: "domcontentloaded" });
-    await expect(page.getByRole("heading", { name: "Daily operating home" })).toBeVisible();
-    await expect(page.getByTestId("live-work-operating-focus")).toBeVisible();
-    await expect(page.getByTestId("live-work-next-action")).toBeVisible();
-    await expect(page.getByTestId("live-work-priority-rail")).toContainText(/Unread attention/i);
-    await expect(page.getByTestId("live-work-priority-rail")).toContainText(/Assignments/i);
-    await expect(page.getByTestId("live-work-priority-rail")).toContainText(/Payment follow-up/i);
-    await expect(page.getByTestId("live-work-priority-rail")).toContainText(/Booking pressure/i);
-    await expect(page.getByTestId("start-work-get-paid")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Live Work" })).toBeVisible();
+    await expect(page.getByTestId("live-work-tabs")).toContainText(/Drafts/i);
+    await expect(page.getByTestId("live-work-tabs")).toContainText(/In progress/i);
+    await expect(page.getByTestId("live-work-tabs")).toContainText(/Ready to send/i);
+    await expect(page.getByTestId("live-work-tabs")).toContainText(/Payment follow-up/i);
+    await expect(page.getByTestId("live-work-queue")).toBeVisible();
+    await expect(page.locator("body")).not.toContainText(/Daily operating home|Recommended flow|Authoritative counts/i);
+    await page.getByTestId("page-info-button").click();
+    await expect(page.getByTestId("page-info-tooltip")).toContainText(/resume drafts/i);
   });
 
   test("bookings page stays available when legacy tenant feature flags are turned off", async ({ page, request }) => {
@@ -479,18 +480,13 @@ test.describe("dashboard workflows", () => {
     await expect(page.getByTestId("dashboard-start-work")).toBeVisible();
     await page.getByTestId("dashboard-start-work").click();
     await expect(page).toHaveURL(/\/dashboard\/work$/);
-    await expect(page.getByRole("heading", { name: /daily operating home/i })).toBeVisible();
-    await expect(page.getByTestId("live-work-operating-focus")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Live Work" })).toBeVisible();
     await expect(page.getByTestId("start-work-flow")).toBeVisible();
-    await expect(page.getByTestId("start-work-queue-chart")).toBeVisible();
     await expect(page.getByTestId("start-work-primary")).toBeVisible();
     await expect(page.getByTestId("start-work-create")).toBeVisible();
-    await expect(page.getByTestId("start-work-guided")).toBeVisible();
-    await expect(page.getByTestId("start-work-bookings")).toBeVisible();
-    await expect(page.getByTestId("start-work-send")).toBeVisible();
-    await expect(page.getByTestId("start-work-get-paid")).toBeVisible();
-    await expect(page.getByTestId("start-work-flow")).toContainText(/Add photos and signatures/i);
-    await expect(page.getByTestId("start-work-flow")).toContainText(/Create invoice or submit for approval/i);
+    await expect(page.getByTestId("live-work-tabs")).toContainText(/Drafts/i);
+    await expect(page.getByTestId("live-work-queue")).toBeVisible();
+    await expect(page.locator("body")).not.toContainText(/Add photos and signatures|Create invoice or submit for approval|Recommended flow/i);
     await expect(page.locator(".operator-page__statLabel", { hasText: "Needs work" })).toBeVisible();
     await expect(page.locator(".operator-page__statLabel", { hasText: "Ready to share" })).toBeVisible();
     await expect(page.locator(".operator-page__statLabel", { hasText: "Needs payment follow-up" })).toBeVisible();
