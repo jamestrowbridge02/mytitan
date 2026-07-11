@@ -353,13 +353,12 @@ export default function CustomersPage() {
         <OperatorPageHeader
           eyebrow={terms.customers}
           title={terms.customers}
-          subtitle={`Keep every ${terms.customers.slice(0, -1).toLowerCase() || "customer"} relationship clear so contact details, history, and the next reply stay easy to place.`}
+          info={`Manage contact details, history, and next actions for each ${terms.customers.slice(0, -1).toLowerCase() || "customer"}.`}
           actions={[
             { label: "Add contact", onClick: () => setAddContactOpen((prev) => !prev) },
             { label: `New ${terms.jobs.slice(0, -1) || "Job"}`, href: "/dashboard/jobs/new?guided=1&entry=work" },
             { label: `Review ${terms.bookings}`, href: "/dashboard/bookings", variant: "secondary" },
           ]}
-          shortcuts={["Search by name, phone, or email", "Use this page to move from contact intake into the first booking or first job"]}
           stats={stats}
         />
 

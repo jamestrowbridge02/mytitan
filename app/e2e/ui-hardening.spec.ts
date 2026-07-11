@@ -115,7 +115,7 @@ test.describe("ui hardening regressions", () => {
     await loginAs(page, request, "e2e.operator@mytitan.local", "MyTitanE2E!2026");
 
     await page.goto("/dashboard/settings");
-    await expect(page.getByRole("heading", { name: "Workspace settings" })).toBeVisible();
+    await expect(page.locator("h1", { hasText: "Settings" })).toBeVisible();
 
     await page.getByTestId("settings-tab-jobs").click();
     await expect(page.getByTestId("settings-workflow-panel")).toBeVisible();
@@ -279,7 +279,7 @@ test.describe("ui hardening regressions", () => {
     await expect(page.getByTestId("ccv2-work-board")).toBeVisible();
 
     await page.goto("/dashboard/settings");
-    await expect(page.getByRole("heading", { name: "Workspace settings" })).toBeVisible();
+    await expect(page.locator("h1", { hasText: "Settings" })).toBeVisible();
     await expect(page.locator(".settings-premium-card").first()).toBeVisible();
   });
 });

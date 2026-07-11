@@ -66,7 +66,7 @@ test.describe("login post-auth stability", () => {
     expectNoPageErrors("/dashboard");
 
     await page.goto("/dashboard/settings");
-    await expect(page.getByRole("heading", { name: "Workspace settings", exact: true })).toBeVisible();
+    await expect(page.locator("h1", { hasText: "Settings" })).toBeVisible();
     await expect(page.getByText("Application error: a client-side exception has occurred")).toHaveCount(0);
     expectNoPageErrors("/dashboard/settings");
 
@@ -141,7 +141,7 @@ test.describe("login post-auth stability", () => {
     await page.getByRole("button", { name: "Log in" }).click();
 
     await page.waitForURL(/\/dashboard\/finance$/, { timeout: 15_000 });
-    await expect(page.getByRole("heading", { name: "Money owed" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Finance", exact: true })).toBeVisible();
   });
 
   test("login page handles demo_token query strings according to the public demo feature flag", async ({ page, request }) => {

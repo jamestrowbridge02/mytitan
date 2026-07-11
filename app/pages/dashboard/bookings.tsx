@@ -568,13 +568,12 @@ export default function BookingsPage() {
         <OperatorPageHeader
           eyebrow="Scheduling"
           title={terms.bookings}
-          subtitle={`See what is booked, convert the right visits into ${terms.jobs.toLowerCase()}, and keep the schedule ready to move.`}
+          info={`Review booked visits, convert ready items into ${terms.jobs.toLowerCase()}, and keep the schedule current.`}
           actions={[
             { label: "Start work", href: "/dashboard/work" },
             { label: "Calendar", href: "/dashboard/calendar", variant: "secondary" },
             { label: `${terms.bookings} settings`, href: "/dashboard/booking/settings", variant: "secondary" },
           ]}
-          shortcuts={[`Use filters to isolate today's ${terms.bookings.toLowerCase()} load or unlinked items`, `Convert ready visits into ${terms.jobs.toLowerCase()} and open linked work from the same queue`]}
           stats={stats}
         />
         <div className="operator-inline-actions">

@@ -511,8 +511,8 @@ export default function FinancePage() {
       <div className="operator-stack">
         <OperatorPageHeader
           eyebrow="Finance"
-          title="Money owed, paid, and VAT records"
-          subtitle="Authoritative invoice and tax reporting over real tenant job billing fields. This supports records and exports, not tax advice."
+          title="Finance"
+          info="Review money owed, paid records, VAT reporting fields, exports, and manual reconciliation."
           actions={[
             { label: 'Create payment request', onClick: () => document.getElementById('create-payment-request')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) },
             { label: 'Create invoice', href: '/dashboard/jobs/new', variant: 'secondary' },

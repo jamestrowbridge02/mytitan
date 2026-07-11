@@ -68,7 +68,7 @@ export default function AssetsPage() {
       <OperatorPageHeader
         eyebrow="Operations"
         title="Assets & tools"
-        subtitle="Track equipment availability, assignment, maintenance, inspections, and required-job warnings."
+        info="Track equipment availability, assignment, maintenance, inspections, and required-job warnings."
       />
       {error ? <div className="alert error">{error}</div> : null}
       {message ? <div className="alert success">{message}</div> : null}

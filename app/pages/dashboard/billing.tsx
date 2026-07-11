@@ -306,7 +306,7 @@ export default function BillingPage() {
         <OperatorPageHeader
           eyebrow="Settings"
           title="MyTitan Account"
-          subtitle="Your plan, job allowance, payment method, and MyTitan invoices."
+          info="Review your MyTitan plan, job allowance, payment method, and invoice history."
         />
 
         <div className="card billing-page-shell billing-page-shell--admin">

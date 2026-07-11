@@ -68,7 +68,7 @@ test.describe("mobile shell usability", () => {
       { path: "/dashboard/bookings", assertion: () => page.getByPlaceholder("Search customer, booking id, job id, or status") },
       { path: "/dashboard/billing", assertion: () => page.getByRole("heading", { name: /mytitan account/i }) },
       { path: "/dashboard/jobs/new?guided=1&entry=work", assertion: () => page.getByTestId("jobs-guided-nav-bottom") },
-      { path: "/dashboard/settings?tab=general", assertion: () => page.getByRole("heading", { name: /workspace settings/i }) },
+      { path: "/dashboard/settings?tab=general", assertion: () => page.locator("h1", { hasText: /^Settings$/ }) },
     ];
 
     for (const route of routes) {

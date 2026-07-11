@@ -108,7 +108,7 @@ test.describe("analytics and benchmarking", () => {
   test("analytics layout customization persists from settings", async ({ page, request }) => {
     await installApiProxy(page, request);
     await page.goto("/dashboard/settings?tab=general");
-    await expect(page.getByRole("heading", { name: "Workspace settings", exact: true })).toBeVisible();
+    await expect(page.locator("h1", { hasText: "Settings" })).toBeVisible();
     const customerSignalsRow = page.getByTestId("settings-analytics-layout-row-customer-commercial-signals");
     const normalizeButton = customerSignalsRow.getByRole("button", { name: /Hide panel|Show panel/ });
     await normalizeButton.scrollIntoViewIfNeeded();

@@ -1572,25 +1572,10 @@ export default function CalendarPage() {
           <OperatorPageHeader
             eyebrow="Scheduling"
             title="Calendar"
-            subtitle={
-              viewMode === 'month'
-                ? 'Month view for workload overview, quick reassignment, and clear empty days.'
-                : viewMode === 'day'
-                ? 'Day view for focused dispatching, staff cover, and precise timing changes.'
-                : bookingMode === 'EMPLOYEE'
-                  ? 'Staff rota week view with employee availability and cover gaps.'
-                  : bookingMode === 'HYBRID'
-                    ? 'Hybrid week view with location bookings and staff rota cover.'
-                    : 'Location bookings week view with location availability and cover gaps.'
-            }
+            info="View bookings, staff rota, availability, and capacity. Timing changes require confirmation before schedules move."
             actions={[
               { label: 'Bookings', href: '/dashboard/bookings', variant: 'secondary' },
               { label: 'Today', onClick: () => setFocusDate(startOfDay(new Date())) },
-            ]}
-            shortcuts={[
-              bookingMode === 'EMPLOYEE' ? 'Employee-based' : bookingMode === 'HYBRID' ? 'Hybrid booking' : 'Location-based',
-              planningMode === 'rota' ? 'Staff rota' : 'Location bookings',
-              dragEnabled ? 'Timing changes require confirmation' : 'Planning view',
             ]}
             stats={calendarStats}
           />

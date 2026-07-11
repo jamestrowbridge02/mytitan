@@ -536,7 +536,7 @@ export default function Dashboard() {
           <OperatorChartCard
             title="Today&apos;s operating picture"
             description="Use this to decide whether the next move is booking conversion, live delivery, customer handoff, or payment follow-up."
-            annotation="Authoritative counts"
+            annotation="Live counts"
             icon="work"
             rows={todayDecisionRows}
             testId="dashboard-workload-chart"

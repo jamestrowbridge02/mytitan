@@ -124,24 +124,59 @@ export function OperatorPageHeader({
   eyebrow,
   title,
   subtitle,
+  info,
   actions,
   stats,
   shortcuts,
 }: {
   eyebrow?: string;
   title: string;
-  subtitle: string;
+  subtitle?: string;
+  info?: string;
   actions?: OperatorAction[];
   stats?: OperatorStat[];
   shortcuts?: string[];
 }) {
+  const infoId = useId();
+  const [infoOpen, setInfoOpen] = useState(false);
   return (
     <section className="card operator-page">
       <div className="operator-page__hero">
         <div className="operator-page__copy">
           {eyebrow ? <div className="operator-page__eyebrow">{eyebrow}</div> : null}
-          <h1 className="operator-page__title">{title}</h1>
-          <p className="muted operator-page__subtitle">{subtitle}</p>
+          <div className="operator-page__titleRow">
+            <h1 className="operator-page__title">{title}</h1>
+            {info ? (
+              <span className="operator-info">
+                <button
+                  aria-controls={infoId}
+                  aria-expanded={infoOpen}
+                  aria-label={`About ${title}`}
+                  className="operator-info__button"
+                  data-testid="page-info-button"
+                  type="button"
+                  onBlur={(event) => {
+                    if (!event.currentTarget.parentElement?.contains(event.relatedTarget as Node | null)) setInfoOpen(false);
+                  }}
+                  onClick={() => setInfoOpen((current) => !current)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape") setInfoOpen(false);
+                  }}
+                >
+                  i
+                </button>
+                {infoOpen ? (
+                  <span className="operator-info__tooltip" data-testid="page-info-tooltip" id={infoId} role="tooltip">
+                    {info}
+                    <button className="operator-info__close" type="button" aria-label="Close information" onClick={() => setInfoOpen(false)}>
+                      Close
+                    </button>
+                  </span>
+                ) : null}
+              </span>
+            ) : null}
+          </div>
+          {subtitle ? <p className="muted operator-page__subtitle">{subtitle}</p> : null}
           {shortcuts?.length ? (
             <div className="operator-page__shortcuts">
               {shortcuts.map((item) => (

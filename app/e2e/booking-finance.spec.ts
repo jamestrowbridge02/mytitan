@@ -97,7 +97,7 @@ test.describe("booking finance", () => {
     expect(patchDue.ok()).toBeTruthy();
 
     await page.goto("/dashboard/finance", { waitUntil: "networkidle" });
-    await expect(page.getByRole("heading", { name: "Money owed, paid, and VAT records" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Finance", exact: true })).toBeVisible();
     await expect(page.getByText(/Money owed/i).first()).toBeVisible();
     await expect(page.getByRole("heading", { name: "Finance summary" })).toBeVisible();
     await expect(page.getByText(/VAT|setup needed/i).first()).toBeVisible();
