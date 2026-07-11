@@ -231,10 +231,28 @@ function normalizeJourneyStage(value: string | undefined, hasPrefilledService: b
   return hasPrefilledService ? "service" : "location";
 }
 
-function formatTeamMemberLabel(value?: string | null) {
-  if (!value) return "Any available team member";
-  const localPart = value.split("@")[0]?.replace(/[._-]+/g, " ").trim();
-  if (!localPart) return "Any available team member";
+type PublicStaffMember = {
+  id: string;
+  email: string;
+  displayName?: string | null;
+  jobTitle?: string | null;
+  department?: string | null;
+  seniority?: string | null;
+};
+
+type WorkforceTerminology = {
+  singular: string;
+  plural: string;
+  defaultFieldWorker: string;
+  publicBooking: string;
+};
+
+function formatTeamMemberLabel(member?: PublicStaffMember | null, fallbackLabel = "team member") {
+  if (!member) return `Any available ${fallbackLabel}`;
+  const direct = String(member.displayName || member.jobTitle || "").trim();
+  if (direct) return direct;
+  const localPart = member.email?.split("@")[0]?.replace(/[._-]+/g, " ").trim();
+  if (!localPart) return `Any available ${fallbackLabel}`;
   return localPart.replace(/\b\w/g, (match) => match.toUpperCase());
 }
 
@@ -277,7 +295,13 @@ export default function PublicBookingJourneyPage() {
   const queryCustomerPhone = typeof router.query.customerPhone === "string" ? router.query.customerPhone : "";
 
   const [services, setServices] = useState<Service[]>([]);
-  const [staff, setStaff] = useState<Array<{ id: string; email: string }>>([]);
+  const [staff, setStaff] = useState<PublicStaffMember[]>([]);
+  const [workforceTerminology, setWorkforceTerminology] = useState<WorkforceTerminology>({
+    singular: "Team member",
+    plural: "Team",
+    defaultFieldWorker: "Team member",
+    publicBooking: "team member",
+  });
   const [locations, setLocations] = useState<PublicLocation[]>([]);
   const [folderImages, setFolderImages] = useState<Record<string, string>>({});
   const [folders, setFolders] = useState<BookingFolder[]>([]);
@@ -491,6 +515,12 @@ export default function PublicBookingJourneyPage() {
         setTradeAccountMatch(data.tradeAccountMatch || null);
         setPublicBundles(data.publicBundles || { enabled: false, minServices: 1, maxServices: 4 });
         setStaff(Array.isArray(data.staff) ? data.staff : []);
+        setWorkforceTerminology({
+          singular: data?.workforceTerminology?.singular || "Team member",
+          plural: data?.workforceTerminology?.plural || "Team",
+          defaultFieldWorker: data?.workforceTerminology?.defaultFieldWorker || "Team member",
+          publicBooking: data?.workforceTerminology?.publicBooking || "team member",
+        });
         setLocations(Array.isArray(data.locations) ? data.locations : []);
         setFolderImages(data.folderImages && typeof data.folderImages === "object" ? data.folderImages : {});
         setFolders(Array.isArray(data.folders) ? data.folders : []);
@@ -874,7 +904,7 @@ export default function PublicBookingJourneyPage() {
                   {typeof service.discountPriceCents === "number" && typeof service.standardPriceCents === "number" ? (
                     <span className="public-booking-serviceCard__strike">{formatMoney(service.standardPriceCents)}</span>
                   ) : null}
-                  {bookingWorkflow.providerSelectionEnabled && serviceProvider ? <span>{formatTeamMemberLabel(serviceProvider.email)}</span> : null}
+                  {bookingWorkflow.providerSelectionEnabled && serviceProvider ? <span>{formatTeamMemberLabel(serviceProvider, workforceTerminology.publicBooking)}</span> : null}
                   {publicBundlesEnabled && isInBundle ? <span>Added</span> : null}
                 </div>
               </button>
@@ -1002,10 +1032,10 @@ export default function PublicBookingJourneyPage() {
           <input className="input public-booking-datePicker" aria-label="Week starting" data-testid="public-booking-date-input" type="date" value={date} onChange={(event) => setDate(getWeekStart(event.target.value))} />
           {bookingWorkflow.providerSelectionEnabled && bookingProEnabled && staff.length ? (
             <label className="public-booking-field">
-              <span>Provider</span>
+              <span>Choose a {workforceTerminology.publicBooking.toLowerCase()}</span>
               <select className="input" value={selectedStaff} onChange={(event) => setSelectedStaff(event.target.value)}>
-                <option value="">Any available provider</option>
-                {staff.map((member) => <option key={member.id} value={member.id}>{formatTeamMemberLabel(member.email)}</option>)}
+                <option value="">Any available {workforceTerminology.publicBooking.toLowerCase()}</option>
+                {staff.map((member) => <option key={member.id} value={member.id}>{formatTeamMemberLabel(member, workforceTerminology.publicBooking)}</option>)}
               </select>
             </label>
           ) : null}

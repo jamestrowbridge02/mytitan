@@ -292,4 +292,79 @@ test.describe("Phase 10F/G checkout, global, and vertical foundations", () => {
       });
     }
   });
+
+  test("workforce terminology, titles, and public booking labels stay configurable without granting access", async ({ request }) => {
+    const token = await login(request);
+    const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+    const settingsResponse = await requestLocalApi(request, "/tenant/settings", { headers });
+    expect(settingsResponse.ok()).toBeTruthy();
+    const settings = await settingsResponse.json();
+    const originalConfig = settings.businessConfigJson || {};
+    expect(originalConfig.workforceTerminology?.singular).toBe("Technician");
+    expect(originalConfig.workforceTerminology?.plural).toBe("Technicians");
+
+    const usersResponse = await requestLocalApi(request, "/users", { headers });
+    expect(usersResponse.ok()).toBeTruthy();
+    const users = await usersResponse.json();
+    const owner = users.find((user: any) => user.role === "OWNER");
+    const technician = users.find((user: any) => user.email === fixtureRefs.technicianEmail);
+    const finance = users.find((user: any) => user.email === fixtureRefs.financeEmail);
+    expect(owner?.isSchedulable).toBeFalsy();
+    expect(technician?.jobTitle).toBe("Junior Technician");
+    expect(technician?.permissionProfile).toBe("Field worker");
+    expect(finance?.permissionProfile).toBe("Finance");
+    expect(finance?.isSchedulable).toBeFalsy();
+
+    const publicConfig = await requestLocalApi(request, `/public/booking/${fixtureRefs.publicBookingToken}/config`);
+    expect(publicConfig.ok()).toBeTruthy();
+    const publicBody = await publicConfig.json();
+    expect(publicBody.workforceTerminology.singular).toBe("Technician");
+    expect(publicBody.workforceTerminology.plural).toBe("Technicians");
+    expect(publicBody.workforceTerminology.publicBooking).toBe("technician");
+    expect((publicBody.staff || []).map((entry: any) => entry.email)).toContain(fixtureRefs.technicianEmail);
+    expect((publicBody.staff || []).map((entry: any) => entry.email)).not.toContain(fixtureRefs.financeEmail);
+
+    try {
+      const updated = await requestLocalApi(request, "/tenant/settings", {
+        method: "PUT",
+        headers,
+        data: {
+          businessConfigJson: {
+            workforceTerminology: {
+              singular: "Engineer",
+              plural: "Engineers",
+              defaultFieldWorkerLabel: "Engineer",
+              publicBookingLabel: "engineer",
+            },
+          },
+        },
+      });
+      expect(updated.ok()).toBeTruthy();
+
+      const changedPublicConfig = await requestLocalApi(request, `/public/booking/${fixtureRefs.publicBookingToken}/config`);
+      expect(changedPublicConfig.ok()).toBeTruthy();
+      const changedPublicBody = await changedPublicConfig.json();
+      expect(changedPublicBody.workforceTerminology.singular).toBe("Engineer");
+      expect(changedPublicBody.workforceTerminology.plural).toBe("Engineers");
+      expect(changedPublicBody.workforceTerminology.publicBooking).toBe("engineer");
+
+      const refreshedUsers = await (await requestLocalApi(request, "/users", { headers })).json();
+      const refreshedOwner = refreshedUsers.find((user: any) => user.role === "OWNER");
+      const refreshedTechnician = refreshedUsers.find((user: any) => user.email === fixtureRefs.technicianEmail);
+      expect(refreshedOwner?.isSchedulable).toBeFalsy();
+      expect(refreshedTechnician?.isSchedulable).toBeTruthy();
+      expect(refreshedTechnician?.role).toBe("TECHNICIAN");
+    } finally {
+      await requestLocalApi(request, "/tenant/settings", {
+        method: "PUT",
+        headers,
+        data: {
+          businessConfigJson: {
+            ...originalConfig,
+            workforceTerminology: originalConfig.workforceTerminology,
+          },
+        },
+      });
+    }
+  });
 });

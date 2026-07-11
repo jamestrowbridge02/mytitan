@@ -36,6 +36,7 @@ export const fixtureRefs = {
   financeJobId: "e2e-job-finance-ready",
   technicianRoleJobId: "e2e-job-technician-role",
   portalToken: "e2e-public-portal-token",
+  publicBookingToken: "e2e-booking-public-token",
   automationSuggestionKey: "invoice-overdue-follow-up",
   dismissedAutomationSuggestionKey: "technician-arrival-office-notify",
   customFieldJobSerialKey: "serial_number",

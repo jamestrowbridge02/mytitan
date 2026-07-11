@@ -5,6 +5,7 @@ import { ErrorState } from '../../../components/states/ErrorState';
 import { LoadingState } from '../../../components/states/LoadingState';
 import { ApiError, apiFetch } from '../../../lib/api';
 import { isSchedulingIntelligenceV1Enabled } from '../../../lib/feature-flags';
+import { resolveWorkforceTerminology } from '../../../lib/workforce-terminology';
 
 type WeeklyScheduleSlot = {
   start?: string | null;
@@ -94,6 +95,7 @@ export default function ScheduleSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [saveError, setSaveError] = useState('');
+  const [tenantSettings, setTenantSettings] = useState<any>(null);
   const [saveRequestId, setSaveRequestId] = useState<string | undefined>(undefined);
   const [successMessage, setSuccessMessage] = useState('');
   const defaultExceptionForm = useMemo(() => buildExceptionFormDefaults(), []);
@@ -139,9 +141,13 @@ export default function ScheduleSettingsPage() {
         from: weekStart.toISOString(),
         to: weekEnd.toISOString(),
       });
-      const response = (await apiFetch(`/calendar/schedules?${query.toString()}`)) as ScheduleResponse;
+      const [response, settings] = await Promise.all([
+        apiFetch(`/calendar/schedules?${query.toString()}`) as Promise<ScheduleResponse>,
+        apiFetch('/tenant/settings').catch(() => null),
+      ]);
       if (!isMountedRef.current) return;
       setScheduleData(response);
+      setTenantSettings(settings);
       const map: Record<string, WeeklyScheduleJson> = {};
       for (const schedule of response.schedules) {
         map[schedule.technicianId] = schedule.weeklyJson ?? {};
@@ -167,6 +173,7 @@ export default function ScheduleSettingsPage() {
     if (!scheduleData || !selectedTechId) return null;
     return scheduleData.technicians.find((tech) => tech.id === selectedTechId) ?? null;
   }, [scheduleData, selectedTechId]);
+  const workforceTerms = useMemo(() => resolveWorkforceTerminology(tenantSettings), [tenantSettings]);
 
   const currentWeeklyJson = weeklyJsonByTech[selectedTechId] ?? {};
   const formattedSlots = currentWeeklyJson;
@@ -447,7 +454,7 @@ function buildExceptionFormDefaults() {
   if (loading && !scheduleData) {
     return (
       <DashboardShell>
-        <LoadingState title="Loading schedules" description="Fetching technician availability." />
+        <LoadingState title="Loading schedules" description={`Fetching ${workforceTerms.singular.toLowerCase()} availability.`} />
       </DashboardShell>
     );
   }
@@ -470,7 +477,7 @@ function buildExceptionFormDefaults() {
       <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
           <div>
-            <h1>Staff rota</h1>
+            <h1>{workforceTerms.singular} rota</h1>
             <p className="muted" style={{ margin: 0 }}>
               Plan shifts, roles, venues, breaks, and absences. This does not calculate payroll.
             </p>

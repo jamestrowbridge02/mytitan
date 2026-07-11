@@ -5,6 +5,7 @@ import { AutomationsService } from '../automations/automations.service';
 import { BillingService } from '../billing/billing.service';
 import { buildPaymentCollectionOptions } from '../billing/payment-collection';
 import { getInternalNotificationSettings, getPortalControlSettings } from '../common/business-config';
+import { resolveWorkforceTerminology } from '../common/workforce-terminology';
 import { ComplianceService } from '../compliance/compliance.service';
 import { EmailService } from '../email/email.service';
 import { EnterpriseFeatureFlagsService } from '../enterprise/enterprise-feature-flags.service';
@@ -1932,8 +1933,9 @@ export class BookingsService {
             isActive: true,
             isSchedulable: true,
             appearsInBookingAssignment: true,
+            isPublicBookable: true,
           },
-          select: { id: true, email: true },
+          select: { id: true, email: true, displayName: true, jobTitle: true, department: true, seniority: true },
           orderBy: { email: 'asc' },
         })
       : [];
@@ -2050,6 +2052,7 @@ export class BookingsService {
       folderImages,
       folders: folders.filter((folder: any) => visibleFolderKeys.has(folder.key)),
       staff,
+      workforceTerminology: resolveWorkforceTerminology(settings),
       bookingWorkflow: {
         locationFirstScheduling: bookingWorkflow.locationFirstScheduling,
         locationRequiredForBooking: bookingWorkflow.locationRequiredForBooking,
@@ -3395,8 +3398,9 @@ export class BookingsService {
           isActive: true,
           isSchedulable: true,
           appearsInBookingAssignment: true,
+          isPublicBookable: true,
         },
-        select: { id: true, email: true },
+        select: { id: true, email: true, displayName: true, jobTitle: true, department: true, seniority: true },
         orderBy: { email: 'asc' },
       }),
       this.listProServices(companyId),
@@ -3425,6 +3429,7 @@ export class BookingsService {
       questions,
       businessHours: bookingSettings.businessHours,
       locations,
+      workforceTerminology: resolveWorkforceTerminology(settings),
       staff,
       services,
       folderImages,

@@ -76,8 +76,8 @@ test.describe("final product experience polish", () => {
 
     await page.goto("/dashboard/calendar", { waitUntil: "networkidle" });
     await expect(page.locator('[data-calendar-experience="operations"]')).toBeVisible();
-    await expect(page.getByTestId("calendar-click-to-action-rail")).toContainText(/Location bookings|Staff rota|Capacity and absence/i);
-    await expect(page.getByTestId("operations-command-lenses")).toContainText(/Bookings|Staff rota|Availability|Capacity|Assets|Fleet|Live map/i);
+    await expect(page.getByTestId("calendar-click-to-action-rail")).toContainText(/Location bookings|Technician rota|Capacity and absence/i);
+    await expect(page.getByTestId("operations-command-lenses")).toContainText(/Bookings|Technician rota|Availability|Capacity|Assets|Fleet|Live map/i);
     await expect(page.getByTestId("operations-capacity-summary")).toContainText(/booked from|available|Utilisation/i);
     await expect(page.getByTestId("operations-route-foundation")).toContainText(/Traffic-aware optimisation remains unavailable until a maps provider is configured/i);
     await page.getByTestId("operations-lens-capacity").click();

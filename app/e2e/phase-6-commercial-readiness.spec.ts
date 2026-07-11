@@ -27,10 +27,10 @@ test.describe("phase 6 category leader commercial readiness", () => {
 
     await page.goto("/dashboard/users", { waitUntil: "networkidle" });
     await expect(page.getByTestId("phase6-advanced-permissions")).toContainText(/Advanced role foundations/i);
-    for (const key of ["owner", "admin", "finance", "dispatcher", "technician", "viewer", "location_manager", "commercial_read_only"]) {
+    for (const key of ["owner", "admin", "finance", "dispatcher", "field_worker", "viewer", "location_manager", "commercial_read_only"]) {
       await expect(page.getByTestId(`phase6-role-${key}`)).toBeVisible();
     }
-    await expect(page.getByTestId("phase6-permission-safeguards")).toContainText(/Location-level permissions|Finance-only permissions|Technician-only views|Portal\/support restrictions|Audit role changes/i);
+    await expect(page.getByTestId("phase6-permission-safeguards")).toContainText(/Location-level permissions|Finance-only permissions|Assigned-work views|Portal\/support restrictions|Audit role changes/i);
   });
 
   test("forecasting uses source evidence, assumptions, confidence, and limitations", async ({ page, request }) => {

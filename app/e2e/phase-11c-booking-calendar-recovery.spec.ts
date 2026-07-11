@@ -55,11 +55,11 @@ test.describe("Phase 11C booking visibility and calendar recovery", () => {
     await expect(page.getByTestId(`calendar-booking-${created.id}`)).toBeVisible();
     await expect(page.getByTestId("calendar-empty-state")).toHaveCount(0);
     await expect(page.getByTestId("calendar-planning-mode-toggle")).toContainText("Location bookings");
-    await expect(page.getByTestId("calendar-planning-mode-toggle")).toContainText("Staff rota");
+    await expect(page.getByTestId("calendar-planning-mode-toggle")).toContainText("Technician rota");
     await expect(page.getByTestId("calendar-booking-basis")).toContainText(/Location-based booking|Employee-based booking|Hybrid booking/);
     await expect(page.getByTestId("calendar-missing-cover")).toContainText("No staff member is assigned.");
     await page.getByTestId("calendar-planning-mode-rota").click();
-    await expect(page.getByTestId("calendar-planning-mode-status")).toContainText("Staff rota view");
+    await expect(page.getByTestId("calendar-planning-mode-status")).toContainText("Technician rota view");
     await expect(page.getByTestId("calendar-time-grid")).toBeVisible();
 
     const secondStart = new Date(start.getTime() + 2 * 60 * 60 * 1000);
@@ -105,7 +105,7 @@ test.describe("Phase 11C booking visibility and calendar recovery", () => {
       await page.goto("/dashboard/calendar", { waitUntil: "networkidle" });
       await expect(page.getByTestId("calendar-booking-basis")).toContainText("Employee-based booking");
       await page.getByTestId("calendar-planning-mode-rota").click();
-      await expect(page.getByTestId("calendar-planning-mode-status")).toContainText("Employee-based booking uses staff availability first.");
+      await expect(page.getByTestId("calendar-planning-mode-status")).toContainText("Technician-based booking uses availability first.");
     } finally {
       await requestLocalApi(request, "/bookings/settings", {
         method: "POST",

@@ -26,6 +26,7 @@ import { formatSuggestedSlotLabel, type SuggestedSlot } from '../../lib/suggeste
 import { SuggestedSlotReasons } from '../../components/SuggestedSlotReasons';
 import { useStickyOperatorView } from '../../lib/operator-view-state';
 import { useOperationalRefresh } from '../../lib/operational-refresh';
+import { resolveWorkforceTerminology } from '../../lib/workforce-terminology';
 
 type BookingWarning =
   | { code: 'OVERLAP'; id: string; startsAt: string; endsAt: string }
@@ -255,15 +256,18 @@ const SCHEDULE_WARNING_CODES: BookingWarning['code'][] = [
   'TIME_OFF',
 ];
 
-const OPERATIONS_LENSES: Array<{ key: OperationsLens; label: string; detail: string }> = [
-  { key: 'bookings', label: 'Bookings', detail: 'Scheduled work by time, customer, service, status, location, and staff.' },
-  { key: 'rota', label: 'Staff rota', detail: 'Shifts, leave, unavailable periods, and cover gaps from schedule data.' },
-  { key: 'availability', label: 'Availability', detail: 'Business hours, staff availability, leave, bookings, and remaining slots.' },
+function buildOperationsLenses(workforceTerms: { singular: string; plural: string }): Array<{ key: OperationsLens; label: string; detail: string }> {
+  const pluralLower = workforceTerms.plural.toLowerCase();
+  return [
+  { key: 'bookings', label: 'Bookings', detail: `Scheduled work by time, customer, service, status, location, and ${pluralLower}.` },
+  { key: 'rota', label: `${workforceTerms.singular} rota`, detail: `Shifts, leave, unavailable periods, and cover gaps from ${pluralLower} schedule data.` },
+  { key: 'availability', label: 'Availability', detail: `Business hours, ${pluralLower} availability, leave, bookings, and remaining slots.` },
   { key: 'capacity', label: 'Capacity', detail: 'Available hours, booked hours, remaining hours, and utilisation.' },
   { key: 'assets', label: 'Assets', detail: 'Asset requirements are surfaced when linked to jobs or bookings.' },
   { key: 'fleet', label: 'Fleet', detail: 'Fleet readiness is available when vehicles or mobile assets are configured.' },
   { key: 'map', label: 'Live map', detail: 'Map view stays unavailable until a maps provider is configured.' },
-];
+  ];
+}
 
 function getStatusColor(status?: string) {
   if (!status) return STATUS_COLORS.PLANNED;
@@ -594,6 +598,7 @@ export default function CalendarPage() {
   const [focusDate, setFocusDate] = useState(() => startOfDay(new Date()));
   const [viewMode, setViewMode] = useStickyOperatorView<CalendarViewMode>('mytitan_calendar_mode_v1', 'week');
   const [data, setData] = useState<CalendarResponse | null>(null);
+  const [tenantSettings, setTenantSettings] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [requestId, setRequestId] = useState<string | undefined>(undefined);
@@ -942,7 +947,9 @@ export default function CalendarPage() {
     return { available, booked, remaining, utilization };
   }, [availabilityMap, bookedMinutesMap]);
 
-  const selectedLens = OPERATIONS_LENSES.find((lens) => lens.key === operationsLens) || OPERATIONS_LENSES[0];
+  const workforceTerms = useMemo(() => resolveWorkforceTerminology(tenantSettings), [tenantSettings]);
+  const operationsLenses = useMemo(() => buildOperationsLenses(workforceTerms), [workforceTerms]);
+  const selectedLens = operationsLenses.find((lens) => lens.key === operationsLens) || operationsLenses[0];
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 900);
@@ -1018,6 +1025,13 @@ export default function CalendarPage() {
           })
           .catch(() => {
             if (isActive) setBookingMode('LOCATION');
+          });
+        apiFetch('/tenant/settings')
+          .then((settings: any) => {
+            if (isActive) setTenantSettings(settings || null);
+          })
+          .catch(() => {
+            if (isActive) setTenantSettings(null);
           });
       } catch (err: any) {
         if (isActive) {
@@ -1572,7 +1586,7 @@ export default function CalendarPage() {
           <OperatorPageHeader
             eyebrow="Scheduling"
             title="Calendar"
-            info="View bookings, staff rota, availability, and capacity. Timing changes require confirmation before schedules move."
+            info={`View bookings, ${workforceTerms.plural.toLowerCase()} rota, availability, and capacity. Timing changes require confirmation before schedules move.`}
             actions={[
               { label: 'Bookings', href: '/dashboard/bookings', variant: 'secondary' },
               { label: 'Today', onClick: () => setFocusDate(startOfDay(new Date())) },
@@ -1583,16 +1597,16 @@ export default function CalendarPage() {
           <section className="operator-quickRail" data-testid="calendar-click-to-action-rail">
             <div className="operator-actionTile" data-testid="calendar-planning-mode-status">
               <div className="operator-actionTile__body">
-                <h3>{planningMode === 'rota' ? 'Staff rota view' : 'Location bookings view'}</h3>
+                <h3>{planningMode === 'rota' ? `${workforceTerms.singular} rota view` : 'Location bookings view'}</h3>
                 <p>
                   {bookingMode === 'EMPLOYEE'
-                    ? 'Employee-based booking uses staff availability first.'
+                    ? `${workforceTerms.singular}-based booking uses availability first.`
                     : bookingMode === 'HYBRID'
-                      ? 'Hybrid booking shows both location demand and staff cover.'
+                      ? `Hybrid booking shows both location demand and ${workforceTerms.plural.toLowerCase()} cover.`
                       : 'Location-based booking uses location availability first.'}
                 </p>
               </div>
-              <span className="button secondary">{bookingMode === 'EMPLOYEE' ? 'Employee-based' : bookingMode === 'HYBRID' ? 'Hybrid' : 'Location-based'}</span>
+              <span className="button secondary">{bookingMode === 'EMPLOYEE' ? `${workforceTerms.singular}-based` : bookingMode === 'HYBRID' ? 'Hybrid' : 'Location-based'}</span>
             </div>
             <Link className="operator-actionTile" href="/dashboard/bookings?view=today">
               <div className="operator-actionTile__body">
@@ -1604,7 +1618,7 @@ export default function CalendarPage() {
             <Link className="operator-actionTile" href="/dashboard/scheduling">
               <div className="operator-actionTile__body">
                 <h3>Capacity and absence</h3>
-                <p>Check technician availability, time off, and location capacity before moving work.</p>
+                <p>Check {workforceTerms.singular.toLowerCase()} availability, time off, and location capacity before moving work.</p>
               </div>
               <span className="button secondary">Open scheduling</span>
             </Link>
@@ -1630,7 +1644,7 @@ export default function CalendarPage() {
               </Link>
             </div>
             <div className="operator-grid operator-grid--four" style={{ marginTop: 12 }}>
-              {OPERATIONS_LENSES.map((lens) => {
+              {operationsLenses.map((lens) => {
                 const unavailable = lens.key === 'map';
                 return (
                   <button
@@ -1689,7 +1703,7 @@ export default function CalendarPage() {
               <div>
                 <h2 className="operator-section__title">
                   {planningMode === 'rota'
-                    ? viewMode === 'month' ? 'Monthly rota' : viewMode === 'day' ? 'Daily staff rota' : 'Weekly staff rota'
+                    ? viewMode === 'month' ? 'Monthly rota' : viewMode === 'day' ? `Daily ${workforceTerms.singular.toLowerCase()} rota` : `Weekly ${workforceTerms.singular.toLowerCase()} rota`
                     : viewMode === 'month' ? 'Monthly bookings' : viewMode === 'day' ? 'Daily bookings' : 'Weekly bookings'}
                 </h2>
                 <p className="operator-section__subtitle">{formatViewRangeLabel(days, viewMode)}</p>
@@ -1698,7 +1712,7 @@ export default function CalendarPage() {
                 <div style={{ display: 'inline-flex', border: '1px solid rgba(148, 163, 184, 0.3)', borderRadius: 999, padding: 4, gap: 4 }} data-testid="calendar-planning-mode-toggle">
                   {([
                     ['bookings', 'Location bookings'],
-                    ['rota', 'Staff rota'],
+                    ['rota', `${workforceTerms.singular} rota`],
                   ] as Array<[CalendarPlanningMode, string]>).map(([mode, label]) => (
                     <button
                       key={mode}
@@ -1744,7 +1758,7 @@ export default function CalendarPage() {
                     onChange={(event) => setShowTechnicianOverlay(event.target.checked)}
                     data-testid="calendar-technician-overlay-toggle"
                   />
-                  Staff overlay
+                  {workforceTerms.singular} overlay
                 </label>
               </div>
             </div>
@@ -1767,7 +1781,7 @@ export default function CalendarPage() {
         <OperatorFilterBar
           searchValue={search}
           onSearchChange={setSearch}
-          searchPlaceholder="Search customer, job ref, technician, or location"
+          searchPlaceholder={`Search customer, job ref, ${workforceTerms.singular.toLowerCase()}, or location`}
           resultsLabel={`${filteredBlocks.length} visible bookings`}
           actions={[
             {
@@ -1777,9 +1791,9 @@ export default function CalendarPage() {
             },
           ]}
         >
-          <OperatorFilterField label="Technician">
+          <OperatorFilterField label={workforceTerms.singular}>
             <select className="input" value={selectedTechId} onChange={(event) => setSelectedTechId(event.target.value)}>
-              <option value="ALL">All technicians</option>
+              <option value="ALL">All {workforceTerms.plural.toLowerCase()}</option>
               {technicianFilterOptions.map((tech) => (
                 <option key={tech.id} value={tech.id}>{tech.name || tech.email}</option>
               ))}
