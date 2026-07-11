@@ -61,6 +61,12 @@ export type TenantSettings = {
       customers?: string | null;
       technicians?: string | null;
     } | null;
+    workforceTerminology?: {
+      singular?: string | null;
+      plural?: string | null;
+      defaultFieldWorkerLabel?: string | null;
+      publicBookingLabel?: string | null;
+    } | null;
     defaults?: {
       commandCentreVersion?: "v1" | "v2" | null;
     } | null;

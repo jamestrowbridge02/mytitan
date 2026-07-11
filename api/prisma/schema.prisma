@@ -574,6 +574,12 @@ model User {
   emailVerified                  Boolean                       @default(false)
   passwordHash                   String
   role                           UserRole                      @default(STAFF)
+  displayName                    String?
+  jobTitle                       String?
+  department                     String?
+  seniority                      String?
+  employeeReference              String?
+  permissionProfile              String?
   tokenVersion                   Int                           @default(0)
   isActive                       Boolean                       @default(true)
   isStaffMember                  Boolean                       @default(false)
@@ -581,6 +587,7 @@ model User {
   isAssignable                   Boolean                       @default(false)
   appearsOnRota                  Boolean                       @default(false)
   appearsInBookingAssignment     Boolean                       @default(false)
+  isPublicBookable               Boolean                       @default(false)
   workforceAccessType            WorkforceAccessType           @default(EMPLOYEE)
   skillsJson                     Json?
   color                          String?

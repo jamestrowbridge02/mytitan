@@ -4137,15 +4137,49 @@ export default function SettingsPage() {
             <div className="card settings-premium-card" style={{ marginBottom: 12 }}>
               <h3 style={{ marginTop: 0 }}>Field-team wording</h3>
               <p className="muted settings-premium-muted">Match the language your field team already uses.</p>
-              <label className="settings-premium-label">Technicians label</label>
+              <label className="settings-premium-label">Singular workforce label</label>
               <input
                 className="input settings-premium-input"
-                value={workflowConfig.terminology?.technicians || ''}
+                value={workflowConfig.workforceTerminology?.singular || ''}
                 onChange={(e) => updateBusinessConfig((current) => ({
                   ...current,
-                  terminology: { ...(current.terminology || {}), technicians: e.target.value || null },
+                  workforceTerminology: { ...(current.workforceTerminology || {}), singular: e.target.value || null },
                 }))}
-                placeholder="Technicians"
+                placeholder="Team member"
+                data-testid="settings-workforce-label-singular"
+              />
+              <label className="settings-premium-label">Plural workforce label</label>
+              <input
+                className="input settings-premium-input"
+                value={workflowConfig.workforceTerminology?.plural || workflowConfig.terminology?.technicians || ''}
+                onChange={(e) => updateBusinessConfig((current) => ({
+                  ...current,
+                  workforceTerminology: { ...(current.workforceTerminology || {}), plural: e.target.value || null },
+                }))}
+                placeholder="Team"
+                data-testid="settings-workforce-label-plural"
+              />
+              <label className="settings-premium-label">Default field-worker label</label>
+              <input
+                className="input settings-premium-input"
+                value={workflowConfig.workforceTerminology?.defaultFieldWorkerLabel || ''}
+                onChange={(e) => updateBusinessConfig((current) => ({
+                  ...current,
+                  workforceTerminology: { ...(current.workforceTerminology || {}), defaultFieldWorkerLabel: e.target.value || null },
+                }))}
+                placeholder="Technician"
+                data-testid="settings-workforce-label-field-worker"
+              />
+              <label className="settings-premium-label">Customer booking label</label>
+              <input
+                className="input settings-premium-input"
+                value={workflowConfig.workforceTerminology?.publicBookingLabel || ''}
+                onChange={(e) => updateBusinessConfig((current) => ({
+                  ...current,
+                  workforceTerminology: { ...(current.workforceTerminology || {}), publicBookingLabel: e.target.value || null },
+                }))}
+                placeholder="team member"
+                data-testid="settings-workforce-label-public"
               />
             </div>
 

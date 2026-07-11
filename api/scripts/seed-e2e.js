@@ -507,11 +507,17 @@ async function ensureWorkspaceUser(companyId, locationId, fixture) {
   const isFieldStaff = !isMytitanStaff && ["STAFF", "TECHNICIAN"].includes(String(fixture.role || ""));
   const isExternalOperator = String(fixture.role || "") === "EXTERNAL_OPERATOR";
   const workforceDefaults = {
+    displayName: fixture.email.split("@")[0],
+    jobTitle: String(fixture.role || "") === "TECHNICIAN" ? "Junior Technician" : String(fixture.role || "") === "EXTERNAL_OPERATOR" ? "Senior Technician" : null,
+    department: ["STAFF", "TECHNICIAN", "DISPATCHER", "EXTERNAL_OPERATOR"].includes(String(fixture.role || "")) ? "Operations" : String(fixture.role || "") === "FINANCE" ? "Accounts" : null,
+    seniority: String(fixture.role || "") === "TECHNICIAN" ? "Junior" : String(fixture.role || "") === "EXTERNAL_OPERATOR" ? "Senior" : null,
+    permissionProfile: String(fixture.role || "") === "FINANCE" ? "Finance" : String(fixture.role || "") === "TECHNICIAN" ? "Field worker" : String(fixture.role || "") === "DISPATCHER" ? "Dispatcher" : String(fixture.role || "") === "EXTERNAL_OPERATOR" ? "Subcontractor" : null,
     isStaffMember: isFieldStaff || isExternalOperator,
     isSchedulable: isFieldStaff,
     isAssignable: isFieldStaff || isExternalOperator,
     appearsOnRota: isFieldStaff,
     appearsInBookingAssignment: isFieldStaff || isExternalOperator,
+    isPublicBookable: isFieldStaff,
     workforceAccessType: isExternalOperator ? "CONTRACTOR" : "EMPLOYEE",
   };
   if (preserveProtectedStaffHash) {
@@ -712,6 +718,12 @@ async function ensureTenantSettings(companyId, defaultLocationId, planId) {
       businessConfigJson: {
         defaults: { commandCentreVersion: "v2" },
         navigation: { showIntelligence: true, showPortalOps: true, showTechnicianQueue: true },
+        workforceTerminology: {
+          singular: "Technician",
+          plural: "Technicians",
+          defaultFieldWorkerLabel: "Technician",
+          publicBookingLabel: "technician",
+        },
         compliance: {
           requireExecutionEvidenceForCompletedJobs: true,
           executionAcknowledgementThresholdHours: 24,
@@ -774,6 +786,12 @@ async function ensureTenantSettings(companyId, defaultLocationId, planId) {
       businessConfigJson: {
         defaults: { commandCentreVersion: "v2" },
         navigation: { showIntelligence: true, showPortalOps: true, showTechnicianQueue: true },
+        workforceTerminology: {
+          singular: "Technician",
+          plural: "Technicians",
+          defaultFieldWorkerLabel: "Technician",
+          publicBookingLabel: "technician",
+        },
         compliance: {
           requireExecutionEvidenceForCompletedJobs: true,
           executionAcknowledgementThresholdHours: 24,
