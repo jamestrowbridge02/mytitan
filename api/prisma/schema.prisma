@@ -2644,7 +2644,16 @@ model IntegrationConnection {
   refreshTokenEncrypted String?
   scopes                String?
   externalTenantId      String?
+  externalTenantName    String?
   realmId               String?
+  accessTokenExpiresAt  DateTime?
+  lastRefreshedAt       DateTime?
+  lastVerifiedAt        DateTime?
+  lastSuccessfulSyncAt  DateTime?
+  lastFailedSyncAt      DateTime?
+  healthState           String?
+  disconnectState       String?
+  metadataJson          Json?
   connectedAt           DateTime?
   createdAt             DateTime                   @default(now())
   updatedAt             DateTime                   @updatedAt

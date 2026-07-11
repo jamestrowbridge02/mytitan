@@ -18,6 +18,8 @@ const PROVIDERS: Record<ProviderKey, {
   connectPath: string;
   checkPath?: string;
   disconnectPath: string;
+  organisationsPath?: string;
+  selectOrganisationPath?: string;
 }> = {
   xero: {
     name: "Xero",
@@ -26,6 +28,8 @@ const PROVIDERS: Record<ProviderKey, {
     connectPath: "/integrations/xero/connect",
     checkPath: "/integrations/xero/check",
     disconnectPath: "/integrations/xero/disconnect",
+    organisationsPath: "/integrations/xero/organisations",
+    selectOrganisationPath: "/integrations/xero/organisations/select",
   },
   quickbooks: {
     name: "QuickBooks",
@@ -49,6 +53,7 @@ export default function ProviderSetupPage() {
   const providerKey = String(router.query.provider || "") as ProviderKey;
   const provider = PROVIDERS[providerKey];
   const [status, setStatus] = useState<any>(null);
+  const [organisations, setOrganisations] = useState<any[]>([]);
   const [permissions, setPermissions] = useState(emptyPermissionSnapshot());
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
@@ -65,6 +70,12 @@ export default function ProviderSetupPage() {
     ]);
     setPermissions(normalizePermissionSnapshot(me?.permissions));
     setStatus(nextStatus || null);
+    if (provider.organisationsPath && nextStatus?.connectionState === "select_organisation") {
+      const orgResult = await apiFetch(provider.organisationsPath).catch(() => null);
+      setOrganisations(Array.isArray(orgResult?.organisations) ? orgResult.organisations : []);
+    } else {
+      setOrganisations([]);
+    }
     setLoading(false);
   }
 
@@ -80,6 +91,7 @@ export default function ProviderSetupPage() {
   const state = useMemo(() => {
     if (!status?.setupAvailable || status?.allowed === false || status?.enabled === false) return "Not available";
     if (status?.connectionState === "needs_reconnect") return "Needs attention";
+    if (status?.connectionState === "select_organisation") return "Select organisation";
     if (status?.connected) return "Connected";
     return "Needs setup";
   }, [status]);
@@ -112,6 +124,25 @@ export default function ProviderSetupPage() {
       setMessage(provider.checkPath ? "Connection verified." : "Connection status refreshed.");
     } catch (nextError: any) {
       setError(nextError?.message || "Connection verification failed.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function selectOrganisation(selectionId: string) {
+    if (!provider?.selectOrganisationPath || !canManage) return;
+    setBusy(`select-${selectionId}`);
+    setError("");
+    setMessage("");
+    try {
+      await apiFetch(provider.selectOrganisationPath, {
+        method: "POST",
+        body: JSON.stringify({ selectionId }),
+      });
+      await load();
+      setMessage("Xero organisation selected and read-only verification recorded.");
+    } catch (nextError: any) {
+      setError(nextError?.message || "Xero organisation could not be selected.");
     } finally {
       setBusy("");
     }
@@ -174,9 +205,52 @@ export default function ProviderSetupPage() {
           <li><strong>Complete</strong><span>Live sync remains off until mappings and explicit activation controls are satisfied.</span></li>
         </ol>
 
+        {status?.diagnostics?.nextAction ? (
+          <div className="alert info" role="status">
+            {status.diagnostics.nextAction}
+          </div>
+        ) : null}
+
+        {!status?.setupAvailable && providerKey === "xero" ? (
+          <div className="operator-empty-state" data-testid="xero-platform-config-required">
+            <h3>Xero app configuration required</h3>
+            <p>Platform Admin must configure the Xero client ID, client secret and redirect URI before tenant admins can connect.</p>
+            <p>Callback URL: <code>{typeof window === "undefined" ? "/integrations/xero/callback" : `${window.location.origin.replace(/\/+$/, "")}/integrations/xero/callback`}</code></p>
+          </div>
+        ) : null}
+
+        {status?.connectionState === "select_organisation" ? (
+          <div className="operator-subsection" data-testid="xero-organisation-selector">
+            <h3>Select Xero organisation</h3>
+            <p>Choose the Xero organisation that belongs to this MyTitan business. MyTitan will only run a read-only verification.</p>
+            {organisations.length ? (
+              <div className="settings-list">
+                {organisations.map((organisation) => (
+                  <div className="settings-list__row" key={organisation.selectionId}>
+                    <div>
+                      <strong>{organisation.tenantName || "Xero organisation"}</strong>
+                      <span>{organisation.tenantType || "Organisation"} · provider identifier kept server-side</span>
+                    </div>
+                    <button
+                      className="button secondary"
+                      type="button"
+                      disabled={!canManage || busy === `select-${organisation.selectionId}`}
+                      onClick={() => void selectOrganisation(organisation.selectionId)}
+                    >
+                      {busy === `select-${organisation.selectionId}` ? "Selecting..." : "Select organisation"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="alert warning" role="status">No Xero organisations were returned for this connection. Reconnect after confirming the Xero account has organisation access.</div>
+            )}
+          </div>
+        ) : null}
+
         <div className="billing-page-actions">
           {!status?.connected ? (
-            <button className="button" type="button" disabled={!canManage || !status?.setupAvailable || busy === "connect"} onClick={() => void connect()}>
+            <button className="button" type="button" disabled={!canManage || !status?.setupAvailable || busy === "connect" || status?.connectionState === "select_organisation"} onClick={() => void connect()}>
               {busy === "connect" ? "Opening..." : `Connect ${provider?.name || "provider"}`}
             </button>
           ) : (

@@ -58,6 +58,20 @@ export class IntegrationsController {
     return this.integrations.disconnect(user.companyId, 'XERO');
   }
 
+  @Get('xero/organisations')
+  @Roles('OWNER', 'ADMIN')
+  listXeroOrganisations(@CurrentUser() user: JwtPayload) {
+    requireMarketplaceEnabled();
+    return this.integrations.listXeroOrganisations(user.companyId, user.sub);
+  }
+
+  @Post('xero/organisations/select')
+  @Roles('OWNER', 'ADMIN')
+  selectXeroOrganisation(@CurrentUser() user: JwtPayload, @Body() body: Record<string, any>) {
+    requireMarketplaceEnabled();
+    return this.integrations.selectXeroOrganisation(user.companyId, user.sub, String(body?.selectionId || ''));
+  }
+
   @Post('xero/check')
   @Roles('OWNER', 'ADMIN')
   checkXero(@CurrentUser() user: JwtPayload) {
@@ -394,8 +408,14 @@ export class IntegrationsCallbackController {
   @Get('xero/callback')
   async xeroCallback(@Query('code') code: string, @Query('state') state: string, @Res() res: Response) {
     requireMarketplaceEnabled();
-    await this.integrations.handleCallback('XERO', code, state);
-    res.redirect(buildAppUrl('/dashboard/integrations?connected=xero'));
+    const result = await this.integrations.handleCallback('XERO', code, state);
+    res.redirect(
+      buildAppUrl(
+        result?.organisationSelectionRequired
+          ? '/dashboard/settings/integrations/xero?setup=select-organisation'
+          : '/dashboard/integrations?connected=xero',
+      ),
+    );
   }
 
   @Get('qbo/callback')

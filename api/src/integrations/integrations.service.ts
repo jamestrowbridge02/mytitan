@@ -12,7 +12,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { TenantService } from '../tenant/tenant.service';
 import { BYOG_PROVIDER_MAP, BYOG_PROVIDER_ORDER, resolveByogProvider, toByogProviderSlug, toByogScopeLabel } from './byog-integrations';
 import { IntegrationClientFactory } from './integration-client.factory';
-import { encryptText } from './integrations.crypto';
+import { decryptText, encryptText } from './integrations.crypto';
 
 export type IntegrationProviderKey = 'XERO' | 'QBO' | 'GOOGLE_CALENDAR';
 type IntegrationOwnership = 'WORKSPACE' | 'USER';
@@ -24,6 +24,12 @@ type ProviderConfig = {
   authUrl: string;
   tokenUrl: string;
   scopes: string[];
+};
+
+type XeroOrganisation = {
+  tenantId: string;
+  tenantName: string | null;
+  tenantType?: string | null;
 };
 
 type RolloutIssueKey =
@@ -280,6 +286,60 @@ export class IntegrationsService {
     return `${raw.slice(0, 6)}••••${raw.slice(-4)}`;
   }
 
+  private sanitizeXeroOrganisations(input: unknown): XeroOrganisation[] {
+    if (!Array.isArray(input)) return [];
+    const seen = new Set<string>();
+    return input
+      .map((entry: any) => ({
+        tenantId: String(entry?.tenantId || entry?.id || '').trim(),
+        tenantName: String(entry?.tenantName || entry?.name || '').trim() || null,
+        tenantType: String(entry?.tenantType || '').trim() || null,
+      }))
+      .filter((entry) => {
+        if (!entry.tenantId || seen.has(entry.tenantId)) return false;
+        seen.add(entry.tenantId);
+        return true;
+      })
+      .slice(0, 20);
+  }
+
+  private async fetchXeroOrganisations(accessToken: string, tenantId?: string | null): Promise<XeroOrganisation[]> {
+    if (this.isE2ETenant(tenantId)) {
+      return [{ tenantId: 'e2e-xero-organisation', tenantName: 'E2E Xero Organisation', tenantType: 'ORGANISATION' }];
+    }
+    const res = await fetch('https://api.xero.com/connections', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    const data = await res.json().catch(() => []);
+    if (!res.ok) {
+      throw new BadRequestException('Xero organisation lookup failed');
+    }
+    return this.sanitizeXeroOrganisations(data);
+  }
+
+  private safeConnectionMetadata(connection: any) {
+    const metadata = connection?.metadataJson && typeof connection.metadataJson === 'object' && !Array.isArray(connection.metadataJson)
+      ? connection.metadataJson
+      : {};
+    const pendingOrganisations = this.sanitizeXeroOrganisations((metadata as any).pendingOrganisations);
+    return {
+      pendingOrganisations: pendingOrganisations.map((organisation) => ({
+        selectionId: crypto.createHash('sha256').update(`${connection?.id || 'connection'}:${organisation.tenantId}`).digest('hex').slice(0, 16),
+        tenantName: organisation.tenantName,
+        tenantType: organisation.tenantType || null,
+      })),
+      syncOwnership: (metadata as any).syncOwnership || {
+        contacts: 'mytitan_authoritative_push_preview',
+        invoices: 'mytitan_authoritative_export_preview',
+        payments: 'xero_status_import_review_required',
+        taxRates: 'xero_authoritative_read_only',
+        accounts: 'xero_authoritative_read_only',
+      },
+      mappingState: (metadata as any).mappingState || 'not_configured',
+      liveProviderMutation: false,
+    };
+  }
+
   private isE2ETenant(tenantId?: string | null) {
     return String(tenantId || '').startsWith('e2e-');
   }
@@ -421,23 +481,49 @@ export class IntegrationsService {
       connectionState:
         connection?.status === 'connected'
           ? 'ready'
+          : connection?.status === 'organization_selection_required'
+            ? 'select_organisation'
           : connection?.status === 'needs_reconnect' || connection?.status === 'needs_reauth'
             ? 'needs_reconnect'
             : 'setup_needed',
       connectedAt: connection?.connectedAt ?? null,
-      lastCheckedAt: connection?.updatedAt ?? null,
+      lastCheckedAt: connection?.lastVerifiedAt ?? connection?.updatedAt ?? null,
+      lastVerifiedAt: connection?.lastVerifiedAt ?? null,
+      lastSuccessfulSyncAt: connection?.lastSuccessfulSyncAt ?? null,
+      lastFailedSyncAt: connection?.lastFailedSyncAt ?? null,
       scopes: connection?.scopes ?? null,
-      externalTenantId: connection?.externalTenantId ? this.maskExternalReference(connection.externalTenantId) : null,
+      externalTenantId: provider === 'XERO' ? null : connection?.externalTenantId ? this.maskExternalReference(connection.externalTenantId) : null,
       realmId: connection?.realmId ? this.maskExternalReference(connection.realmId) : null,
       providerAccountName:
-        provider === 'XERO' && connection?.externalTenantId
-          ? 'Connected Xero organisation'
+        provider === 'XERO' && connection?.externalTenantName
+          ? connection.externalTenantName
+          : provider === 'XERO' && connection?.externalTenantId
+          ? 'Selected Xero organisation'
           : provider === 'QBO' && connection?.realmId
             ? 'Connected QuickBooks company'
             : null,
-      credentialStorage: connection ? 'server_encrypted' : 'not_stored',
+      credentialStorage: connection?.accessTokenEncrypted || connection?.refreshTokenEncrypted ? 'server_encrypted' : 'not_stored',
       tokensReturnedToClient: false,
       liveSyncEnabled: false,
+      healthState: connection?.healthState ?? (connection?.status === 'connected' ? 'connected' : null),
+      disconnectState: connection?.disconnectState ?? null,
+      diagnostics:
+        provider === 'XERO'
+          ? {
+              setupInstructions: setupAvailable
+                ? 'Connect Xero, select the organisation, then run read-only verification before enabling mapping previews.'
+                : 'Platform Admin must configure Xero client ID, client secret and redirect URI before tenant admins can connect.',
+              nextAction:
+                connection?.status === 'organization_selection_required'
+                  ? 'Select the Xero organisation to bind to this MyTitan business.'
+                  : connection?.status === 'connected'
+                    ? 'Configure mappings and run previews before any live export.'
+                    : setupAvailable
+                      ? 'Start Xero OAuth connection.'
+                      : 'Complete external Xero app registration and platform runtime configuration.',
+              ...this.safeConnectionMetadata(connection),
+            }
+          : undefined,
       setupAvailable,
       allowed: access.allowed,
       enabled: access.enabled,
@@ -457,8 +543,11 @@ export class IntegrationsService {
       tokenStorage: status.credentialStorage,
       tokensReturnedToClient: false,
       liveProviderMutation: false,
+      readOnlyVerification: status.connected,
       nextAction: status.connected
         ? 'Check mappings and preview export before enabling live sync flags.'
+        : status.connectionState === 'select_organisation'
+          ? 'Select and confirm the Xero organisation before verification can complete.'
         : 'Connect account before dry-run accounting validation.',
     };
   }
@@ -570,7 +659,12 @@ export class IntegrationsService {
       params.set('prompt', 'consent');
     }
 
-    return { url: `${config.authUrl}?${params.toString()}` };
+    return {
+      url: `${config.authUrl}?${params.toString()}`,
+      requestId: state.slice(0, 12),
+      expiresAt,
+      tokensReturnedToClient: false,
+    };
   }
 
   private async exchangeToken(provider: IntegrationProviderKey, code: string, tenantId?: string | null) {
@@ -667,18 +761,27 @@ export class IntegrationsService {
     }
 
     let externalTenantId: string | null = null;
-    if (provider === 'XERO' && tokenData.external_tenant_id) {
-      externalTenantId = String(tokenData.external_tenant_id || '').trim() || null;
-    } else if (provider === 'XERO') {
+    let externalTenantName: string | null = null;
+    let pendingOrganisations: XeroOrganisation[] = [];
+    if (provider === 'XERO') {
       try {
-        const res = await fetch('https://api.xero.com/connections', {
-          headers: { Authorization: `Bearer ${accessToken}` },
+        pendingOrganisations = await this.fetchXeroOrganisations(accessToken, tenantId);
+      } catch (error) {
+        await this.recordRolloutIssue(tenantId, 'provider_setup_error', {
+          provider,
+          scope,
+          title: 'Xero organisation lookup failed',
+          body: 'MyTitan received OAuth tokens but could not read available Xero organisations.',
+          recommendedAction: 'Retry connection after confirming Xero app scopes and organisation access.',
+          userId: ownerUserId,
         });
-        const connections = (await res.json()) as Array<{ tenantId: string }>;
-        externalTenantId = connections?.[0]?.tenantId ?? null;
-      } catch {
-        externalTenantId = null;
+        throw error;
       }
+    } else if (provider === 'QBO') {
+      externalTenantId = null;
+    }
+    if (provider !== 'XERO' && tokenData.external_tenant_id) {
+      externalTenantId = String(tokenData.external_tenant_id || '').trim() || null;
     }
 
     let encryptedAccess: string;
@@ -700,6 +803,25 @@ export class IntegrationsService {
     }
 
     const scopeValue = tokenData.scope ?? this.getProviderConfig(provider, tenantId).scopes.join(' ');
+    const expiresInSeconds = Number(tokenData.expires_in || 0);
+    const accessTokenExpiresAt = expiresInSeconds > 0 ? new Date(Date.now() + expiresInSeconds * 1000) : null;
+    const connectionStatus = provider === 'XERO' ? 'organization_selection_required' : 'connected';
+    const connectionHealth = provider === 'XERO' ? 'organization_selection_required' : 'connected';
+    const metadataJson = provider === 'XERO'
+      ? {
+          pendingOrganisations,
+          syncOwnership: {
+            contacts: 'mytitan_authoritative_push_preview',
+            invoices: 'mytitan_authoritative_export_preview',
+            payments: 'xero_status_import_review_required',
+            taxRates: 'xero_authoritative_read_only',
+            accounts: 'xero_authoritative_read_only',
+          },
+          mappingState: 'not_configured',
+          tokenSource: 'oauth_authorization_code',
+          liveProviderMutation: false,
+        }
+      : undefined;
     try {
       await db.integrationConnection.upsert({
         where: {
@@ -714,12 +836,19 @@ export class IntegrationsService {
           scope,
           scopeOwnerKey,
           ownerUserId,
-          status: 'connected',
+          status: connectionStatus,
           accessTokenEncrypted: encryptedAccess,
           refreshTokenEncrypted: encryptedRefresh,
           scopes: scopeValue ?? null,
           externalTenantId,
+          externalTenantName,
           realmId: realmId ?? null,
+          accessTokenExpiresAt,
+          lastRefreshedAt: null,
+          lastVerifiedAt: provider === 'XERO' ? null : new Date(),
+          healthState: connectionHealth,
+          disconnectState: null,
+          ...(metadataJson !== undefined ? { metadataJson } : {}),
           connectedAt: new Date(),
         },
         create: {
@@ -728,12 +857,18 @@ export class IntegrationsService {
           scope,
           scopeOwnerKey,
           ownerUserId,
-          status: 'connected',
+          status: connectionStatus,
           accessTokenEncrypted: encryptedAccess,
           refreshTokenEncrypted: encryptedRefresh,
           scopes: scopeValue ?? null,
           externalTenantId,
+          externalTenantName,
           realmId: realmId ?? null,
+          accessTokenExpiresAt,
+          lastVerifiedAt: provider === 'XERO' ? null : new Date(),
+          healthState: connectionHealth,
+          disconnectState: null,
+          ...(metadataJson !== undefined ? { metadataJson } : {}),
           connectedAt: new Date(),
         },
       });
@@ -756,9 +891,94 @@ export class IntegrationsService {
       throw error;
     }
 
-    await this.audit.log(tenantId, 'integrations.connect', `Connected ${provider}`, ownerUserId || undefined);
+    await this.audit.log(
+      tenantId,
+      provider === 'XERO' ? 'integrations.connect.pending_organisation' : 'integrations.connect',
+      provider === 'XERO' ? 'Xero OAuth completed; organisation selection required' : `Connected ${provider}`,
+      ownerUserId || undefined,
+    );
 
-    return { ok: true, provider };
+    return { ok: true, provider, state: connectionStatus, organisationSelectionRequired: provider === 'XERO' };
+  }
+
+  async listXeroOrganisations(tenantId: string, userId?: string | null) {
+    const db = this.prisma as any;
+    const scopedWhere = this.getScopedConnectionWhere(tenantId, 'XERO', userId);
+    if (!scopedWhere) throw new BadRequestException('Xero connection scope could not be resolved.');
+    const connection = await db.integrationConnection.findUnique({ where: scopedWhere });
+    if (!connection) {
+      throw new BadRequestException('Connect Xero before selecting an organisation.');
+    }
+    const metadata = this.safeConnectionMetadata(connection);
+    return {
+      ok: true,
+      provider: 'xero',
+      state: connection.status,
+      organisations: metadata.pendingOrganisations,
+      selectedOrganisation: connection.externalTenantId
+        ? {
+            tenantName: connection.externalTenantName || 'Selected Xero organisation',
+          }
+        : null,
+      tokensReturnedToClient: false,
+    };
+  }
+
+  async selectXeroOrganisation(tenantId: string, userId: string, selectionId: string) {
+    const db = this.prisma as any;
+    const scopedWhere = this.getScopedConnectionWhere(tenantId, 'XERO', userId);
+    if (!scopedWhere) throw new BadRequestException('Xero connection scope could not be resolved.');
+    const connection = await db.integrationConnection.findUnique({ where: scopedWhere });
+    if (!connection?.accessTokenEncrypted) {
+      throw new BadRequestException('Connect Xero before selecting an organisation.');
+    }
+    const requested = String(selectionId || '').trim();
+    const metadata = connection.metadataJson && typeof connection.metadataJson === 'object' && !Array.isArray(connection.metadataJson)
+      ? connection.metadataJson
+      : {};
+    let organisations = this.sanitizeXeroOrganisations((metadata as any).pendingOrganisations);
+    if (!organisations.length) {
+      try {
+        organisations = await this.fetchXeroOrganisations(decryptText(connection.accessTokenEncrypted), tenantId);
+      } catch {
+        throw new BadRequestException('Xero organisation list could not be refreshed for selection.');
+      }
+    }
+    const selected = organisations.find((organisation) => (
+      crypto.createHash('sha256').update(`${connection.id}:${organisation.tenantId}`).digest('hex').slice(0, 16) === requested
+    ));
+    if (!selected) {
+      throw new BadRequestException('Selected Xero organisation is not available for this connection attempt.');
+    }
+    const nextMetadata = {
+      ...metadata,
+      pendingOrganisations: organisations,
+      selectedOrganisation: { tenantId: selected.tenantId, tenantName: selected.tenantName, tenantType: selected.tenantType || null },
+      mappingState: (metadata as any).mappingState || 'not_configured',
+      liveProviderMutation: false,
+    };
+    await db.integrationConnection.update({
+      where: scopedWhere,
+      data: {
+        status: 'connected',
+        externalTenantId: selected.tenantId,
+        externalTenantName: selected.tenantName || 'Xero organisation',
+        healthState: 'connected_read_only_verified',
+        lastVerifiedAt: new Date(),
+        metadataJson: nextMetadata,
+      },
+    });
+    await this.audit.log(tenantId, 'integrations.xero.organisation_select', 'Selected and read-only verified Xero organisation', userId);
+    return {
+      ok: true,
+      provider: 'xero',
+      connected: true,
+      organisation: {
+        tenantName: selected.tenantName || 'Xero organisation',
+      },
+      tokensReturnedToClient: false,
+      liveProviderMutation: false,
+    };
   }
 
   async disconnect(tenantId: string, provider: IntegrationProviderKey, userId?: string | null) {
@@ -775,12 +995,20 @@ export class IntegrationsService {
       });
       throw new ForbiddenException('This integration requires an active user context.');
     }
-    await db.integrationConnection.deleteMany({
+    await db.integrationConnection.updateMany({
       where: {
         tenantId,
         provider,
         scope,
         ...(scope === 'USER' ? { ownerUserId: String(userId || '').trim() } : {}),
+      },
+      data: {
+        status: 'disconnected',
+        accessTokenEncrypted: null,
+        refreshTokenEncrypted: null,
+        healthState: 'disconnected',
+        disconnectState: 'operator_requested',
+        lastVerifiedAt: null,
       },
     });
     await this.audit.log(tenantId, 'integrations.disconnect', `Disconnected ${provider}`, userId || undefined);
@@ -793,11 +1021,19 @@ export class IntegrationsService {
 
   async queueAccountingSyncCheck(tenantId: string, userId: string, provider: 'XERO' | 'QUICKBOOKS') {
     const db = this.prisma as any;
-    const credential = await db.integrationCredential.findFirst({
-      where: { tenantId, provider, scope: 'WORKSPACE' },
-      select: { id: true, status: true, lastVerifiedAt: true },
+    const connectionProvider = provider === 'QUICKBOOKS' ? 'QBO' : 'XERO';
+    const connection = await db.integrationConnection.findUnique({
+      where: {
+        tenantId_provider_scope_scopeOwnerKey: {
+          tenantId,
+          provider: connectionProvider,
+          scope: 'WORKSPACE',
+          scopeOwnerKey: 'workspace',
+        },
+      },
+      select: { id: true, status: true, lastVerifiedAt: true, externalTenantId: true },
     });
-    const ready = credential?.status === 'CONNECTED' && Boolean(credential.lastVerifiedAt);
+    const ready = connection?.status === 'connected' && Boolean(connection.lastVerifiedAt) && (provider === 'QUICKBOOKS' || Boolean(connection.externalTenantId));
     const event = await db.integrationOrchestrationEvent.create({
       data: {
         tenantId,
@@ -811,7 +1047,7 @@ export class IntegrationsService {
         message: ready
           ? 'Provider setup is verified. Use the accounting mapping preview and explicit live-sync gate before sending ledger data.'
           : 'Provider setup must be connected and verified before accounting sync.',
-        metadataJson: { liveProviderMutation: false, source: 'legacy_sync_endpoint' },
+        metadataJson: { liveProviderMutation: false, source: 'integration_connection', syncMode: 'read_only_gate' },
       },
     });
     await this.audit.log(tenantId, 'integrations.accounting.sync_check', `${provider} sync check ${ready ? 'queued for review' : 'blocked'}`, userId);

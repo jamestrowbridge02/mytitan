@@ -172,8 +172,34 @@ test.describe("Phase 1O catalog readiness and accounting OAuth onboarding", () =
       });
       expect(status.ok()).toBeTruthy();
       const statusBody = await status.json();
-      expect(statusBody.connected).toBe(true);
-      expect(statusBody.connectionState).toBe("ready");
+      if (provider === "xero") {
+        expect(statusBody.connected).toBe(false);
+        expect(statusBody.connectionState).toBe("select_organisation");
+        const organisations = await requestLocalApi(request, "/integrations/xero/organisations", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        expect(organisations.ok()).toBeTruthy();
+        const organisationsBody = await organisations.json();
+        expect(organisationsBody.tokensReturnedToClient).toBe(false);
+        expect(organisationsBody.organisations[0].selectionId).toBeTruthy();
+        const selected = await requestLocalApi(request, "/integrations/xero/organisations/select", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          data: { selectionId: organisationsBody.organisations[0].selectionId },
+        });
+        expect(selected.ok()).toBeTruthy();
+        const selectedBody = await selected.json();
+        expect(selectedBody.tokensReturnedToClient).toBe(false);
+        const readyStatus = await requestLocalApi(request, "/integrations/xero/status", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const readyStatusBody = await readyStatus.json();
+        expect(readyStatusBody.connected).toBe(true);
+        expect(readyStatusBody.connectionState).toBe("ready");
+      } else {
+        expect(statusBody.connected).toBe(true);
+        expect(statusBody.connectionState).toBe("ready");
+      }
       expect(statusBody.credentialStorage).toBe("server_encrypted");
       expect(statusBody.tokensReturnedToClient).toBe(false);
       const serialized = JSON.stringify(statusBody);

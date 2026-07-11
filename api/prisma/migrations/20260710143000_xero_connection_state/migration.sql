@@ -1,0 +1,10 @@
+ALTER TABLE "IntegrationConnection"
+  ADD COLUMN IF NOT EXISTS "externalTenantName" TEXT,
+  ADD COLUMN IF NOT EXISTS "accessTokenExpiresAt" TIMESTAMP(3),
+  ADD COLUMN IF NOT EXISTS "lastRefreshedAt" TIMESTAMP(3),
+  ADD COLUMN IF NOT EXISTS "lastVerifiedAt" TIMESTAMP(3),
+  ADD COLUMN IF NOT EXISTS "lastSuccessfulSyncAt" TIMESTAMP(3),
+  ADD COLUMN IF NOT EXISTS "lastFailedSyncAt" TIMESTAMP(3),
+  ADD COLUMN IF NOT EXISTS "healthState" TEXT,
+  ADD COLUMN IF NOT EXISTS "disconnectState" TEXT,
+  ADD COLUMN IF NOT EXISTS "metadataJson" JSONB;
