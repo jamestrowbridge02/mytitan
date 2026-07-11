@@ -135,7 +135,10 @@ export function EntityArtifactsCard({
     setBusy(true);
     setError("");
     try {
-      const currentLabel = String(labelInputRef.current?.value || label || "").trim();
+      const domLabel = typeof document !== "undefined"
+        ? document.querySelector<HTMLInputElement>(`input[data-testid="artifact-label-${entityType}"]`)?.value
+        : "";
+      const currentLabel = String(labelInputRef.current?.value || domLabel || label || "").trim();
       const form = new FormData();
       if (currentLabel) form.append("label", currentLabel);
       form.append("kind", kind);
