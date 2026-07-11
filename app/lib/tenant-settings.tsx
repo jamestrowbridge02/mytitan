@@ -173,13 +173,24 @@ export type TenantSettings = {
 };
 
 export type EmailReadiness = {
-  status: 'ready' | 'not_configured' | 'misconfigured' | 'failing';
-  source: 'environment' | 'missing';
-  transport: 'smtp' | 'none';
+  status: 'ready' | 'safe_capture' | 'not_configured' | 'misconfigured' | 'failing';
+  source: 'environment' | 'encrypted_vault' | 'safe_capture' | 'missing';
+  transport: 'smtp' | 'capture' | 'none';
   canSend: boolean;
   fromEmail?: string | null;
   fromName?: string | null;
   replyToEmail?: string | null;
+  deliveryReady?: boolean;
+  deliveryPath?: 'custom_sender' | 'mytitan_service' | 'unavailable';
+  fromAddressSource?: 'custom_verified_sender' | 'mytitan_system_sender' | 'none';
+  replyTo?: string | null;
+  replyToSource?: 'business_email' | 'mytitan_system_email' | 'none';
+  customSenderConfigured?: boolean;
+  customSenderVerified?: boolean;
+  systemSenderReady?: boolean;
+  effectiveSenderLabel?: string;
+  operatorAction?: string;
+  requestId?: string;
   guidance: string;
   dnsRecords: string[];
   senderOwnership?: 'workspace' | 'system' | 'none';

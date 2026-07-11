@@ -152,7 +152,7 @@ export default function CommunicationsPage() {
             <div className="communications-readinessItem">
               <strong>Email</strong>
               <span className={emailReady ? "badge success" : "badge warn"}>{emailReady ? "Ready" : "Setup needed"}</span>
-              <p className="muted">{emailReadiness?.effective?.notice || emailReadiness?.effective?.guidance || "Finish sender setup before customer email sends live."}</p>
+              <p className="muted">{emailReadiness?.effective?.notice || emailReadiness?.effective?.guidance || "Customer messages use the MyTitan email service when delivery is ready."}</p>
             </div>
             <div className="communications-readinessItem">
               <strong>Portal messages</strong>

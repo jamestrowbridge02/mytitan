@@ -1174,7 +1174,7 @@ export default function BillingPage() {
                 </div>
                 <div style={{ display: 'grid', gap: 10 }}>
                   <p className="muted billing-page-panel__text" style={{ marginBottom: 0 }}>
-                    1. Verify the workspace sender or keep the MyTitan fallback truthful.
+                    1. Use the verified MyTitan email service, or verify an optional custom sending domain.
                   </p>
                   <p className="muted billing-page-panel__text" style={{ marginBottom: 0 }}>
                     2. Confirm whether customer payments stay manual or move through a real tenant-owned provider.

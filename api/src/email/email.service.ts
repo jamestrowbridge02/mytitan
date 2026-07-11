@@ -56,6 +56,17 @@ export type OperationalEmailReadiness = {
     senderOwnership: EmailOwnership | 'none';
     usingFallback: boolean;
     notice: string | null;
+    deliveryReady: boolean;
+    deliveryPath: 'custom_sender' | 'mytitan_service' | 'unavailable';
+    fromAddressSource: 'custom_verified_sender' | 'mytitan_system_sender' | 'none';
+    replyTo: string | null;
+    replyToSource: 'business_email' | 'mytitan_system_email' | 'none';
+    customSenderConfigured: boolean;
+    customSenderVerified: boolean;
+    systemSenderReady: boolean;
+    effectiveSenderLabel: string;
+    operatorAction: string;
+    requestId: string;
   };
 };
 
@@ -495,7 +506,7 @@ export class EmailService {
   }
 
   private fallbackNotice() {
-    return 'Sent by MyTitan because your workspace sending email is not set up.';
+    return 'Messages are sent securely by MyTitan using your business name.';
   }
 
   private async getTenantMailPresentation(companyId?: string | null) {
@@ -652,7 +663,7 @@ export class EmailService {
     return {
       workspaceName: String(tenant.companyName || tenant.emailSenderName || 'MyTitan').trim() || 'MyTitan',
       logoUrl: resolvePublicUrl(tenant.logoUrl, { kind: 'api' }) || null,
-      senderName: tenant.emailSenderName || null,
+      senderName: tenant.emailSenderName || tenant.companyName || null,
       replyToEmail:
         ownership === 'workspace'
           ? this.normalizeEmail(tenant.emailReplyTo || '') || this.normalizeEmail(tenant.contactEmail || '') || null
@@ -915,7 +926,7 @@ export class EmailService {
         replyToEmail: config.replyToEmail,
         guidance:
           ownership === 'workspace'
-            ? 'Customer email is not set up yet. Add your sending email in Settings.'
+            ? 'Optional custom sending domain is not configured. MyTitan delivery can still send customer email.'
             : 'Configure Email Provider in Platform Admin Infrastructure.',
         dnsRecords,
         environment: mode,
@@ -939,7 +950,7 @@ export class EmailService {
         replyToEmail: config.replyToEmail,
         guidance:
           ownership === 'workspace'
-            ? 'Customer email is not set up yet. Add your sending email in Settings.'
+            ? 'Optional custom sending domain needs attention. MyTitan delivery can still send customer email.'
             : missingSenderSetup
               ? 'Configure Email Provider in Platform Admin Infrastructure.'
               : 'Email delivery is partially configured. Complete the SMTP host, sender email, sender name, and matching credential fields on the server, then retry.',
@@ -1013,40 +1024,142 @@ export class EmailService {
     };
   }
 
+  private buildCustomerDeliveryResolution(input: {
+    companyId: string;
+    tenant: TenantMailPresentation;
+    workspace: EmailReadiness;
+    fallback: EmailReadiness;
+  }) {
+    const businessName = String(input.tenant.emailSenderName || input.tenant.companyName || '').replace(/[\r\n"]/g, '').trim() || 'Your business';
+    const businessReplyTo = this.normalizeEmail(input.tenant.emailReplyTo || '') || this.normalizeEmail(input.tenant.contactEmail || '') || null;
+    const customSenderConfigured = Boolean(input.workspace.fromEmail || input.tenant.smtpHost || input.tenant.smtpUsername);
+    const customSenderVerified = Boolean(input.workspace.canSend);
+    const systemSenderReady = Boolean(input.fallback.canSend);
+    const requestId = `email_${hashContent(`${input.companyId}:${Date.now()}:${businessName}`).slice(0, 12)}`;
+
+    if (customSenderVerified) {
+      return {
+        deliveryReady: true,
+        deliveryPath: 'custom_sender' as const,
+        fromAddressSource: 'custom_verified_sender' as const,
+        fromEmail: input.workspace.fromEmail,
+        fromName: input.workspace.fromName || businessName,
+        replyTo: input.workspace.replyToEmail || businessReplyTo,
+        replyToSource: (input.workspace.replyToEmail || businessReplyTo ? 'business_email' : 'none') as 'business_email' | 'none',
+        customSenderConfigured,
+        customSenderVerified,
+        systemSenderReady,
+        effectiveSenderLabel: input.workspace.fromEmail || `${businessName}`,
+        operatorAction: 'No action required. Your verified custom sender is active.',
+        guidance: 'Messages are sent from your verified custom sender.',
+        notice: null,
+        requestId,
+      };
+    }
+
+    if (systemSenderReady) {
+      const fromName = `${businessName} via MyTitan`;
+      return {
+        deliveryReady: true,
+        deliveryPath: 'mytitan_service' as const,
+        fromAddressSource: 'mytitan_system_sender' as const,
+        fromEmail: input.fallback.fromEmail,
+        fromName,
+        replyTo: businessReplyTo || input.fallback.replyToEmail || null,
+        replyToSource: (businessReplyTo ? 'business_email' : input.fallback.replyToEmail ? 'mytitan_system_email' : 'none') as 'business_email' | 'mytitan_system_email' | 'none',
+        customSenderConfigured,
+        customSenderVerified: false,
+        systemSenderReady,
+        effectiveSenderLabel: fromName,
+        operatorAction: businessReplyTo
+          ? 'No action required for basic customer email. Set up a custom sending domain only if you want one.'
+          : 'Add a reply email so customer responses route back to your business.',
+        guidance: businessReplyTo
+          ? 'Messages are sent securely by MyTitan using your business name. Replies go to your business email.'
+          : 'Messages can be sent securely by MyTitan. Add a reply email to receive customer responses.',
+        notice: businessReplyTo ? this.fallbackNotice() : 'Replies are not yet routed to your business.',
+        requestId,
+      };
+    }
+
+    return {
+      deliveryReady: false,
+      deliveryPath: 'unavailable' as const,
+      fromAddressSource: 'none' as const,
+      fromEmail: null,
+      fromName: businessName,
+      replyTo: businessReplyTo,
+      replyToSource: (businessReplyTo ? 'business_email' : 'none') as 'business_email' | 'none',
+      customSenderConfigured,
+      customSenderVerified: false,
+      systemSenderReady,
+      effectiveSenderLabel: businessName,
+      operatorAction: 'Ask Platform Admin to restore the MyTitan email service.',
+      guidance: 'Customer email delivery is unavailable because the MyTitan email service is not ready.',
+      notice: null,
+      requestId,
+    };
+  }
+
   async getOperationalReadiness(companyId: string, options?: { probe?: boolean }): Promise<OperationalEmailReadiness> {
-    const [workspace, fallback] = await Promise.all([
+    const [tenant, workspace, fallback] = await Promise.all([
+      this.getTenantMailPresentation(companyId),
       this.getReadiness(companyId, { probe: options?.probe, ownership: 'workspace' }),
       this.getReadiness(null, { probe: options?.probe, ownership: 'system' }),
     ]);
+    const delivery = this.buildCustomerDeliveryResolution({ companyId, tenant, workspace, fallback });
 
-    if (workspace.canSend) {
+    if (delivery.deliveryPath === 'custom_sender') {
       return {
         workspace,
         fallback,
         effective: {
           ...workspace,
+          fromEmail: delivery.fromEmail,
+          fromName: delivery.fromName,
+          replyToEmail: delivery.replyTo,
           senderOwnership: 'workspace',
           usingFallback: false,
-          notice: null,
-          guidance: 'Customer emails will use your workspace sending email.',
+          notice: delivery.notice,
+          guidance: delivery.guidance,
+          deliveryReady: delivery.deliveryReady,
+          deliveryPath: delivery.deliveryPath,
+          fromAddressSource: delivery.fromAddressSource,
+          replyTo: delivery.replyTo,
+          replyToSource: delivery.replyToSource,
+          customSenderConfigured: delivery.customSenderConfigured,
+          customSenderVerified: delivery.customSenderVerified,
+          systemSenderReady: delivery.systemSenderReady,
+          effectiveSenderLabel: delivery.effectiveSenderLabel,
+          operatorAction: delivery.operatorAction,
+          requestId: delivery.requestId,
         },
       };
     }
 
-    if (fallback.canSend) {
+    if (delivery.deliveryPath === 'mytitan_service') {
       return {
         workspace,
         fallback,
         effective: {
           ...fallback,
-          fromName: workspace.fromName || fallback.fromName,
-          replyToEmail: workspace.replyToEmail || fallback.replyToEmail,
+          fromName: delivery.fromName,
+          replyToEmail: delivery.replyTo,
           senderOwnership: 'system',
           usingFallback: true,
-          notice: this.fallbackNotice(),
-          guidance: workspace.replyToEmail
-            ? 'Customer emails will be sent by MyTitan with your business email as Reply-To until your sending domain is verified.'
-            : 'Customer emails can be sent by MyTitan until you add your own sending email.',
+          notice: delivery.notice,
+          guidance: delivery.guidance,
+          deliveryReady: delivery.deliveryReady,
+          deliveryPath: delivery.deliveryPath,
+          fromAddressSource: delivery.fromAddressSource,
+          replyTo: delivery.replyTo,
+          replyToSource: delivery.replyToSource,
+          customSenderConfigured: delivery.customSenderConfigured,
+          customSenderVerified: delivery.customSenderVerified,
+          systemSenderReady: delivery.systemSenderReady,
+          effectiveSenderLabel: delivery.effectiveSenderLabel,
+          operatorAction: delivery.operatorAction,
+          requestId: delivery.requestId,
         },
       };
     }
@@ -1059,17 +1172,23 @@ export class EmailService {
         status: workspace.status === 'failing' || fallback.status === 'failing' ? 'failing' : workspace.status,
         canSend: false,
         fromEmail: null,
-        fromName: null,
-        replyToEmail: workspace.replyToEmail || fallback.replyToEmail,
+        fromName: delivery.fromName,
+        replyToEmail: delivery.replyTo,
         senderOwnership: 'none',
         usingFallback: false,
-        notice: null,
-        guidance:
-          workspace.status === 'ready'
-            ? 'Customer email is unavailable right now. Check MyTitan system email.'
-            : fallback.canSend
-              ? 'Customer emails can be sent by MyTitan until you add your own sending email.'
-              : 'Customer email is unavailable right now. Add your sending email in Settings or contact support about MyTitan email readiness.',
+        notice: delivery.notice,
+        guidance: delivery.guidance,
+        deliveryReady: delivery.deliveryReady,
+        deliveryPath: delivery.deliveryPath,
+        fromAddressSource: delivery.fromAddressSource,
+        replyTo: delivery.replyTo,
+        replyToSource: delivery.replyToSource,
+        customSenderConfigured: delivery.customSenderConfigured,
+        customSenderVerified: delivery.customSenderVerified,
+        systemSenderReady: delivery.systemSenderReady,
+        effectiveSenderLabel: delivery.effectiveSenderLabel,
+        operatorAction: delivery.operatorAction,
+        requestId: delivery.requestId,
       },
     };
   }
@@ -1129,7 +1248,7 @@ export class EmailService {
         status: 'not_configured',
         reason:
           ownership === 'workspace'
-            ? 'Customer email is not set up yet. Add your sending email in Settings.'
+            ? 'Optional custom sending domain is not configured. MyTitan delivery can still send customer email.'
             : 'MyTitan email is not set up yet. Configure Email Provider in Platform Admin Infrastructure.',
         metaJson: {
           transport: readiness.transport,
@@ -1142,7 +1261,7 @@ export class EmailService {
         status: 'not_configured',
         reason:
           ownership === 'workspace'
-            ? 'Customer email is not set up yet. Add your sending email in Settings.'
+            ? 'Optional custom sending domain needs attention. MyTitan delivery can still send customer email.'
             : 'MyTitan email is not set up yet. Configure Email Provider in Platform Admin Infrastructure.',
         actionHref,
       };
@@ -1160,7 +1279,7 @@ export class EmailService {
         status: 'misconfigured',
         reason:
           ownership === 'workspace'
-            ? 'Customer email is not set up yet. Add your sending email in Settings.'
+            ? 'Optional custom sending domain needs attention. MyTitan delivery can still send customer email.'
             : 'MyTitan email is only partially configured on the server.',
         metaJson: {
           transport: readiness.transport,
@@ -1173,7 +1292,7 @@ export class EmailService {
         status: 'misconfigured',
         reason:
           ownership === 'workspace'
-            ? 'Customer email is not set up yet. Add your sending email in Settings.'
+            ? 'Optional custom sending domain needs attention. MyTitan delivery can still send customer email.'
             : 'MyTitan email is only partially configured on the server.',
         actionHref,
       };
@@ -1309,7 +1428,8 @@ export class EmailService {
         null,
         {
           ...input,
-          fromName: null,
+          fromName: readiness.effective.fromName,
+          replyToEmail: readiness.effective.replyToEmail,
         },
         { ...(options || {}), ownership: 'system' },
       );
@@ -1317,7 +1437,7 @@ export class EmailService {
         ...result,
         senderOwnership: 'system',
         usedFallback: true,
-        notice: this.fallbackNotice(),
+        notice: readiness.effective.notice || this.fallbackNotice(),
         actionHref: result.actionHref || '/dashboard/settings?tab=messages',
       };
     }
@@ -1325,7 +1445,7 @@ export class EmailService {
     return {
       delivered: false,
       status: 'not_configured',
-      reason: 'Customer email delivery is unavailable because neither the workspace sender nor MyTitan fallback is ready.',
+      reason: 'Customer email delivery is unavailable because the MyTitan email service is not ready.',
       actionHref: '/dashboard/settings?tab=messages',
       senderOwnership: undefined,
       usedFallback: false,

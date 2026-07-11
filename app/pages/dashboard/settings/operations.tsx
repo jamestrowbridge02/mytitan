@@ -471,11 +471,11 @@ export default function SettingsOperationsPage() {
       },
       {
         key: "workspace-sender",
-        area: "Workspace sender",
+        area: "Customer email",
         state: workspaceEmailReady ? "ready" : "needs_setup",
-        detail: workspaceEmailReady ? "Your business sender is ready." : "Add and verify your business email details.",
+        detail: workspaceEmailReady ? "Customer email is ready." : "Check customer email status.",
         href: "/dashboard/settings?tab=messages",
-        action: "Manage sender",
+        action: "Manage email",
       },
       {
         key: "stripe-webhook",

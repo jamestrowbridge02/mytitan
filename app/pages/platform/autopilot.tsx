@@ -35,7 +35,7 @@ const supportPlaybooks = [
     key: "email-delivery-failure",
     title: "Email delivery failure",
     symptoms: "Verification, summary, invoice, or service-record email is not delivered.",
-    checks: "Check system sender readiness, workspace sender setup, recipient resolution, and notification logs.",
+    checks: "Check MyTitan email service readiness, customer reply routing, recipient resolution, and notification logs.",
     repair: "Retry safe queued delivery or route through verified MyTitan system sender where policy allows.",
     escalation: "Escalate to Notifications with message id and tenant id only.",
   },

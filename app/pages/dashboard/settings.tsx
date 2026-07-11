@@ -72,7 +72,7 @@ const TABS: Array<{ key: TabKey; label: string; description: string; group: 'Set
   { key: 'bookings', label: 'Booking & Customer Pages', description: 'Availability wording, stages, and customer-facing setup handoff', group: 'Setup' },
   { key: 'general', label: 'Business Profile', description: 'Business details, branding, and workspace defaults', group: 'Settings' },
   { key: 'output', label: 'Job Output', description: 'Own the service record and completion output chain', group: 'Settings' },
-  { key: 'messages', label: 'Notifications & Email', description: 'Customer sender identity, routing, readiness, and reusable wording', group: 'Settings' },
+  { key: 'messages', label: 'Notifications & Email', description: 'Customer email, reply routing, internal alerts, and reusable wording', group: 'Settings' },
   { key: 'advanced', label: 'Advanced', description: 'Automation, custom fields, and deeper controls', group: 'Settings' },
 ];
 
@@ -87,7 +87,7 @@ const SETTINGS_DIRECTORY = [
   {
     key: 'email-notifications',
     title: 'Email & Notifications',
-    description: 'Sender identity, fallback behaviour, operator alerts, and summary recipients.',
+    description: 'Customer email identity, reply routing, operator alerts, and summary recipients.',
     actionLabel: 'Open email & notifications',
     href: '/dashboard/settings?tab=messages&section=notifications-email',
   },
@@ -2854,7 +2854,7 @@ export default function SettingsPage() {
             <div className="card settings-premium-card" style={{ marginBottom: 12 }} data-testid="customer-feedback-settings-card">
               <h3 style={{ marginTop: 0 }}>Customer feedback follow-up</h3>
               <p className="muted settings-premium-muted">
-                Optionally add a feedback prompt after completed work. This only appears when you enable it, and the service record email keeps using the current workspace sender or MyTitan fallback path.
+                Optionally add a feedback prompt after completed work. This only appears when you enable it, and the service record email uses the current customer email status.
               </p>
               <label className="settings-premium-label">
                 <input
@@ -2937,8 +2937,8 @@ export default function SettingsPage() {
         {tab === 'messages' && (
           <>
             <div className="card settings-premium-card" style={{ marginBottom: 12 }} data-testid="settings-workspace-email-card" {...getSectionProps('channel-email')}>
-              <h3 style={{ marginTop: 0 }}>Workspace customer email</h3>
-              <p className="muted settings-premium-muted">Keep your workspace sender blank until you are ready. Customer emails can be sent by MyTitan until you add your own sending email.</p>
+              <h3 style={{ marginTop: 0 }}>Customer email</h3>
+              <p className="muted settings-premium-muted">MyTitan sends customer messages using your business name. Add the reply email customers should use when they respond.</p>
               <label className="settings-premium-label">Name people see</label>
               <input className="input settings-premium-input" value={form.emailSenderName || ''} onChange={(e) => setForm({ ...form, emailSenderName: e.target.value })} />
 
@@ -3200,32 +3200,40 @@ export default function SettingsPage() {
             </div>
 
             <div className="card settings-premium-card" style={{ marginBottom: 12 }}>
-              <h3 style={{ marginTop: 0 }}>Delivery readiness</h3>
-              <p className="muted settings-premium-muted">Workspace sender readiness, MyTitan fallback readiness, and the live customer-email path are shown separately so you can see what will actually happen before you send.</p>
-              <div style={{ display: 'grid', gap: 12 }}>
+              <h3 style={{ marginTop: 0 }}>Customer email status</h3>
+              <p className="muted settings-premium-muted">Update each setting once. MyTitan reuses it across bookings, messages, invoices and customer pages.</p>
+              <div style={{ display: 'grid', gap: 12 }} data-testid="effective-email-readiness-status">
                 <div>
                   <p className="muted settings-premium-muted" data-testid="email-readiness-status">
-                    Workspace sender: {emailReadiness?.workspace?.status === 'ready' ? 'Ready' : emailReadiness?.workspace?.status === 'failing' ? 'Configured but failing' : emailReadiness?.workspace?.status === 'misconfigured' ? 'Needs attention' : 'Not set up'}
+                    Customer email: {emailReadiness?.effective?.deliveryReady || emailReadiness?.effective?.canSend ? 'Ready' : 'Needs attention'}
                   </p>
-                  <p className="muted settings-premium-muted">{emailReadiness?.workspace?.guidance || 'Checking workspace sender readiness…'}</p>
-                  {emailReadiness?.workspace?.fromEmail ? <p className="muted settings-premium-muted">Workspace sending email: {emailReadiness.workspace.fromEmail}</p> : null}
-                  {emailReadiness?.workspace?.replyToEmail ? <p className="muted settings-premium-muted">Workspace reply-to: {emailReadiness.workspace.replyToEmail}</p> : null}
+                  <p className="muted settings-premium-muted">{emailReadiness?.effective?.guidance || 'Checking customer email status…'}</p>
+                  {emailReadiness?.effective?.requestId ? <p className="muted settings-premium-muted">Request ID: {emailReadiness.effective.requestId}</p> : null}
                 </div>
                 <div>
                   <p className="muted settings-premium-muted" data-testid="system-email-readiness-status">
-                    MyTitan system email: {systemEmailReadiness?.status === 'ready' ? 'Ready' : systemEmailReadiness?.status === 'failing' ? 'Configured but failing' : systemEmailReadiness?.status === 'misconfigured' ? 'Needs attention' : 'Not set up'}
+                    Delivery service: {emailReadiness?.effective?.systemSenderReady || systemEmailReadiness?.canSend ? 'MyTitan email service' : 'Needs Platform Admin attention'}
                   </p>
-                  <p className="muted settings-premium-muted">{systemEmailReadiness?.guidance || 'Checking MyTitan system email readiness…'}</p>
+                  <p className="muted settings-premium-muted">Sending identity: {emailReadiness?.effective?.effectiveSenderLabel || form.emailSenderName || form.companyName || 'Your business via MyTitan'}</p>
                 </div>
-                <div data-testid="effective-email-readiness-status">
+                <div>
+                  <p className="muted settings-premium-muted">Replies: {emailReadiness?.effective?.replyTo || form.emailReplyTo || 'Add a reply email to receive customer responses'}</p>
                   <p className="muted settings-premium-muted">
-                    Effective customer delivery: {emailReadiness?.effective?.canSend ? emailReadiness?.effective?.usingFallback ? 'Ready via MyTitan fallback' : 'Ready via workspace sender' : 'Unavailable'}
+                    Custom sending domain: {emailReadiness?.effective?.customSenderVerified ? 'Verified and active' : emailReadiness?.effective?.customSenderConfigured ? 'Needs verification' : 'Optional — not configured'}
                   </p>
-                  <p className="muted settings-premium-muted">{emailReadiness?.effective?.guidance || 'Checking effective customer-email delivery…'}</p>
+                  <p className="muted settings-premium-muted">{emailReadiness?.effective?.operatorAction || 'Set up a custom sending domain only if you want one.'}</p>
                   {emailReadiness?.effective?.notice ? <p className="muted settings-premium-muted">{emailReadiness.effective.notice}</p> : null}
                 </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button className="button secondary" type="button" data-testid="customer-email-preview" onClick={previewSummaryEmails} disabled={previewingSummary}>
+                    Preview email
+                  </button>
+                  <a className="button secondary" href="/dashboard/settings?tab=messages&section=channel-email">Change reply email</a>
+                  <a className="button secondary" href="/dashboard/settings/integrations/email-sender">Set up custom sending domain</a>
+                  <a className="button secondary" href="/dashboard/communications">View delivery history</a>
+                </div>
               </div>
-              {emailReadiness?.workspace?.dnsRecords?.length ? (
+              {emailReadiness?.workspace?.dnsRecords?.length && emailReadiness?.effective?.customSenderConfigured ? (
                 <div data-testid="email-dns-guidance">
                   {emailReadiness.workspace.dnsRecords.map((item) => (
                     <p key={item} className="muted settings-premium-muted" style={{ marginBottom: 6 }}>{item}</p>

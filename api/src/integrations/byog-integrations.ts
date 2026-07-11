@@ -278,7 +278,7 @@ export const BYOG_PROVIDER_MAP: Record<TenantIntegrationProvider, ByogProviderDe
     requiredPermissions: ['sender credentials'],
     requiredScopes: [],
     setupUrl: '/dashboard/settings/integrations/email-sender',
-    advancedLabel: 'Workspace sender',
+    advancedLabel: 'Custom sending domain',
   },
   GENERIC_WEBHOOK: {
     provider: 'GENERIC_WEBHOOK',

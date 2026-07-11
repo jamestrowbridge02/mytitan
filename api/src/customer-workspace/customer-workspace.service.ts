@@ -377,7 +377,7 @@ export class CustomerWorkspaceService {
         message:
           delivery.status === "failed"
             ? "We could not send the customer invite email just now. Check outbound email readiness and try again."
-            : delivery.reason || "Customer email is not set up yet. Add your sending email in Settings.",
+            : delivery.reason || "Customer email could not be sent. Check the MyTitan email service status.",
         actionHref: delivery.actionHref || "/dashboard/settings?tab=messages",
       };
     }
@@ -399,7 +399,7 @@ export class CustomerWorkspaceService {
       ...account,
       status: "sent",
       message: delivery.usedFallback
-        ? `Customer invite email sent to ${email} by MyTitan because your workspace sending email is not set up.`
+        ? `Customer invite email sent to ${email} through the MyTitan email service.`
         : `Customer invite email sent to ${email}.`,
     };
   }

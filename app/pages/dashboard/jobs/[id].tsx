@@ -1335,8 +1335,8 @@ export default function JobDetailPage() {
                   <strong>Customer email path</strong>
                   <p className="muted" style={{ margin: "6px 0 0 0" }}>
                     {emailReadiness?.effective?.canSend
-                      ? emailReadiness?.effective?.notice || "Service-record and follow-up emails will use the workspace sender that is ready."
-                      : emailReadiness?.effective?.guidance || "Customer email is unavailable right now. Finish setup in Settings."}
+                      ? emailReadiness?.effective?.notice || "Service-record and follow-up emails use your business name through the MyTitan email service."
+                      : emailReadiness?.effective?.guidance || "Customer email needs attention. Check Customer email status in Settings."}
                   </p>
                 </div>
               ) : null}

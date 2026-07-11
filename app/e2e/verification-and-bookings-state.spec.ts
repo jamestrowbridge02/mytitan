@@ -217,7 +217,7 @@ test.describe("verification resend and bookings state", () => {
 
     const workspace = await workspaceResponse.json();
     const system = await systemResponse.json();
-    expect(String(workspace?.workspace?.guidance || "")).toMatch(/customer email is not set up yet|settings/i);
+    expect(String(workspace?.workspace?.guidance || "")).toMatch(/optional custom sending domain|mytitan delivery/i);
     expect(String(system?.guidance || "")).not.toMatch(/customer email is not set up yet|add your sending email in settings/i);
     expect(String(system?.guidance || "")).not.toMatch(/add your sending email in settings/i);
     expect(workspace?.workspace?.fromEmail ?? null).toBeNull();
@@ -227,7 +227,9 @@ test.describe("verification resend and bookings state", () => {
       expect(system?.fromEmail ?? null).not.toBeNull();
       expect(system?.fromName ?? null).not.toBeNull();
       if (workspace?.effective?.usingFallback) {
-        expect(String(workspace?.effective?.notice || "")).toMatch(/sent by mytitan because your workspace sending email is not set up/i);
+        expect(String(workspace?.effective?.notice || "")).toMatch(/messages are sent securely by mytitan|replies are not yet routed/i);
+        expect(String(workspace?.effective?.deliveryPath || "")).toBe("mytitan_service");
+        expect(String(workspace?.effective?.fromAddressSource || "")).toBe("mytitan_system_sender");
       }
     } else {
       expect(String(system?.guidance || "")).toMatch(/mytitan email|smtp host|server|configure email provider/i);
@@ -244,11 +246,10 @@ test.describe("verification resend and bookings state", () => {
     await expect(page.getByTestId("email-readiness-status")).toBeVisible();
     await expect(page.getByTestId("system-email-readiness-status")).toBeVisible();
     await expect(page.getByTestId("effective-email-readiness-status")).toBeVisible();
-    await expect(page.getByTestId("email-dns-guidance")).toContainText(/SPF|DKIM|DMARC/i);
     await expect(page.getByText(/smtp_password|smtp_pass/i)).toHaveCount(0);
   });
 
-  test("messages settings explain MyTitan fallback calmly when workspace sender is not ready", async ({ page, request }) => {
+  test("messages settings show MyTitan delivery as the default customer email path", async ({ page, request }) => {
     await installApiProxy(page, request);
     await loginAs(page, request, defaultOperatorEmail, defaultOperatorPassword);
     await page.route("**/api/tenant/settings/email-readiness", async (route) => {
@@ -262,9 +263,9 @@ test.describe("verification resend and bookings state", () => {
             transport: "none",
             canSend: false,
             fromEmail: null,
-            fromName: null,
-            replyToEmail: null,
-            guidance: "Customer email is not set up yet. Add your sending email in Settings.",
+            fromName: "Wheel A&R",
+            replyToEmail: "hello@wheelar.co.uk",
+            guidance: "Optional custom sending domain is not configured. MyTitan delivery can still send customer email.",
             dnsRecords: [],
           },
           fallback: {
@@ -284,13 +285,24 @@ test.describe("verification resend and bookings state", () => {
             transport: "smtp",
             canSend: true,
             fromEmail: "system@example.com",
-            fromName: "MyTitan",
-            replyToEmail: null,
-            guidance: "Customer emails can be sent by MyTitan until you add your own sending email.",
+            fromName: "Wheel A&R via MyTitan",
+            replyToEmail: "hello@wheelar.co.uk",
+            replyTo: "hello@wheelar.co.uk",
+            replyToSource: "business_email",
+            deliveryReady: true,
+            deliveryPath: "mytitan_service",
+            fromAddressSource: "mytitan_system_sender",
+            customSenderConfigured: false,
+            customSenderVerified: false,
+            systemSenderReady: true,
+            effectiveSenderLabel: "Wheel A&R via MyTitan",
+            operatorAction: "No action required for basic customer email. Set up a custom sending domain only if you want one.",
+            requestId: "email_test123",
+            guidance: "Messages are sent securely by MyTitan using your business name. Replies go to your business email.",
             dnsRecords: [],
             senderOwnership: "system",
             usingFallback: true,
-            notice: "Sent by MyTitan because your workspace sending email is not set up.",
+            notice: "Messages are sent securely by MyTitan using your business name.",
           },
         }),
       });
@@ -315,9 +327,12 @@ test.describe("verification resend and bookings state", () => {
 
     await page.goto("/dashboard/settings?tab=messages");
     const effectiveCard = page.getByTestId("effective-email-readiness-status");
-    await expect(effectiveCard).toContainText(/ready via mytitan fallback/i);
-    await expect(effectiveCard).toContainText(/customer emails can be sent by mytitan until you add your own sending email/i);
-    await expect(effectiveCard).toContainText(/sent by mytitan because your workspace sending email is not set up/i);
+    await expect(effectiveCard).toContainText(/Customer email:\s*Ready/i);
+    await expect(effectiveCard).toContainText(/Wheel A&R via MyTitan/i);
+    await expect(effectiveCard).toContainText(/Replies:\s*hello@wheelar.co.uk/i);
+    await expect(effectiveCard).toContainText(/Delivery service:\s*MyTitan email service/i);
+    await expect(effectiveCard).toContainText(/Custom sending domain:\s*Optional/i);
+    await expect(effectiveCard).not.toContainText(/not set up|fallback|workspace sender/i);
   });
 
   test("settings save categorized internal notification recipients and booking setup links back to settings", async ({ page, request }) => {

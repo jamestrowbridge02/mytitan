@@ -74,6 +74,9 @@ type BookingSettingsPayload = {
       guidance?: string;
       notice?: string | null;
       usingFallback?: boolean;
+      effectiveSenderLabel?: string | null;
+      deliveryReady?: boolean;
+      replyTo?: string | null;
     } | null;
   } | null;
   notificationRecipients?: Array<{
@@ -1924,14 +1927,14 @@ export default function BookingProSettingsPage() {
           <div className="operator-section__header">
             <div>
               <h2 className="operator-section__title">Confirmations</h2>
-              <p className="operator-section__subtitle">Customer confirmations use workspace sender rules. Internal alerts are managed in Settings.</p>
+              <p className="operator-section__subtitle">Customer confirmations use your business name through the MyTitan email service. Internal alerts are managed in Settings.</p>
             </div>
           </div>
           <div className="operator-stack">
             <div className="operator-formGrid">
               <div>
                 <div className="operator-kicker">Sender</div>
-                <div className="operator-row__subtitle" style={{ marginTop: 6 }}>{settings?.emailSenderName || "Workspace sender from Messages settings"}</div>
+                <div className="operator-row__subtitle" style={{ marginTop: 6 }}>{settings?.emailSenderName || settings?.emailReadiness?.effective?.effectiveSenderLabel || "Business name via MyTitan"}</div>
               </div>
               <div>
                 <div className="operator-kicker">Reply-to</div>
@@ -1941,14 +1944,12 @@ export default function BookingProSettingsPage() {
                 <div className="operator-kicker">Email readiness</div>
                 <div className="operator-row__subtitle" style={{ marginTop: 6 }}>
                   {settings?.emailReadiness?.effective?.canSend
-                    ? settings?.emailReadiness?.effective?.usingFallback
-                      ? "Ready via MyTitan"
-                      : "Ready via workspace sender"
+                    ? "Ready"
                     : "Unavailable"}
                 </div>
               </div>
             </div>
-            <p className="operator-note" style={{ margin: 0 }}>{settings?.emailReadiness?.effective?.guidance || settings?.emailReadiness?.guidance || "Workspace customer email readiness is managed in Email & Notifications settings."}</p>
+            <p className="operator-note" style={{ margin: 0 }}>{settings?.emailReadiness?.effective?.guidance || settings?.emailReadiness?.guidance || "Customer email status is managed in Email & Notifications settings."}</p>
             {settings?.emailReadiness?.effective?.notice ? (
               <p className="operator-note" style={{ margin: 0 }}>{settings.emailReadiness.effective.notice}</p>
             ) : null}

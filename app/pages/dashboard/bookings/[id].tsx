@@ -491,8 +491,8 @@ export default function BookingDetailPage() {
             <EntitySection title="Customer email" subtitle="Live delivery path for booking updates.">
               <p className="muted" style={{ marginTop: 0 }}>
                 {emailReadiness?.effective?.canSend
-                  ? emailReadiness?.effective?.notice || "Booking updates will use the workspace sender that is ready."
-                  : emailReadiness?.effective?.guidance || "Customer email is unavailable right now. Finish setup in Settings."}
+                  ? emailReadiness?.effective?.notice || "Booking updates use your business name through the MyTitan email service."
+                  : emailReadiness?.effective?.guidance || "Customer email needs attention. Check Customer email status in Settings."}
               </p>
               {!emailReadiness?.effective?.canSend ? (
                 <Link className="button secondary" href="/dashboard/settings?tab=messages">

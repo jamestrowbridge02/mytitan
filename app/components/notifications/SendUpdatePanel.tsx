@@ -130,7 +130,7 @@ export default function SendUpdatePanel({
         {channel === "email" ? (
           emailReadiness?.effective?.canSend ? (
             <p className="muted" style={{ marginTop: 0, color: emailReadiness?.effective?.usingFallback ? "#9a3412" : "#0f766e" }}>
-              {emailReadiness?.effective?.notice || "Customer email will use the workspace sender that is ready."}
+              {emailReadiness?.effective?.notice || "Customer email uses your business name through the MyTitan email service."}
             </p>
           ) : (
             <p className="muted" style={{ marginTop: 0 }}>
