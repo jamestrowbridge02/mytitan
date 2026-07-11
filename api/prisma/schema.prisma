@@ -1091,14 +1091,24 @@ model Job {
 model CustomerPaymentRequest {
   id                  String    @id @default(cuid())
   tenantId            String
-  jobId               String
+  sourceType          String    @default("JOB")
+  jobId               String?
+  bookingId           String?
+  statementId         String?
+  relatedRecordLabel  String?
   customerId          String?
+  recipientEmail      String?
+  recipientPhone      String?
   provider            String
   providerKey         String?
   providerState       String
   status              String    @default("manual_pending")
   amountCents         Int
   currency            String
+  description         String?
+  reference           String?
+  deliveryChannel     String?
+  expiresAt           DateTime?
   publicTokenHash     String    @unique
   publicTokenPrefix   String
   providerRequestRef  String?
@@ -1117,17 +1127,22 @@ model CustomerPaymentRequest {
   actionUrl           String?
   dueAt               DateTime?
   sentAt              DateTime?
+  viewedAt            DateTime?
   paidAt              DateTime?
   cancelledAt         DateTime?
+  expiredAt           DateTime?
   metadataJson        Json?
   createdByUserId     String?
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
   company             Company   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  job                 Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  job                 Job?      @relation(fields: [jobId], references: [id], onDelete: SetNull)
   customer            Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, jobId, createdAt])
+  @@index([tenantId, sourceType, createdAt])
+  @@index([tenantId, statementId, createdAt])
+  @@index([tenantId, bookingId, createdAt])
   @@index([tenantId, customerId, createdAt])
   @@index([tenantId, status, dueAt])
   @@index([tenantId, reviewedAt, createdAt])

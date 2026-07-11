@@ -98,6 +98,54 @@ test.describe("payments hardening", () => {
     expect(JSON.stringify(setupPayload)).not.toContain("MyTitan Stripe");
   });
 
+  test("finance can create a provider-bound payment request and public page stays token safe", async ({ page, request }) => {
+    await installApiProxy(page, request);
+    const token = await loginAs(page, request, defaultOperatorEmail, defaultOperatorPassword);
+    const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+    const suffix = String(Date.now());
+    const job = await createCompletedPaymentJob(request, token, `finance-${suffix}`);
+
+    const created = await requestLocalApi(request, "/billing/payment-requests", {
+      method: "POST",
+      headers,
+      data: {
+        sourceType: "invoice",
+        jobId: job.id,
+        amountCents: 7500,
+        currency: "GBP",
+        description: "Finance-created payment request",
+        recipientEmail: `finance-pay-${suffix}@example.test`,
+        provider: "manual",
+        deliveryChannel: "copy_link",
+        send: false,
+      },
+    });
+    expect(created.ok()).toBeTruthy();
+    const createdJson = await created.json();
+    expect(createdJson.request.provider).toBe("manual");
+    expect(createdJson.request.sourceType).toBe("INVOICE");
+    expect(createdJson.review.myTitanBillingStripe).toBe("excluded");
+    expect(createdJson.publicUrl).toContain("/payment-request/");
+    expect(JSON.stringify(createdJson)).not.toContain("sk_");
+    expect(JSON.stringify(createdJson)).not.toContain("whsec_");
+    expect(JSON.stringify(createdJson)).not.toContain("paymentCheckoutSessionId");
+
+    const report = await requestLocalApi(request, "/billing/finance-report", { headers });
+    expect(report.ok()).toBeTruthy();
+    const reportJson = await report.json();
+    const row = (reportJson.paymentRequests || []).find((item: any) => item.id === createdJson.request.id);
+    expect(row).toBeTruthy();
+    expect(row.provider).toMatch(/manual/i);
+    expect(JSON.stringify(reportJson)).not.toContain("MyTitan Billing Stripe");
+
+    const publicPath = new URL(createdJson.publicUrl).pathname;
+    await page.goto(publicPath);
+    await expect(page.getByRole("heading", { name: /Payment Customer|Business|MyTitan/i }).first()).toBeVisible();
+    await expect(page.getByText(/Secure payment request/i)).toBeVisible();
+    await expect(page.getByText(/MyTitan Billing Stripe is not used/i)).toBeVisible();
+    await expect(page.locator("body")).not.toContainText(/tenantId|providerRequestRef|sk_|whsec_/i);
+  });
+
   test("tenant-owned provider requests require verified webhook events before paid state", async ({ page, request }) => {
     await installApiProxy(page, request);
     const token = await loginAs(page, request, fixtureRefs.workspaceAdminEmail, fixtureRefs.workspaceAdminPassword);

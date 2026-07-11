@@ -6,6 +6,7 @@ import { AuditService } from '../audit/audit.service';
 import { DEFAULT_WORKSPACE_CURRENCY } from '../common/geo-defaults';
 import { isAutomationsV1Enabled, isNotificationsV1Enabled } from '../common/feature-flags';
 import { NotificationsService } from '../notifications/notifications.service';
+import { EmailService } from '../email/email.service';
 import { AutomationsService } from '../automations/automations.service';
 import { buildAppUrl } from '../common/public-url';
 import { PrismaService } from '../prisma/prisma.service';
@@ -74,6 +75,7 @@ export class BillingService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly notifications: NotificationsService,
+    private readonly email: EmailService,
     private readonly automations: AutomationsService,
     private readonly integrationClientFactory: IntegrationClientFactory,
     private readonly enterpriseFlags: EnterpriseFeatureFlagsService,
@@ -822,13 +824,15 @@ export class BillingService {
       };
     }
     const currency = String(input.job.currency || DEFAULT_WORKSPACE_CURRENCY).toLowerCase();
+    const amountCents = Math.max(0, Number(input.job.paymentRequestAmountCents || input.job.totalCents || 0));
+    const sourceId = String(input.job.id || input.requestId);
     const token = input.job.publicTokens?.[0]?.token || null;
     const successUrl = token
       ? buildAppUrl(`/portal/job/${token}?payment=processing`)
-      : buildAppUrl(`/dashboard/jobs/${input.job.id}?payment=processing`);
+      : buildAppUrl(`/payment-request/${input.job.publicPaymentToken || ''}?payment=processing`);
     const cancelUrl = token
       ? buildAppUrl(`/portal/job/${token}?payment=cancelled`)
-      : buildAppUrl(`/dashboard/jobs/${input.job.id}?payment=cancelled`);
+      : buildAppUrl(`/payment-request/${input.job.publicPaymentToken || ''}?payment=cancelled`);
     const session = await this.stripeConnect.checkout.sessions.create(
       {
         mode: 'payment',
@@ -840,7 +844,7 @@ export class BillingService {
           metadata: {
             type: 'customer_payment_request',
             tenantId: input.tenantId,
-            jobId: input.job.id,
+            jobId: input.job.id || '',
             paymentRequestId: input.requestId,
             paymentRequestRef: input.providerRequestRef,
           },
@@ -848,7 +852,7 @@ export class BillingService {
         metadata: {
           type: 'customer_payment_request',
           tenantId: input.tenantId,
-          jobId: input.job.id,
+          jobId: input.job.id || '',
           paymentRequestId: input.requestId,
           paymentRequestRef: input.providerRequestRef,
         },
@@ -857,12 +861,13 @@ export class BillingService {
             quantity: 1,
             price_data: {
               currency,
-              unit_amount: Number(input.job.totalCents || 0),
+              unit_amount: amountCents,
               product_data: {
-                name: `Invoice ${input.job.invoiceNumber || input.job.jobRef || input.job.id}`,
+                name: String(input.job.paymentRequestDescription || input.job.invoiceNumber || input.job.jobRef || 'Customer payment request').slice(0, 180),
                 metadata: {
                   tenantId: input.tenantId,
-                  jobId: input.job.id,
+                  jobId: input.job.id || '',
+                  sourceId,
                 },
               },
             },
@@ -889,16 +894,27 @@ export class BillingService {
     if (!row) return null;
     return {
       id: row.id,
-      jobId: row.jobId,
+      sourceType: row.sourceType || 'JOB',
+      jobId: row.jobId || null,
+      bookingId: row.bookingId || null,
+      statementId: row.statementId || null,
+      relatedRecordLabel: row.relatedRecordLabel || null,
       customerId: row.customerId || null,
+      recipientEmail: row.recipientEmail || null,
+      recipientPhone: row.recipientPhone || null,
       provider: row.provider,
+      providerLabel: row.metadataJson?.providerLabel || (row.provider === 'manual' ? 'Manual collection' : row.provider === 'stripe-connect' ? 'Business Stripe setup' : 'Business payment provider'),
       providerState: row.providerState,
       status: row.status,
       amountCents: Number(row.amountCents || 0),
       currency: row.currency,
+      description: row.description || null,
+      reference: row.reference || null,
+      deliveryChannel: row.deliveryChannel || null,
       providerRequestRef: options?.includeProviderRef ? this.maskProviderReference(row.providerRequestRef) : null,
       actionUrl: row.actionUrl || null,
       dueAt: row.dueAt || null,
+      expiresAt: row.expiresAt || null,
       sentAt: row.sentAt || null,
       paidAt: row.paidAt || null,
       manualReference: row.manualReference ? this.maskProviderReference(row.manualReference) : null,
@@ -6402,12 +6418,15 @@ export class BillingService {
       billingActivitiesByJobId.set(activity.jobId, current);
     }
 
-    const paymentRequests = jobIds.length
-      ? await db.customerPaymentRequest.findMany({
-          where: { tenantId, jobId: { in: jobIds }, cancelledAt: null },
-          orderBy: [{ updatedAt: 'desc' }, { createdAt: 'desc' }],
-        })
-      : [];
+    const paymentRequests = await db.customerPaymentRequest.findMany({
+      where: {
+        tenantId,
+        cancelledAt: null,
+        ...(Object.keys(createdAt).length ? { createdAt } : {}),
+      },
+      orderBy: [{ updatedAt: 'desc' }, { createdAt: 'desc' }],
+      take: 100,
+    });
     const latestPaymentRequestByJobId = new Map<string, any>();
     for (const request of paymentRequests) {
       if (!latestPaymentRequestByJobId.has(request.jobId)) {
@@ -6711,6 +6730,32 @@ export class BillingService {
         })),
       },
       customerBalances: Array.from(customerBalances.values()).sort((a, b) => b.unpaidCents - a.unpaidCents),
+      paymentRequests: paymentRequests.map((request: any) => {
+        const jobRow = request.jobId ? rows.find((row: any) => row.jobId === request.jobId) : null;
+        return {
+          id: request.id,
+          sourceType: request.sourceType || (request.jobId ? 'JOB' : 'STANDALONE'),
+          jobId: request.jobId || null,
+          bookingId: request.bookingId || null,
+          statementId: request.statementId || null,
+          customerId: request.customerId || null,
+          customerName: jobRow?.customerName || request.metadataJson?.customerName || request.recipientEmail || 'Customer',
+          relatedRecord: request.relatedRecordLabel || jobRow?.invoiceNumber || jobRow?.jobRef || 'Standalone request',
+          amountCents: Number(request.amountCents || 0),
+          currency: request.currency,
+          provider: request.metadataJson?.providerLabel || (request.provider === 'manual' ? 'Manual collection' : request.provider === 'stripe-connect' ? 'Business Stripe setup' : 'Business payment provider'),
+          status: request.status,
+          sentAt: request.sentAt || null,
+          viewedAt: request.viewedAt || null,
+          dueAt: request.dueAt || null,
+          paidAt: request.paidAt || null,
+          expiresAt: request.expiresAt || null,
+          lastActivity: request.paidAt || request.viewedAt || request.sentAt || request.updatedAt || request.createdAt,
+          actionUrl: request.jobId ? `/dashboard/jobs/${request.jobId}#payments` : request.actionUrl || null,
+          publicUrlAvailable: Boolean(request.actionUrl),
+          reviewNeeded: Boolean(['paid', 'partial_manual', 'provider_attention', 'payment_failed', 'provider_unavailable'].includes(String(request.status || '')) && !request.reviewedAt),
+        };
+      }),
       invoices: rows,
       reconciliationQueue,
       bookingDeposits,
@@ -6926,6 +6971,244 @@ export class BillingService {
       },
       request: this.sanitizePaymentRequest(request, { includeProviderRef: true }),
       readiness: await this.getTenantPaymentProviderReadiness(tenantId),
+    };
+  }
+
+  async createFinancePaymentRequest(tenantId: string, userId: string, input: CustomerPaymentRequestDto = {}) {
+    const db = this.prisma as any;
+    const sourceType = String(input.sourceType || (input.jobId ? 'job' : input.statementId ? 'statement' : input.customerId ? 'customer' : 'standalone')).toLowerCase();
+    const deliveryChannel = String(input.deliveryChannel || 'email').toLowerCase();
+    let job: any = null;
+    let customer: any = null;
+    let statement: any = null;
+    let booking: any = null;
+
+    if (input.jobId || sourceType === 'invoice') {
+      const jobId = String(input.jobId || '').trim();
+      if (!jobId) throw new BadRequestException('Choose an invoice or job before creating a payment request.');
+      job = await db.job.findFirst({
+        where: { id: jobId, companyId: tenantId },
+        include: {
+          customer: true,
+          publicTokens: {
+            where: { expiresAt: { gt: new Date() } },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+          },
+        },
+      });
+      if (!job) throw new BadRequestException('Related job or invoice was not found.');
+      if (job.invoicePaidAt) throw new BadRequestException('This invoice is already paid.');
+      customer = job.customer || null;
+    }
+
+    if (input.statementId || sourceType === 'statement') {
+      const statementId = String(input.statementId || '').trim();
+      if (!statementId) throw new BadRequestException('Choose a statement before creating a payment request.');
+      statement = await db.accountStatement.findFirst({ where: { id: statementId, tenantId }, include: { customer: true, tradeAccount: true } });
+      if (!statement) throw new BadRequestException('Statement was not found.');
+      customer = statement.customer || customer;
+    }
+
+    if (input.bookingId || sourceType === 'booking') {
+      const bookingId = String(input.bookingId || '').trim();
+      if (!bookingId) throw new BadRequestException('Choose a booking before creating a payment request.');
+      booking = await db.booking.findFirst({ where: { id: bookingId, companyId: tenantId } });
+      if (!booking) throw new BadRequestException('Booking was not found.');
+    }
+
+    if (!customer && input.customerId) {
+      customer = await db.customer.findFirst({ where: { id: input.customerId, companyId: tenantId } });
+      if (!customer) throw new BadRequestException('Customer was not found.');
+    }
+
+    const outstandingCents = job
+      ? Math.max(0, Number(job.totalCents || 0))
+      : statement
+        ? Math.max(0, Number(statement.openBalanceCents || 0))
+        : 0;
+    const amountCents = Math.max(0, Math.trunc(Number(input.amountCents || outstandingCents || 0)));
+    if (amountCents <= 0) throw new BadRequestException('Enter a payment request amount above £0.00.');
+    if (outstandingCents > 0 && amountCents > outstandingCents && !input.allowOverRequest) {
+      throw new BadRequestException('Amount exceeds the outstanding balance. Confirm over-request before creating it.');
+    }
+
+    const recipientEmail = String(input.recipientEmail || customer?.email || statement?.sentTo || job?.customerEmail || booking?.customerEmail || '').trim();
+    if (deliveryChannel === 'email' && !recipientEmail) {
+      throw new BadRequestException('Add a recipient email or choose copy link before sending this payment request.');
+    }
+
+    const readiness = await this.getTenantPaymentProviderReadiness(tenantId);
+    const requestedProvider = this.normalizeTenantPaymentProvider(input.provider || readiness.selectedProvider);
+    const provider = readiness.providers.find((candidate: any) => candidate.provider === requestedProvider) || readiness.providers[0];
+    if (provider.provider === 'open-banking' || provider.provider === 'paypal' || provider.provider === 'gocardless') {
+      throw new BadRequestException(`${provider.label} is not live for customer payment requests yet.`);
+    }
+    const canUseProvider = provider.provider !== 'manual' && this.providerReadyForCustomerCheckout(provider);
+    const manualFallback = provider.provider === 'manual' || !canUseProvider;
+    const activeWhere: any = {
+      tenantId,
+      cancelledAt: null,
+      status: { in: ['manual_pending', 'provider_pending', 'payment_processing'] },
+    };
+    if (job?.id) activeWhere.jobId = job.id;
+    else if (statement?.id) activeWhere.statementId = statement.id;
+    else if (booking?.id) activeWhere.bookingId = booking.id;
+    else if (customer?.id) activeWhere.customerId = customer.id;
+    else activeWhere.id = '__standalone_no_duplicate_scope__';
+    const activeRequest = await db.customerPaymentRequest.findFirst({ where: activeWhere, orderBy: { createdAt: 'desc' } });
+    if (activeRequest) {
+      return {
+        request: this.sanitizePaymentRequest(activeRequest, { includeProviderRef: true }),
+        readiness,
+        duplicatePrevented: true,
+        requestId: `payreq_${activeRequest.id.slice(-8)}`,
+      };
+    }
+
+    const token = this.generatePublicPaymentToken();
+    const tokenHash = this.hashPublicPaymentToken(token);
+    const publicUrl = buildAppUrl(`/payment-request/${token}`);
+    const dueAt = input.dueAt ? new Date(input.dueAt) : job?.invoiceDueAt || statement?.toDate || null;
+    if (dueAt && Number.isNaN(dueAt.getTime())) throw new BadRequestException('Due date is invalid.');
+    const expiresAt = input.expiresAt ? new Date(input.expiresAt) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    if (Number.isNaN(expiresAt.getTime())) throw new BadRequestException('Expiry date is invalid.');
+    const relatedRecordLabel = String(
+      input.reference ||
+      statement?.reference ||
+      job?.invoiceNumber ||
+      job?.jobRef ||
+      booking?.id ||
+      'Standalone payment request',
+    ).slice(0, 120);
+    const description = String(input.description || (job ? `Payment for ${job.invoiceNumber || job.jobRef || 'invoice'}` : statement ? `Payment for statement ${statement.reference}` : 'Customer payment request')).slice(0, 240);
+    let status = manualFallback
+      ? provider.provider === 'manual'
+        ? 'manual_pending'
+        : 'provider_unavailable'
+      : 'provider_pending';
+    let providerRequestRef = canUseProvider ? `cpr_${crypto.randomBytes(12).toString('hex')}` : null;
+    const metadataJson: any = {
+      requestedProvider,
+      providerLabel: provider.label,
+      providerCategory: provider.category,
+      deliveryChannel,
+      publicRequest: 'opaque_token',
+      myTitanBillingStripe: 'excluded',
+      myTitanStripe: 'not_used_for_customer_payments',
+      allowPartialPayment: Boolean(input.allowPartialPayment && (provider as any).supportsPartialPayments),
+      notes: input.notes ? String(input.notes).slice(0, 240) : null,
+      safeMetadata: input.metadata && typeof input.metadata === 'object' ? input.metadata : null,
+      fallbackReason: manualFallback && provider.provider !== 'manual'
+        ? `${provider.label} is ${String(provider.state || 'setup_needed').replace(/_/g, ' ')}. Manual collection remains available.`
+        : null,
+    };
+    let request = await db.customerPaymentRequest.create({
+      data: {
+        tenantId,
+        sourceType: sourceType.toUpperCase(),
+        jobId: job?.id || null,
+        bookingId: booking?.id || null,
+        statementId: statement?.id || null,
+        relatedRecordLabel,
+        customerId: customer?.id || job?.customerId || null,
+        recipientEmail: recipientEmail || null,
+        recipientPhone: String(input.recipientPhone || customer?.phone || booking?.customerPhone || '').trim() || null,
+        provider: manualFallback ? (provider.provider === 'manual' ? 'manual' : provider.provider) : provider.provider,
+        providerKey: provider.providerKey || null,
+        providerState: String(provider.state || 'setup_needed'),
+        status,
+        amountCents,
+        currency: String(input.currency || job?.currency || statement?.currency || DEFAULT_WORKSPACE_CURRENCY).toUpperCase(),
+        description,
+        reference: String(input.reference || relatedRecordLabel).slice(0, 120),
+        deliveryChannel,
+        expiresAt,
+        publicTokenHash: tokenHash,
+        publicTokenPrefix: token.slice(0, 8),
+        providerRequestRef,
+        actionUrl: manualFallback ? publicUrl : null,
+        dueAt,
+        sentAt: input.send === false ? null : new Date(),
+        metadataJson,
+        createdByUserId: userId,
+      },
+    });
+
+    if (canUseProvider && provider.provider === 'stripe-connect' && providerRequestRef) {
+      const session = await this.createTenantStripeCheckoutSession({
+        tenantId,
+        job: {
+          ...(job || {}),
+          id: job?.id || '',
+          currency: request.currency,
+          totalCents: amountCents,
+          paymentRequestAmountCents: amountCents,
+          paymentRequestDescription: description,
+          customerEmail: recipientEmail,
+          publicPaymentToken: token,
+          publicTokens: job?.publicTokens || [],
+        },
+        requestId: request.id,
+        providerRequestRef,
+      });
+      status = session.status;
+      providerRequestRef = session.providerRequestRef;
+      request = await db.customerPaymentRequest.update({
+        where: { id: request.id },
+        data: {
+          status,
+          providerRequestRef,
+          actionUrl: session.actionUrl || publicUrl,
+          metadataJson: {
+            ...metadataJson,
+            providerLifecycleState: session.lifecycleState,
+            providerSafeDetail: session.detail,
+            stripeConnectMode: this.tenantStripeConnectMode(),
+            stripeConnectSession: session.sessionIdMasked || null,
+            stripeAccount: session.accountMasked || null,
+          },
+        },
+      });
+    }
+
+    if (input.send !== false && deliveryChannel === 'email' && recipientEmail) {
+      const business = await db.tenantSetting.findUnique({ where: { tenantId } }).catch(() => null);
+      const businessName = String(business?.tradingName || business?.companyName || 'Your business');
+      const safeLink = request.actionUrl || publicUrl;
+      const result = await this.email.sendOperationalEmail(tenantId, {
+        to: recipientEmail,
+        subject: `${businessName} payment request ${request.reference || ''}`.trim(),
+        text: [
+          `${businessName} has sent you a payment request.`,
+          `Amount: ${this.formatMoneyLabel(amountCents, request.currency)}`,
+          `Reference: ${request.reference || relatedRecordLabel}`,
+          dueAt ? `Due: ${dueAt.toLocaleDateString('en-GB')}` : null,
+          `Pay securely or view instructions: ${safeLink}`,
+        ].filter(Boolean).join('\n'),
+        html: `<p>${businessName} has sent you a payment request.</p><p><strong>Amount:</strong> ${this.formatMoneyLabel(amountCents, request.currency)}</p><p><strong>Reference:</strong> ${request.reference || relatedRecordLabel}</p><p><a href="${safeLink}">View secure payment request</a></p>`,
+        templateKey: 'customer_payment_request',
+      } as any, { templateKey: 'customer_payment_request' });
+      metadataJson.emailDelivery = { status: result.status, delivered: Boolean(result.delivered), senderOwnership: result.senderOwnership || null };
+      request = await db.customerPaymentRequest.update({ where: { id: request.id }, data: { metadataJson } });
+    }
+
+    await this.audit.log(tenantId, 'billing.customer_payment_request.create', `Finance payment request created for ${relatedRecordLabel}`, userId);
+    await this.audit.log(tenantId, input.send === false ? 'billing.customer_payment_request.created_draft' : 'billing.customer_payment_request.sent', `Payment request ${request.id} ${input.send === false ? 'created' : 'sent or prepared'}`, userId);
+    return {
+      request: this.sanitizePaymentRequest(request, { includeProviderRef: true }),
+      readiness,
+      review: {
+        recipientEmail: recipientEmail || null,
+        provider: provider.label,
+        amountCents,
+        currency: request.currency,
+        businessBranding: 'business_identity_via_mytitan_email',
+        replyTo: 'business_email_when_configured',
+        myTitanBillingStripe: 'excluded',
+      },
+      publicUrl: request.actionUrl || publicUrl,
+      requestId: `payreq_${request.id.slice(-8)}`,
     };
   }
 
@@ -7286,6 +7569,74 @@ export class BillingService {
           : 'The business will collect this payment directly and update the job once received. Use the bank details or payment instructions supplied by the business.'
         : null,
       separationMessage: 'Payment is handled by the business.',
+    };
+  }
+
+  async getPublicPaymentRequestByToken(token: string) {
+    const db = this.prisma as any;
+    const raw = String(token || '').trim();
+    if (!raw || raw.length < 24) throw new NotFoundException('Payment request not found.');
+    const row = await db.customerPaymentRequest.findUnique({ where: { publicTokenHash: this.hashPublicPaymentToken(raw) } });
+    if (!row) throw new NotFoundException('Payment request not found.');
+    const tenant = await db.tenantSetting.findUnique({
+      where: { tenantId: row.tenantId },
+      select: {
+        companyName: true,
+        tradingName: true,
+        contactEmail: true,
+        emailReplyTo: true,
+        logoUrl: true,
+        brandPrimary: true,
+      },
+    }).catch(() => null);
+    const expired = Boolean(row.expiresAt && new Date(row.expiresAt).getTime() < Date.now());
+    if (expired && !['paid', 'cancelled', 'expired'].includes(String(row.status || ''))) {
+      await db.customerPaymentRequest.update({ where: { id: row.id }, data: { status: 'expired', expiredAt: row.expiresAt } }).catch(() => null);
+      row.status = 'expired';
+    }
+    if (!row.viewedAt) {
+      await db.customerPaymentRequest.update({ where: { id: row.id }, data: { viewedAt: new Date() } }).catch(() => null);
+      await this.audit.log(row.tenantId, 'billing.customer_payment_request.viewed', `Payment request ${row.id} viewed`, null).catch(() => null);
+    }
+    const canPay = Boolean(row.actionUrl && ['provider_pending', 'payment_processing'].includes(String(row.status || '')));
+    const manual = row.provider === 'manual' || ['manual_pending', 'provider_unavailable'].includes(String(row.status || ''));
+    return {
+      business: {
+        name: String(tenant?.tradingName || tenant?.companyName || 'Business'),
+        logoUrl: tenant?.logoUrl || null,
+        brandPrimary: tenant?.brandPrimary || null,
+        replyTo: tenant?.emailReplyTo || tenant?.contactEmail || null,
+      },
+      request: {
+        id: row.id,
+        status: row.status,
+        amountCents: Number(row.amountCents || 0),
+        currency: row.currency,
+        description: row.description || 'Payment request',
+        reference: row.reference || row.relatedRecordLabel || null,
+        relatedRecordLabel: row.relatedRecordLabel || null,
+        dueAt: row.dueAt || null,
+        expiresAt: row.expiresAt || null,
+        paidAt: row.paidAt || null,
+        providerLabel: row.metadataJson?.providerLabel || (row.provider === 'manual' ? 'Manual collection' : 'Business payment provider'),
+        actionAvailable: canPay,
+        actionUrl: canPay ? row.actionUrl : null,
+        manualInstructions: manual
+          ? 'This request uses business-owned manual collection. Follow the instructions supplied by the business and payment will be recorded only after evidence is confirmed.'
+          : null,
+        unavailableReason:
+          row.status === 'paid'
+            ? 'This payment request has already been paid.'
+            : row.status === 'cancelled'
+              ? 'This payment request was cancelled.'
+              : row.status === 'expired'
+                ? 'This payment request has expired.'
+                : null,
+      },
+      separation: {
+        customerMoney: 'handled_by_business_payment_provider',
+        myTitanBillingStripe: 'not_used',
+      },
     };
   }
 

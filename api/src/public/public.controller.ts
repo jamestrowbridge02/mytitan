@@ -66,6 +66,11 @@ export class PublicController {
     return buildAppUrl("/");
   }
 
+  @Get("payment-request/:token")
+  async paymentRequest(@Param("token") token: string) {
+    return this.billingService.getPublicPaymentRequestByToken(token);
+  }
+
   private hashSegment(value: string) {
     return crypto.createHash("sha256").update(value).digest("hex").slice(0, 16);
   }

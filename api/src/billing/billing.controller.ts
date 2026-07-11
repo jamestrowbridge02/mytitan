@@ -188,10 +188,17 @@ export class BillingController {
   }
 
   @Get('finance-report')
-  @Roles('OWNER', 'ADMIN', 'STAFF', 'READ_ONLY')
+  @Roles('OWNER', 'ADMIN', 'FINANCE', 'STAFF', 'READ_ONLY')
   async financeReport(@CurrentUser() user: JwtPayload, @Query() query: FinanceReportQueryDto) {
     await assertPermission({ user, permission: 'billing.manage', audit: this.audit, action: 'billing.finance_report' });
     return this.billing.getFinanceReport(user.companyId, query);
+  }
+
+  @Post('payment-requests')
+  @Roles('OWNER', 'ADMIN', 'FINANCE')
+  async createFinancePaymentRequest(@CurrentUser() user: JwtPayload, @Body() dto: CustomerPaymentRequestDto) {
+    await assertPermission({ user, permission: 'billing.manage', audit: this.audit, action: 'billing.customer_payment_request.create' });
+    return this.billing.createFinancePaymentRequest(user.companyId, user.sub, dto);
   }
 
   @Post('refund')

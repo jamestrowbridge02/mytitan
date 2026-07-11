@@ -123,6 +123,81 @@ export class SendStatementDto {
 
 export class CustomerPaymentRequestDto {
   @IsOptional()
+  @IsIn(['customer', 'job', 'booking', 'invoice', 'statement', 'standalone'])
+  sourceType?: 'customer' | 'job' | 'booking' | 'invoice' | 'statement' | 'standalone';
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  customerId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  jobId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  bookingId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  statementId?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  amountCents?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(3)
+  currency?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(240)
+  description?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  reference?: string;
+
+  @IsOptional()
+  @IsDateString()
+  dueAt?: string;
+
+  @IsOptional()
+  @IsDateString()
+  expiresAt?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(240)
+  recipientEmail?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  recipientPhone?: string;
+
+  @IsOptional()
+  @IsIn(['email', 'sms', 'copy_link', 'customer_portal', 'trade_portal'])
+  deliveryChannel?: 'email' | 'sms' | 'copy_link' | 'customer_portal' | 'trade_portal';
+
+  @IsOptional()
+  @IsBoolean()
+  allowOverRequest?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  allowPartialPayment?: boolean;
+
+  @IsOptional()
   @IsIn(TENANT_PAYMENT_REQUEST_PROVIDERS)
   provider?: 'manual' | 'stripe-connect' | 'open-banking' | 'paypal' | 'gocardless' | 'sumup' | 'worldpay';
 

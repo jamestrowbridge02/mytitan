@@ -62,6 +62,29 @@ type FinanceReport = {
     invoiceCount: number;
     overdueCount: number;
   }>;
+  paymentRequests?: Array<{
+    id: string;
+    sourceType: string;
+    jobId?: string | null;
+    bookingId?: string | null;
+    statementId?: string | null;
+    customerId?: string | null;
+    customerName: string;
+    relatedRecord: string;
+    amountCents: number;
+    currency: string;
+    provider: string;
+    status: string;
+    sentAt?: string | null;
+    viewedAt?: string | null;
+    dueAt?: string | null;
+    paidAt?: string | null;
+    expiresAt?: string | null;
+    lastActivity?: string | null;
+    actionUrl?: string | null;
+    publicUrlAvailable?: boolean;
+    reviewNeeded?: boolean;
+  }>;
   invoices: Array<{
     id: string;
     jobId: string;
@@ -166,6 +189,15 @@ export default function FinancePage() {
   const [statementCustomerId, setStatementCustomerId] = useState('');
   const [statementFrom, setStatementFrom] = useState(() => `${new Date().getFullYear()}-01-01`);
   const [statementTo, setStatementTo] = useState(() => new Date().toISOString().slice(0, 10));
+  const [paymentSource, setPaymentSource] = useState<'invoice' | 'customer' | 'statement' | 'standalone'>('invoice');
+  const [paymentJobId, setPaymentJobId] = useState('');
+  const [paymentCustomerId, setPaymentCustomerId] = useState('');
+  const [paymentStatementId, setPaymentStatementId] = useState('');
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentDescription, setPaymentDescription] = useState('');
+  const [paymentRecipient, setPaymentRecipient] = useState('');
+  const [paymentProvider, setPaymentProvider] = useState<'manual' | 'stripe-connect'>('manual');
+  const [paymentDelivery, setPaymentDelivery] = useState<'email' | 'copy_link'>('email');
 
   async function load() {
     setLoading(true);
@@ -254,6 +286,56 @@ export default function FinancePage() {
       await load();
     } catch (err: any) {
       showError(err?.message || 'Statement could not be sent');
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  async function createPaymentRequest() {
+    clearNotice();
+    const selectedInvoice = data?.invoices.find((invoice) => invoice.jobId === paymentJobId);
+    const selectedCustomer = data?.customerBalances.find((customer) => customer.customerId === paymentCustomerId);
+    const selectedStatement = statements.find((statement) => statement.id === paymentStatementId);
+    const amountCents = Number(paymentAmount || selectedInvoice?.unpaidAmountCents || selectedStatement?.openBalanceCents || selectedCustomer?.unpaidCents || 0);
+    if (!amountCents || amountCents <= 0) {
+      showError('Enter an amount above £0.00.');
+      return;
+    }
+    if (paymentDelivery === 'email' && !paymentRecipient) {
+      showError('Add a recipient email or choose copy link.');
+      return;
+    }
+    const ok = window.confirm(`Create payment request for ${formatMoney(amountCents, selectedInvoice?.currency || selectedStatement?.currency || selectedCustomer?.currency || data?.settings.currency || 'GBP')}?`);
+    if (!ok) return;
+    setActionBusy(true);
+    try {
+      const result = await apiFetch('/billing/payment-requests', {
+        method: 'POST',
+        body: JSON.stringify({
+          sourceType: paymentSource,
+          jobId: paymentSource === 'invoice' ? paymentJobId : undefined,
+          customerId: paymentSource === 'customer' ? paymentCustomerId : selectedInvoice?.customerId || selectedStatement?.customerId || undefined,
+          statementId: paymentSource === 'statement' ? paymentStatementId : undefined,
+          amountCents,
+          currency: selectedInvoice?.currency || selectedStatement?.currency || selectedCustomer?.currency || data?.settings.currency || 'GBP',
+          description: paymentDescription || selectedInvoice?.invoiceNumber || selectedStatement?.reference || 'Customer payment request',
+          reference: selectedInvoice?.invoiceNumber || selectedStatement?.reference || undefined,
+          recipientEmail: paymentRecipient || undefined,
+          provider: paymentProvider,
+          deliveryChannel: paymentDelivery,
+          send: paymentDelivery === 'email',
+        }),
+      });
+      if (paymentDelivery === 'copy_link' && result?.publicUrl && typeof navigator !== 'undefined') {
+        await navigator.clipboard?.writeText(result.publicUrl).catch(() => undefined);
+      }
+      showSuccess(paymentDelivery === 'copy_link' ? 'Payment request created and secure link copied when supported.' : 'Payment request created and email delivery attempted.');
+      setPaymentAmount('');
+      setPaymentDescription('');
+      setPaymentRecipient('');
+      await load();
+    } catch (err: any) {
+      showError(err?.message || 'Payment request could not be created.');
     } finally {
       setActionBusy(false);
     }
@@ -432,6 +514,12 @@ export default function FinancePage() {
           title="Money owed, paid, and VAT records"
           subtitle="Authoritative invoice and tax reporting over real tenant job billing fields. This supports records and exports, not tax advice."
           actions={[
+            { label: 'Create payment request', onClick: () => document.getElementById('create-payment-request')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) },
+            { label: 'Create invoice', href: '/dashboard/jobs/new', variant: 'secondary' },
+            { label: 'Statements', onClick: () => document.getElementById('statements')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), variant: 'secondary' },
+            { label: 'Record manual payment', onClick: () => document.getElementById('refunds')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), variant: 'secondary' },
+            { label: 'Record adjustment', onClick: () => document.getElementById('refunds')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), variant: 'secondary' },
+            { label: 'Review reconciliation', onClick: () => document.getElementById('reconciliation')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), variant: 'secondary' },
             { label: 'Export CSV', onClick: exportCsv, variant: 'secondary' },
             { label: 'Open settings', href: '/dashboard/settings?tab=general' },
           ]}
@@ -440,6 +528,105 @@ export default function FinancePage() {
         />
 
         <OperatorNotice notice={notice} onDismiss={clearNotice} />
+
+        {data ? (
+          <section className="card operator-section" id="create-payment-request" data-testid="finance-create-payment-request">
+            <div className="operator-section__header">
+              <div>
+                <h2 className="operator-section__title">Create payment request</h2>
+                <p className="operator-section__subtitle">Use the business customer-payment provider only. MyTitan Billing Stripe is never used for customer money.</p>
+              </div>
+              <OperatorStatusBadge label="Provider-aware" tone="success" />
+            </div>
+            <div className="three-col">
+              <label>
+                <span>Source</span>
+                <select className="input" value={paymentSource} onChange={(event) => setPaymentSource(event.target.value as typeof paymentSource)}>
+                  <option value="invoice">Invoice/job</option>
+                  <option value="customer">Customer balance</option>
+                  <option value="statement">Statement</option>
+                  <option value="standalone">Standalone</option>
+                </select>
+              </label>
+              {paymentSource === 'invoice' ? (
+                <label>
+                  <span>Invoice</span>
+                  <select className="input" value={paymentJobId} onChange={(event) => {
+                    const invoice = data.invoices.find((row) => row.jobId === event.target.value);
+                    setPaymentJobId(event.target.value);
+                    setPaymentAmount(invoice?.unpaidAmountCents ? String(invoice.unpaidAmountCents) : '');
+                    setPaymentRecipient('');
+                  }}>
+                    <option value="">Choose invoice</option>
+                    {data.invoices.filter((invoice) => invoice.unpaidAmountCents > 0).map((invoice) => (
+                      <option key={invoice.jobId} value={invoice.jobId}>{invoice.invoiceNumber} · {invoice.customerName} · {formatMoney(invoice.unpaidAmountCents, invoice.currency)}</option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+              {paymentSource === 'customer' ? (
+                <label>
+                  <span>Customer</span>
+                  <select className="input" value={paymentCustomerId} onChange={(event) => {
+                    const customer = data.customerBalances.find((row) => row.customerId === event.target.value);
+                    setPaymentCustomerId(event.target.value);
+                    setPaymentAmount(customer?.unpaidCents ? String(customer.unpaidCents) : '');
+                  }}>
+                    <option value="">Choose customer</option>
+                    {data.customerBalances.filter((row) => row.customerId).map((row) => (
+                      <option key={row.customerId} value={row.customerId || ''}>{row.customerName} · {formatMoney(row.unpaidCents, row.currency)}</option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+              {paymentSource === 'statement' ? (
+                <label>
+                  <span>Statement</span>
+                  <select className="input" value={paymentStatementId} onChange={(event) => {
+                    const statement = statements.find((row) => row.id === event.target.value);
+                    setPaymentStatementId(event.target.value);
+                    setPaymentAmount(statement?.openBalanceCents ? String(statement.openBalanceCents) : '');
+                  }}>
+                    <option value="">Choose statement</option>
+                    {statements.map((statement) => (
+                      <option key={statement.id} value={statement.id}>{statement.reference} · {formatMoney(statement.openBalanceCents, statement.currency)}</option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+              <label>
+                <span>Amount in pence</span>
+                <input className="input" type="number" min="1" step="1" value={paymentAmount} onChange={(event) => setPaymentAmount(event.target.value)} />
+              </label>
+              <label>
+                <span>Provider</span>
+                <select className="input" value={paymentProvider} onChange={(event) => setPaymentProvider(event.target.value as typeof paymentProvider)}>
+                  <option value="manual">Bank transfer / manual collection</option>
+                  <option value="stripe-connect">Business Stripe setup</option>
+                </select>
+              </label>
+              <label>
+                <span>Delivery</span>
+                <select className="input" value={paymentDelivery} onChange={(event) => setPaymentDelivery(event.target.value as typeof paymentDelivery)}>
+                  <option value="email">Email through MyTitan delivery</option>
+                  <option value="copy_link">Copy secure link</option>
+                </select>
+              </label>
+              <label>
+                <span>Recipient email</span>
+                <input className="input" type="email" value={paymentRecipient} onChange={(event) => setPaymentRecipient(event.target.value)} placeholder="customer@example.com" />
+              </label>
+              <label>
+                <span>Description</span>
+                <input className="input" type="text" value={paymentDescription} onChange={(event) => setPaymentDescription(event.target.value)} placeholder="Invoice balance, deposit, or agreed payment" />
+              </label>
+            </div>
+            <p className="muted">Review before sending: recipient, amount, provider, expiry, business branding, Reply-To, and related record are included. A request is not proof of payment.</p>
+            <button className="button" type="button" disabled={actionBusy} onClick={() => void createPaymentRequest()}>
+              {actionBusy ? 'Creating...' : 'Create payment request'}
+            </button>
+          </section>
+        ) : null}
 
         <section className="card operator-section" id="refunds">
           <div className="operator-section__header">
@@ -524,6 +711,53 @@ export default function FinancePage() {
             </div>
           ) : null}
         </section>
+
+        {data ? (
+          <section className="card operator-section" id="payment-requests" data-testid="finance-payment-request-section">
+            <div className="operator-section__header">
+              <div>
+                <h2 className="operator-section__title">Payment requests</h2>
+                <p className="operator-section__subtitle">Draft, sent, viewed, paid, failed, expired, cancelled and review states for provider-backed collection instructions.</p>
+              </div>
+            </div>
+            <div className="operator-table" data-testid="finance-payment-requests">
+              {(data.paymentRequests || []).slice(0, 20).map((request) => (
+                <div key={request.id} className="operator-table__row">
+                  <div className="operator-table__cell">
+                    <strong>{request.customerName}</strong>
+                    <div className="operator-cellSubtle">{request.relatedRecord} · {request.sourceType.toLowerCase().replaceAll('_', ' ')}</div>
+                  </div>
+                  <div className="operator-table__cell">
+                    <strong>{formatMoney(request.amountCents, request.currency)}</strong>
+                    <div className="operator-cellSubtle">{request.provider}</div>
+                  </div>
+                  <div className="operator-table__cell">
+                    <OperatorStatusBadge label={request.status.replaceAll('_', ' ')} tone={request.status === 'paid' ? 'success' : request.status === 'failed' || request.status === 'expired' || request.status === 'cancelled' ? 'critical' : request.reviewNeeded ? 'warning' : 'neutral'} />
+                    <div className="operator-cellSubtle">Sent {formatDate(request.sentAt)} · Due {formatDate(request.dueAt)}</div>
+                  </div>
+                  <div className="operator-table__cell">
+                    <div>Last activity {formatDate(request.lastActivity)}</div>
+                    {request.viewedAt ? <div className="operator-cellSubtle">Viewed {formatDate(request.viewedAt)}</div> : null}
+                  </div>
+                  <div className="operator-table__cell" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {request.actionUrl ? <Link href={request.actionUrl}>Open</Link> : null}
+                    {request.actionUrl ? (
+                      <button className="button secondary" type="button" onClick={() => navigator.clipboard?.writeText(request.actionUrl || '').then(() => showSuccess('Payment link copied')).catch(() => showError('Copy is unavailable in this browser'))}>
+                        Copy link
+                      </button>
+                    ) : null}
+                    {request.jobId && request.reviewNeeded ? (
+                      <button className="button secondary" type="button" disabled={actionBusy} onClick={() => void reviewPaymentRequest(request.jobId || '', request.id)}>
+                        Mark reviewed
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+              {!(data.paymentRequests || []).length ? <p className="muted">No payment requests yet. Use Create payment request to send one through the business payment provider.</p> : null}
+            </div>
+          </section>
+        ) : null}
 
         {data ? (
           <section className="card operator-section" id="reconciliation" data-testid="finance-reconciliation-queue">
