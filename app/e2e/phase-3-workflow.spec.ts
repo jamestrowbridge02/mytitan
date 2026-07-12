@@ -45,16 +45,14 @@ test.describe("Phase 3 workflow excellence", () => {
     expect([403, 401]).toContain(denied.status());
   });
 
-  test("bookings and calendar expose click-to-action workflow rails", async ({ page, request }) => {
+  test("bookings and calendar expose compact workflow access", async ({ page, request }) => {
     await installApiProxy(page, request);
     await loginAs(page, request, fixtureRefs.workspaceAdminEmail, fixtureRefs.workspaceAdminPassword);
 
     await page.goto("/dashboard/bookings", { waitUntil: "networkidle" });
-    const bookingRail = page.getByTestId("booking-click-to-action-rail");
-    await expect(bookingRail).toBeVisible();
-    await expect(bookingRail).toContainText("Convert ready bookings");
-    await expect(bookingRail).toContainText("Plan by location");
-    await expect(bookingRail.getByRole("link", { name: "Change workflow" })).toHaveAttribute("href", "/dashboard/booking/settings#workflow");
+    await expect(page.getByTestId("bookings-premium-workspace")).toBeVisible();
+    await expect(page.getByTestId("bookings-settings-handoff")).toContainText(/Booking rules|Public booking/i);
+    await expect(page.getByTestId("bookings-settings-handoff").getByRole("link", { name: "Manage" })).toHaveAttribute("href", "/dashboard/booking/settings");
 
     await page.goto("/dashboard/calendar", { waitUntil: "networkidle" });
     const calendarRail = page.getByTestId("calendar-click-to-action-rail");

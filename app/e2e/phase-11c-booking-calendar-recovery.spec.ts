@@ -27,10 +27,11 @@ test.describe("Phase 11C booking visibility and calendar recovery", () => {
     const customerName = `Phase 11C Visible Booking ${suffix}`;
 
     await page.goto("/dashboard/bookings", { waitUntil: "networkidle" });
+    await page.getByTestId("bookings-create-primary").click();
     await page.getByTestId("booking-create-customer-name").fill(customerName);
     await page.getByTestId("booking-create-start").fill(localDateTimeInput(start));
     await page.getByTestId("booking-create-end").fill(localDateTimeInput(end));
-    await page.getByRole("button", { name: "Create booking", exact: true }).click();
+    await page.getByTestId("booking-create-panel").getByRole("button", { name: "Create booking", exact: true }).click();
     await expect(page.getByText(customerName, { exact: true })).toBeVisible();
 
     const scopedResponse = await requestLocalApi(

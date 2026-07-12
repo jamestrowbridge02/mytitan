@@ -410,7 +410,8 @@ test.describe("verification resend and bookings state", () => {
 
       await page.goto("/dashboard/bookings");
       await expect(page.getByRole("heading", { level: 1, name: /Bookings|Requests/ })).toBeVisible();
-      await expect(page.getByRole("button", { name: /Bookings are ready to set up\./i })).toBeVisible();
+      await expect(page.getByTestId("bookings-settings-handoff")).toContainText(/Public booking|Not live/i);
+      await expect(page.getByTestId("bookings-settings-handoff").getByRole("link", { name: "Manage" })).toBeVisible();
       await expect(page.getByText("Bookings are off right now.")).toHaveCount(0);
     } finally {
       await updateTenantSettings(request, token, {
@@ -452,7 +453,7 @@ test.describe("verification resend and bookings state", () => {
 
       await page.goto("/dashboard/bookings");
       await expect(page.getByRole("heading", { level: 1, name: /Bookings|Requests/ })).toBeVisible();
-      await expect(page.getByText("Bookings are live, but there are no open slots right now.").first()).toBeVisible();
+      await expect(page.getByTestId("bookings-settings-handoff")).toContainText(/Live, no slots|Next slot/i);
       await expect(page.getByText("Bookings are off right now.")).toHaveCount(0);
     } finally {
       await updateTenantSettings(request, token, {

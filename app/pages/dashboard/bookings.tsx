@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { useRouter } from "next/router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { EntityCustomFieldsCard } from "../../components/custom-fields/EntityCustomFieldsCard";
 import { OperatorNotice } from "../../components/feedback/OperatorNotice";
@@ -11,11 +10,8 @@ import {
   OperatorDataTable,
   OperatorDataTableHeader,
   OperatorDataTableRow,
-  OperatorEmptyStateCard,
   OperatorFilterBar,
   OperatorFilterField,
-  OperatorGuidance,
-  OperatorPageHeader,
   OperatorRowActions,
   OperatorSavedViews,
 } from "../../components/ui/operator-page";
@@ -188,7 +184,6 @@ function hydrateBookingSettingsForm(
 }
 
 export default function BookingsPage() {
-  const router = useRouter();
   const { settings: tenantSettings } = useTenantSettings();
   const terms = getBusinessTerms(tenantSettings);
   const bookingStages = getBookingStages(tenantSettings);
@@ -204,7 +199,9 @@ export default function BookingsPage() {
   const [bookingServices, setBookingServices] = useState<BookingServiceOption[]>([]);
   const [settings, setSettings] = useState<BookingSettings | null>(null);
   const [creatingBooking, setCreatingBooking] = useState(false);
+  const [createBookingOpen, setCreateBookingOpen] = useState(false);
   const creatingBookingRef = useRef(false);
+  const createPanelRef = useRef<HTMLDivElement | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [timingFilter, setTimingFilter] = useState<TimingFilter>("all");
@@ -313,6 +310,7 @@ export default function BookingsPage() {
       setCustomerPhone("");
       setServiceId("");
       setServiceLines([]);
+      setCreateBookingOpen(false);
       showSuccess(selectedService ? `Booking created with ${selectedService.name}${selectedLines.length > 1 ? ` and ${selectedLines.length - 1} more service${selectedLines.length > 2 ? "s" : ""}` : ""}. It is now ready in the queue.` : "Booking created. It is now ready in the queue.");
       await refreshNow();
     } catch (err: any) {
@@ -385,40 +383,20 @@ export default function BookingsPage() {
   const stats = useMemo(() => {
     const linkedJobs = bookings.filter((booking) => booking.jobId).length;
     const needsConversion = bookings.filter((booking) => !booking.jobId).length;
-    const readyToConvert = bookings.filter((booking) => !booking.jobId && getConversionIssues(booking).length === 0).length;
     const todaysWork = bookings.filter((booking) => isToday(booking.startsAt)).length;
+    const upcoming = bookings.filter((booking) => {
+      const startsAt = booking?.startsAt ? new Date(booking.startsAt) : null;
+      return Boolean(startsAt && !Number.isNaN(startsAt.getTime()) && startsAt.getTime() >= Date.now());
+    }).length;
     return [
-      { label: terms.bookings, value: String(bookings.length), hint: `${linkedJobs} already linked to ${terms.jobs.toLowerCase()}` },
-      { label: "Needs conversion", value: String(needsConversion), hint: "Booked visits still waiting to become work" },
-      { label: "Ready to convert", value: String(readyToConvert), hint: "Can move straight into a job now" },
-      { label: "Today's workload", value: String(todaysWork), hint: "Visits that should move today" },
+      { label: "Today", value: String(todaysWork), hint: `${todaysWork} scheduled today` },
+      { label: "Upcoming", value: String(upcoming), hint: `${upcoming} upcoming` },
+      { label: "Needs conversion", value: String(needsConversion), hint: `${needsConversion} not linked to ${terms.jobs.toLowerCase()}` },
+      { label: `Linked to ${terms.jobs.toLowerCase()}`, value: String(linkedJobs), hint: `${linkedJobs} linked` },
     ];
-  }, [bookings, terms.bookings, terms.jobs]);
+  }, [bookings, terms.jobs]);
 
   const statusOptions = useMemo(() => Array.from(new Set(bookings.map((booking) => String(booking.status || "PLANNED")))).sort(), [bookings]);
-  const bookingReadinessGuidance = useMemo(() => {
-    if (!settings?.publicState || settings.publicState === "live") {
-      return null;
-    }
-
-    if (settings.publicState === "setup_required") {
-      return {
-        title: "Bookings are ready to set up.",
-        items: [
-          settings.publicMessage || "Finish your booking settings to start taking bookings.",
-          "Turn on public bookings, confirm your hours, and publish at least one booking service before you share the link.",
-        ],
-      };
-    }
-
-    return {
-      title: "Bookings are live, but there are no open slots right now.",
-      items: [
-        settings.publicMessage || "Bookings are live, but there are no open slots right now.",
-        "Check business hours, blackout dates, and team availability before sharing the link.",
-      ],
-    };
-  }, [settings]);
 
   const filteredBookings = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
@@ -453,35 +431,6 @@ export default function BookingsPage() {
     }
     return counts;
   }, [bookings]);
-
-  const nextWorkflowActions = useMemo(
-    () => [
-      {
-        title: "Convert ready bookings",
-        detail: `${savedViewCounts.unlinked} booked visit${savedViewCounts.unlinked === 1 ? "" : "s"} still need a job record.`,
-        action: "Open conversion queue",
-        onClick: () => {
-          setSavedView("unlinked");
-          setTimingFilter("unlinked");
-        },
-      },
-      {
-        title: "Plan by location",
-        detail: settings?.bookingWorkflow?.locationFirstScheduling === false ? "Technician-first scheduling is selected." : "Location-first scheduling is selected for booking work.",
-        action: "Open calendar",
-        href: "/dashboard/calendar?from=bookings",
-      },
-      {
-        title: settings?.autoConfirmPublicBookings ? "Auto-confirm is on" : "Approval path is on",
-        detail: settings?.autoConfirmPublicBookings
-          ? "Real available slots can confirm immediately."
-          : "Public requests stay in review until a user confirms them.",
-        action: "Change workflow",
-        href: "/dashboard/booking/settings#workflow",
-      },
-    ],
-    [savedViewCounts.unlinked, settings?.autoConfirmPublicBookings, settings?.bookingWorkflow?.locationFirstScheduling, setSavedView],
-  );
 
   const clearFilters = () => {
     setSavedView("all");
@@ -562,57 +511,97 @@ export default function BookingsPage() {
     });
   };
 
+  useEffect(() => {
+    if (!createBookingOpen) return;
+    const input = createPanelRef.current?.querySelector<HTMLElement>('select, input, button, a[href]');
+    input?.focus();
+  }, [createBookingOpen]);
+
+  const publicStatusLabel = !settings
+    ? "Unavailable"
+    : settings.publicEnabled
+    ? settings.publicState === "no_slots"
+      ? "Live, no slots"
+      : "Live"
+    : "Not live";
+  const bookingRuleSummary = settings
+    ? `${settings.bookingWorkflow?.locationFirstScheduling === false ? terms.technicians : "Location"}-first · ${settings.autoConfirmPublicBookings ? "Auto-confirm on" : "Manual approval"}`
+    : "Review settings";
+  const hasActiveFilters = activeFilters.length > 0;
+
   return (
     <DashboardShell>
-      <div className="operator-stack">
-        <OperatorPageHeader
-          eyebrow="Scheduling"
-          title={terms.bookings}
-          info={`Review booked visits, convert ready items into ${terms.jobs.toLowerCase()}, and keep the schedule current.`}
-          actions={[
-            { label: "Start work", href: "/dashboard/work" },
-            { label: "Calendar", href: "/dashboard/calendar", variant: "secondary" },
-            { label: `${terms.bookings} settings`, href: "/dashboard/booking/settings", variant: "secondary" },
-          ]}
-          stats={stats}
-        />
-        <div className="operator-inline-actions">
-          <span className="muted">{isRefreshing ? "Refreshing bookings..." : lastUpdatedAt ? "Updated just now" : "Live booking queue"}</span>
-          <button className="button secondary operator-compact-button" type="button" disabled={isRefreshing} onClick={() => void refreshNow()}>
-            Refresh
-          </button>
-        </div>
+      <div className="operator-stack bookings-premium" data-testid="bookings-premium-workspace">
+        <header className="bookings-premium-header">
+          <div>
+            <h1>{terms.bookings}</h1>
+            <p>{lastUpdatedAt ? "Updated just now" : "Live booking queue"}</p>
+          </div>
+          <div className="bookings-premium-header__actions">
+            <button className="button" type="button" data-testid="bookings-create-primary" onClick={() => setCreateBookingOpen(true)}>
+              Create booking
+            </button>
+            <Link className="button secondary" href="/dashboard/calendar">
+              Calendar
+            </Link>
+            <Link className="button secondary" href="/dashboard/booking/settings">
+              Settings
+            </Link>
+            <button className="button secondary operator-compact-button" type="button" disabled={isRefreshing} onClick={() => void refreshNow()}>
+              Refresh
+            </button>
+          </div>
+        </header>
 
-        <OperatorNotice notice={notice} onDismiss={clearNotice} />
-        {bookingReadinessGuidance ? <OperatorGuidance title={bookingReadinessGuidance.title} items={bookingReadinessGuidance.items} /> : null}
-
-        <section className="operator-quickRail" data-testid="booking-click-to-action-rail">
-          {nextWorkflowActions.map((item) => (
-            <article className="operator-actionTile" key={item.title}>
-              <div className="operator-actionTile__body">
-                <h3>{item.title}</h3>
-                <p>{item.detail}</p>
-              </div>
-              {item.href ? (
-                <Link className="button secondary" href={item.href}>
-                  {item.action}
-                </Link>
-              ) : (
-                <button className="button secondary" type="button" onClick={item.onClick}>
-                  {item.action}
-                </button>
-              )}
-            </article>
+        <section className="bookings-metric-grid" aria-label="Booking overview">
+          {stats.map((stat) => (
+            <button
+              key={stat.label}
+              type="button"
+              className="bookings-metric-card"
+              onClick={() => {
+                if (stat.label === "Today") setSavedView("today");
+                if (stat.label === "Upcoming") setSavedView("upcoming");
+                if (stat.label === "Needs conversion") setSavedView("unlinked");
+                if (stat.label.startsWith("Linked")) setSavedView("all");
+              }}
+            >
+              <span>{stat.label}</span>
+              <strong>{stat.value}</strong>
+            </button>
           ))}
         </section>
 
+        <OperatorNotice notice={notice} onDismiss={clearNotice} />
+
+        {savedViewCounts.unlinked > 0 ? (
+          <section className="card bookings-conversion-strip" data-testid="bookings-conversion-strip">
+            <strong>{savedViewCounts.unlinked} {savedViewCounts.unlinked === 1 ? "booking needs" : "bookings need"} jobs</strong>
+            <div className="operator-inline-actions">
+              <button
+                className="button secondary operator-compact-button"
+                type="button"
+                onClick={() => {
+                  setSavedView("unlinked");
+                  setTimingFilter("unlinked");
+                }}
+              >
+                Review
+              </button>
+            </div>
+          </section>
+        ) : null}
+
         <div className={marketplaceEnabled && settings ? "operator-split" : "operator-stack"}>
-          <section className="card operator-section">
+          {createBookingOpen ? (
+          <section className="card operator-section bookings-create-panel" data-testid="booking-create-panel" ref={createPanelRef}>
             <div className="operator-section__header">
               <div>
                 <h2 className="operator-section__title">Create {terms.bookings.slice(0, -1).toLowerCase() || "booking"}</h2>
-              <p className="operator-section__subtitle">Keep manual entry compact so the next visit can be added without leaving the queue.</p>
               </div>
+              <button className="button secondary operator-compact-button" type="button" onClick={() => setCreateBookingOpen(false)}>
+                Close
+              </button>
             </div>
 
             <form onSubmit={onCreate} className="operator-stack">
@@ -716,53 +705,53 @@ export default function BookingsPage() {
               </div>
             </form>
           </section>
+          ) : null}
 
           {marketplaceEnabled && settings ? (
-            <section className="card operator-section" data-testid="bookings-settings-handoff">
+            <section className="card operator-section bookings-public-status" data-testid="bookings-settings-handoff">
               <div className="operator-section__header">
                 <div>
-                  <h2 className="operator-section__title">Public {terms.bookings.toLowerCase()} setup</h2>
-                  <p className="operator-section__subtitle">Operational work stays here. Configuration and customer-facing customisation live in Settings.</p>
+                  <h2 className="operator-section__title">Public booking</h2>
+                  <p className="operator-section__subtitle">{publicStatusLabel}</p>
                 </div>
               </div>
 
               <div className="operator-stack">
                 <div className="booking-summary-grid">
                   <article className="booking-lifecycle-card">
-                    <strong>Public status</strong>
-                    <p>{settings.publicEnabled ? "Live or ready to share" : "Needs setup in Settings"}</p>
-                    <p>{settings.publicMessage || "Manage services, hours, appearance, and notifications from Booking settings."}</p>
+                    <strong>{publicStatusLabel}</strong>
+                    <p>{String(settings.publishedServiceCount || 0)} services available</p>
                   </article>
                   <article className="booking-lifecycle-card">
-                    <strong>Share link</strong>
-                    <p>{settings.publicUrl || "No public link is ready yet."}</p>
-                    <p>{settings.icsUrl ? "ICS feed is available from the booking settings screen." : "Publish from Settings to generate the public route and related feeds."}</p>
+                    <strong>Next slot</strong>
+                    <p>{settings.nextAvailableSlot ? formatDateTime(settings.nextAvailableSlot) : "Not available"}</p>
                   </article>
                   <article className="booking-lifecycle-card">
-                    <strong>Published services</strong>
-                    <p>{String(settings.publishedServiceCount || 0)} visible to customers</p>
-                    <p>{settings.nextAvailableSlot ? `Next open slot: ${formatDateTime(settings.nextAvailableSlot)}` : "No next slot is visible yet."}</p>
+                    <strong>Booking rules</strong>
+                    <p>{bookingRuleSummary}</p>
                   </article>
                 </div>
 
-                <OperatorGuidance
-                  title="Manage in Settings"
-                  items={[
-                    "Use Booking settings for services, hours, blackout dates, public page appearance, and payment collection setup.",
-                    "Use Email & Notifications for senders, ops recipients, and reusable wording instead of editing those on operational pages.",
-                  ]}
-                />
-
                 <div className="operator-inline-actions">
-                  <Link className="button" href="/dashboard/booking/settings">
-                    Manage in Settings
-                  </Link>
-                  <Link className="button secondary" href="/dashboard/settings?tab=messages">
-                    Email & notifications
-                  </Link>
+                  {settings.publicUrl ? (
+                    <Link className="button secondary" href={settings.publicUrl} target="_blank" rel="noreferrer">
+                      Preview
+                    </Link>
+                  ) : null}
                   {settings.publicUrl ? (
                     <button className="button secondary" type="button" onClick={() => void copyText(settings.publicUrl || "", "Public booking link")}>
                       Copy link
+                    </button>
+                  ) : null}
+                  <Link className="button secondary" href="/dashboard/booking/settings">
+                    Manage
+                  </Link>
+                  <Link className="button secondary" href="/dashboard/settings?tab=messages">
+                    Notifications
+                  </Link>
+                  {settings.icsUrl ? (
+                    <button className="button secondary" type="button" onClick={() => void copyText(settings.icsUrl || "", "ICS feed")}>
+                      Copy ICS
                     </button>
                   ) : null}
                 </div>
@@ -775,7 +764,6 @@ export default function BookingsPage() {
           <div className="operator-section__header">
             <div>
               <h2 className="operator-section__title">{terms.bookings} queue</h2>
-              <p className="operator-section__subtitle">Filter the queue first, then convert ready visits, open linked work, or clear blockers quickly.</p>
             </div>
           </div>
 
@@ -793,11 +781,11 @@ export default function BookingsPage() {
           <OperatorFilterBar
             searchValue={search}
             onSearchChange={setSearch}
-            searchPlaceholder="Search customer, booking id, job id, or status"
+            searchPlaceholder="Search bookings..."
             resultsLabel={`${filteredBookings.length} shown of ${bookings.length} ${terms.bookings.toLowerCase()}`}
-            actions={[
+            actions={hasActiveFilters ? [
               { label: "Reset filters", variant: "secondary", onClick: clearFilters },
-            ]}
+            ] : undefined}
           >
             <OperatorFilterField label="Status">
               <select className="input" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
@@ -818,15 +806,6 @@ export default function BookingsPage() {
           </OperatorFilterBar>
 
           <OperatorActiveFilters chips={activeFilters} onClearAll={activeFilters.length ? clearFilters : undefined} />
-
-          <OperatorGuidance
-            title={`Move booked demand into work`}
-            items={[
-              "Use Needs conversion to find visits that still need to become real work.",
-              "Use Convert to job when the visit is ready, then review the linked job to start work without switching context.",
-              "Keep Schedule as a supporting control while the primary action follows the real booking state.",
-            ]}
-          />
 
           <OperatorBulkBar count={selectedIds.length} hint="Bulk tools stay non-destructive on bookings">
             <button className="button secondary operator-compact-button" type="button" onClick={() => setSelectedIds([])}>
@@ -1028,15 +1007,19 @@ export default function BookingsPage() {
               })}
             </OperatorDataTable>
           ) : !notice || notice.kind !== "error" ? (
-            <OperatorEmptyStateCard
-              title={`No ${terms.bookings.toLowerCase()} match this view`}
-              description="Clear the filters, open the calendar, or create a booking so the next visit can move cleanly into work."
-              actions={[
-                { label: "Reset filters", variant: "secondary", onClick: clearFilters },
-                { label: "Start work", href: "/dashboard/work" },
-                { label: "Review calendar", href: "/dashboard/calendar", variant: "secondary" },
-              ]}
-            />
+            <div className="bookings-empty-state" data-testid="bookings-empty-state">
+              <h3>{hasActiveFilters ? `No ${terms.bookings.toLowerCase()} match these filters` : `No ${terms.bookings.toLowerCase()} yet`}</h3>
+              <div className="operator-inline-actions">
+                {hasActiveFilters ? (
+                  <button className="button secondary" type="button" onClick={clearFilters}>Clear filters</button>
+                ) : (
+                  <>
+                    <button className="button" type="button" onClick={() => setCreateBookingOpen(true)}>Create booking</button>
+                    {settings?.publicUrl ? <Link className="button secondary" href={settings.publicUrl} target="_blank" rel="noreferrer">Open public booking</Link> : null}
+                  </>
+                )}
+              </div>
+            </div>
           ) : null}
         </section>
 

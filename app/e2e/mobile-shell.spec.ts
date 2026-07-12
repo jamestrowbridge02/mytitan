@@ -65,7 +65,7 @@ test.describe("mobile shell usability", () => {
       { path: "/dashboard/jobs", assertion: () => page.getByLabel("Search job ref, customer, reg, service, or owner") },
       { path: "/dashboard/jobs/e2e-job-portal-active", assertion: () => page.getByTestId("job-customer-handoff-card") },
       { path: "/dashboard/customers", assertion: () => page.getByLabel("Search customer, phone, or email") },
-      { path: "/dashboard/bookings", assertion: () => page.getByPlaceholder("Search customer, booking id, job id, or status") },
+      { path: "/dashboard/bookings", assertion: () => page.getByPlaceholder("Search bookings...") },
       { path: "/dashboard/billing", assertion: () => page.getByRole("heading", { name: /mytitan account/i }) },
       { path: "/dashboard/jobs/new?guided=1&entry=work", assertion: () => page.getByTestId("jobs-guided-nav-bottom") },
       { path: "/dashboard/settings?tab=general", assertion: () => page.locator("h1", { hasText: /^Settings$/ }) },

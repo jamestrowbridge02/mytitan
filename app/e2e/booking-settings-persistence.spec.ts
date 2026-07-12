@@ -12,8 +12,8 @@ test.describe("booking settings ownership", () => {
 
     const handoff = page.getByTestId("bookings-settings-handoff");
     await expect(handoff).toBeVisible();
-    await expect(handoff).toContainText("Manage in Settings");
-    await expect(handoff.getByRole("link", { name: "Manage in Settings" })).toBeVisible();
+    await expect(handoff).toContainText("Public booking");
+    await expect(handoff.getByRole("link", { name: "Manage" })).toBeVisible();
     await expect(handoff.getByRole("button", { name: "Save booking settings" })).toHaveCount(0);
     await expect(handoff.locator('input[type="time"]')).toHaveCount(0);
     await expect(handoff.locator('input[type="checkbox"]')).toHaveCount(0);

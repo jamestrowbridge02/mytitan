@@ -43,11 +43,13 @@ test.describe("dashboard workflows", () => {
     await page.goto("/dashboard", { waitUntil: "networkidle" });
 
     await expect(page.getByTestId("dashboard-premium-home")).toBeVisible();
-    await expect(page.getByRole("heading", { level: 1, name: /Good morning|Good afternoon|Good evening/i })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Dashboard" })).toBeVisible();
     await expect(page.getByTestId("dashboard-premium-home").getByRole("heading", { level: 1 })).toHaveCount(1);
+    await expect(page.locator(".dashboard-premium-greeting")).toContainText(/Good morning|Good afternoon|Good evening/i);
     const headerBox = await page.locator(".dashboard-premium-header").boundingBox();
     expect(headerBox?.height || 0).toBeLessThan(120);
     await expectReadableText(page.locator(".dashboard-premium-header h1"));
+    await expectReadableText(page.locator(".dashboard-premium-greeting"));
     await expect(page.locator("#dashboard-snapshot-title")).toHaveClass(/visually-hidden/);
     await expect(page.getByTestId("dashboard-primary-action")).toBeVisible();
     await expect(page.getByTestId("dashboard-snapshot-grid").locator("a")).toHaveCount(4);
@@ -245,6 +247,8 @@ test.describe("dashboard workflows", () => {
     const secondService = await secondServiceResponse.json();
 
     await page.reload({ waitUntil: "domcontentloaded" });
+    await page.getByTestId("bookings-create-primary").click();
+    await expect(page.getByTestId("booking-create-panel")).toBeVisible();
     await page.getByTestId("booking-create-service").selectOption(String(service.id));
     await page.getByTestId("booking-create-service-add").click();
     await expect(page.getByTestId("booking-create-service-add")).toBeDisabled();
@@ -266,7 +270,7 @@ test.describe("dashboard workflows", () => {
     await page.getByTestId("booking-create-customer-email").fill(`booking-service-${unique}@example.test`);
     await page.getByTestId("booking-create-start").fill(dateTimeLocalInMinutes(180));
     await expect(page.getByTestId("booking-create-end")).not.toHaveValue("");
-    const createButton = page.getByRole("button", { name: "Create booking" });
+    const createButton = page.getByTestId("booking-create-panel").getByRole("button", { name: "Create booking" });
     await createButton.dblclick();
     await expect(page.getByTestId("operator-notice-success")).toContainText(serviceName);
 
@@ -430,7 +434,7 @@ test.describe("dashboard workflows", () => {
 
       await page.goto("/dashboard/bookings");
       await expect(page.getByRole("heading", { level: 1, name: /Bookings|Requests/ })).toBeVisible();
-      await expect(page.getByPlaceholder("Search customer, booking id, job id, or status")).toBeVisible();
+      await expect(page.getByPlaceholder("Search bookings...")).toBeVisible();
       await expect(page.getByText("Feature 'bookings_enabled' is disabled for this tenant")).toHaveCount(0);
       await expect(page.getByText("Bookings are off right now.")).toHaveCount(0);
     } finally {
