@@ -44,6 +44,11 @@ test.describe("dashboard workflows", () => {
 
     await expect(page.getByTestId("dashboard-premium-home")).toBeVisible();
     await expect(page.getByRole("heading", { level: 1, name: /Good morning|Good afternoon|Good evening/i })).toBeVisible();
+    await expect(page.getByTestId("dashboard-premium-home").getByRole("heading", { level: 1 })).toHaveCount(1);
+    const headerBox = await page.locator(".dashboard-premium-header").boundingBox();
+    expect(headerBox?.height || 0).toBeLessThan(120);
+    await expectReadableText(page.locator(".dashboard-premium-header h1"));
+    await expect(page.locator("#dashboard-snapshot-title")).toHaveClass(/visually-hidden/);
     await expect(page.getByTestId("dashboard-primary-action")).toBeVisible();
     await expect(page.getByTestId("dashboard-snapshot-grid").locator("a")).toHaveCount(4);
     await expect(page.getByTestId("dashboard-priority-action")).toBeVisible();
