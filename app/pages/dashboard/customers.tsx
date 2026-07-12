@@ -3,18 +3,14 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/router";
 import { EntityCustomFieldsCard } from "../../components/custom-fields/EntityCustomFieldsCard";
 import { DashboardShell } from "../../components/dashboard-shell";
-import { OperatorActionTile } from "../../components/ui/operator-insights";
 import {
   OperatorActiveFilters,
   OperatorBulkBar,
   OperatorDataTable,
   OperatorDataTableHeader,
   OperatorDataTableRow,
-  OperatorEmptyStateCard,
   OperatorFilterBar,
   OperatorFilterField,
-  OperatorGuidance,
-  OperatorPageHeader,
   OperatorRowActions,
   OperatorSavedViews,
 } from "../../components/ui/operator-page";
@@ -36,7 +32,7 @@ type CustomerRow = {
 
 type ContactFilter = "all" | "email" | "phone" | "missing";
 type ActivityFilter = "all" | "active" | "quiet";
-type CustomerSavedView = "all" | "ready-for-work" | "needs-follow-up" | "recent-activity" | "missing-contact";
+type CustomerSavedView = "all" | "ready-for-work" | "needs-follow-up" | "missing-contact";
 
 function getTimelineHref(customer: CustomerRow) {
   return `/dashboard/customers/${encodeURIComponent(customer.slug || customer.id)}?name=${encodeURIComponent(customer.name)}`;
@@ -60,9 +56,9 @@ function describeCustomerOperatorState(customer: CustomerRow) {
 
   if (!hasContact) {
     return {
-      label: "Needs contact detail",
+      label: "Needs details",
       summary: "Add an email or phone number before the next customer follow-up.",
-      actionLabel: "Open contact",
+      actionLabel: "Open customer",
     };
   }
 
@@ -231,7 +227,7 @@ export default function CustomersPage() {
     try {
       const recordName = contactCompanyName.trim() || contactName.trim() || contactEmail.trim() || contactPhone.trim() || contactMobile.trim();
       if (!recordName) {
-        pushNotice("Add at least one contact detail before saving.");
+        pushNotice("Add at least one customer detail before saving.");
         return;
       }
       const created = await apiFetch("/trade-accounts", {
@@ -251,27 +247,26 @@ export default function CustomersPage() {
       setContactPhone("");
       setContactMobile("");
       setAddContactOpen(false);
-      pushNotice("Contact added. Opening the record now.");
+      pushNotice("Customer added. Opening the record now.");
       if (created?.id && typeof window !== "undefined") {
         window.location.href = `/dashboard/trade-accounts/${created.id}`;
       }
     } catch {
-      pushNotice("Could not add the contact. Check the details and try again.");
+      pushNotice("Could not add the customer. Check the details and try again.");
     } finally {
       setContactSaving(false);
     }
   }
 
   const stats = useMemo(() => {
-    const linkedWork = customers.filter((customer) => Number(customer.jobCount || 0) > 0).length;
     const readyForWork = customers.filter((customer) => (customer.email || customer.phone) && Number(customer.jobCount || 0) === 0).length;
     const needsFollowUp = customers.filter((customer) => Number(customer.jobCount || 0) > 0 && Number(customer.activityCount || 0) === 0).length;
     const missingContact = customers.filter((customer) => !customer.email && !customer.phone).length;
     return [
-      { label: terms.customers, value: String(customers.length), hint: `${linkedWork} already linked to work` },
-      { label: "Ready for first work", value: String(readyForWork), hint: "Contact is ready and no job exists yet" },
-      { label: "Needs follow-up", value: String(needsFollowUp), hint: "Work exists but the customer still needs an update" },
-      { label: "Missing contact", value: String(missingContact), hint: "Add the basics before work starts" },
+      { id: "all", label: "All", value: String(customers.length) },
+      { id: "ready-for-work", label: "Ready for work", value: String(readyForWork) },
+      { id: "needs-follow-up", label: "Needs follow-up", value: String(needsFollowUp) },
+      { id: "missing-contact", label: "Missing details", value: String(missingContact) },
     ];
   }, [customers]);
 
@@ -285,8 +280,7 @@ export default function CustomersPage() {
 
       if (normalizedSearch && !searchable.includes(normalizedSearch)) return false;
       if (savedView === "ready-for-work" && (!hasEmail && !hasPhone || Number(customer.jobCount || 0) > 0)) return false;
-      if (savedView === "needs-follow-up" && activityCount > 0) return false;
-      if (savedView === "recent-activity" && activityCount <= 0) return false;
+      if (savedView === "needs-follow-up" && (Number(customer.jobCount || 0) <= 0 || activityCount > 0)) return false;
       if (savedView === "missing-contact" && (hasEmail || hasPhone)) return false;
       if (contactFilter === "email" && !hasEmail) return false;
       if (contactFilter === "phone" && !hasPhone) return false;
@@ -302,14 +296,12 @@ export default function CustomersPage() {
       all: customers.length,
       "ready-for-work": 0,
       "needs-follow-up": 0,
-      "recent-activity": 0,
       "missing-contact": 0,
     };
     for (const customer of customers) {
       const activityCount = Number(customer.activityCount || 0);
       if ((customer.email || customer.phone) && Number(customer.jobCount || 0) === 0) counts["ready-for-work"] += 1;
-      if (activityCount <= 0) counts["needs-follow-up"] += 1;
-      if (activityCount > 0) counts["recent-activity"] += 1;
+      if (Number(customer.jobCount || 0) > 0 && activityCount <= 0) counts["needs-follow-up"] += 1;
       if (!customer.email && !customer.phone) counts["missing-contact"] += 1;
     }
     return counts;
@@ -339,6 +331,14 @@ export default function CustomersPage() {
     filteredCustomers.find((customer) => Number(customer.jobCount || 0) > 0 && Number(customer.activityCount || 0) === 0) ||
     customers.find((customer) => Number(customer.jobCount || 0) > 0 && Number(customer.activityCount || 0) === 0) ||
     null;
+  const priorityCustomer = firstCustomerNeedingContact || firstCustomerNeedingFollowUp || firstCustomerReadyForWork;
+  const priorityAction = firstCustomerNeedingContact
+    ? { label: "Open customer", href: getTimelineHref(firstCustomerNeedingContact), title: `${firstCustomerNeedingContact.name} needs details` }
+    : firstCustomerNeedingFollowUp
+      ? { label: "Continue follow-up", href: `${getTimelineHref(firstCustomerNeedingFollowUp)}&focus=communications`, title: `${firstCustomerNeedingFollowUp.name} needs follow-up` }
+      : firstCustomerReadyForWork
+        ? { label: "Create job", href: buildCustomerJobHref(firstCustomerReadyForWork), title: `${firstCustomerReadyForWork.name} is ready for work` }
+        : null;
 
   return (
     <DashboardShell>
@@ -350,66 +350,54 @@ export default function CustomersPage() {
       </div>
 
       <div className="operator-stack">
-        <OperatorPageHeader
-          eyebrow={terms.customers}
-          title={terms.customers}
-          info={`Manage contact details, history, and next actions for each ${terms.customers.slice(0, -1).toLowerCase() || "customer"}.`}
-          actions={[
-            { label: "Add contact", onClick: () => setAddContactOpen((prev) => !prev) },
-            { label: `New ${terms.jobs.slice(0, -1) || "Job"}`, href: "/dashboard/jobs/new?guided=1&entry=work" },
-            { label: `Review ${terms.bookings}`, href: "/dashboard/bookings", variant: "secondary" },
-          ]}
-          stats={stats}
-        />
+        <header className="customers-premium-header" data-testid="customers-premium-header">
+          <div>
+            <h1>{terms.customers}</h1>
+            <p>Relationship queue</p>
+          </div>
+          <div className="customers-premium-header__actions">
+            <button className="button" type="button" onClick={() => setAddContactOpen((prev) => !prev)}>
+              Add customer
+            </button>
+            <Link className="button secondary" href="/dashboard/jobs/new?guided=1&entry=work">
+              Create job
+            </Link>
+            <Link className="button secondary" href="/dashboard/bookings">
+              {terms.bookings}
+            </Link>
+          </div>
+        </header>
 
-        <section className="operator-quickRail" data-testid="customer-workflow-rail">
-          <OperatorActionTile
-            title={firstCustomerNeedingContact ? `${firstCustomerNeedingContact.name} still needs contact detail` : "Customer intake stays clear"}
-            description={firstCustomerNeedingContact ? "Fix missing contact detail first so bookings, updates, and handoff do not stall later." : "No obvious intake blockers are waiting right now."}
-            icon="customers"
-            tone={firstCustomerNeedingContact ? "warning" : "success"}
-            action={
-              <button className="button" type="button" onClick={() => setAddContactOpen(true)}>
-                {firstCustomerNeedingContact ? "Add contact now" : "Add another contact"}
-              </button>
-            }
-          />
-          <OperatorActionTile
-            title={firstCustomerReadyForWork ? `${firstCustomerReadyForWork.name} is ready for first work` : "First-job path stays available"}
-            description={firstCustomerReadyForWork ? "Move directly from the customer record into a guided job with the details prefilled." : "When a contact is ready, start the job from here instead of jumping around the app."}
-            icon="work"
-            tone="info"
-            action={
-              <Link className="button" href={firstCustomerReadyForWork ? buildCustomerJobHref(firstCustomerReadyForWork) : "/dashboard/jobs/new?guided=1&entry=work"}>
-                Create linked job
-              </Link>
-            }
-          />
-          <OperatorActionTile
-            title={firstCustomerNeedingFollowUp ? `${firstCustomerNeedingFollowUp.name} needs an update` : "Follow-up stays visible"}
-            description={firstCustomerNeedingFollowUp ? "Work exists, but the timeline is still quiet. Open the record and send the next update." : "Use the timeline to keep customer communication attached to the work."}
-            icon="mail"
-            tone={firstCustomerNeedingFollowUp ? "warning" : "neutral"}
-            action={
-              <Link
-                className="button secondary"
-                href={
-                  firstCustomerNeedingFollowUp
-                    ? `${getTimelineHref(firstCustomerNeedingFollowUp)}&focus=communications`
-                    : "/dashboard/customers"
-                }
-              >
-                {firstCustomerNeedingFollowUp ? "Open follow-up" : "Review customer flow"}
-              </Link>
-            }
-          />
+        <section className="customers-metric-grid" aria-label={`${terms.customers} overview`} data-testid="customers-relationship-snapshot">
+          {stats.map((stat) => (
+            <button
+              key={stat.id}
+              type="button"
+              className={`customers-metric-card${savedView === stat.id ? " is-active" : ""}`}
+              onClick={() => setSavedView(stat.id as CustomerSavedView)}
+            >
+              <span>{stat.label}</span>
+              <strong>{stat.value}</strong>
+            </button>
+          ))}
         </section>
+
+        {priorityAction && priorityCustomer ? (
+          <section className="customers-priority-strip" data-testid="customers-priority-action">
+            <div>
+              <span>Next customer action</span>
+              <strong>{priorityAction.title}</strong>
+            </div>
+            <Link className="button secondary" href={priorityAction.href}>
+              {priorityAction.label}
+            </Link>
+          </section>
+        ) : null}
 
         <section className="card operator-section">
           {addContactOpen ? (
-            <div className="card" style={{ marginBottom: 16 }}>
-              <h2 style={{ marginTop: 0 }}>Add contact</h2>
-              <p className="muted">Add someone quickly so work and follow-up can start without a long setup detour.</p>
+            <div className="customers-create-panel" style={{ marginBottom: 16 }}>
+              <h2 style={{ marginTop: 0 }}>Add customer</h2>
               <div className="two-col">
                 <div>
                   <label htmlFor="contact-company-name">Company or account name</label>
@@ -444,8 +432,7 @@ export default function CustomersPage() {
           ) : null}
           <div className="operator-section__header">
             <div>
-              <h2 className="operator-section__title">Customer relationships</h2>
-              <p className="operator-section__subtitle">See who is ready for first work, who needs a follow-up, and who already has live work attached.</p>
+              <h2 className="operator-section__title">Customer queue</h2>
             </div>
           </div>
 
@@ -454,8 +441,7 @@ export default function CustomersPage() {
               { id: "all", label: "All", count: savedViewCounts.all },
               { id: "ready-for-work", label: "Ready for work", count: savedViewCounts["ready-for-work"] },
               { id: "needs-follow-up", label: "Needs follow-up", count: savedViewCounts["needs-follow-up"] },
-              { id: "recent-activity", label: "Recent activity", count: savedViewCounts["recent-activity"] },
-              { id: "missing-contact", label: "Missing contact", count: savedViewCounts["missing-contact"] },
+              { id: "missing-contact", label: "Missing details", count: savedViewCounts["missing-contact"] },
             ]}
             activeView={savedView}
             onChange={(view) => setSavedView(view as CustomerSavedView)}
@@ -464,18 +450,16 @@ export default function CustomersPage() {
           <OperatorFilterBar
             searchValue={search}
             onSearchChange={setSearch}
-            searchPlaceholder="Search customer, phone, or email"
+            searchPlaceholder="Search customers..."
             resultsLabel={`${filteredCustomers.length} shown of ${customers.length} ${terms.customers.toLowerCase()}`}
-            actions={[
-              { label: "Reset filters", variant: "secondary", onClick: clearFilters },
-            ]}
+            actions={activeFilters.length ? [{ label: "Reset filters", variant: "secondary", onClick: clearFilters }] : undefined}
           >
             <OperatorFilterField label="Contact">
               <select className="input" value={contactFilter} onChange={(event) => setContactFilter(event.target.value as ContactFilter)}>
                 <option value="all">All contacts</option>
                 <option value="email">Has email</option>
                 <option value="phone">Has phone</option>
-                <option value="missing">Missing contact</option>
+                <option value="missing">Missing details</option>
               </select>
             </OperatorFilterField>
             <OperatorFilterField label="Activity">
@@ -488,14 +472,6 @@ export default function CustomersPage() {
           </OperatorFilterBar>
 
           <OperatorActiveFilters chips={activeFilters} onClearAll={activeFilters.length ? clearFilters : undefined} />
-
-          <OperatorGuidance
-            title="Move relationships into work"
-            items={[
-              "Use Ready for work when a new contact is ready to become a real job.",
-              "Use Missing contact to fix the basics before you book or dispatch anything.",
-            ]}
-          />
 
           {selectedIds.length ? (
             <OperatorBulkBar count={selectedIds.length} hint="Bulk actions are non-destructive">
@@ -695,16 +671,23 @@ export default function CustomersPage() {
               })}
             </OperatorDataTable>
           ) : (
-            <OperatorEmptyStateCard
-              title={`No ${terms.customers.toLowerCase()} match this view`}
-              description={`Reset the filters, add a contact, or start the next job when a ${terms.customers.slice(0, -1).toLowerCase() || "customer"} is ready to move into work.`}
-              actions={[
-                { label: "Reset filters", variant: "secondary", onClick: clearFilters },
-                { label: "Add contact", onClick: () => setAddContactOpen(true) },
-                { label: "Create job", href: "/dashboard/jobs/new?guided=1&entry=work" },
-                { label: "Review bookings", href: "/dashboard/bookings", variant: "secondary" },
-              ]}
-            />
+            <div className="customers-empty-state" data-testid="customers-empty-state">
+              <h3>{activeFilters.length || savedView !== "all" ? `No ${terms.customers.toLowerCase()} match these filters.` : `No ${terms.customers.toLowerCase()} yet`}</h3>
+              <div className="customers-empty-state__actions">
+                {activeFilters.length || savedView !== "all" ? (
+                  <button className="button secondary" type="button" onClick={clearFilters}>
+                    Clear filters
+                  </button>
+                ) : (
+                  <button className="button" type="button" onClick={() => setAddContactOpen(true)}>
+                    Add customer
+                  </button>
+                )}
+                <Link className="button secondary" href="/dashboard/jobs/new?guided=1&entry=work">
+                  Create job
+                </Link>
+              </div>
+            </div>
           )}
         </section>
 
