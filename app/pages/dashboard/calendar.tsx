@@ -10,7 +10,6 @@ import {
   OperatorDataTableRow,
   OperatorFilterBar,
   OperatorFilterField,
-  OperatorPageHeader,
   OperatorSavedViews,
 } from '../../components/ui/operator-page';
 import { ErrorState } from '../../components/states/ErrorState';
@@ -256,16 +255,15 @@ const SCHEDULE_WARNING_CODES: BookingWarning['code'][] = [
   'TIME_OFF',
 ];
 
-function buildOperationsLenses(workforceTerms: { singular: string; plural: string }): Array<{ key: OperationsLens; label: string; detail: string }> {
-  const pluralLower = workforceTerms.plural.toLowerCase();
+function buildOperationsLenses(workforceTerms: { singular: string; plural: string }): Array<{ key: OperationsLens; label: string }> {
   return [
-  { key: 'bookings', label: 'Bookings', detail: `Scheduled work by time, customer, service, status, location, and ${pluralLower}.` },
-  { key: 'rota', label: `${workforceTerms.singular} rota`, detail: `Shifts, leave, unavailable periods, and cover gaps from ${pluralLower} schedule data.` },
-  { key: 'availability', label: 'Availability', detail: `Business hours, ${pluralLower} availability, leave, bookings, and remaining slots.` },
-  { key: 'capacity', label: 'Capacity', detail: 'Available hours, booked hours, remaining hours, and utilisation.' },
-  { key: 'assets', label: 'Assets', detail: 'Asset requirements are surfaced when linked to jobs or bookings.' },
-  { key: 'fleet', label: 'Fleet', detail: 'Fleet readiness is available when vehicles or mobile assets are configured.' },
-  { key: 'map', label: 'Live map', detail: 'Map view stays unavailable until a maps provider is configured.' },
+  { key: 'bookings', label: 'Bookings' },
+  { key: 'rota', label: `${workforceTerms.singular} rota` },
+  { key: 'availability', label: 'Availability' },
+  { key: 'capacity', label: 'Capacity' },
+  { key: 'assets', label: 'Assets' },
+  { key: 'fleet', label: 'Fleet' },
+  { key: 'map', label: 'Live map' },
   ];
 }
 
@@ -843,38 +841,6 @@ export default function CalendarPage() {
     () => Boolean(data?.blocks?.some((block) => !block.technician?.id)),
     [data],
   );
-  const missingCoverRows = useMemo(() => {
-    const rows: Array<{ id: string; label: string; detail: string }> = [];
-    for (const block of data?.blocks || []) {
-      const dayKey = formatDateKey(new Date(block.startsAt));
-      if (!block.technician?.id) {
-        rows.push({
-          id: `${block.id}-unassigned`,
-          label: getBookingTitle(block),
-          detail: 'No staff member is assigned.',
-        });
-        continue;
-      }
-      if (schedulingEnabled) {
-        const available = availabilityMap.get(block.technician.id)?.[dayKey];
-        if (available === 0) {
-          rows.push({
-            id: `${block.id}-no-cover`,
-            label: getBookingTitle(block),
-            detail: `${block.technician.name || block.technician.email} has no rota cover that day.`,
-          });
-        }
-      }
-      if ((bookingMode === 'LOCATION' || bookingMode === 'HYBRID') && !block.location?.id) {
-        rows.push({
-          id: `${block.id}-no-location`,
-          label: getBookingTitle(block),
-          detail: 'No location is assigned for a location-based booking.',
-        });
-      }
-    }
-    return rows.slice(0, 8);
-  }, [availabilityMap, bookingMode, data?.blocks, schedulingEnabled]);
   const technicians = useMemo(() => {
     const base = data?.technicians || [];
     if (!hasUnassigned) return base;
@@ -889,18 +855,6 @@ export default function CalendarPage() {
       return true;
     });
   }, [technicians]);
-  const calendarStats = useMemo(() => {
-    const bookingCount = data?.blocks?.length || 0;
-    const warningCount = data?.blocks?.filter((block) => (block.warnings ?? []).length > 0).length || 0;
-    const activeTechs = technicians.filter((tech) => tech.id !== '__unassigned__').length;
-    return [
-      { label: viewMode === 'month' ? 'Month' : viewMode === 'day' ? 'Day' : 'Week range', value: formatViewRangeLabel(days, viewMode) || '-', hint: 'Current planning window' },
-      { label: 'Bookings', value: String(bookingCount), hint: warningCount ? `${warningCount} with warnings` : 'No schedule warnings' },
-      { label: 'Staff', value: String(activeTechs), hint: hasUnassigned ? 'Includes unassigned lane' : 'Assigned lanes only' },
-      { label: 'Missing cover', value: String(missingCoverRows.length), hint: missingCoverRows.length ? 'Needs staff or location attention' : 'No cover gaps found' },
-    ];
-  }, [data?.blocks, days, hasUnassigned, missingCoverRows.length, technicians, viewMode]);
-
   const operationIssueRows = useMemo(() => {
     const rows: Array<{ id: string; label: string; detail: string; href: string; severity: 'warning' | 'critical' }> = [];
     for (const block of data?.blocks || []) {
@@ -933,6 +887,39 @@ export default function CalendarPage() {
     return rows.slice(0, 12);
   }, [bookingMode, data?.blocks]);
 
+  const missingCoverRows = useMemo(() => {
+    const rows: Array<{ id: string; label: string; detail: string }> = [];
+    for (const block of data?.blocks || []) {
+      const dayKey = formatDateKey(new Date(block.startsAt));
+      if (!block.technician?.id) {
+        rows.push({
+          id: `${block.id}-unassigned`,
+          label: getBookingTitle(block),
+          detail: 'No staff member is assigned.',
+        });
+        continue;
+      }
+      if (schedulingEnabled) {
+        const available = availabilityMap.get(block.technician.id)?.[dayKey];
+        if (available === 0) {
+          rows.push({
+            id: `${block.id}-no-cover`,
+            label: getBookingTitle(block),
+            detail: `${block.technician.name || block.technician.email} has no rota cover that day.`,
+          });
+        }
+      }
+      if ((bookingMode === 'LOCATION' || bookingMode === 'HYBRID') && !block.location?.id) {
+        rows.push({
+          id: `${block.id}-no-location`,
+          label: getBookingTitle(block),
+          detail: 'No location is assigned for a location-based booking.',
+        });
+      }
+    }
+    return rows.slice(0, 8);
+  }, [availabilityMap, bookingMode, data?.blocks, schedulingEnabled]);
+
   const capacitySummary = useMemo(() => {
     let available = 0;
     let booked = 0;
@@ -949,7 +936,12 @@ export default function CalendarPage() {
 
   const workforceTerms = useMemo(() => resolveWorkforceTerminology(tenantSettings), [tenantSettings]);
   const operationsLenses = useMemo(() => buildOperationsLenses(workforceTerms), [workforceTerms]);
-  const selectedLens = operationsLenses.find((lens) => lens.key === operationsLens) || operationsLenses[0];
+  const bookingBasisLabel = bookingMode === 'EMPLOYEE' ? 'Employee-based booking' : bookingMode === 'HYBRID' ? 'Hybrid booking' : 'Location-based booking';
+  const planningStatusLabel = planningMode === 'rota'
+    ? bookingMode === 'EMPLOYEE'
+      ? `${workforceTerms.singular}-based booking uses availability first.`
+      : `${workforceTerms.singular} rota view`
+    : 'Location bookings';
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 900);
@@ -1583,74 +1575,62 @@ export default function CalendarPage() {
           data-calendar-version={dragEnabled ? '2' : '1'}
           data-calendar-experience="operations"
         >
-          <OperatorPageHeader
-            eyebrow="Scheduling"
-            title="Calendar"
-            info={`View bookings, ${workforceTerms.plural.toLowerCase()} rota, availability, and capacity. Timing changes require confirmation before schedules move.`}
-            actions={[
-              { label: 'Bookings', href: '/dashboard/bookings', variant: 'secondary' },
-              { label: 'Today', onClick: () => setFocusDate(startOfDay(new Date())) },
-            ]}
-            stats={calendarStats}
-          />
-
-          <section className="operator-quickRail" data-testid="calendar-click-to-action-rail">
-            <div className="operator-actionTile" data-testid="calendar-planning-mode-status">
-              <div className="operator-actionTile__body">
-                <h3>{planningMode === 'rota' ? `${workforceTerms.singular} rota view` : 'Location bookings view'}</h3>
-                <p>
-                  {bookingMode === 'EMPLOYEE'
-                    ? `${workforceTerms.singular}-based booking uses availability first.`
-                    : bookingMode === 'HYBRID'
-                      ? `Hybrid booking shows both location demand and ${workforceTerms.plural.toLowerCase()} cover.`
-                      : 'Location-based booking uses location availability first.'}
-                </p>
-              </div>
-              <span className="button secondary">{bookingMode === 'EMPLOYEE' ? `${workforceTerms.singular}-based` : bookingMode === 'HYBRID' ? 'Hybrid' : 'Location-based'}</span>
+          <section className="card calendar-premium-header" data-testid="calendar-premium-header">
+            <div>
+              <h1>Calendar</h1>
+              <p>{formatViewRangeLabel(days, viewMode)}</p>
             </div>
-            <Link className="operator-actionTile" href="/dashboard/bookings?view=today">
-              <div className="operator-actionTile__body">
-                <h3>Today&apos;s booking queue</h3>
-                <p>Open visits that need confirmation, conversion, or timing decisions before dispatch.</p>
-              </div>
-              <span className="button secondary">Open queue</span>
-            </Link>
-            <Link className="operator-actionTile" href="/dashboard/scheduling">
-              <div className="operator-actionTile__body">
-                <h3>Capacity and absence</h3>
-                <p>Check {workforceTerms.singular.toLowerCase()} availability, time off, and location capacity before moving work.</p>
-              </div>
-              <span className="button secondary">Open scheduling</span>
-            </Link>
-            <Link className="operator-actionTile" href="/dashboard/booking/settings#workflow">
-              <div className="operator-actionTile__body">
-                <h3>Booking workflow rules</h3>
-                <p>Choose auto-confirm, manual review, job creation, and location-first scheduling settings.</p>
-              </div>
-              <span className="button secondary">Edit workflow</span>
+            <Link className="button" href="/dashboard/bookings" data-testid="calendar-create-booking">
+              Create booking
             </Link>
           </section>
 
-          <section className="card operator-section" data-testid="operations-command-lenses">
-            <div className="operator-section__header">
-              <div>
-                <h2 className="operator-section__title">Operations command centre</h2>
-                <p className="operator-section__subtitle">
-                  {selectedLens.detail}
-                </p>
+          <section className="card operator-section calendar-control-panel" aria-label="Calendar controls">
+            <div className="calendar-toolbar" data-testid="calendar-date-toolbar">
+              <button className="button secondary operator-compact-button" type="button" onClick={() => setFocusDate(startOfDay(new Date()))}>Today</button>
+              <div className="calendar-segmented" aria-label="Calendar view">
+                {(['day', 'week', 'month'] as CalendarViewMode[]).map((mode) => (
+                  <button
+                    key={mode}
+                    className={viewMode === mode ? 'button primary operator-compact-button' : 'button secondary operator-compact-button'}
+                    type="button"
+                    data-testid={`calendar-view-toggle-${mode}`}
+                    aria-pressed={viewMode === mode}
+                    onClick={() => setViewMode(mode)}
+                  >
+                    {mode[0].toUpperCase() + mode.slice(1)}
+                  </button>
+                ))}
               </div>
-              <Link className="button secondary operator-compact-button" href="/dashboard/scheduling">
-                Manage availability
-              </Link>
+              <button className="button secondary operator-compact-button" type="button" aria-label="Previous calendar range" onClick={() => setFocusDate((prev) => shiftFocusDate(prev, viewMode, -1))}>
+                Previous
+              </button>
+              <button className="button secondary operator-compact-button" type="button" aria-label="Next calendar range" onClick={() => setFocusDate((prev) => shiftFocusDate(prev, viewMode, 1))}>
+                Next
+              </button>
+              <div className="calendar-toolbar__spacer" />
+              <div className="calendar-manage-menu" data-testid="calendar-click-to-action-rail" aria-label="Calendar management shortcuts">
+                <span className="button secondary operator-compact-button" aria-hidden="true">Manage</span>
+                <div className="calendar-manage-menu__panel">
+                  <Link href="/dashboard/bookings?view=today">Today&apos;s booking queue</Link>
+                  <Link href="/dashboard/scheduling">Manage availability</Link>
+                  <Link href="/dashboard/booking/settings#workflow">Edit workflow</Link>
+                  <Link href="/dashboard/enterprise#maps">Maps</Link>
+                  <Link href="/dashboard/assets">Assets</Link>
+                </div>
+              </div>
             </div>
-            <div className="operator-grid operator-grid--four" style={{ marginTop: 12 }}>
+
+            <div className="calendar-lens-row" role="tablist" aria-label="Calendar lens" data-testid="operations-command-lenses">
               {operationsLenses.map((lens) => {
                 const unavailable = lens.key === 'map';
                 return (
                   <button
                     key={lens.key}
                     type="button"
-                    className={operationsLens === lens.key ? 'button primary' : 'button secondary'}
+                    role="tab"
+                    aria-selected={operationsLens === lens.key}
+                    className={operationsLens === lens.key ? 'button primary operator-compact-button' : 'button secondary operator-compact-button'}
                     data-testid={`operations-lens-${lens.key}`}
                     onClick={() => {
                       setOperationsLens(lens.key);
@@ -1665,51 +1645,16 @@ export default function CalendarPage() {
                     }}
                   >
                     {lens.label}
-                    {unavailable ? ' - setup required' : ''}
+                    {unavailable ? ' setup' : ''}
                   </button>
                 );
               })}
             </div>
-            <div className="operator-grid operator-grid--three" style={{ marginTop: 12 }}>
-              <article className="mt-surface-note" data-testid="operations-capacity-summary">
-                <strong>Capacity</strong>
-                <p className="muted" style={{ margin: '6px 0 0 0' }}>
-                  {formatHours(capacitySummary.booked)} booked from {formatHours(capacitySummary.available)} available. {formatHours(capacitySummary.remaining)} remaining. Utilisation {capacitySummary.utilization}%.
-                </p>
-              </article>
-              <article className="mt-surface-note" data-testid="operations-assets-foundation">
-                <strong>Assets and fleet</strong>
-                <p className="muted" style={{ margin: '6px 0 0 0' }}>
-                  Asset and fleet lenses are ready to surface linked job assets when configured. They do not invent availability without asset records.
-                </p>
-                <Link className="button secondary operator-compact-button" href="/dashboard/assets" style={{ marginTop: 8 }}>
-                  Open assets
-                </Link>
-              </article>
-              <article className="mt-surface-note" data-testid="operations-route-foundation">
-                <strong>Route foundations</strong>
-                <p className="muted" style={{ margin: '6px 0 0 0' }}>
-                  Provider-neutral directions links are available from job/site data. Traffic-aware optimisation remains unavailable until a maps provider is configured.
-                </p>
-                <Link className="button secondary operator-compact-button" href="/dashboard/enterprise#maps" style={{ marginTop: 8 }}>
-                  Review maps readiness
-                </Link>
-              </article>
-            </div>
-          </section>
 
-          <div className="card operator-section">
-            <div className="operator-section__header">
-              <div>
-                <h2 className="operator-section__title">
-                  {planningMode === 'rota'
-                    ? viewMode === 'month' ? 'Monthly rota' : viewMode === 'day' ? `Daily ${workforceTerms.singular.toLowerCase()} rota` : `Weekly ${workforceTerms.singular.toLowerCase()} rota`
-                    : viewMode === 'month' ? 'Monthly bookings' : viewMode === 'day' ? 'Daily bookings' : 'Weekly bookings'}
-                </h2>
-                <p className="operator-section__subtitle">{formatViewRangeLabel(days, viewMode)}</p>
-              </div>
-              <div className="operator-inline-actions" style={{ flexWrap: 'wrap' }}>
-                <div style={{ display: 'inline-flex', border: '1px solid rgba(148, 163, 184, 0.3)', borderRadius: 999, padding: 4, gap: 4 }} data-testid="calendar-planning-mode-toggle">
+            <div className="calendar-scope-row">
+              <div className="calendar-scope-control">
+                <span>Mode</span>
+                <div className="calendar-segmented" data-testid="calendar-planning-mode-toggle">
                   {([
                     ['bookings', 'Location bookings'],
                     ['rota', `${workforceTerms.singular} rota`],
@@ -1719,6 +1664,7 @@ export default function CalendarPage() {
                       className={planningMode === mode ? 'button primary operator-compact-button' : 'button secondary operator-compact-button'}
                       type="button"
                       data-testid={`calendar-planning-mode-${mode}`}
+                      aria-pressed={planningMode === mode}
                       onClick={() => {
                         setPlanningMode(mode);
                         if (mode === 'rota') setShowTechnicianOverlay(true);
@@ -1728,39 +1674,96 @@ export default function CalendarPage() {
                     </button>
                   ))}
                 </div>
-                <div style={{ display: 'inline-flex', border: '1px solid rgba(148, 163, 184, 0.3)', borderRadius: 999, padding: 4, gap: 4 }}>
-                  {(['day', 'week', 'month'] as CalendarViewMode[]).map((mode) => (
-                    <button
-                      key={mode}
-                      className={viewMode === mode ? 'button primary operator-compact-button' : 'button secondary operator-compact-button'}
-                      type="button"
-                      data-testid={`calendar-view-toggle-${mode}`}
-                      onClick={() => setViewMode(mode)}
-                    >
-                      {mode[0].toUpperCase() + mode.slice(1)}
-                    </button>
-                  ))}
-                </div>
-                <button className="button secondary operator-compact-button" type="button" onClick={() => setFocusDate((prev) => shiftFocusDate(prev, viewMode, -1))}>
-                  {viewMode === 'month' ? 'Prev month' : viewMode === 'day' ? 'Prev day' : 'Prev week'}
-                </button>
-                <button className="button secondary operator-compact-button" type="button" onClick={() => setFocusDate(startOfDay(new Date()))}>Today</button>
-                <button className="button secondary operator-compact-button" type="button" onClick={() => setFocusDate((prev) => shiftFocusDate(prev, viewMode, 1))}>
-                  {viewMode === 'month' ? 'Next month' : viewMode === 'day' ? 'Next day' : 'Next week'}
-                </button>
-                <Link className="button secondary operator-compact-button" href="/dashboard/bookings">
-                  Booking queue
-                </Link>
-                <label className="button secondary operator-compact-button" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  <input
-                    type="checkbox"
-                    checked={showTechnicianOverlay}
-                    onChange={(event) => setShowTechnicianOverlay(event.target.checked)}
-                    data-testid="calendar-technician-overlay-toggle"
-                  />
-                  {workforceTerms.singular} overlay
-                </label>
               </div>
+              <label>
+                <span>Location</span>
+                <select className="input" value={selectedLocationId} onChange={(event) => setSelectedLocationId(event.target.value)}>
+                  <option value="ALL">All locations</option>
+                  {locationOptions.map((loc) => (
+                    <option key={loc.id} value={loc.id}>{loc.label}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>{workforceTerms.singular}</span>
+                <select className="input" value={selectedTechId} onChange={(event) => setSelectedTechId(event.target.value)}>
+                  <option value="ALL">All {workforceTerms.plural.toLowerCase()}</option>
+                  {technicianFilterOptions.map((tech) => (
+                    <option key={tech.id} value={tech.id}>{tech.name || tech.email}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="calendar-toggle-pill">
+                <input
+                  type="checkbox"
+                  checked={showTechnicianOverlay}
+                  onChange={(event) => setShowTechnicianOverlay(event.target.checked)}
+                  data-testid="calendar-technician-overlay-toggle"
+                />
+                {workforceTerms.singular} overlay
+              </label>
+              <span className="calendar-mode-badge" data-testid="calendar-planning-mode-status">{planningStatusLabel}</span>
+              <span className="calendar-mode-badge" data-testid="calendar-booking-basis">{bookingBasisLabel}</span>
+            </div>
+          </section>
+
+          <section className="calendar-snapshot-grid" aria-label="Calendar snapshot">
+            <article className="mt-surface-note">
+              <span>Bookings</span>
+              <strong>{data?.blocks?.length || 0}</strong>
+            </article>
+            <article className="mt-surface-note">
+              <span>{workforceTerms.plural} working</span>
+              <strong>{technicians.filter((tech) => tech.id !== '__unassigned__').length}</strong>
+            </article>
+            <article className="mt-surface-note" data-testid="operations-capacity-summary">
+              <span>Capacity</span>
+              <strong>{capacitySummary.available > 0 ? `${capacitySummary.utilization}%` : 'Not available'}</strong>
+            </article>
+            <article className="mt-surface-note">
+              <span>Warnings</span>
+              <strong>{operationIssueRows.length}</strong>
+            </article>
+          </section>
+
+          <section className="card operator-section calendar-warning-summary" data-testid="operations-actionable-warnings">
+            <div className="operator-section__header">
+              <div>
+                <h2 className="operator-section__title">Warnings</h2>
+                <p className="operator-section__subtitle">{operationIssueRows.length ? `${operationIssueRows.length} scheduling issue${operationIssueRows.length === 1 ? '' : 's'}` : 'No scheduling issues'}</p>
+              </div>
+              <Link className="button secondary operator-compact-button" href="/dashboard/scheduling">
+                Open scheduling
+              </Link>
+            </div>
+            {operationIssueRows.length ? (
+              <div className="calendar-warning-list">
+                {operationIssueRows.slice(0, 4).map((row) => (
+                  <Link key={row.id} className="operator-mini-card mt-linkCard" href={row.href} data-testid={`operations-warning-${row.id}`}>
+                    <strong>{row.label}</strong>
+                    <span className="muted">{row.detail}</span>
+                    <span className={row.severity === 'critical' ? 'badge warn' : 'badge'}>{row.severity === 'critical' ? 'Needs action' : 'Review'}</span>
+                  </Link>
+                ))}
+              </div>
+            ) : null}
+            <div className="visually-hidden" data-testid="calendar-missing-cover">
+              {missingCoverRows.length ? missingCoverRows.map((row) => `${row.label}: ${row.detail}`).join(' ') : 'No scheduling issues'}
+            </div>
+          </section>
+
+          <div className="card operator-section calendar-main-surface">
+            <div className="operator-section__header">
+              <div>
+                <h2 className="operator-section__title">
+                  {planningMode === 'rota'
+                    ? viewMode === 'month' ? 'Monthly rota' : viewMode === 'day' ? `Daily ${workforceTerms.singular.toLowerCase()} rota` : `Weekly ${workforceTerms.singular.toLowerCase()} rota`
+                    : viewMode === 'month' ? 'Monthly bookings' : viewMode === 'day' ? 'Daily bookings' : 'Weekly bookings'}
+                </h2>
+              </div>
+              <Link className="button secondary operator-compact-button" href="/dashboard/bookings">
+                Booking queue
+              </Link>
             </div>
 
         <OperatorSavedViews
@@ -1781,15 +1784,15 @@ export default function CalendarPage() {
         <OperatorFilterBar
           searchValue={search}
           onSearchChange={setSearch}
-          searchPlaceholder={`Search customer, job ref, ${workforceTerms.singular.toLowerCase()}, or location`}
+          searchPlaceholder="Search bookings..."
           resultsLabel={`${filteredBlocks.length} visible bookings`}
-          actions={[
+          actions={activeFilters.length ? [
             {
               label: 'Reset filters',
               variant: 'secondary',
               onClick: clearFilters,
             },
-          ]}
+          ] : undefined}
         >
           <OperatorFilterField label={workforceTerms.singular}>
             <select className="input" value={selectedTechId} onChange={(event) => setSelectedTechId(event.target.value)}>
@@ -1843,56 +1846,6 @@ export default function CalendarPage() {
         {schedulingEnabled && scheduleError ? (
           <p className="muted" style={{ marginTop: 6, fontSize: 12 }}>Schedule overlay: {scheduleError}</p>
         ) : null}
-        <section className="operator-grid operator-grid--two" style={{ marginTop: 12 }} data-testid="calendar-booking-mode-summary">
-          <article className="mt-surface-note" data-testid="calendar-booking-basis">
-            <strong>{bookingMode === 'EMPLOYEE' ? 'Employee-based booking' : bookingMode === 'HYBRID' ? 'Hybrid booking' : 'Location-based booking'}</strong>
-            <p className="muted" style={{ margin: '6px 0 0 0' }}>
-              {bookingMode === 'EMPLOYEE'
-                ? 'Calendar prioritises employee and staff availability.'
-                : bookingMode === 'HYBRID'
-                  ? 'Calendar shows location demand alongside staff rota coverage.'
-                  : 'Calendar prioritises location availability and flags missing staff cover.'}
-            </p>
-          </article>
-          <article className="mt-surface-note" data-testid="calendar-missing-cover">
-            <strong>Missing cover</strong>
-            {missingCoverRows.length ? (
-              <div style={{ display: 'grid', gap: 6, marginTop: 8 }}>
-                {missingCoverRows.map((row) => (
-                  <p key={row.id} className="muted" style={{ margin: 0 }}>
-                    {row.label}: {row.detail}
-                  </p>
-                ))}
-              </div>
-            ) : (
-              <p className="muted" style={{ margin: '6px 0 0 0' }}>No missing staff cover in this view.</p>
-            )}
-          </article>
-        </section>
-        <section className="card operator-section" style={{ marginTop: 12 }} data-testid="operations-actionable-warnings">
-          <div className="operator-section__header">
-            <div>
-              <h2 className="operator-section__title">Actionable warnings</h2>
-              <p className="operator-section__subtitle">Missing cover, unassigned work, double bookings, rota conflicts, and capacity issues link to the affected booking.</p>
-            </div>
-            <Link className="button secondary operator-compact-button" href="/dashboard/scheduling">
-              Open scheduling
-            </Link>
-          </div>
-          {operationIssueRows.length ? (
-            <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
-              {operationIssueRows.map((row) => (
-                <Link key={row.id} className="operator-mini-card mt-linkCard" href={row.href} data-testid={`operations-warning-${row.id}`}>
-                  <strong>{row.label}</strong>
-                  <span className="muted">{row.detail}</span>
-                  <span className={row.severity === 'critical' ? 'badge warn' : 'badge'}>{row.severity === 'critical' ? 'Needs action' : 'Review'}</span>
-                </Link>
-              ))}
-            </div>
-          ) : (
-            <p className="muted" style={{ margin: '12px 0 0 0' }}>No actionable scheduling warnings in this view.</p>
-          )}
-        </section>
         {visibleQueue.length ? (
           <div style={{ marginTop: 12 }}>
             <OperatorDataTable columns="minmax(220px, 1.5fr) minmax(170px, 1fr) minmax(130px, 0.8fr) minmax(150px, auto)">
@@ -1939,10 +1892,16 @@ export default function CalendarPage() {
         ) : null}
         {data && filteredBlocks.length === 0 ? (
           <div className="card" data-testid="calendar-empty-state" style={{ marginTop: 12, padding: 18 }}>
-            <strong>No bookings in this view</strong>
-            <p className="muted" style={{ marginTop: 6, marginBottom: 0 }}>
-              Try another date range or clear filters to see more scheduled work.
-            </p>
+            <strong>{activeFilters.length ? 'No bookings match these filters.' : 'Nothing scheduled'}</strong>
+            {activeFilters.length ? (
+              <button className="button secondary operator-compact-button" type="button" onClick={clearFilters} style={{ marginTop: 10 }}>
+                Clear filters
+              </button>
+            ) : (
+              <Link className="button secondary operator-compact-button" href="/dashboard/bookings" style={{ marginTop: 10 }}>
+                Create booking
+              </Link>
+            )}
           </div>
         ) : null}
         {toastState ? (

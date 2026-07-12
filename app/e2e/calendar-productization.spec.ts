@@ -16,15 +16,21 @@ test.describe("calendar productization", () => {
     await installApiProxy(page, request);
     await loginAs(page, request, "e2e.operator@mytitan.local", "MyTitanE2E!2026");
     await page.goto("/dashboard/calendar");
+    await expect(page.getByTestId("calendar-premium-header").getByRole("heading", { name: "Calendar" })).toBeVisible();
+    await expect(page.getByTestId("calendar-create-booking")).toBeVisible();
+    await expect(page.getByTestId("operations-command-lenses")).toBeVisible();
+    await expect(page.getByTestId("operations-actionable-warnings")).toHaveCount(1);
     await expect(page.getByTestId("calendar-view-toggle-day")).toBeVisible();
-    await page.getByPlaceholder("Search customer, job ref, technician, or location").fill("no matching bookings");
+    await page.getByPlaceholder("Search bookings...").fill("no matching bookings");
     await page.getByTestId("calendar-view-toggle-day").click();
     await expect(page.getByTestId("calendar-empty-state")).toBeVisible();
     await page.getByTestId("calendar-view-toggle-week").click();
     await expect(page.getByTestId("calendar-empty-state")).toBeVisible();
     await page.getByTestId("calendar-view-toggle-month").click();
     await expect(page.getByTestId("calendar-month-grid")).toBeVisible();
-    await expect(page.getByTestId("calendar-empty-state")).toContainText(/No bookings/i);
+    await expect(page.getByTestId("calendar-empty-state")).toContainText(/No bookings match these filters/i);
+    await expect(page.locator("body")).not.toContainText("Provider-neutral directions links");
+    await expect(page.locator("body")).not.toContainText("No actionable scheduling warnings in this view");
   });
 
   test("rescheduling a booking in the calendar persists after reload", async ({ page, request }) => {
