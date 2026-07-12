@@ -102,6 +102,7 @@ test.describe("booking finance", () => {
     await expect(page.getByRole("heading", { name: "Finance summary" })).toBeVisible();
     await expect(page.getByText(/VAT|setup needed/i).first()).toBeVisible();
     await expect(page.getByRole("heading", { name: "Customer balances" })).toBeVisible();
+    await page.getByRole("button", { name: /Invoices/i }).click();
     await expect(page.getByRole("heading", { name: "Invoice records" })).toBeVisible();
   });
 

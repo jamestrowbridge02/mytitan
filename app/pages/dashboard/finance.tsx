@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { DashboardShell } from '../../components/dashboard-shell';
-import { OperatorPageHeader, OperatorStatusBadge } from '../../components/ui/operator-page';
+import { OperatorSavedViews, OperatorStatusBadge } from '../../components/ui/operator-page';
 import { OperatorNotice } from '../../components/feedback/OperatorNotice';
 import { useOperatorNotice } from '../../components/feedback/useOperatorNotice';
 import { apiFetch } from '../../lib/api';
@@ -170,6 +170,15 @@ function toCsvValue(value: unknown) {
   return `"${raw.replaceAll('"', '""')}"`;
 }
 
+function toMoneyInput(cents: number) {
+  return ((cents || 0) / 100).toFixed(2);
+}
+
+function moneyInputToCents(value: string) {
+  const normalized = String(value || '0').replace(/[^\d.-]/g, '');
+  return Math.round(Number(normalized || 0) * 100);
+}
+
 export default function FinancePage() {
   const { settings } = useTenantSettings();
   const { notice, showError, showSuccess, clearNotice } = useOperatorNotice();
@@ -198,6 +207,8 @@ export default function FinancePage() {
   const [paymentRecipient, setPaymentRecipient] = useState('');
   const [paymentProvider, setPaymentProvider] = useState<'manual' | 'stripe-connect'>('manual');
   const [paymentDelivery, setPaymentDelivery] = useState<'email' | 'copy_link'>('email');
+  const [activeTab, setActiveTab] = useState<'overview' | 'invoices' | 'payment-requests' | 'statements' | 'reconciliation'>('overview');
+  const [paymentRequestOpen, setPaymentRequestOpen] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -296,7 +307,9 @@ export default function FinancePage() {
     const selectedInvoice = data?.invoices.find((invoice) => invoice.jobId === paymentJobId);
     const selectedCustomer = data?.customerBalances.find((customer) => customer.customerId === paymentCustomerId);
     const selectedStatement = statements.find((statement) => statement.id === paymentStatementId);
-    const amountCents = Number(paymentAmount || selectedInvoice?.unpaidAmountCents || selectedStatement?.openBalanceCents || selectedCustomer?.unpaidCents || 0);
+    const amountCents = paymentAmount
+      ? moneyInputToCents(paymentAmount)
+      : Number(selectedInvoice?.unpaidAmountCents || selectedStatement?.openBalanceCents || selectedCustomer?.unpaidCents || 0);
     if (!amountCents || amountCents <= 0) {
       showError('Enter an amount above £0.00.');
       return;
@@ -333,6 +346,7 @@ export default function FinancePage() {
       setPaymentAmount('');
       setPaymentDescription('');
       setPaymentRecipient('');
+      setPaymentRequestOpen(false);
       await load();
     } catch (err: any) {
       showError(err?.message || 'Payment request could not be created.');
@@ -351,11 +365,10 @@ export default function FinancePage() {
     const primaryMoneyOwed = data.summary.totalsByCurrency[0]?.unpaidCents || 0;
     const primaryOverdue = data.summary.totalsByCurrency[0]?.overdueCents || 0;
     return [
-      { label: 'Money owed', value: formatMoney(primaryMoneyOwed, primaryCurrency), hint: `${data.summary.moneyOwedCount} open invoices` },
+      { id: 'outstanding', label: 'Outstanding', value: formatMoney(primaryMoneyOwed, primaryCurrency), hint: `${data.summary.moneyOwedCount} open invoices` },
       { label: 'Overdue', value: formatMoney(primaryOverdue, primaryCurrency), hint: `${data.summary.overdueCount} overdue invoices` },
-      { label: 'Paid', value: String(data.summary.paidCount), hint: 'Invoices marked paid' },
-      { label: 'Manual review', value: String(data.summary.manualReviewCount || 0), hint: 'Reconciliation items needing finance sign-off' },
-      { label: 'VAT', value: data.taxSummary.configured ? 'Configured' : 'Setup needed', hint: data.taxSummary.guidance },
+      { label: 'Collected', value: String(data.summary.paidCount), hint: 'Invoices marked paid' },
+      { label: 'Needs review', value: String(data.summary.manualReviewCount || 0), hint: 'Reconciliation items needing finance sign-off' },
     ];
   }, [data, settings?.defaultCurrency]);
 
@@ -429,7 +442,7 @@ export default function FinancePage() {
         method: 'POST',
         body: JSON.stringify({
           jobId: selectedJobId,
-          amountCents: Number(refundAmount),
+          amountCents: moneyInputToCents(refundAmount),
           reason: refundReason,
           mode: 'manual_record',
         }),
@@ -453,7 +466,7 @@ export default function FinancePage() {
         method: 'POST',
         body: JSON.stringify({
           jobId: selectedJobId,
-          amountCents: Number(adjustmentAmount),
+          amountCents: moneyInputToCents(adjustmentAmount),
           direction: adjustmentDirection,
           reason: adjustmentReason,
         }),
@@ -509,34 +522,63 @@ export default function FinancePage() {
   return (
     <DashboardShell>
       <div className="operator-stack">
-        <OperatorPageHeader
-          eyebrow="Finance"
-          title="Finance"
-          info="Review money owed, paid records, VAT reporting fields, exports, and manual reconciliation."
-          actions={[
-            { label: 'Create payment request', onClick: () => document.getElementById('create-payment-request')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) },
-            { label: 'Create invoice', href: '/dashboard/jobs/new', variant: 'secondary' },
-            { label: 'Statements', onClick: () => document.getElementById('statements')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), variant: 'secondary' },
-            { label: 'Record manual payment', onClick: () => document.getElementById('refunds')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), variant: 'secondary' },
-            { label: 'Record adjustment', onClick: () => document.getElementById('refunds')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), variant: 'secondary' },
-            { label: 'Review reconciliation', onClick: () => document.getElementById('reconciliation')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), variant: 'secondary' },
-            { label: 'Export CSV', onClick: exportCsv, variant: 'secondary' },
-            { label: 'Open settings', href: '/dashboard/settings?tab=general' },
-          ]}
-          shortcuts={['Money pending out only appears when authoritative data exists', 'No totals are invented from non-billing records']}
-          stats={stats}
-        />
+        <header className="premium-page-header" data-testid="finance-premium-header">
+          <div>
+            <h1>Finance</h1>
+            <p>Invoices, payments and reconciliation</p>
+          </div>
+          <div className="premium-page-header__actions">
+            <Link className="button secondary" href="/dashboard/jobs/new">Create invoice</Link>
+            <button
+              className="button"
+              type="button"
+              onClick={() => {
+                setActiveTab('payment-requests');
+                setPaymentRequestOpen(true);
+              }}
+            >
+              Payment request
+            </button>
+            <button className="button secondary" type="button" onClick={exportCsv}>Export</button>
+            <Link className="button ghost" href="/dashboard/settings?tab=general">Settings</Link>
+          </div>
+        </header>
+
+        {stats.length ? (
+          <section className="premium-metric-grid" aria-label="Finance overview">
+            {stats.map((stat) => (
+              <article className="premium-metric-card" key={stat.label}>
+                <span>{stat.label}</span>
+                <strong>{stat.value}</strong>
+                {stat.hint ? <small>{stat.hint}</small> : null}
+              </article>
+            ))}
+          </section>
+        ) : null}
+
+        <section className="card operator-section" aria-label="Finance views">
+          <OperatorSavedViews
+            views={[
+              { id: 'overview', label: 'Overview' },
+              { id: 'invoices', label: 'Invoices', count: data?.invoices.length || 0 },
+              { id: 'payment-requests', label: 'Payment requests', count: data?.paymentRequests?.length || 0 },
+              { id: 'statements', label: 'Statements', count: statements.length },
+              { id: 'reconciliation', label: 'Reconciliation', count: data?.reconciliationQueue?.length || 0 },
+            ]}
+            activeView={activeTab}
+            onChange={(view) => setActiveTab(view as typeof activeTab)}
+          />
+        </section>
 
         <OperatorNotice notice={notice} onDismiss={clearNotice} />
 
-        {data ? (
+        {data && activeTab === 'payment-requests' && paymentRequestOpen ? (
           <section className="card operator-section" id="create-payment-request" data-testid="finance-create-payment-request">
             <div className="operator-section__header">
               <div>
                 <h2 className="operator-section__title">Create payment request</h2>
-                <p className="operator-section__subtitle">Use the business customer-payment provider only. MyTitan Billing Stripe is never used for customer money.</p>
               </div>
-              <OperatorStatusBadge label="Provider-aware" tone="success" />
+              <button className="button secondary" type="button" onClick={() => setPaymentRequestOpen(false)}>Close</button>
             </div>
             <div className="three-col">
               <label>
@@ -554,7 +596,7 @@ export default function FinancePage() {
                   <select className="input" value={paymentJobId} onChange={(event) => {
                     const invoice = data.invoices.find((row) => row.jobId === event.target.value);
                     setPaymentJobId(event.target.value);
-                    setPaymentAmount(invoice?.unpaidAmountCents ? String(invoice.unpaidAmountCents) : '');
+                    setPaymentAmount(invoice?.unpaidAmountCents ? toMoneyInput(invoice.unpaidAmountCents) : '');
                     setPaymentRecipient('');
                   }}>
                     <option value="">Choose invoice</option>
@@ -570,7 +612,7 @@ export default function FinancePage() {
                   <select className="input" value={paymentCustomerId} onChange={(event) => {
                     const customer = data.customerBalances.find((row) => row.customerId === event.target.value);
                     setPaymentCustomerId(event.target.value);
-                    setPaymentAmount(customer?.unpaidCents ? String(customer.unpaidCents) : '');
+                    setPaymentAmount(customer?.unpaidCents ? toMoneyInput(customer.unpaidCents) : '');
                   }}>
                     <option value="">Choose customer</option>
                     {data.customerBalances.filter((row) => row.customerId).map((row) => (
@@ -585,7 +627,7 @@ export default function FinancePage() {
                   <select className="input" value={paymentStatementId} onChange={(event) => {
                     const statement = statements.find((row) => row.id === event.target.value);
                     setPaymentStatementId(event.target.value);
-                    setPaymentAmount(statement?.openBalanceCents ? String(statement.openBalanceCents) : '');
+                    setPaymentAmount(statement?.openBalanceCents ? toMoneyInput(statement.openBalanceCents) : '');
                   }}>
                     <option value="">Choose statement</option>
                     {statements.map((statement) => (
@@ -595,8 +637,8 @@ export default function FinancePage() {
                 </label>
               ) : null}
               <label>
-                <span>Amount in pence</span>
-                <input className="input" type="number" min="1" step="1" value={paymentAmount} onChange={(event) => setPaymentAmount(event.target.value)} />
+                <span>Amount</span>
+                <input className="input" inputMode="decimal" value={paymentAmount} onChange={(event) => setPaymentAmount(event.target.value)} />
               </label>
               <label>
                 <span>Provider</span>
@@ -621,18 +663,16 @@ export default function FinancePage() {
                 <input className="input" type="text" value={paymentDescription} onChange={(event) => setPaymentDescription(event.target.value)} placeholder="Invoice balance, deposit, or agreed payment" />
               </label>
             </div>
-            <p className="muted">Review before sending: recipient, amount, provider, expiry, business branding, Reply-To, and related record are included. A request is not proof of payment.</p>
             <button className="button" type="button" disabled={actionBusy} onClick={() => void createPaymentRequest()}>
               {actionBusy ? 'Creating...' : 'Create payment request'}
             </button>
           </section>
         ) : null}
 
-        <section className="card operator-section" id="refunds">
+        <section className="card operator-section" id="finance-filters">
           <div className="operator-section__header">
             <div>
               <h2 className="operator-section__title">Filters</h2>
-              <p className="operator-section__subtitle">Limit the report window without changing the underlying invoice truth.</p>
             </div>
           </div>
           <div className="two-col">
@@ -663,11 +703,10 @@ export default function FinancePage() {
           </div>
         </section>
 
-        <section className="card operator-section">
+        {activeTab === 'overview' ? <section className="card operator-section">
           <div className="operator-section__header">
             <div>
               <h2 className="operator-section__title">Finance summary</h2>
-              <p className="operator-section__subtitle">Compact collections visibility with one dominant next action per area.</p>
             </div>
           </div>
           {loading && !data ? <p className="muted">Loading finance report...</p> : null}
@@ -678,7 +717,6 @@ export default function FinancePage() {
                 {data.summary.moneyPendingInByCurrency.map((row) => (
                   <p key={row.currency}>{formatMoney(row.amountCents, row.currency)}</p>
                 ))}
-                <p>Use the invoice table below to chase the next real payment.</p>
               </article>
               <article className="booking-lifecycle-card">
                 <strong>Overdue</strong>
@@ -689,7 +727,6 @@ export default function FinancePage() {
               <article className="booking-lifecycle-card">
                 <strong>Tax / VAT records</strong>
                 <p>{data.taxSummary.configured ? `VAT ${data.settings.vatNumber || 'configured'}` : 'VAT setup needed'}</p>
-                <p>{data.taxSummary.guidance}</p>
                 <p>Invoice prefix: {data.settings.invoiceNumberPrefix || 'None'}</p>
               </article>
               <article className="booking-lifecycle-card">
@@ -710,15 +747,15 @@ export default function FinancePage() {
               </article>
             </div>
           ) : null}
-        </section>
+        </section> : null}
 
-        {data ? (
+        {data && activeTab === 'payment-requests' ? (
           <section className="card operator-section" id="payment-requests" data-testid="finance-payment-request-section">
             <div className="operator-section__header">
               <div>
                 <h2 className="operator-section__title">Payment requests</h2>
-                <p className="operator-section__subtitle">Draft, sent, viewed, paid, failed, expired, cancelled and review states for provider-backed collection instructions.</p>
               </div>
+              <button className="button secondary" type="button" onClick={() => setPaymentRequestOpen(true)}>Create payment request</button>
             </div>
             <div className="operator-table" data-testid="finance-payment-requests">
               {(data.paymentRequests || []).slice(0, 20).map((request) => (
@@ -754,17 +791,16 @@ export default function FinancePage() {
                   </div>
                 </div>
               ))}
-              {!(data.paymentRequests || []).length ? <p className="muted">No payment requests yet. Use Create payment request to send one through the business payment provider.</p> : null}
+              {!(data.paymentRequests || []).length ? <div className="premium-empty-state"><h3>No payment requests yet</h3><button className="button" type="button" onClick={() => setPaymentRequestOpen(true)}>Create payment request</button></div> : null}
             </div>
           </section>
         ) : null}
 
-        {data ? (
+        {data && activeTab === 'reconciliation' ? (
           <section className="card operator-section" id="reconciliation" data-testid="finance-reconciliation-queue">
             <div className="operator-section__header">
               <div>
                 <h2 className="operator-section__title">Reconciliation queue</h2>
-                <p className="operator-section__subtitle">Review real payment states, evidence, missing references, and overdue balances without inventing revenue.</p>
               </div>
               <button className="button secondary" type="button" disabled={actionBusy || !(data.reconciliationQueue || []).some((item) => item.paymentRequestId && !item.reviewedAt)} onClick={() => void bulkReviewVisible()}>
                 Mark visible reviewed
@@ -804,11 +840,10 @@ export default function FinancePage() {
           </section>
         ) : null}
 
-        <section className="card operator-section">
+        {data && activeTab === 'invoices' ? <section className="card operator-section" id="refunds">
           <div className="operator-section__header">
             <div>
               <h2 className="operator-section__title">Refunds and adjustments</h2>
-              <p className="operator-section__subtitle">Record manual balance changes truthfully. Stripe refunds only run where a real Stripe payment exists.</p>
             </div>
           </div>
           <div className="two-col">
@@ -826,10 +861,10 @@ export default function FinancePage() {
             <div className="booking-summary-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
               <article className="booking-lifecycle-card">
                 <strong>Manual refund</strong>
-                <input className="input" type="number" min="1" step="1" placeholder="Amount in pence" value={refundAmount} onChange={(event) => setRefundAmount(event.target.value)} />
+                <input className="input" inputMode="decimal" placeholder="Amount" value={refundAmount} onChange={(event) => setRefundAmount(event.target.value)} />
                 <input className="input" type="text" placeholder="Reason" value={refundReason} onChange={(event) => setRefundReason(event.target.value)} />
                 <button className="button" type="button" disabled={actionBusy || !selectedJobId || !refundAmount} onClick={() => void submitRefund()}>
-                  {actionBusy ? 'Saving...' : 'Refund recorded'}
+                  {actionBusy ? 'Saving...' : 'Record refund'}
                 </button>
               </article>
               <article className="booking-lifecycle-card">
@@ -838,23 +873,22 @@ export default function FinancePage() {
                   <option value="credit">Credit</option>
                   <option value="debit">Debit</option>
                 </select>
-                <input className="input" type="number" min="1" step="1" placeholder="Amount in pence" value={adjustmentAmount} onChange={(event) => setAdjustmentAmount(event.target.value)} />
+                <input className="input" inputMode="decimal" placeholder="Amount" value={adjustmentAmount} onChange={(event) => setAdjustmentAmount(event.target.value)} />
                 <input className="input" type="text" placeholder="Reason" value={adjustmentReason} onChange={(event) => setAdjustmentReason(event.target.value)} />
                 <button className="button secondary" type="button" disabled={actionBusy || !selectedJobId || !adjustmentAmount} onClick={() => void submitAdjustment()}>
-                  {actionBusy ? 'Saving...' : 'Adjustment saved'}
+                  {actionBusy ? 'Saving...' : 'Record adjustment'}
                 </button>
               </article>
             </div>
           </div>
-        </section>
+        </section> : null}
 
         {data ? (
           <>
-            <section className="card operator-section" id="statements" data-testid="finance-statements">
+            {activeTab === 'statements' ? <section className="card operator-section" id="statements" data-testid="finance-statements">
               <div className="operator-section__header">
                 <div>
                   <h2 className="operator-section__title">Account statements</h2>
-                  <p className="operator-section__subtitle">Group issued invoices into a dated customer statement, then send the generated PDF.</p>
                 </div>
               </div>
               <div className="three-col">
@@ -886,13 +920,12 @@ export default function FinancePage() {
                 ))}
                 {!statements.length ? <p className="muted">No statements generated yet.</p> : null}
               </div>
-            </section>
+            </section> : null}
 
-            <section className="card operator-section" id="invoice-records">
+            {activeTab === 'overview' ? <section className="card operator-section" id="invoice-records">
               <div className="operator-section__header">
                 <div>
                   <h2 className="operator-section__title">Customer balances</h2>
-                  <p className="operator-section__subtitle">Customers with the most money still pending in.</p>
                 </div>
               </div>
               <div className="operator-table">
@@ -912,13 +945,12 @@ export default function FinancePage() {
                   </div>
                 ))}
               </div>
-            </section>
+            </section> : null}
 
-            <section className="card operator-section">
+            {activeTab === 'overview' ? <section className="card operator-section">
               <div className="operator-section__header">
                 <div>
                   <h2 className="operator-section__title">Booking deposit records</h2>
-                  <p className="operator-section__subtitle">Webhook-backed deposit payment and refund truth for public bookings.</p>
                 </div>
               </div>
               <div className="operator-table">
@@ -944,13 +976,12 @@ export default function FinancePage() {
                   </div>
                 ))}
               </div>
-            </section>
+            </section> : null}
 
-            <section className="card operator-section">
+            {activeTab === 'invoices' ? <section className="card operator-section">
               <div className="operator-section__header">
                 <div>
                   <h2 className="operator-section__title">Invoice records</h2>
-                  <p className="operator-section__subtitle">Invoice date, customer, net, tax, gross, payment state, and next action.</p>
                 </div>
               </div>
               <div className="operator-table">
@@ -995,7 +1026,7 @@ export default function FinancePage() {
                   </div>
                 ))}
               </div>
-            </section>
+            </section> : null}
           </>
         ) : null}
       </div>

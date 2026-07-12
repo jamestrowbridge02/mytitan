@@ -68,6 +68,7 @@ test.describe("final go/no-go current-state audit", () => {
     const before = await beforeResponse.json();
 
     await page.goto("/dashboard/finance", { waitUntil: "networkidle" });
+    await page.getByRole("button", { name: /Statements/i }).click();
     const customer = page.getByTestId("statement-customer");
     await expect(customer).toBeVisible();
     const options = await customer.locator("option").evaluateAll((nodes) =>
