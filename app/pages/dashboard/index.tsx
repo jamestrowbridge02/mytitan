@@ -342,8 +342,8 @@ export default function Dashboard() {
 
         <header className="dashboard-premium-header">
           <div>
-            <p className="dashboard-premium-kicker">Dashboard</p>
-            <h1>{displayName(me) ? `${greeting()}, ${displayName(me)}` : greeting()}</h1>
+            <h1 className="dashboard-premium-title">Dashboard</h1>
+            <p className="dashboard-premium-greeting">{displayName(me) ? `${greeting()}, ${displayName(me)}` : greeting()}</p>
             <p className="dashboard-premium-meta">{businessName(settings, me)} · {formatDate()}</p>
           </div>
           <div className="dashboard-premium-header__actions">
