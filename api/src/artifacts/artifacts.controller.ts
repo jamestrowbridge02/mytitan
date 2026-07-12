@@ -100,18 +100,21 @@ export class ArtifactsController {
     const headerLabel = typeof req?.headers?.["x-artifact-label"] === "string" ? req.headers["x-artifact-label"] : null;
     const requestBody = (req?.body || {}) as Record<string, any>;
     const requestQuery = (req?.query || {}) as Record<string, any>;
+    const firstText = (...values: unknown[]) => {
+      for (const value of values) {
+        if (typeof value !== "string") continue;
+        const clean = value.trim();
+        if (clean) return clean;
+      }
+      return null;
+    };
     return this.artifacts.createFromUpload({
       tenantId: user.companyId,
       userId: user.sub,
       entityType,
       entityId,
-      label:
-        typeof body?.label === "string" ? body.label :
-        typeof query?.label === "string" ? query.label :
-        typeof requestBody?.label === "string" ? requestBody.label :
-        typeof requestQuery?.label === "string" ? requestQuery.label :
-        headerLabel,
-      kind: typeof body?.kind === "string" ? body.kind : typeof query?.kind === "string" ? query.kind : "",
+      label: firstText(body?.label, requestBody?.label, headerLabel, query?.label, requestQuery?.label),
+      kind: firstText(body?.kind, requestBody?.kind, query?.kind, requestQuery?.kind) || "",
       portalVisible: body?.portalVisible ?? query?.portalVisible,
       file,
     });

@@ -1482,10 +1482,26 @@ async function ensurePublicToken(token, jobId, expiresAt) {
 }
 
 async function ensureActivityEvent(id, payload) {
+  const payloadJson =
+    payload.payloadJson && typeof payload.payloadJson === "object" && !Array.isArray(payload.payloadJson)
+      ? payload.payloadJson
+      : {};
+  const markedPayload = {
+    ...payload,
+    payloadJson: {
+      ...payloadJson,
+      activityScope: "VALIDATION_E2E_ACTIVITY",
+      tenantVisible: false,
+      fixture: true,
+      validation: true,
+      source: "seed:e2e",
+      environment: "validation",
+    },
+  };
   await prisma.activityEvent.upsert({
     where: { id },
-    create: { id, ...payload },
-    update: payload,
+    create: { id, ...markedPayload },
+    update: markedPayload,
   });
 }
 

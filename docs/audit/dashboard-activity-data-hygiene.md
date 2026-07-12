@@ -11,14 +11,16 @@ Date: 2026-07-12
 - `ActivityController` now requires JWT authentication.
 - Recent activity derives tenant scope from `CurrentUser.companyId`; client-supplied tenant scope is no longer accepted for the tenant Dashboard API.
 - Event creation endpoints derive `tenantId` from the authenticated user.
-- `ActivityService.list` defaults to hiding validation-style activity using structured `payloadJson` markers (`fixture`, `e2e`, `validation`, `source`, `environment`) and a legacy fallback for already-seeded validation rows.
-- Callers that need validation activity for diagnostics must opt in with `includeValidation=1`.
+- `ActivityService.getTenantActivity` is now the tenant Dashboard query path. It requires an authenticated company ID, requires `tenantId` equality, applies tenant-visible scope checks, and verifies referenced job/customer subjects still belong to the same company.
+- Tenant activity filtering uses structured `payloadJson` ownership and fixture markers (`activityScope`, `tenantVisible`, `fixture`, `e2e`, `validation`, `demo`, `source`, `environment`). It does not rely on display-label text matching.
+- Tenant users cannot opt into validation activity through Dashboard query parameters. Platform and validation activity must use separate explicit query paths.
+- Event creation rejects missing tenant ownership, missing job subjects, customer/company mismatches, job/company mismatches, and structured validation fixture creation in production runtime.
 
 ## Production Safety
 
 No records are deleted by this change. If production is suspected to contain test-only rows, use an operator-reviewed production operation:
 
-1. Run a read-only query for activity rows with fixture/validation payload markers and legacy E2E references.
+1. Run a read-only query for activity rows with fixture/validation payload markers and ownership scope fields.
 2. Export row IDs, tenant IDs, timestamps, labels, and payload marker fields as evidence.
 3. Confirm tenant ownership and whether the rows are production customer data or test contamination.
 4. Prepare a reviewed cleanup migration or archival operation.
@@ -26,5 +28,4 @@ No records are deleted by this change. If production is suspected to contain tes
 
 ## Residual Risk
 
-Legacy rows without structured markers can only be identified by conservative fallback patterns. New activity creation should use structured markers for validation events.
-
+Legacy rows without structured payload markers are no longer classified by display text in the tenant query. Operator cleanup must therefore use immutable ownership evidence, fixture metadata, environment markers, source system evidence, and subject ownership checks rather than label matching alone.

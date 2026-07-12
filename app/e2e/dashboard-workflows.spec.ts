@@ -69,6 +69,75 @@ test.describe("dashboard workflows", () => {
     await expect(page.locator(".dashboard-secondary-links")).toHaveCount(0);
   });
 
+  test("dashboard activity feed is tenant-owned and excludes platform or validation events", async ({ page, request }) => {
+    await installApiProxy(page, request);
+    await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
+    const token = await getToken(page);
+    const unique = Date.now();
+    const genuineLabel = `Tenant-owned dashboard activity ${unique}`;
+    const validationLabel = `Validation-only dashboard activity ${unique}`;
+
+    const genuineResponse = await requestLocalApi(request, "/activity/events", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      data: {
+        type: "dashboard.tenant-owned",
+        label: genuineLabel,
+        tenantVisible: true,
+        payloadJson: {
+          source: "dashboard-workflow-test",
+        },
+      },
+    });
+    expect(genuineResponse.ok()).toBeTruthy();
+
+    const validationResponse = await requestLocalApi(request, "/activity/events", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      data: {
+        type: "dashboard.validation-only",
+        label: validationLabel,
+        payloadJson: {
+          validation: true,
+          fixture: true,
+          source: "playwright",
+          environment: "validation",
+        },
+      },
+    });
+    expect([201, 400]).toContain(validationResponse.status());
+
+    const missingSubjectResponse = await requestLocalApi(request, "/activity/events", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      data: {
+        type: "dashboard.bad-subject",
+        label: `Bad subject dashboard activity ${unique}`,
+        jobId: `missing-cross-tenant-job-${unique}`,
+      },
+    });
+    expect(missingSubjectResponse.status()).toBe(400);
+
+    const recentResponse = await requestLocalApi(request, "/activity/recent?limit=30&includeValidation=1", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(recentResponse.ok()).toBeTruthy();
+    const recent = await recentResponse.json();
+    const labels = recent.map((row: any) => String(row.label || ""));
+    expect(labels).toContain(genuineLabel);
+    expect(labels).not.toContain(validationLabel);
+    expect(labels.some((label: string) => /Rule E2E compliance exception escalation success|E2E Portal Active|E2E Portal Expired/i.test(label))).toBe(false);
+  });
+
   test("bookings page handles blocked and successful conversion flows", async ({ page, request }) => {
     await installApiProxy(page, request);
     await page.goto("/dashboard/bookings", { waitUntil: "domcontentloaded" });

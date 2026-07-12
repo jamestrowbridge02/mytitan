@@ -83,6 +83,7 @@ export function EntityArtifactsCard({
   const [folderFilter, setFolderFilter] = useState("ALL");
   const [governance, setGovernance] = useState<MediaGovernance | null>(null);
   const labelInputRef = useRef<HTMLInputElement | null>(null);
+  const latestLabelRef = useRef("");
   const labelOverridesRef = useRef<Record<string, string>>({});
   const pendingUploadLabelRef = useRef("");
   const previousEntityKeyRef = useRef(`${entityType}:${entityId}`);
@@ -124,6 +125,7 @@ export function EntityArtifactsCard({
     setPortalVisible(false);
     setFile(null);
     setLabel("");
+    latestLabelRef.current = "";
   }, [entityType, entityId]);
 
   async function upload() {
@@ -139,7 +141,7 @@ export function EntityArtifactsCard({
       const domLabel = typeof document !== "undefined"
         ? document.querySelector<HTMLInputElement>(`input[data-testid="artifact-label-${entityType}"]`)?.value
         : "";
-      const currentLabel = String(labelInputRef.current?.value || domLabel || label || "").trim();
+      const currentLabel = String(labelInputRef.current?.value || domLabel || latestLabelRef.current || label || "").trim();
       pendingUploadLabelRef.current = currentLabel;
       const form = new FormData();
       if (currentLabel) form.append("label", currentLabel);
@@ -167,6 +169,7 @@ export function EntityArtifactsCard({
       }
       setFile(null);
       setLabel("");
+      latestLabelRef.current = "";
       setPortalVisible(false);
       const input = document.querySelector<HTMLInputElement>(`input[data-artifact-input="${entityType}-${entityId}"]`);
       if (input) input.value = "";
@@ -294,7 +297,13 @@ export function EntityArtifactsCard({
             ref={labelInputRef}
             className="input"
             value={label}
-            onChange={(event) => setLabel(event.target.value)}
+            onChange={(event) => {
+              latestLabelRef.current = event.target.value;
+              setLabel(event.target.value);
+            }}
+            onInput={(event) => {
+              latestLabelRef.current = event.currentTarget.value;
+            }}
             placeholder="Label"
             data-testid={`artifact-label-${entityType}`}
           />

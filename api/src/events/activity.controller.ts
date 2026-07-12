@@ -16,14 +16,12 @@ export class ActivityController {
     @Query("jobId") jobId?: string,
     @Query("customerId") customerId?: string,
     @Query("customerName") customerName?: string,
-    @Query("includeValidation") includeValidation?: string,
   ) {
     const n = Number(limit || 12);
-    return this.activity.list(n, user?.companyId || null, {
+    return this.activity.getTenantActivity(user?.companyId || "", n, {
       jobId: jobId || null,
       customerId: customerId || null,
       customerName: customerName || null,
-      includeValidation: includeValidation === "1" || includeValidation === "true",
     });
   }
 
@@ -42,6 +40,7 @@ export class ActivityController {
       status?: string | null;
       vehicleReg?: string | null;
       technicianId?: string | null;
+      tenantVisible?: boolean;
       payloadJson?: any;
     },
   ) {
@@ -56,6 +55,8 @@ export class ActivityController {
       status: body.status ?? null,
       vehicleReg: body.vehicleReg ?? null,
       technicianId: body.technicianId ?? null,
+      actorUserId: user.sub,
+      tenantVisible: body.tenantVisible,
       payloadJson: body.payloadJson ?? null,
     });
   }
@@ -94,6 +95,7 @@ export class ActivityController {
         subject: body.subject ?? null,
         message: body.message ?? "",
         delivered: true,
+        actorUserId: user.sub,
       },
     });
 
