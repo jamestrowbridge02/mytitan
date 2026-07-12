@@ -12,29 +12,35 @@ test.describe("sidebar navigation cleanup", () => {
     await page.mouse.move(600, 200);
     const sidebar = page.getByRole("complementary");
     const dashboardLink = sidebar.getByRole("link", { name: "Dashboard", exact: true });
-    const jobsLink = sidebar.locator('a[href="/dashboard/jobs"]');
     const bookingsLink = sidebar.locator('a[href="/dashboard/bookings"]');
     const collapsedWidth = await sidebar.evaluate((node) => Math.round((node as HTMLElement).getBoundingClientRect().width));
     await expect(dashboardLink).toBeVisible();
-    await expect(sidebar.getByRole("link", { name: "Live Work" })).toBeVisible();
-    await expect(jobsLink).toBeVisible();
+    await expect(sidebar.getByRole("link", { name: "Work", exact: true })).toBeVisible();
     await expect(sidebar.getByRole("link", { name: "Calendar" })).toBeVisible();
-    await expect(sidebar.getByRole("link", { name: "Customer page" })).toBeVisible();
-    await expect(sidebar.getByRole("link", { name: "Payments" })).toBeVisible();
+    await expect(sidebar.getByRole("link", { name: "Customer Portal" })).toBeVisible();
+    await expect(sidebar.getByRole("link", { name: /Finance/ })).toBeVisible();
+    await expect(sidebar.getByRole("link", { name: "Communications" })).toBeVisible();
     await expect(sidebar.getByRole("link", { name: "Team" })).toBeVisible();
     await expect(sidebar.getByRole("link", { name: "Tools" })).toBeVisible();
     await expect(bookingsLink).toBeVisible();
+    await expect(sidebar.getByRole("link", { name: "Enterprise" })).toHaveCount(0);
+    await expect(sidebar.locator('a[href="/dashboard/jobs"]')).toHaveCount(0);
+    await expect(sidebar.getByRole("link", { name: "Live Work" })).toHaveCount(0);
+    await expect(sidebar.getByRole("link", { name: "Payments", exact: true })).toHaveCount(0);
+    await expect(sidebar.getByRole("link", { name: "Revenue" })).toHaveCount(0);
+    await expect(sidebar.getByRole("link", { name: "Billing" })).toHaveCount(0);
     await expect(sidebar.getByRole("link", { name: "General" })).toHaveCount(0);
     await expect(sidebar.getByRole("link", { name: "Job Output" })).toHaveCount(0);
     await expect(sidebar.getByRole("link", { name: "Messages" })).toHaveCount(0);
     await expect(sidebar.getByText("Today at a glance")).toHaveCount(0);
     await sidebar.hover();
-    await expect(sidebar.getByText(/Jobs|Work Orders/)).toBeVisible();
-    await expect(sidebar.getByText("Customer page")).toBeVisible();
-    await expect(sidebar.getByText("Live Work")).toBeVisible();
+    await expect(sidebar.getByText("Operations")).toBeVisible();
+    await expect(sidebar.locator(".mt-sidebar__groupTitle", { hasText: "Finance" })).toBeVisible();
+    await expect(sidebar.getByText("Customer Portal")).toBeVisible();
+    await expect(sidebar.getByRole("link", { name: "Communications" })).toBeVisible();
     await expect(sidebar.getByText("Team")).toBeVisible();
     await expect(sidebar.getByText("Calendar")).toBeVisible();
-    await expect(sidebar.getByText("Payments")).toBeVisible();
+    await expect(sidebar.getByRole("link", { name: /Finance/ })).toBeVisible();
     await expect(sidebar.getByText("Tools")).toBeVisible();
     await expect(sidebar.getByText(/Bookings|Requests/)).toBeVisible();
     await expect(sidebar.getByText("Today at a glance")).toHaveCount(0);
@@ -95,23 +101,23 @@ test.describe("sidebar navigation cleanup", () => {
 
   test("sidebar highlights only the current route", async ({ page, request }) => {
     await installApiProxy(page, request);
-    await page.goto("/dashboard/service-plans");
+    await page.goto("/dashboard/finance");
     await page.mouse.move(600, 200);
 
     const sidebar = page.getByRole("complementary");
     const dashboardLink = sidebar.getByRole("link", { name: "Dashboard", exact: true });
-    const servicePlansLink = sidebar.getByRole("link", { name: "Plans", exact: true });
+    const financeLink = sidebar.getByRole("link", { name: /Finance/ });
 
-    await expect(servicePlansLink).toHaveAttribute("aria-current", "page");
+    await expect(financeLink).toHaveAttribute("aria-current", "page");
     await expect(dashboardLink).not.toHaveAttribute("aria-current", "page");
     await sidebar.hover();
-    await expect(sidebar.getByText("Plans")).toBeVisible();
+    await expect(sidebar.getByRole("link", { name: /Finance/ })).toBeVisible();
     await expect(sidebar.getByText("Run repeat work on time")).toHaveCount(0);
-    await expect(servicePlansLink).toHaveAttribute("aria-current", "page");
+    await expect(financeLink).toHaveAttribute("aria-current", "page");
 
     await page.goto("/dashboard");
     await expect(dashboardLink).toHaveAttribute("aria-current", "page");
-    await expect(servicePlansLink).not.toHaveAttribute("aria-current", "page");
+    await expect(financeLink).not.toHaveAttribute("aria-current", "page");
   });
 
   test("primary sidebar icons are distinct and settings uses a cog", async ({ page, request }) => {
@@ -119,7 +125,7 @@ test.describe("sidebar navigation cleanup", () => {
     await page.goto("/dashboard");
     const sidebar = page.getByRole("complementary");
     const hrefs = [
-      "/dashboard/jobs",
+      "/dashboard/work",
       "/dashboard/calendar",
       "/dashboard/bookings",
       "/dashboard/customers",
@@ -155,21 +161,24 @@ test.describe("sidebar navigation cleanup", () => {
     const sidebar = page.getByRole("complementary");
     await expect(sidebar.getByRole("link", { name: "Dashboard", exact: true })).toBeVisible();
     await expect(sidebar.getByRole("link", { name: "Work", exact: true })).toBeVisible();
-    await expect(sidebar.locator('a[href="/dashboard/jobs"]')).toBeVisible();
+    await expect(sidebar.locator('a[href="/dashboard/jobs"]')).toHaveCount(0);
     await expect(sidebar.getByRole("link", { name: "Calendar", exact: true })).toBeVisible();
     await expect(sidebar.getByRole("link", { name: /Customers|Vehicles/ })).toBeVisible();
     await expect(sidebar.getByRole("link", { name: "Tools", exact: true })).toHaveCount(0);
     await expect(sidebar.getByRole("link", { name: "Team", exact: true })).toHaveCount(0);
   });
 
-  test("finance sidebar keeps the payments workspace primary", async ({ page, request }) => {
+  test("finance sidebar keeps the finance workspace primary", async ({ page, request }) => {
     await installApiProxy(page, request);
     await loginAs(page, request, fixtureRefs.financeEmail, fixtureRefs.financePassword);
     await page.goto("/dashboard/finance");
 
     const sidebar = page.getByRole("complementary");
     await expect(sidebar.getByRole("link", { name: "Dashboard", exact: true })).toBeVisible();
-    await expect(sidebar.getByRole("link", { name: "Payments", exact: true })).toBeVisible();
+    await expect(sidebar.getByRole("link", { name: /Finance/ })).toBeVisible();
+    await expect(sidebar.getByRole("link", { name: "Payments", exact: true })).toHaveCount(0);
+    await expect(sidebar.getByRole("link", { name: "Revenue", exact: true })).toHaveCount(0);
+    await expect(sidebar.getByRole("link", { name: "Billing", exact: true })).toHaveCount(0);
     await expect(sidebar.getByRole("link", { name: /Customers|Vehicles/ })).toBeVisible();
     await expect(sidebar.getByRole("link", { name: "Team", exact: true })).toHaveCount(0);
   });

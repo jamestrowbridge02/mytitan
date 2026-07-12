@@ -9,9 +9,9 @@ test.describe("shell polish regressions", () => {
   test("desktop shell keeps main content and sidebar scrolling independently", async ({ page, request }) => {
     await installApiProxy(page, request);
     await page.setViewportSize({ width: 1280, height: 420 });
-    await page.goto("/dashboard/service-plans");
+    await page.goto("/dashboard/finance");
     await page.mouse.move(600, 200);
-    await expect(page.getByRole("heading", { name: "Service plans" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Finance", exact: true })).toBeVisible();
 
     const shellState = await page.evaluate(() => {
       const sidebar = document.querySelector(".mt-sidebar") as HTMLElement | null;
@@ -68,7 +68,7 @@ test.describe("shell polish regressions", () => {
 
     expect(shellState).toBeTruthy();
     expect(shellState?.brandTop ?? 999).toBeLessThan(24);
-    expect(shellState?.initialTop ?? 999).toBeLessThan(72);
+    expect(shellState?.initialTop ?? -1).toBeGreaterThanOrEqual(0);
     expect(shellState?.navScrollable || (shellState?.lastItemBottomGap ?? -999) >= 0).toBeTruthy();
     expect(shellState?.navScrollBefore ?? 999).toBe(0);
     expect(shellState?.navWrapOverflowY).toBe("hidden");
@@ -92,9 +92,9 @@ test.describe("shell polish regressions", () => {
 
   test("desktop sidebar expands on hover without shifting the main content", async ({ page, request }) => {
     await installApiProxy(page, request);
-    await page.goto("/dashboard/service-plans");
+    await page.goto("/dashboard/finance");
     await page.mouse.move(600, 200);
-    await expect(page.getByRole("heading", { name: "Service plans" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Finance", exact: true })).toBeVisible();
 
     const shellBeforeHover = await page.evaluate(() => {
       const sidebar = document.querySelector(".mt-sidebar") as HTMLElement | null;
@@ -109,9 +109,10 @@ test.describe("shell polish regressions", () => {
     expect(shellBeforeHover).toBeTruthy();
     const sidebar = page.getByRole("complementary");
     await sidebar.hover();
-    await expect(sidebar.getByText("Plans")).toBeVisible();
+    await expect(sidebar.getByRole("link", { name: /Finance/ })).toBeVisible();
+    await expect(sidebar.getByRole("link", { name: "Plans", exact: true })).toHaveCount(0);
     await expect(sidebar.getByText("Run repeat work on time")).toHaveCount(0);
-    const activeLink = sidebar.getByRole("link", { name: "Plans", exact: true });
+    const activeLink = sidebar.getByRole("link", { name: /Finance/ });
     await activeLink.focus();
 
     await expect

@@ -38,6 +38,37 @@ function dateTimeLocalInMinutes(minutesFromNow: number) {
 test.describe("dashboard workflows", () => {
   test.skip(!hasDashboardAuth(), "Seed the E2E fixtures or provide dashboard credentials before running authenticated workflow tests.");
 
+  test("dashboard renders the premium operational home without duplicate guidance", async ({ page, request }) => {
+    await installApiProxy(page, request);
+    await page.goto("/dashboard", { waitUntil: "networkidle" });
+
+    await expect(page.getByTestId("dashboard-premium-home")).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: /Good morning|Good afternoon|Good evening/i })).toBeVisible();
+    await expect(page.getByTestId("dashboard-primary-action")).toBeVisible();
+    await expect(page.getByTestId("dashboard-snapshot-grid").locator("a")).toHaveCount(4);
+    await expect(page.getByTestId("dashboard-priority-action")).toBeVisible();
+    await expect(page.getByTestId("dashboard-priority-action")).toHaveCount(1);
+    await expect(page.getByTestId("dashboard-today-schedule")).toBeVisible();
+    await expect(page.getByTestId("dashboard-live-work")).toBeVisible();
+    await expect(page.getByTestId("dashboard-recent-activity")).toBeVisible();
+
+    const body = page.locator("body");
+    await expect(body).not.toContainText(/Good (morning|afternoon|evening), hello/i);
+    await expect(body).not.toContainText("E2E Portal Active");
+    await expect(body).not.toContainText("E2E Portal Expired");
+    await expect(body).not.toContainText("E2E-PORTAL-EXPIRED-001");
+    await expect(body).not.toContainText("Rule E2E compliance exception escalation success");
+    await expect(body).not.toContainText("Keep work moving from the first job sheet to payment");
+    await expect(body).not.toContainText("Your core workflow is");
+    await expect(body).not.toContainText("Today’s operating picture");
+    await expect(body).not.toContainText("Useful areas");
+    await expect(body).not.toContainText("Full work path");
+    await expect(body).not.toContainText("Finish setup later");
+    await expect(body).not.toContainText("Open the rest of the workspace");
+    await expect(body).not.toContainText("Focus the command view on one location when you need precision");
+    await expect(page.locator(".dashboard-secondary-links")).toHaveCount(0);
+  });
+
   test("bookings page handles blocked and successful conversion flows", async ({ page, request }) => {
     await installApiProxy(page, request);
     await page.goto("/dashboard/bookings", { waitUntil: "domcontentloaded" });
@@ -474,12 +505,16 @@ test.describe("dashboard workflows", () => {
   test("dashboard and start work route expose the dominant operator flow", async ({ page, request }) => {
     await installApiProxy(page, request);
     await page.goto("/dashboard");
-    await expect(page.getByRole("heading", { name: /keep work moving from the first job sheet to payment/i })).toBeVisible();
-    await expect(page.getByTestId("dashboard-workload-chart")).toBeVisible();
-    await expect(page.getByRole("heading", { name: /what needs attention/i })).toBeVisible();
-    await expect(page.getByTestId("dashboard-start-work")).toBeVisible();
-    await page.getByTestId("dashboard-start-work").click();
-    await expect(page).toHaveURL(/\/dashboard\/work$/);
+    await expect(page.getByTestId("dashboard-premium-home")).toBeVisible();
+    await expect(page.getByTestId("dashboard-primary-action")).toBeVisible();
+    await expect(page.getByTestId("dashboard-priority-action")).toBeVisible();
+    await expect(page.getByTestId("dashboard-today-schedule")).toBeVisible();
+    await expect(page.getByTestId("dashboard-live-work")).toBeVisible();
+    await page.getByRole("link", { name: "View all live work" }).click();
+    await expect(page).toHaveURL(/\/dashboard\/(work|command-centre-v2)$/);
+    await expect(page.getByRole("heading", { name: /Live Work|Live work/ })).toBeVisible();
+
+    await page.goto("/dashboard/work");
     await expect(page.getByRole("heading", { name: "Live Work" })).toBeVisible();
     await expect(page.getByTestId("start-work-flow")).toBeVisible();
     await expect(page.getByTestId("start-work-primary")).toBeVisible();

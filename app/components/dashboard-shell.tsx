@@ -579,11 +579,19 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   ) : null;
 
   const locationScopeCard = locationsEnabled && locationCtx.available.length > 1 ? (
-    <div className="card dashboard-shell__locationCard" data-testid="location-scope-switcher">
+    <div className="card dashboard-shell__locationCard dashboard-shell__locationCard--compact" data-testid="location-scope-switcher">
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
         <div>
-          <strong>Location scope</strong>
-          <p className="muted" style={{ margin: '6px 0 0 0' }}>Focus the command view on one location when you need precision, without changing tenant boundaries.</p>
+          <strong>Location</strong>
+          <span
+            className="dashboard-shell__locationInfo"
+            tabIndex={0}
+            role="img"
+            aria-label="Filter Dashboard metrics and work by location."
+            title="Filter Dashboard metrics and work by location."
+          >
+            i
+          </span>
         </div>
         <select
           className="input dashboard-shell__locationSelect"

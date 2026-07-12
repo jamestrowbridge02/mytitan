@@ -148,16 +148,26 @@ export class ActivityService {
     return created;
   }
 
-  async list(limit = 20, tenantId?: string | null, filters?: { jobId?: string | null; customerId?: string | null; customerName?: string | null }) {
+  private isValidationFixtureEvent(row: any) {
+    const payload = row?.payloadJson && typeof row.payloadJson === "object" ? row.payloadJson : {};
+    if (payload?.fixture === true || payload?.e2e === true || payload?.validation === true) return true;
+    if (payload?.source === "e2e" || payload?.source === "playwright" || payload?.environment === "validation") return true;
+    const legacyNeedle = `${row?.jobRef || ""} ${row?.label || ""} ${row?.customerName || ""}`;
+    return /\b(E2E|Playwright|fixture|seeded)\b/i.test(legacyNeedle);
+  }
+
+  async list(limit = 20, tenantId?: string | null, filters?: { jobId?: string | null; customerId?: string | null; customerName?: string | null; includeValidation?: boolean }) {
     const where: any = {};
     if (tenantId) where.tenantId = tenantId;
     if (filters?.jobId) where.jobId = filters.jobId;
     if (filters?.customerId) where.customerId = filters.customerId;
     if (filters?.customerName) where.customerName = { equals: filters.customerName, mode: "insensitive" };
-    return this.prisma.activityEvent.findMany({
+    const take = Math.max(1, Math.min(limit, 50));
+    const rows = await this.prisma.activityEvent.findMany({
       where,
       orderBy: { at: "desc" },
-      take: Math.max(1, Math.min(limit, 50)),
+      take: filters?.includeValidation ? take : Math.min(take * 3, 150),
     });
+    return (filters?.includeValidation ? rows : rows.filter((row) => !this.isValidationFixtureEvent(row))).slice(0, take);
   }
 }

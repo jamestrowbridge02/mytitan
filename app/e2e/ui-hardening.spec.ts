@@ -266,8 +266,9 @@ test.describe("ui hardening regressions", () => {
     await installApiProxy(page, request);
     await loginAs(page, request, "e2e.operator@mytitan.local", "MyTitanE2E!2026");
     await page.goto("/dashboard");
-    await expect(page.getByRole("heading", { name: "Keep work moving from the first job sheet to payment" })).toBeVisible();
-    await expect(page.getByTestId("dashboard-start-work")).toBeVisible();
+    await expect(page.getByTestId("dashboard-premium-home")).toBeVisible();
+    await expect(page.getByTestId("dashboard-primary-action")).toBeVisible();
+    await expect(page.getByTestId("dashboard-priority-action")).toBeVisible();
 
     await page.goto("/dashboard/jobs");
     await expect(page.getByRole("heading", { name: /Jobs|Work Orders/, exact: true })).toBeVisible();

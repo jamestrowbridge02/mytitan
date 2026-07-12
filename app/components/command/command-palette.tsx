@@ -2,7 +2,7 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import React from "react";
 import { apiFetch } from "../../lib/api";
-import { getBusinessTerms, getCommandCentreHref, getOptionalModuleVisibility } from "../../lib/business-config";
+import { getBusinessTerms, getOptionalModuleVisibility } from "../../lib/business-config";
 import {
   canAccessDashboardHref,
   getOperatorQuickActions,
@@ -82,7 +82,6 @@ export default function CommandPalette() {
   const router = useRouter();
   const { settings } = useTenantSettings();
   const terms = getBusinessTerms(settings);
-  const commandCentreHref = getCommandCentreHref(settings);
   const moduleVisibility = getOptionalModuleVisibility(settings);
   const [open, setOpen] = React.useState(false);
   const [routesOnly, setRoutesOnly] = React.useState(false);
@@ -162,18 +161,18 @@ export default function CommandPalette() {
         },
         {
           id: "command-centre",
-          label: "Live work",
-          href: commandCentreHref,
-          description: "Run the active queue from the command surface.",
-          section: "Complete Work",
-          keywords: ["command centre", "command center", "live work", "queue", "board", "complete work"],
+          label: "Work",
+          href: "/dashboard/work",
+          description: "Assigned, live, draft, ready, completed, and payment follow-up views.",
+          section: "Operations",
+          keywords: ["command centre", "command center", "live work", "queue", "board", "complete work", "assigned", "jobs"],
         },
         {
           id: "jobs",
           label: "Jobs",
           href: "/dashboard/jobs",
           description: "Authoritative work records and follow-through.",
-          section: "Complete Work",
+          section: "Operations",
           keywords: ["jobs", "work orders", "queue", "complete work"],
         },
         {
@@ -181,7 +180,7 @@ export default function CommandPalette() {
           label: `New ${terms.jobs.slice(0, -1) || "Job"}`,
           href: "/dashboard/jobs/new?guided=1&entry=work",
           description: "Open the next job without browsing through setup.",
-          section: "Complete Work",
+          section: "Operations",
           keywords: ["new job", "guided form", "create job", "complete work"],
         },
         {
@@ -189,7 +188,7 @@ export default function CommandPalette() {
           label: "Assign technician",
           href: "/dashboard/scheduling?focus=unassigned",
           description: "Open unassigned work and assignment recommendations.",
-          section: "Book Work",
+          section: "Operations",
           keywords: ["assign technician", "assignment", "unassigned", "schedule", "book work"],
         },
         {
@@ -197,7 +196,7 @@ export default function CommandPalette() {
           label: "Unpaid invoices",
           href: "/dashboard/jobs?filter=unpaid",
           description: "Jump to jobs needing invoice or payment follow-up.",
-          section: "Get Paid",
+          section: "Finance",
           keywords: ["unpaid", "invoice", "payment", "follow up", "get paid"],
         },
         {
@@ -205,7 +204,7 @@ export default function CommandPalette() {
           label: "Bookings",
           href: "/dashboard/bookings",
           description: "Turn new demand into scheduled work.",
-          section: "Book Work",
+          section: "Operations",
           keywords: ["bookings", "requests", "schedule", "book work"],
         },
         {
@@ -213,7 +212,7 @@ export default function CommandPalette() {
           label: "Customers",
           href: "/dashboard/customers",
           description: "Keep contact, history, and next work step connected.",
-          section: "Get Customers",
+          section: "Operations",
           keywords: ["customers", "crm", "contacts", "get customers"],
         },
         {
@@ -221,16 +220,16 @@ export default function CommandPalette() {
           label: "Calendar",
           href: "/dashboard/scheduling",
           description: "Plan capacity, timing, locations, and optional assignments.",
-          section: "Book Work",
+          section: "Operations",
           keywords: ["calendar", "schedule", "capacity", "dispatch"],
         },
         {
           id: "payments-invoices",
-          label: "Payments & Invoices",
+          label: "Finance",
           href: "/dashboard/finance",
-          description: "Set up customer payments and invoices.",
-          section: "Get Paid",
-          keywords: ["payments", "invoices", "finance", "money owed"],
+          description: "Invoices, payments, revenue, reconciliation, and payment setup shortcuts.",
+          section: "Finance",
+          keywords: ["payments", "invoices", "finance", "money owed", "revenue", "reconciliation"],
         },
         {
           id: "mytitan-account",
@@ -293,7 +292,7 @@ export default function CommandPalette() {
           label: "Notifications",
           href: "/dashboard/notifications",
           description: "Review operational updates without relying on email delivery.",
-          section: "Complete Work",
+          section: "Communications",
           keywords: ["notifications", "inbox", "updates"],
         },
         {
@@ -301,7 +300,7 @@ export default function CommandPalette() {
           label: "Communications",
           href: "/dashboard/communications",
           description: "Review customer messages, portal updates, and delivery status.",
-          section: "Get Customers",
+          section: "Communications",
           keywords: ["communications", "messages", "email", "sms", "whatsapp", "portal"],
         },
         {
@@ -309,15 +308,15 @@ export default function CommandPalette() {
           label: "Billing readiness",
           href: "/dashboard/billing/readiness",
           description: "Resolve lifecycle and invoice follow-through safely.",
-          section: "Get Paid",
+          section: "Finance",
           keywords: ["billing", "invoices", "readiness", "payments"],
         },
         {
           id: "finance",
-          label: "Get Paid overview",
+          label: "Finance overview",
           href: "/dashboard/finance",
           description: "Review payment follow-up and balance pressure.",
-          section: "Get Paid",
+          section: "Finance",
           keywords: ["finance", "collection", "revenue"],
         },
         moduleVisibility.showIntelligence
@@ -326,7 +325,7 @@ export default function CommandPalette() {
               label: "Reports",
               href: "/dashboard/analytics",
               description: "Track workload, revenue, and operational movement.",
-              section: "Grow Business",
+              section: "Business",
               keywords: ["analytics", "reports", "insights", "grow business"],
             }
           : null,
@@ -345,7 +344,7 @@ export default function CommandPalette() {
           label: "Connected Tools",
           href: "/dashboard/integrations",
           description: "Connect accounting, payments, calendar, and messaging.",
-          section: "Operations",
+          section: "Settings",
           keywords: ["integrations", "tools", "providers"],
         },
         {
@@ -353,7 +352,7 @@ export default function CommandPalette() {
           label: "Launch Readiness",
           href: "/dashboard/settings/launch-control",
           description: "See what is live, blocked, or still needs setup.",
-          section: "Operations",
+          section: "Settings",
           keywords: ["launch control", "operations", "readiness"],
         },
         {
@@ -361,7 +360,7 @@ export default function CommandPalette() {
           label: "Settings",
           href: "/dashboard/settings",
           description: "Workspace control without hunting through the sidebar.",
-          section: "Operations",
+          section: "Settings",
           keywords: ["settings", "workspace"],
         },
         {
@@ -403,7 +402,7 @@ export default function CommandPalette() {
             }
           : null,
       ].filter((item): item is PaletteItem => Boolean(item)),
-    [commandCentreHref, developerMode, moduleVisibility.showIntelligence, platformAdmin, terms.bookings, terms.customers, terms.jobs, workspaceRole],
+    [developerMode, moduleVisibility.showIntelligence, platformAdmin, terms.bookings, terms.customers, terms.jobs, workspaceRole],
   );
 
   const operationalItems = React.useMemo<PaletteItem[]>(() => {
@@ -548,6 +547,14 @@ export default function CommandPalette() {
       return haystack.includes(q);
     });
   }, [items, query]);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.dispatchEvent(new CustomEvent("mytitan:command-palette-state", { detail: { open } }));
+    return () => {
+      window.dispatchEvent(new CustomEvent("mytitan:command-palette-state", { detail: { open: false } }));
+    };
+  }, [open]);
 
   React.useEffect(() => {
     if (typeof window === "undefined") return;

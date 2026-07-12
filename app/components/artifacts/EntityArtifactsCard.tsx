@@ -84,6 +84,7 @@ export function EntityArtifactsCard({
   const [governance, setGovernance] = useState<MediaGovernance | null>(null);
   const labelInputRef = useRef<HTMLInputElement | null>(null);
   const labelOverridesRef = useRef<Record<string, string>>({});
+  const pendingUploadLabelRef = useRef("");
   const previousEntityKeyRef = useRef(`${entityType}:${entityId}`);
 
   function applyLocalLabelOverrides(rows: ArtifactItem[]) {
@@ -139,6 +140,7 @@ export function EntityArtifactsCard({
         ? document.querySelector<HTMLInputElement>(`input[data-testid="artifact-label-${entityType}"]`)?.value
         : "";
       const currentLabel = String(labelInputRef.current?.value || domLabel || label || "").trim();
+      pendingUploadLabelRef.current = currentLabel;
       const form = new FormData();
       if (currentLabel) form.append("label", currentLabel);
       form.append("kind", kind);
@@ -157,8 +159,9 @@ export function EntityArtifactsCard({
         body: form,
       });
       if (created?.id) {
-        if (currentLabel) labelOverridesRef.current[created.id] = currentLabel;
-        const createdWithLabel = currentLabel ? { ...created, label: currentLabel } : created;
+        const submittedLabel = pendingUploadLabelRef.current;
+        if (submittedLabel) labelOverridesRef.current[created.id] = submittedLabel;
+        const createdWithLabel = submittedLabel ? { ...created, label: submittedLabel } : created;
         setItems((current) => [createdWithLabel, ...current.filter((item) => item.id !== created.id)]);
         setLoading(false);
       }
@@ -173,6 +176,7 @@ export function EntityArtifactsCard({
     } catch (err: any) {
       setError(err?.message || "Failed to upload artifact");
     } finally {
+      pendingUploadLabelRef.current = "";
       setBusy(false);
     }
   }

@@ -251,9 +251,9 @@ function contactHasPreference(contact: any, event: string, channel: string) {
 function pickSnapshotContact(contacts: any[], kind: 'primary' | 'secondary' | 'billing') {
   if (kind === 'billing') {
     return (
+      contacts.find((contact) => contact.isBilling) ||
       contacts.find((contact) => contact.legacyAliasKey === 'BILLING_CONTACT') ||
       contacts.find((contact) => contactHasPreference(contact, 'INVOICE', 'EMAIL')) ||
-      contacts.find((contact) => contact.isBilling) ||
       contacts.find((contact) => optionalText(contact.email)) ||
       contacts[0] ||
       null
@@ -261,15 +261,15 @@ function pickSnapshotContact(contacts: any[], kind: 'primary' | 'secondary' | 'b
   }
   if (kind === 'secondary') {
     return (
-      contacts.find((contact) => contact.legacyAliasKey === 'SECONDARY_CONTACT') ||
       contacts.find((contact) => !contact.isPrimary && !contact.isBilling) ||
+      contacts.find((contact) => contact.legacyAliasKey === 'SECONDARY_CONTACT') ||
       null
     );
   }
   return (
+    contacts.find((contact) => contact.isPrimary) ||
     contacts.find((contact) => contact.legacyAliasKey === 'PRIMARY_CONTACT') ||
     contacts.find((contact) => contactHasPreference(contact, 'JOB_COMPLETION', 'EMAIL')) ||
-    contacts.find((contact) => contact.isPrimary) ||
     contacts[0] ||
     null
   );

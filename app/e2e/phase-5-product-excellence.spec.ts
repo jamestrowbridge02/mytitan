@@ -10,16 +10,16 @@ test.describe("phase 5 product excellence and commercial readiness", () => {
 
     await page.goto("/dashboard", { waitUntil: "networkidle" });
     const kpis = [
-      { testId: "dashboard-kpi-jobs-today", href: /\/dashboard\/jobs/ },
+      { testId: "dashboard-kpi-bookings-today", href: /\/dashboard\/bookings/ },
+      { testId: "dashboard-kpi-live-jobs", href: /\/dashboard\/jobs/ },
       { testId: "dashboard-kpi-revenue-today", href: /\/dashboard\/finance/ },
-      { testId: "dashboard-kpi-technicians-active", href: /\/dashboard\/technician/ },
-      { testId: "dashboard-kpi-pending-approvals", href: /\/dashboard\/portal/ },
+      { testId: "dashboard-kpi-team-working", href: /\/dashboard\/technician/ },
     ];
     for (const kpi of kpis) {
       await expect(page.getByTestId(kpi.testId)).toBeVisible();
       await expect(page.getByTestId(kpi.testId)).toHaveAttribute("href", kpi.href);
-      await expect(page.getByTestId(kpi.testId)).toContainText(/Open/);
     }
+    await expect(page.getByTestId("dashboard-snapshot-grid").locator("a")).toHaveCount(4);
   });
 
   test("technician mobile surface compresses to my day, next job, start work, and sync status", async ({ page, request }) => {

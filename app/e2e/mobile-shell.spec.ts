@@ -60,7 +60,7 @@ test.describe("mobile shell usability", () => {
     await installApiProxy(page, request);
 
     const routes = [
-      { path: "/dashboard", assertion: () => page.getByTestId("dashboard-start-work") },
+      { path: "/dashboard", assertion: () => page.getByTestId("dashboard-primary-action") },
       { path: "/dashboard/work", assertion: () => page.getByText("Needs payment follow-up").first() },
       { path: "/dashboard/jobs", assertion: () => page.getByLabel("Search job ref, customer, reg, service, or owner") },
       { path: "/dashboard/jobs/e2e-job-portal-active", assertion: () => page.getByTestId("job-customer-handoff-card") },

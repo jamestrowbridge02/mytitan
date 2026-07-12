@@ -501,6 +501,8 @@ export default function TradeAccountProfilePage() {
       billingCountry: readInputValue("crm-billing-country", profileFormRef.current?.billingCountry ?? profileForm.billingCountry),
     };
     profileFormRef.current = currentProfileForm;
+    const primaryContactId = contactForm.find((contact) => contact.isPrimary)?.id || contactForm[0]?.id || "";
+    const billingContactId = contactForm.find((contact) => contact.isBilling)?.id || "";
     const profilePayload = {
       ...currentProfileForm,
       locations: locationForm
@@ -557,49 +559,53 @@ export default function TradeAccountProfilePage() {
             location.country,
         ),
       contacts: contactForm
-        .map((contact) => ({
-          id: contact.id,
-          name: String(
-            contact.isPrimary
-              ? currentProfileForm.contactName ?? contact.name
-              : contact.isBilling
-                ? currentProfileForm.billingContactName ?? contact.name
-                : contact.name,
-          ).trim(),
-          roleLabel: contact.roleLabel.trim(),
-          email: String(
-            contact.isPrimary
-              ? currentProfileForm.contactEmail ?? contact.email
-              : contact.isBilling
-                ? currentProfileForm.billingEmail ?? contact.email
-                : contact.email,
-          ).trim(),
-          phone: String(
-            contact.isPrimary
-              ? currentProfileForm.contactPhone ?? contact.phone
-              : contact.isBilling
-                ? currentProfileForm.billingPhone ?? contact.phone
-                : contact.phone,
-          ).trim(),
-          mobile: String(
-            contact.isPrimary
-              ? currentProfileForm.contactMobile ?? contact.mobile
-              : contact.isBilling
-                ? currentProfileForm.billingMobile ?? contact.mobile
-                : contact.mobile,
-          ).trim(),
-          tradeAccountLocationId: contact.tradeAccountLocationId || undefined,
-          isPrimary: contact.isPrimary,
-          isBilling: contact.isBilling,
-          isActive: contact.isActive,
-          preferences: contact.preferences
-            .filter((preference) => preference.enabled)
-            .map((preference) => ({
-              event: preference.event,
-              channel: preference.channel,
-              enabled: preference.enabled,
-            })),
-        }))
+        .map((contact) => {
+          const isPrimaryContact = contact.id === primaryContactId;
+          const isBillingContact = Boolean(billingContactId) && contact.id === billingContactId;
+          return {
+            id: contact.id,
+            name: String(
+              isPrimaryContact
+                ? currentProfileForm.contactName ?? contact.name
+                : isBillingContact
+                  ? currentProfileForm.billingContactName ?? contact.name
+                  : contact.name,
+            ).trim(),
+            roleLabel: contact.roleLabel.trim(),
+            email: String(
+              isPrimaryContact
+                ? currentProfileForm.contactEmail ?? contact.email
+                : isBillingContact
+                  ? currentProfileForm.billingEmail ?? contact.email
+                  : contact.email,
+            ).trim(),
+            phone: String(
+              isPrimaryContact
+                ? currentProfileForm.contactPhone ?? contact.phone
+                : isBillingContact
+                  ? currentProfileForm.billingPhone ?? contact.phone
+                  : contact.phone,
+            ).trim(),
+            mobile: String(
+              isPrimaryContact
+                ? currentProfileForm.contactMobile ?? contact.mobile
+                : isBillingContact
+                  ? currentProfileForm.billingMobile ?? contact.mobile
+                  : contact.mobile,
+            ).trim(),
+            tradeAccountLocationId: contact.tradeAccountLocationId || undefined,
+            isPrimary: isPrimaryContact,
+            isBilling: isBillingContact,
+            isActive: contact.isActive,
+            preferences: contact.preferences
+              .filter((preference) => preference.enabled)
+              .map((preference) => ({
+                event: preference.event,
+                channel: preference.channel,
+                enabled: preference.enabled,
+              })),
+          };
+        })
         .filter((contact) => contact.name || contact.email || contact.phone || contact.mobile),
     };
     try {

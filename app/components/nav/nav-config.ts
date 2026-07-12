@@ -16,51 +16,64 @@ export type NavGroup = {
 
 export const NAV_GROUPS: NavGroup[] = [
   {
-    title: "Complete Work",
+    title: "",
     items: [
       { title: "Dashboard", description: "Business pulse and the next decision", href: "/dashboard", icon: "dashboard" },
-      { title: "Complete Work", sidebarTitle: "Work", description: "Open the main job sheet path", href: "/dashboard/work", icon: "work" },
-      { title: "Assigned work", sidebarTitle: "Assigned", description: "Assigned jobs, ETA, evidence, and field actions", href: "/dashboard/technician", icon: "technician" },
-      { title: "Live Work", description: "Run the active day from one command view", href: "/dashboard/command-centre-v2", icon: "command" },
-      { title: "Jobs", description: "Authoritative work records and follow-through", href: "/dashboard/jobs", icon: "jobs" },
+    ],
+  },
+  {
+    title: "Operations",
+    items: [
+      { title: "Work", description: "Assigned, live, draft, ready, completed, and payment follow-up views", href: "/dashboard/work", icon: "work" },
       { title: "Calendar", description: "Book work by shaping capacity, timing, and assignment flow", href: "/dashboard/calendar", icon: "calendar" },
       { title: "Bookings", description: "Turn new demand into scheduled work", href: "/dashboard/bookings", icon: "bookings" },
-      { title: "Grow Business", sidebarTitle: "Reports", description: "See workload, revenue, and benchmark movement", href: "/dashboard/analytics", icon: "analytics" },
-      { title: "Compliance", description: "Find what needs attention before it becomes drag", href: "/dashboard/compliance", icon: "shield" },
-      { title: "Assets & Tools", sidebarTitle: "Assets", description: "Equipment checkout, maintenance, and availability", href: "/dashboard/assets", icon: "assets" },
+      { title: "Customers", description: "Relationship history, context, and follow-up in one place", href: "/dashboard/customers", icon: "customers" },
+      { title: "Assets", description: "Equipment checkout, maintenance, and availability", href: "/dashboard/assets", icon: "assets" },
     ],
   },
   {
-    title: "Get Customers",
+    title: "Sales",
     items: [
-      { title: "Get Customers", sidebarTitle: "Customers", description: "Relationship history, context, and follow-up in one place", href: "/dashboard/customers", icon: "customers" },
-      { title: "Communications", sidebarTitle: "Comms", description: "Customer messages, portal updates, and delivery status", href: "/dashboard/communications", icon: "mail" },
-      { title: "Portal", sidebarTitle: "Customer page", description: "Customer-safe updates, documents, and self-service access", href: "/dashboard/portal", icon: "portal" },
-      { title: "Service Plans", sidebarTitle: "Plans", description: "Keep repeat work dependable and visible", href: "/dashboard/service-plans", icon: "plans" },
-    ],
-  },
-  {
-    title: "Get Paid",
-    items: [
-      { title: "Get Paid", sidebarTitle: "Payments", description: "Money owed, overdue balances, and finance control", href: "/dashboard/finance", icon: "revenue" },
-      { title: "Payment Setup", description: "Manage how this workspace takes customer payments", href: "/dashboard/settings/payments", icon: "billing" },
       { title: "Quotes", description: "Send prices with a cleaner approval path", href: "/dashboard/quotes", icon: "quotes" },
-      { title: "Revenue", description: "Track invoices, cash collection, and follow-up", href: "/dashboard/revenue", icon: "revenue" },
-      { title: "Billing", description: "Workspace commercial state, plan continuity, and pack readiness", href: "/dashboard/billing", icon: "billing" },
     ],
   },
   {
-    title: "Grow Business",
+    title: "Finance",
     items: [
-      { title: "Company Profile", sidebarTitle: "Profile", description: "Business details, brand, hours, services, booking, portals, and communications", href: "/dashboard/settings?tab=general&section=company-profile-hub", icon: "settings" },
-      { title: "Settings", description: "Workspace controls and workflow preferences", href: "/dashboard/settings", icon: "settings" },
-      { title: "Team", description: "Invite members and keep access deliberate", href: "/dashboard/users", icon: "team" },
-      { title: "Integrations", sidebarTitle: "Tools", description: "Connected tools and account health", href: "/dashboard/integrations", icon: "integrations" },
-      { title: "Enterprise", description: "Readiness for integrations, offline, reports, growth, and trust", href: "/dashboard/enterprise", icon: "enterprise" },
+      { title: "Finance", description: "Invoices, payments, revenue, reconciliation, and payment setup shortcuts", href: "/dashboard/finance", icon: "revenue" },
     ],
   },
   {
-    title: "Admin",
+    title: "Communications",
+    items: [
+      { title: "Communications", description: "Customer messages, email, SMS, delivery history, templates, and preferences", href: "/dashboard/communications", icon: "mail" },
+      { title: "Customer Portal", description: "Customer-safe updates, documents, and self-service access", href: "/dashboard/portal", icon: "portal" },
+    ],
+  },
+  {
+    title: "Business",
+    items: [
+      { title: "Reports", description: "See workload, revenue, and benchmark movement", href: "/dashboard/analytics", icon: "analytics" },
+      { title: "Compliance", description: "Find what needs attention before it becomes drag", href: "/dashboard/compliance", icon: "shield" },
+      { title: "Team", description: "Invite members and keep access deliberate", href: "/dashboard/users", icon: "team" },
+    ],
+  },
+  {
+    title: "Settings",
+    items: [
+      { title: "Business Profile", description: "Business details, brand, hours, services, booking, portals, and communications", href: "/dashboard/settings?tab=general&section=company-profile-hub", icon: "settings" },
+      { title: "Settings", description: "Workspace controls and workflow preferences", href: "/dashboard/settings", icon: "settings" },
+      { title: "Tools", description: "Connected tools and account health", href: "/dashboard/integrations", icon: "integrations" },
+    ],
+  },
+  {
+    title: "Platform",
+    items: [
+      { title: "Platform Admin", sidebarTitle: "Enterprise", description: "MyTitan platform-only administration", href: "/platform", icon: "enterprise" },
+    ],
+  },
+  {
+    title: "Developer",
     items: [
       { title: "Developer Admin", description: "Internal tools", href: "/dev-admin", devOnly: true, icon: "settings" },
     ],

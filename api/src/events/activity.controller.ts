@@ -1,6 +1,10 @@
-import { Body, Controller, Get, Post, Query } from "@nestjs/common";
+import { Body, Controller, Get, Post, Query, UseGuards } from "@nestjs/common";
+import { JwtAuthGuard } from "../auth/auth.guard";
+import { CurrentUser } from "../auth/current-user.decorator";
+import { JwtPayload } from "../auth/auth.types";
 import { ActivityService } from "./activity.service";
 
+@UseGuards(JwtAuthGuard)
 @Controller("activity")
 export class ActivityController {
   constructor(private readonly activity: ActivityService) {}
@@ -8,21 +12,24 @@ export class ActivityController {
   @Get("recent")
   async recent(
     @Query("limit") limit?: string,
-    @Query("tenantId") tenantId?: string,
+    @CurrentUser() user?: JwtPayload,
     @Query("jobId") jobId?: string,
     @Query("customerId") customerId?: string,
     @Query("customerName") customerName?: string,
+    @Query("includeValidation") includeValidation?: string,
   ) {
     const n = Number(limit || 12);
-    return this.activity.list(n, tenantId || null, {
+    return this.activity.list(n, user?.companyId || null, {
       jobId: jobId || null,
       customerId: customerId || null,
       customerName: customerName || null,
+      includeValidation: includeValidation === "1" || includeValidation === "true",
     });
   }
 
   @Post("events")
   async createEvent(
+    @CurrentUser() user: JwtPayload,
     @Body()
     body: {
       type: string;
@@ -41,7 +48,7 @@ export class ActivityController {
     return this.activity.push({
       type: body.type,
       label: body.label,
-      tenantId: body.tenantId ?? null,
+      tenantId: user.companyId,
       customerId: body.customerId ?? null,
       jobId: body.jobId ?? null,
       jobRef: body.jobRef ?? null,
@@ -55,6 +62,7 @@ export class ActivityController {
 
   @Post("communications/send")
   async sendCommunication(
+    @CurrentUser() user: JwtPayload,
     @Body()
     body: {
       channel: "sms" | "email";
@@ -76,7 +84,7 @@ export class ActivityController {
     const row = await this.activity.push({
       type: `${channel}.sent`,
       label,
-      tenantId: body.tenantId ?? null,
+      tenantId: user.companyId,
       customerId: body.customerId ?? null,
       jobId: body.jobId ?? null,
       jobRef: body.jobRef ?? null,

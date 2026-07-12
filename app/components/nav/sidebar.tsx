@@ -3,7 +3,7 @@ import { useRouter } from "next/router";
 import React from "react";
 import { NAV_GROUPS, NavItem } from "./nav-config";
 import { apiFetch, clearToken } from "../../lib/api";
-import { getBusinessTerms, getCommandCentreHref, getOptionalModuleVisibility } from "../../lib/business-config";
+import { getBusinessTerms, getOptionalModuleVisibility } from "../../lib/business-config";
 import { isLogoutV1Enabled } from "../../lib/feature-flags";
 import { useTenantSettings } from "../../lib/tenant-settings";
 import { emptyPermissionSnapshot, normalizePermissionSnapshot } from "../../lib/workspace-permissions";
@@ -40,6 +40,24 @@ function isActive(pathname: string, href?: string) {
 
   if (target === "/") return current === "/";
   if (target === "/dashboard") return current === "/dashboard";
+  if (target === "/dashboard/work") {
+    return (
+      current === "/dashboard/work" ||
+      current === "/dashboard/command-centre-v2" ||
+      current === "/dashboard/command-centre" ||
+      current === "/dashboard/technician" ||
+      current === "/dashboard/jobs" ||
+      current.startsWith("/dashboard/jobs/")
+    );
+  }
+  if (target === "/dashboard/finance") {
+    return (
+      current === "/dashboard/finance" ||
+      current === "/dashboard/revenue" ||
+      current.startsWith("/dashboard/billing") ||
+      current === "/dashboard/settings/payments"
+    );
+  }
   if (target === "/dashboard/settings") {
     const targetTab = normalizeSettingsTab(targetUrl.searchParams.get("tab"));
     if (!targetTab) return current === target;
@@ -193,8 +211,9 @@ export default function Sidebar({
   const logoutEnabled = isLogoutV1Enabled();
   const [permissions, setPermissions] = React.useState(() => emptyPermissionSnapshot());
   const [workspaceRole, setWorkspaceRole] = React.useState<string | null>(null);
+  const [platformAdmin, setPlatformAdmin] = React.useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = React.useState(false);
   const terms = getBusinessTerms(settings);
-  const commandCentreHref = getCommandCentreHref(settings);
   const moduleVisibility = getOptionalModuleVisibility(settings);
   const path = router.asPath || router.pathname || "";
   const roleMode = resolveSidebarRoleMode(permissions, workspaceRole);
@@ -214,11 +233,13 @@ export default function Sidebar({
         if (!cancelled) {
           setPermissions(normalizePermissionSnapshot(me?.permissions));
           setWorkspaceRole(typeof me?.role === "string" ? me.role : null);
+          setPlatformAdmin(Boolean(me?.platformAdmin));
         }
       } catch {
         if (!cancelled) {
           setPermissions(emptyPermissionSnapshot());
           setWorkspaceRole(null);
+          setPlatformAdmin(false);
         }
       }
     };
@@ -227,6 +248,16 @@ export default function Sidebar({
       cancelled = true;
     };
   }, [showSidebar]);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onCommandPaletteState = (event: Event) => {
+      const detail = (event as CustomEvent<{ open?: boolean }>).detail;
+      setCommandPaletteOpen(Boolean(detail?.open));
+    };
+    window.addEventListener("mytitan:command-palette-state", onCommandPaletteState);
+    return () => window.removeEventListener("mytitan:command-palette-state", onCommandPaletteState);
+  }, []);
 
   if (!showSidebar) return null;
   if (mode === "mobile" && !open) return null;
@@ -257,6 +288,7 @@ export default function Sidebar({
     if (href.startsWith("/dashboard/service-plans")) return permissions["settings.manage"];
     if (href.startsWith("/dashboard/quotes")) return permissions["billing.manage"];
     if (href.startsWith("/dashboard/revenue")) return permissions["billing.manage"];
+    if (href.startsWith("/platform")) return platformAdmin;
     if (href.startsWith("/dashboard/scheduling")) return permissions["jobs.transition"] || permissions["dashboard.view_intelligence"] || permissions["technician.execute"];
     if (href.startsWith("/dashboard/calendar")) return permissions["jobs.transition"] || permissions["dashboard.view_intelligence"] || permissions["technician.execute"];
     if (href.startsWith("/dashboard/billing")) return permissions["billing.manage"];
@@ -301,8 +333,6 @@ export default function Sidebar({
         return true;
       })
       .map((item) => {
-        if (item.title === "Live Work") return { ...item, href: commandCentreHref };
-        if (item.title === "Jobs") return { ...item, title: terms.jobs };
         if (item.title === "Customers") return { ...item, title: terms.customers };
         if (item.title === "Bookings") return { ...item, title: "Bookings", sidebarTitle: "Bookings" };
         return item;
@@ -314,6 +344,7 @@ export default function Sidebar({
   return (
     <aside
       aria-label={isMobile ? "Mobile navigation" : undefined}
+      aria-hidden={commandPaletteOpen ? true : undefined}
       className={cx(
         "mt-sidebar fixed inset-y-0 left-0 h-screen shrink-0",
         isMobile ? "mt-sidebar--mobileDrawer z-[70] md:hidden" : "mt-sidebar--desktopRail z-40 hidden md:block",
@@ -367,18 +398,20 @@ export default function Sidebar({
             {navGroups.map((group, groupIndex) => (
               <div key={group.title || `group-${groupIndex}`} className="mt-sidebar__group">
                 {groupIndex > 0 ? <div className="mt-sidebar__groupDivider" aria-hidden="true" /> : null}
+                {group.title ? <div className="mt-sidebar__groupTitle">{group.title}</div> : null}
                 <div className="mt-sidebar__iconList">
                   {group.items.map((it) => {
                     const href = it.href || "#";
                     const active = isActive(path, href);
                     const sidebarLabel = it.sidebarTitle ?? it.title;
+                    const accessibleLabel = sidebarLabel === "Finance" ? "Finance Payments" : sidebarLabel;
 
                     return (
                       <Link
                         key={it.title}
                         href={href}
                         aria-current={active ? "page" : undefined}
-                        aria-label={sidebarLabel}
+                        aria-label={accessibleLabel}
                         title={sidebarLabel}
                         onClick={() => onClose?.()}
                         className={cx(
