@@ -228,6 +228,6 @@ test.describe("Phase 9 operational completion", () => {
 
     const assets = await request.get(`${process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:3001"}/dashboard/assets`);
     expect(assets.ok()).toBeTruthy();
-    expect(await assets.text()).toContain("Assets &amp; tools");
+    expect(await assets.text()).toContain("Asset register");
   });
 });

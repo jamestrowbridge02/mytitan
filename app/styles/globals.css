@@ -13320,6 +13320,164 @@ html[data-theme="dark"] {
   justify-content: flex-end;
 }
 
+.premium-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 2px 0 0;
+}
+
+.premium-page-header h1 {
+  margin: 0;
+  color: var(--mt-page-title-text, var(--mt-text-primary, var(--text-primary)));
+  font-size: clamp(1.75rem, 3vw, 2.35rem);
+  line-height: 1.05;
+  letter-spacing: 0;
+}
+
+.premium-page-header p {
+  margin: 6px 0 0;
+  color: var(--mt-page-subtitle-text, var(--mt-text-secondary, var(--text-muted)));
+  font-weight: 750;
+}
+
+.premium-page-header__actions,
+.premium-inline-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.premium-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.premium-metric-card {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-height: 96px;
+  padding: 16px;
+  border: 1px solid var(--mt-border, var(--border));
+  border-radius: 8px;
+  background: var(--mt-metric-surface, var(--surface));
+  color: var(--mt-metric-text, var(--mt-text-primary, var(--text-primary)));
+  text-align: left;
+}
+
+button.premium-metric-card {
+  cursor: pointer;
+}
+
+.premium-metric-card span,
+.premium-metric-card small {
+  color: inherit;
+  opacity: 0.78;
+  font-weight: 800;
+}
+
+.premium-metric-card strong {
+  color: inherit;
+  font-size: 1.75rem;
+  line-height: 1;
+}
+
+.premium-metric-card.is-active {
+  border-color: var(--mt-tab-selected-surface, #2563eb);
+  background: var(--mt-tab-selected-surface, #2563eb);
+  color: var(--mt-tab-selected-text, #ffffff);
+}
+
+.premium-toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.operator-viewTabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.operator-viewTabs__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--mt-border, var(--border));
+  border-radius: 8px;
+  background: var(--mt-tab-surface, var(--surface));
+  color: var(--mt-tab-text, var(--mt-text-primary, var(--text-primary)));
+  font-weight: 850;
+}
+
+.operator-viewTabs__item.is-active {
+  border-color: var(--mt-tab-selected-surface, #2563eb);
+  background: var(--mt-tab-selected-surface, #2563eb);
+  color: var(--mt-tab-selected-text, #ffffff);
+}
+
+.operator-viewTabs__count {
+  min-width: 1.6em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  color: inherit;
+  text-align: center;
+  font-weight: 900;
+}
+
+.premium-drawer-panel,
+.premium-empty-state {
+  padding: 16px;
+  margin-bottom: 16px;
+  border: 1px solid var(--mt-border, var(--border));
+  border-radius: 8px;
+  background: var(--mt-surface-bg, var(--surface));
+  color: var(--mt-text-primary, var(--text-primary));
+}
+
+.premium-empty-state {
+  display: grid;
+  gap: 12px;
+  place-items: start;
+}
+
+.premium-empty-state h3 {
+  margin: 0;
+  color: inherit;
+  font-size: 1rem;
+}
+
+.quote-line-editor {
+  display: grid;
+  gap: 10px;
+}
+
+.quote-line-editor__row {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.7fr) minmax(180px, 1.5fr) minmax(88px, 0.5fr) minmax(110px, 0.6fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.quote-line-editor__row label {
+  display: grid;
+  gap: 6px;
+  color: var(--mt-text-primary, var(--text-primary));
+  font-weight: 800;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .dashboard-skeleton div {
     animation: none;
@@ -13333,6 +13491,7 @@ html[data-theme="dark"] {
   .calendar-snapshot-grid,
   .bookings-metric-grid,
   .customers-metric-grid,
+  .premium-metric-grid,
   .bookings-public-status .booking-summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -13353,13 +13512,15 @@ html[data-theme="dark"] {
   }
 
   .bookings-premium-header,
-  .customers-premium-header {
+  .customers-premium-header,
+  .premium-page-header {
     align-items: stretch;
     flex-direction: column;
   }
 
   .bookings-premium-header__actions,
-  .customers-premium-header__actions {
+  .customers-premium-header__actions,
+  .premium-page-header__actions {
     justify-content: flex-start;
   }
 
@@ -13376,7 +13537,16 @@ html[data-theme="dark"] {
 
   .bookings-metric-grid,
   .customers-metric-grid,
+  .premium-metric-grid,
   .bookings-public-status .booking-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .premium-page-header__actions > * {
+    width: 100%;
+  }
+
+  .quote-line-editor__row {
     grid-template-columns: 1fr;
   }
 
