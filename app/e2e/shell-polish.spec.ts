@@ -184,7 +184,7 @@ test.describe("shell polish regressions", () => {
 
   test("header quick options expand and collapse without blocking keyboard use", async ({ page, request }) => {
     await installApiProxy(page, request);
-    await page.goto("/dashboard");
+    await page.goto("/dashboard/work");
 
     const toggle = page.locator('button[aria-controls="dashboard-quick-options"]');
     await expect(toggle).toHaveAttribute("aria-expanded", "false");

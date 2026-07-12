@@ -27,7 +27,7 @@ import { GUIDED_MODE_STORAGE_KEY } from '../lib/guided-mode';
 import { useTenantSettings } from '../lib/tenant-settings';
 import { resolveBookingsEnabled } from '../lib/workspace-features';
 import { useMediaQuery } from '../lib/use-media-query';
-import { getOperatorQuickActions, getOperatorRouteMeta, readOperatorRecentDestinations, type OperatorRecentDestination } from '../lib/operator-recents';
+import { getOperatorQuickActions, readOperatorRecentDestinations, type OperatorRecentDestination } from '../lib/operator-recents';
 import { AiAssistant } from './ai-assistant';
 
 type LocationCtx = {
@@ -230,13 +230,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const isDemoUser = useMemo(() => Boolean(me?.demoUser || me?.email === '@mytitan.co.uk'), [me]);
   const unreadCount = useMemo(() => notifications.filter((item) => !item.isRead).length, [notifications]);
   const notificationGroups = useMemo(() => groupNotifications(notifications), [notifications]);
-  const routeMeta = useMemo(() => getOperatorRouteMeta(router.pathname, router.asPath), [router.asPath, router.pathname]);
   const shellQuickActions = useMemo(() => getOperatorQuickActions(router.pathname).slice(0, 3), [router.pathname]);
   const showWorkflowPulse = useMemo(
     () =>
-      router.pathname === '/dashboard' ||
       router.pathname === '/dashboard/work' ||
-      router.pathname === '/dashboard/customers' ||
       router.pathname.startsWith('/dashboard/customers/') ||
       router.pathname === '/dashboard/notifications' ||
       router.pathname === '/dashboard/command-centre-v2' ||
@@ -648,7 +645,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         >
           <div className="dashboard-shell__workflowPulseHeader">
             <div>
-              <div className="dashboard-shell__workflowPulseEyebrow">{routeMeta.label}</div>
+              <div className="dashboard-shell__workflowPulseEyebrow">Next step</div>
               <h2 className="dashboard-shell__workflowPulseTitle">{workflowRecommendation.title}</h2>
               <p className="dashboard-shell__workflowPulseText">{workflowRecommendation.detail}</p>
             </div>
