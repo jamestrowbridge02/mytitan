@@ -7,8 +7,7 @@ import {
   OperatorDataTableHeader,
   OperatorDataTableRow,
   OperatorEmptyStateCard,
-  OperatorGuidance,
-  OperatorPageHeader,
+  OperatorSavedViews,
 } from "../../components/ui/operator-page";
 import { apiFetch } from "../../lib/api";
 import { emptyPermissionSnapshot, hasWorkspacePermission, normalizePermissionSnapshot } from "../../lib/workspace-permissions";
@@ -40,9 +39,16 @@ type FormState = {
   title: string;
   summary: string;
   currency: string;
-  taxCents: string;
+  taxAmount: string;
   expiresAt: string;
-  lineItemsText: string;
+  lineItems: LineItemForm[];
+};
+
+type LineItemForm = {
+  type: string;
+  title: string;
+  quantity: string;
+  unitPrice: string;
 };
 
 const EMPTY_FORM: FormState = {
@@ -51,9 +57,9 @@ const EMPTY_FORM: FormState = {
   title: "",
   summary: "",
   currency: "GBP",
-  taxCents: "0",
+  taxAmount: "0.00",
   expiresAt: "",
-  lineItemsText: "LABOUR | Initial inspection | 1 | 8500",
+  lineItems: [{ type: "LABOUR", title: "Initial inspection", quantity: "1", unitPrice: "85.00" }],
 };
 
 function money(cents: number, currency = "GBP") {
@@ -69,21 +75,25 @@ function toLocalInputValue(value?: string | null) {
   return shifted.toISOString().slice(0, 16);
 }
 
-function parseLineItems(raw: string) {
-  return raw
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line, index) => {
-      const [type, title, quantity, unitPriceCents] = line.split("|").map((part) => part.trim());
-      return {
-        sortOrder: index,
-        type: String(type || "OTHER").toUpperCase(),
-        title: title || `Line ${index + 1}`,
-        quantity: Number(quantity || 1),
-        unitPriceCents: Number(unitPriceCents || 0),
-      };
-    });
+function toMoneyInput(cents: number) {
+  return ((cents || 0) / 100).toFixed(2);
+}
+
+function moneyInputToCents(value: string) {
+  const normalized = String(value || "0").replace(/[^\d.-]/g, "");
+  return Math.round(Number(normalized || 0) * 100);
+}
+
+function parseLineItems(items: LineItemForm[]) {
+  return items
+    .filter((item) => item.title.trim())
+    .map((item, index) => ({
+      sortOrder: index,
+      type: String(item.type || "OTHER").toUpperCase(),
+      title: item.title.trim() || `Line ${index + 1}`,
+      quantity: Number(item.quantity || 1),
+      unitPriceCents: moneyInputToCents(item.unitPrice),
+    }));
 }
 
 export default function QuotesPage() {
@@ -94,6 +104,9 @@ export default function QuotesPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [busyQuoteId, setBusyQuoteId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | Quote["status"]>("all");
+  const [editorOpen, setEditorOpen] = useState(false);
   const [permissions, setPermissions] = useState(() => emptyPermissionSnapshot());
   const [permissionsReady, setPermissionsReady] = useState(false);
   const { notice, showError, showSuccess, clearNotice } = useOperatorNotice();
@@ -159,26 +172,46 @@ export default function QuotesPage() {
       title: selected.title,
       summary: selected.summary || "",
       currency: selected.currency || "GBP",
-      taxCents: String(selected.taxCents || 0),
+      taxAmount: toMoneyInput(selected.taxCents || 0),
       expiresAt: toLocalInputValue(selected.expiresAt),
-      lineItemsText: (selected.lineItems || [])
-        .map((item) => `${item.type} | ${item.title} | ${item.quantity} | ${item.unitPriceCents}`)
-        .join("\n"),
+      lineItems: (selected.lineItems || []).length
+        ? selected.lineItems.map((item) => ({
+          type: item.type || "OTHER",
+          title: item.title || "",
+          quantity: String(item.quantity || 1),
+          unitPrice: toMoneyInput(item.unitPriceCents || 0),
+        }))
+        : [{ type: "LABOUR", title: "", quantity: "1", unitPrice: "0.00" }],
     });
   }, [selectedQuoteId, quotes]);
 
   const stats = useMemo(() => {
     const awaiting = quotes.filter((quote) => quote.status === "SENT").length;
     const approved = quotes.filter((quote) => quote.status === "APPROVED").length;
-    const converted = quotes.filter((quote) => quote.status === "CONVERTED").length;
-    const overdue = quotes.filter((quote) => quote.status === "SENT" && quote.expiresAt && new Date(quote.expiresAt).getTime() < Date.now()).length;
     return [
-      { label: "Drafts", value: String(quotes.filter((quote) => quote.status === "DRAFT").length), hint: "Quotes still being prepared" },
-      { label: "Awaiting approval", value: String(awaiting), hint: "Sent quotes still waiting on customer response" },
-      { label: "Approved", value: String(approved), hint: "Ready for explicit operator conversion" },
-      { label: "Converted", value: String(converted), hint: "Quotes already turned into executable work" },
-      { label: "Expired", value: String(overdue), hint: "Sent quotes already past their expiry date" },
+      { id: "DRAFT", label: "Draft", value: String(quotes.filter((quote) => quote.status === "DRAFT").length) },
+      { id: "SENT", label: "Awaiting response", value: String(awaiting) },
+      { id: "APPROVED", label: "Approved", value: String(approved) },
+      { id: "EXPIRED", label: "Expired", value: String(quotes.filter((quote) => quote.status === "EXPIRED").length) },
     ];
+  }, [quotes]);
+
+  const filteredQuotes = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return quotes.filter((quote) => {
+      const haystack = [quote.quoteNumber, quote.customerName, quote.title, quote.status, quote.jobRef].filter(Boolean).join(" ").toLowerCase();
+      if (q && !haystack.includes(q)) return false;
+      if (statusFilter !== "all" && quote.status !== statusFilter) return false;
+      return true;
+    });
+  }, [quotes, search, statusFilter]);
+
+  const savedViewCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: quotes.length };
+    for (const status of ["DRAFT", "SENT", "APPROVED", "DECLINED", "EXPIRED", "CONVERTED"]) {
+      counts[status] = quotes.filter((quote) => quote.status === status).length;
+    }
+    return counts;
   }, [quotes]);
 
   async function saveQuote() {
@@ -189,9 +222,9 @@ export default function QuotesPage() {
         title: form.title,
         summary: form.summary || undefined,
         currency: form.currency,
-        taxCents: Number(form.taxCents || 0),
+        taxCents: moneyInputToCents(form.taxAmount),
         expiresAt: form.expiresAt ? new Date(form.expiresAt).toISOString() : undefined,
-        lineItems: parseLineItems(form.lineItemsText),
+        lineItems: parseLineItems(form.lineItems),
       };
       if (form.id) {
         await apiFetch(`/quotes/${form.id}`, { method: "PATCH", body: JSON.stringify(payload) });
@@ -200,6 +233,7 @@ export default function QuotesPage() {
         await apiFetch("/quotes", { method: "POST", body: JSON.stringify(payload) });
         showSuccess("Quote created");
       }
+      setEditorOpen(false);
       await loadData();
     } catch (err: any) {
       showError(err?.message || "Failed to save quote");
@@ -235,18 +269,40 @@ export default function QuotesPage() {
   function startCreate() {
     setSelectedQuoteId(null);
     setForm(EMPTY_FORM);
+    setEditorOpen(true);
+  }
+
+  function openQuote(id: string) {
+    setSelectedQuoteId(id);
+    setEditorOpen(true);
+  }
+
+  function updateLineItem(index: number, patch: Partial<LineItemForm>) {
+    setForm((current) => ({
+      ...current,
+      lineItems: current.lineItems.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item),
+    }));
+  }
+
+  function addLineItem() {
+    setForm((current) => ({
+      ...current,
+      lineItems: [...current.lineItems, { type: "OTHER", title: "", quantity: "1", unitPrice: "0.00" }],
+    }));
+  }
+
+  function removeLineItem(index: number) {
+    setForm((current) => ({
+      ...current,
+      lineItems: current.lineItems.length > 1 ? current.lineItems.filter((_, itemIndex) => itemIndex !== index) : current.lineItems,
+    }));
   }
 
   if (permissionsReady && !canManage) {
     return (
       <DashboardShell>
         <div className="operator-stack">
-          <OperatorPageHeader
-            eyebrow="Revenue ops"
-            title="Quotes"
-            subtitle="Quote creation and revenue execution are restricted to workspace roles trusted with billing operations."
-            stats={[]}
-          />
+          <header className="premium-page-header"><div><h1>Quotes</h1><p>Access restricted</p></div></header>
           <OperatorEmptyStateCard
             title="Quote access restricted"
             description="Your role cannot manage quotes or pricing actions. Ask an owner, admin, finance user, or legacy staff operator for access."
@@ -259,36 +315,56 @@ export default function QuotesPage() {
   return (
     <DashboardShell>
       <div className="operator-stack">
-        <OperatorPageHeader
-          eyebrow="Revenue ops"
-          title="Quotes"
-          subtitle="Create, approve, and convert quotes without turning MyTitan into fake accounting software."
-          actions={canManage ? [{ label: "Create quote", onClick: startCreate, testId: "quote-create" }] : undefined}
-          shortcuts={["Quote totals are calculated from line items", "Conversion is always explicit and auditable"]}
-          stats={stats}
-        />
+        <header className="premium-page-header" data-testid="quotes-premium-header">
+          <div>
+            <h1>Quotes</h1>
+            <p>Quote queue</p>
+          </div>
+          <div className="premium-page-header__actions">
+            {canManage ? <button className="button" type="button" onClick={startCreate} data-testid="quote-create">Create quote</button> : null}
+          </div>
+        </header>
 
-        <OperatorGuidance
-          title="Quote workflow guidance"
-          items={[
-            "Use send when customer approval should begin and the quote becomes externally visible in the customer workspace.",
-            "Approved quotes remain separate from execution until an operator explicitly converts them.",
-            "Revenue tasks are generated from real sent, approved, and invoice states instead of fake outbound sequences.",
-          ]}
-        />
+        <section className="premium-metric-grid" aria-label="Quote overview">
+          {stats.map((stat) => (
+            <button key={stat.id} type="button" className={`premium-metric-card${statusFilter === stat.id ? " is-active" : ""}`} onClick={() => setStatusFilter(stat.id as Quote["status"])}>
+              <span>{stat.label}</span>
+              <strong>{stat.value}</strong>
+            </button>
+          ))}
+        </section>
 
         <OperatorNotice notice={notice} onDismiss={clearNotice} />
 
         <section className="card operator-section" data-testid="quote-list">
           <div className="operator-section__header">
             <div>
-              <h2 className="operator-section__title">Quote list</h2>
-              <p className="operator-section__subtitle">Draft, sent, approved, declined, expired, and converted quotes linked to current customers and jobs.</p>
+              <h2 className="operator-section__title">Quote queue</h2>
             </div>
+          </div>
+          <div className="premium-toolbar">
+            <label className="operator-filterbar__search">
+              <span className="operator-filterbar__label">Search</span>
+              <input className="input operator-filterbar__input" aria-label="Search quotes..." placeholder="Search quotes..." value={search} onChange={(event) => setSearch(event.target.value)} />
+            </label>
+            <OperatorSavedViews
+              views={[
+                { id: "all", label: "All", count: savedViewCounts.all },
+                { id: "DRAFT", label: "Draft", count: savedViewCounts.DRAFT },
+                { id: "SENT", label: "Sent", count: savedViewCounts.SENT },
+                { id: "APPROVED", label: "Approved", count: savedViewCounts.APPROVED },
+                { id: "DECLINED", label: "Declined", count: savedViewCounts.DECLINED },
+                { id: "EXPIRED", label: "Expired", count: savedViewCounts.EXPIRED },
+                { id: "CONVERTED", label: "Converted", count: savedViewCounts.CONVERTED },
+              ]}
+              activeView={statusFilter}
+              onChange={(view) => setStatusFilter(view as typeof statusFilter)}
+            />
+            {(search || statusFilter !== "all") ? <button className="button secondary" type="button" onClick={() => { setSearch(""); setStatusFilter("all"); }}>Reset filters</button> : null}
           </div>
           {loading ? (
             <p className="muted">Loading quotes...</p>
-          ) : quotes.length ? (
+          ) : filteredQuotes.length ? (
             <OperatorDataTable columns="minmax(220px, 1.3fr) minmax(150px, 0.8fr) minmax(180px, 0.8fr) minmax(200px, auto)">
               <OperatorDataTableHeader>
                 <div className="operator-table__cell">Quote</div>
@@ -296,10 +372,10 @@ export default function QuotesPage() {
                 <div className="operator-table__cell">State</div>
                 <div className="operator-table__cell">Actions</div>
               </OperatorDataTableHeader>
-              {quotes.map((quote) => (
+              {filteredQuotes.map((quote) => (
                 <OperatorDataTableRow
                   key={quote.id}
-                  onClick={() => setSelectedQuoteId(quote.id)}
+                  onClick={() => openQuote(quote.id)}
                   className={selectedQuoteId === quote.id ? "is-selected" : undefined}
                 >
                   <div className="operator-table__cell">
@@ -350,19 +426,19 @@ export default function QuotesPage() {
               ))}
             </OperatorDataTable>
           ) : (
-            <OperatorEmptyStateCard
-              title="No quotes yet"
-              description="Create the first quote to start a controlled revenue workflow over pricing, approval, and conversion."
-            />
+            <div className="premium-empty-state">
+              <h3>{quotes.length ? "No quotes match these filters." : "No quotes yet"}</h3>
+              {quotes.length ? <button className="button secondary" type="button" onClick={() => { setSearch(""); setStatusFilter("all"); }}>Clear filters</button> : <button className="button" type="button" onClick={startCreate}>Create quote</button>}
+            </div>
           )}
         </section>
 
-        <section className="card operator-section">
+        {editorOpen ? <section className="card operator-section" data-testid="quote-editor">
           <div className="operator-section__header">
             <div>
               <h2 className="operator-section__title">{form.id ? "Edit quote" : "Create quote"}</h2>
-              <p className="operator-section__subtitle">One line per item: `TYPE | Title | Quantity | Unit price cents`.</p>
             </div>
+            <button className="button secondary" type="button" onClick={() => setEditorOpen(false)}>Close</button>
           </div>
           <div style={{ display: "grid", gap: 14 }}>
             <label className="operator-filterbar__field">
@@ -388,18 +464,29 @@ export default function QuotesPage() {
                 <input className="input" value={form.currency} onChange={(event) => setForm((current) => ({ ...current, currency: event.target.value.toUpperCase() }))} />
               </label>
               <label className="operator-filterbar__field">
-                <span className="operator-filterbar__label">Tax cents</span>
-                <input className="input" value={form.taxCents} onChange={(event) => setForm((current) => ({ ...current, taxCents: event.target.value }))} />
+                <span className="operator-filterbar__label">Tax</span>
+                <input className="input" inputMode="decimal" value={form.taxAmount} onChange={(event) => setForm((current) => ({ ...current, taxAmount: event.target.value }))} />
               </label>
               <label className="operator-filterbar__field">
                 <span className="operator-filterbar__label">Expires at</span>
                 <input className="input" type="datetime-local" value={form.expiresAt} onChange={(event) => setForm((current) => ({ ...current, expiresAt: event.target.value }))} />
               </label>
             </div>
-            <label className="operator-filterbar__field">
-              <span className="operator-filterbar__label">Line items</span>
-              <textarea className="input" rows={6} value={form.lineItemsText} onChange={(event) => setForm((current) => ({ ...current, lineItemsText: event.target.value }))} data-testid="quote-line-items" />
-            </label>
+            <div className="quote-line-editor" data-testid="quote-line-items">
+              <div className="operator-section__header">
+                <h3 className="operator-section__title">Line items</h3>
+                <button className="button secondary" type="button" onClick={addLineItem} data-testid="quote-add-line-item">Add row</button>
+              </div>
+              {form.lineItems.map((item, index) => (
+                <div className="quote-line-editor__row" key={index}>
+                  <label><span>Type</span><select className="input" value={item.type} onChange={(event) => updateLineItem(index, { type: event.target.value })} data-testid={`quote-line-type-${index}`}><option value="LABOUR">Labour</option><option value="PART">Part</option><option value="MATERIAL">Material</option><option value="OTHER">Custom</option></select></label>
+                  <label><span>Description</span><input className="input" value={item.title} onChange={(event) => updateLineItem(index, { title: event.target.value })} data-testid={`quote-line-title-${index}`} /></label>
+                  <label><span>Qty</span><input className="input" inputMode="decimal" value={item.quantity} onChange={(event) => updateLineItem(index, { quantity: event.target.value })} data-testid={`quote-line-quantity-${index}`} /></label>
+                  <label><span>Unit price</span><input className="input" inputMode="decimal" value={item.unitPrice} onChange={(event) => updateLineItem(index, { unitPrice: event.target.value })} data-testid={`quote-line-unit-price-${index}`} /></label>
+                  <button className="button secondary" type="button" onClick={() => removeLineItem(index)} disabled={form.lineItems.length <= 1}>Remove</button>
+                </div>
+              ))}
+            </div>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               <button className="button" type="button" onClick={() => void saveQuote()} disabled={saving} data-testid="quote-save">
                 {saving ? "Saving..." : "Save quote"}
@@ -409,7 +496,7 @@ export default function QuotesPage() {
               </button>
             </div>
           </div>
-        </section>
+        </section> : null}
       </div>
     </DashboardShell>
   );

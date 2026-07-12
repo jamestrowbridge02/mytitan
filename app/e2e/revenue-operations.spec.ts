@@ -69,7 +69,14 @@ test.describe("revenue operations", () => {
     await page.getByTestId("quote-create").evaluate((element: HTMLButtonElement) => element.click());
     await page.getByTestId("quote-customer").selectOption(fixtureRefs.convertibleCustomerId);
     await page.getByTestId("quote-title").fill(quoteTitle);
-    await page.getByTestId("quote-line-items").fill("LABOUR | Inspection labour | 1 | 15000\nPART | Service kit | 1 | 9000");
+    await page.getByTestId("quote-line-title-0").fill("Inspection labour");
+    await page.getByTestId("quote-line-quantity-0").fill("1");
+    await page.getByTestId("quote-line-unit-price-0").fill("150.00");
+    await page.getByTestId("quote-add-line-item").click();
+    await page.getByTestId("quote-line-type-1").selectOption("PART");
+    await page.getByTestId("quote-line-title-1").fill("Service kit");
+    await page.getByTestId("quote-line-quantity-1").fill("1");
+    await page.getByTestId("quote-line-unit-price-1").fill("90.00");
     await page.getByTestId("quote-save").evaluate((element: HTMLButtonElement) => element.click());
 
     let createdCount = 0;
@@ -95,6 +102,7 @@ test.describe("revenue operations", () => {
     const createdRow = page.getByTestId("quote-list").locator(".operator-table__row").filter({ hasText: quoteTitle }).first();
     await expect(createdRow).toBeVisible();
     await createdRow.evaluate((element: HTMLElement) => element.click());
+    await expect(page.getByTestId("quote-editor")).toBeVisible();
     await page.getByTestId("quote-title").fill(`${quoteTitle} revised`);
     await page.getByTestId("quote-save").evaluate((element: HTMLButtonElement) => element.click());
     await expect(page.getByText(/Quote updated/i)).toBeVisible();
