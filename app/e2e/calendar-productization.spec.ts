@@ -9,6 +9,27 @@ async function getToken(page: any) {
   return String(token || "");
 }
 
+function parseRgbChannels(value: string) {
+  const match = value.match(/\d+(?:\.\d+)?/g) || [];
+  return match.slice(0, 3).map((channel) => Number(channel));
+}
+
+function relativeLuminance([r, g, b]: number[]) {
+  const normalized = [r, g, b].map((channel) => {
+    const value = channel / 255;
+    return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * normalized[0] + 0.7152 * normalized[1] + 0.0722 * normalized[2];
+}
+
+function contrastRatio(foreground: string, background: string) {
+  const fg = relativeLuminance(parseRgbChannels(foreground));
+  const bg = relativeLuminance(parseRgbChannels(background));
+  const light = Math.max(fg, bg);
+  const dark = Math.min(fg, bg);
+  return (light + 0.05) / (dark + 0.05);
+}
+
 test.describe("calendar productization", () => {
   test.skip(!hasDashboardAuth(), "Seed the E2E fixtures or provide dashboard credentials before running authenticated workflow tests.");
 
@@ -129,6 +150,12 @@ test.describe("calendar productization", () => {
     expect(String(movedBooking?.startsAt || "")).toContain(`T${String(targetHour).padStart(2, "0")}:30:00.000Z`);
 
     await page.reload();
-    await expect(page.getByTestId(`calendar-booking-${createdBooking.id}`).first()).toBeVisible();
+    const bookingCard = page.getByTestId(`calendar-booking-${createdBooking.id}`).first();
+    await expect(bookingCard).toBeVisible();
+    const cardContrast = await bookingCard.evaluate((element) => {
+      const style = window.getComputedStyle(element);
+      return { color: style.color, backgroundColor: style.backgroundColor };
+    });
+    expect(contrastRatio(cardContrast.color, cardContrast.backgroundColor)).toBeGreaterThanOrEqual(4.5);
   });
 });

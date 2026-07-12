@@ -1993,7 +1993,7 @@ export default function CalendarPage() {
                 <div data-testid="calendar-month-grid" style={{ marginTop: 12, display: 'grid', gap: 10 }}>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 10 }}>
                     {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((label) => (
-                      <div key={label} style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      <div key={label} style={{ fontSize: 12, fontWeight: 700, color: 'var(--calendar-hour-text)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                         {label}
                       </div>
                     ))}
@@ -2107,7 +2107,7 @@ export default function CalendarPage() {
                                 key={`${dayKey}-${tech.id}-label`}
                                 style={{
                                   fontSize: 12,
-                                  color: '#9ca3af',
+                                  color: 'var(--calendar-lane-text)',
                                   whiteSpace: 'nowrap',
                                   overflow: 'hidden',
                                   textOverflow: 'ellipsis',
@@ -2117,14 +2117,14 @@ export default function CalendarPage() {
                               </div>
                             ))
                           ) : (
-                            <div style={{ fontSize: 12, color: '#9ca3af' }}>{visibleTechnicians[0]?.name || 'Unassigned'}</div>
+                            <div style={{ fontSize: 12, color: 'var(--calendar-lane-text)' }}>{visibleTechnicians[0]?.name || 'Unassigned'}</div>
                           )}
 
                           <div
                             style={{
                               position: 'relative',
                               height: ROW_HEIGHT,
-                              borderRight: '1px solid rgba(148, 163, 184, 0.25)',
+                              borderRight: '1px solid var(--calendar-grid-line)',
                               paddingRight: 6,
                             }}
                           >
@@ -2139,7 +2139,7 @@ export default function CalendarPage() {
                                     top: top - 8,
                                     right: 2,
                                     fontSize: 11,
-                                    color: '#94a3b8',
+                                    color: 'var(--calendar-hour-text)',
                                   }}
                                 >
                                   {String(hour).padStart(2, '0')}:00
@@ -2172,9 +2172,9 @@ export default function CalendarPage() {
                               style={{
                                 position: 'relative',
                                 height: ROW_HEIGHT,
-                                border: '1px solid rgba(148, 163, 184, 0.25)',
+                                border: '1px solid var(--calendar-lane-border)',
                                 borderRadius: 10,
-                                background: 'rgba(15, 23, 42, 0.15)',
+                                background: 'var(--calendar-lane-bg)',
                               }}
                               onDragOver={handleLaneDragOver}
                               onDrop={(event) => handleLaneDrop(event, day, tech.id)}
@@ -2213,7 +2213,7 @@ export default function CalendarPage() {
                                         left: 0,
                                         right: 0,
                                         top,
-                                        borderTop: '1px solid rgba(148, 163, 184, 0.18)',
+                                        borderTop: '1px solid var(--calendar-grid-line)',
                                       }}
                                     />
                                   );
@@ -2450,7 +2450,7 @@ export default function CalendarPage() {
                                           marginTop: 6,
                                           padding: 6,
                                           borderRadius: 8,
-                                          border: '1px solid rgba(148, 163, 184, 0.35)',
+                                          border: '1px solid var(--calendar-lane-border)',
                                           background: 'rgba(248, 250, 252, 0.95)',
                                           display: 'grid',
                                           gap: 6,
