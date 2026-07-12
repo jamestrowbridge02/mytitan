@@ -15,6 +15,20 @@ function parseRgbChannels(value: string) {
   return match.slice(0, 3).map((channel) => Number(channel));
 }
 
+function relativeLuminance([r, g, b]: number[]) {
+  const channels = [r, g, b].map((value) => {
+    const channel = value / 255;
+    return channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+}
+
+function contrastRatio(foreground: number[], background: number[]) {
+  const lighter = Math.max(relativeLuminance(foreground), relativeLuminance(background));
+  const darker = Math.min(relativeLuminance(foreground), relativeLuminance(background));
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
 async function expectReadableText(locator: Locator, maxChannel = 185) {
   const color = await locator.evaluate((element) => window.getComputedStyle(element).color);
   const channels = parseRgbChannels(color);
@@ -22,6 +36,32 @@ async function expectReadableText(locator: Locator, maxChannel = 185) {
   for (const channel of channels.slice(0, 3)) {
     expect(channel).toBeLessThanOrEqual(maxChannel);
   }
+}
+
+async function expectReadableAgainstSurface(locator: Locator, minimumRatio = 4.5) {
+  const styles = await locator.evaluate((element) => {
+    function usableBackground(node: Element | null): string {
+      let current: Element | null = node;
+      while (current) {
+        const background = window.getComputedStyle(current).backgroundColor;
+        if (background && !/rgba?\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0\s*\)|transparent/i.test(background)) {
+          return background;
+        }
+        current = current.parentElement;
+      }
+      return window.getComputedStyle(document.body).backgroundColor;
+    }
+    const computed = window.getComputedStyle(element);
+    return {
+      color: computed.color,
+      backgroundColor: usableBackground(element),
+    };
+  });
+  const foreground = parseRgbChannels(styles.color);
+  const background = parseRgbChannels(styles.backgroundColor);
+  expect(foreground.length).toBeGreaterThanOrEqual(3);
+  expect(background.length).toBeGreaterThanOrEqual(3);
+  expect(contrastRatio(foreground, background)).toBeGreaterThanOrEqual(minimumRatio);
 }
 
 function dateTimeLocalInMinutes(minutesFromNow: number) {
@@ -45,6 +85,8 @@ test.describe("dashboard workflows", () => {
     await expect(page.getByTestId("dashboard-premium-home")).toBeVisible();
     await expect(page.getByRole("heading", { level: 1, name: "Dashboard" })).toBeVisible();
     await expect(page.getByTestId("dashboard-premium-home").getByRole("heading", { level: 1 })).toHaveCount(1);
+    await expect(page.locator(".mt-shell__main").getByText("Dashboard", { exact: true })).toHaveCount(1);
+    await expect(page.getByTestId("dashboard-shell-workflow-pulse")).toHaveCount(0);
     await expect(page.locator(".dashboard-premium-greeting")).toContainText(/Good morning|Good afternoon|Good evening/i);
     const headerBox = await page.locator(".dashboard-premium-header").boundingBox();
     expect(headerBox?.height || 0).toBeLessThan(120);
@@ -74,6 +116,34 @@ test.describe("dashboard workflows", () => {
     await expect(body).not.toContainText("Open the rest of the workspace");
     await expect(body).not.toContainText("Focus the command view on one location when you need precision");
     await expect(page.locator(".dashboard-secondary-links")).toHaveCount(0);
+  });
+
+  test("tenant pages have one page-owned title and readable shared tabs", async ({ page, request }) => {
+    await installApiProxy(page, request);
+
+    for (const route of ["/dashboard", "/dashboard/calendar", "/dashboard/bookings", "/dashboard/customers"]) {
+      await page.goto(route, { waitUntil: "domcontentloaded" });
+      await expect(page.locator(".mt-shell__main h1")).toHaveCount(1);
+    }
+
+    await page.goto("/dashboard/calendar", { waitUntil: "domcontentloaded" });
+    for (const label of ["All", "Unassigned", "Confirmed", "In progress", "Completed"]) {
+      await expectReadableAgainstSurface(page.locator(".operator-viewTabs__item", { hasText: label }).first());
+      await expectReadableAgainstSurface(page.locator(".operator-viewTabs__item", { hasText: label }).first().locator(".operator-viewTabs__count"));
+    }
+
+    await page.goto("/dashboard/bookings", { waitUntil: "domcontentloaded" });
+    for (const label of ["All", "Upcoming", "Today", "Needs conversion"]) {
+      await expectReadableAgainstSurface(page.locator(".operator-viewTabs__item", { hasText: label }).first());
+      await expectReadableAgainstSurface(page.locator(".operator-viewTabs__item", { hasText: label }).first().locator(".operator-viewTabs__count"));
+    }
+
+    await page.goto("/dashboard/customers", { waitUntil: "domcontentloaded" });
+    await expect(page.locator(".mt-shell__main").getByText(/Customer intake stays clear|First-job path stays available|Move relationships into work|Workspace/)).toHaveCount(0);
+    for (const label of ["All", "Ready for work", "Needs follow-up", "Missing details"]) {
+      await expectReadableAgainstSurface(page.locator(".operator-viewTabs__item", { hasText: label }).first());
+      await expectReadableAgainstSurface(page.locator(".operator-viewTabs__item", { hasText: label }).first().locator(".operator-viewTabs__count"));
+    }
   });
 
   test("dashboard activity feed is tenant-owned and excludes platform or validation events", async ({ page, request }) => {
@@ -619,7 +689,7 @@ test.describe("dashboard workflows", () => {
     await expect(convertibleBookingRow).toContainText(/ready to convert today|needs conversion|in today's schedule|linked and scheduled/i);
 
     await page.goto("/dashboard/customers");
-    await expect(page.locator(".operator-stack").first()).toContainText(/needs contact detail|needs follow-up|active relationship|ready for first job/i);
+    await expect(page.locator(".operator-stack").first()).toContainText(/needs details|needs follow-up|active relationship|ready for first job/i);
   });
 
   test("front-half pipeline surfaces keep customer and booking next steps obvious", async ({ page, request }) => {
@@ -627,7 +697,8 @@ test.describe("dashboard workflows", () => {
 
     await page.goto("/dashboard/customers");
     await expect(page.getByRole("heading", { name: /customers/i })).toBeVisible();
-    await expect(page.getByTestId("customer-workflow-rail")).toBeVisible();
+    await expect(page.getByTestId("customers-premium-header")).toBeVisible();
+    await expect(page.getByTestId("customers-relationship-snapshot")).toBeVisible();
     const readyCustomerRow = page.getByTestId(`customer-row-${fixtureRefs.convertibleCustomerId}`);
     await expect(readyCustomerRow).toContainText(/ready for first job|active relationship|work linked/i);
     await readyCustomerRow.getByRole("button", { name: /more actions/i }).click();
