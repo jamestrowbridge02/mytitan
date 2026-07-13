@@ -747,6 +747,8 @@ export default function SettingsPage() {
   const notificationsEnabled = isNotificationsV1Enabled();
   const automationsEnabled = isAutomationsV1Enabled();
   const [tab, setTab] = useState<TabKey>('general');
+  const [settingsSearch, setSettingsSearch] = useState('');
+  const [settingsDirectoryDismissed, setSettingsDirectoryDismissed] = useState(false);
   const [form, setForm] = useState<any>({});
   const formRef = useRef<any>({});
   const [emailReadiness, setEmailReadiness] = useState<EmailReadiness | null>(null);
@@ -976,6 +978,10 @@ export default function SettingsPage() {
       setTab(normalizedTab);
     }
   }, [router.isReady, router.query.section, router.query.tab, visibleTabs]);
+
+  useEffect(() => {
+    setSettingsDirectoryDismissed(false);
+  }, [router.asPath]);
 
   useEffect(() => {
     if (!visibleTabs.some((item) => item.key === tab)) {
@@ -1681,6 +1687,16 @@ export default function SettingsPage() {
     () => JSON.stringify(settingsPayload) !== JSON.stringify(baselineSettingsPayload),
     [baselineSettingsPayload, settingsPayload],
   );
+  const settingsDirectoryMode = router.isReady && !router.query.tab && !router.query.section && !settingsDirectoryDismissed;
+  const isBusinessProfilePage = tab === 'general' && !settingsDirectoryMode && settingsSection === 'business-profile';
+  const visibleSettingsDirectory = useMemo(() => {
+    const query = settingsSearch.trim().toLowerCase();
+    if (!query) return SETTINGS_DIRECTORY;
+    return SETTINGS_DIRECTORY.filter((item) => {
+      const haystack = `${item.title} ${item.description} ${item.key}`.toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [settingsSearch]);
 
   async function saveSettings() {
     clearNotice();
@@ -1883,15 +1899,61 @@ export default function SettingsPage() {
   <div className="settings-premium-shell">
       <OperatorNotice notice={notice} onDismiss={clearNotice} />
       <OperatorPageHeader
-        eyebrow="Settings"
-        title="Settings"
-        info="Each setting has one edit home. Related pages show summaries and shortcuts only."
+        eyebrow={isBusinessProfilePage ? undefined : 'Settings'}
+        title={isBusinessProfilePage ? 'Business Profile' : 'Settings'}
+        info={isBusinessProfilePage ? 'Business identity and defaults used across customer-facing documents and pages.' : 'Each setting has one edit home. Search or open the canonical section below.'}
         actions={[
-          { label: 'Review connected tools', href: '/dashboard/integrations?section=owner-command', variant: 'secondary' },
-          { label: settings?.guidedSetupCompletedAt ? 'Review setup' : 'Finish setup', href: settings?.guidedSetupCompletedAt ? '/dashboard/settings?tab=jobs&section=template-marketplace' : '/dashboard/setup-wizard', variant: 'primary' },
+          ...(isBusinessProfilePage ? [{ label: savingSettings ? 'Saving...' : settingsDirty ? 'Save changes' : 'Saved', onClick: saveSettings, disabled: savingSettings || !settingsDirty, variant: 'primary' as const }] : []),
+          ...(!isBusinessProfilePage ? [{ label: 'Connected tools', href: '/dashboard/integrations', variant: 'secondary' as const }] : []),
+          ...(!isBusinessProfilePage ? [{ label: settings?.guidedSetupCompletedAt ? 'Review setup' : 'Continue setup', href: settings?.guidedSetupCompletedAt ? '/dashboard/settings/launch-control' : '/dashboard/setup-wizard', variant: 'primary' as const }] : []),
         ]}
-        stats={stats}
+        stats={isBusinessProfilePage ? [] : stats}
       />
+      {settingsDirectoryMode ? (
+        <>
+          <div className="card settings-premium-card" data-testid="settings-directory-home">
+            <label className="settings-premium-label" htmlFor="settings-search">Search settings</label>
+            <input
+              id="settings-search"
+              className="input settings-premium-input"
+              data-testid="settings-search"
+              placeholder="Search logo, VAT, email, booking hours, payments..."
+              value={settingsSearch}
+              onChange={(event) => setSettingsSearch(event.target.value)}
+            />
+            {!settings?.guidedSetupCompletedAt ? (
+              <div className="integration-card" style={{ marginTop: 14 }} data-testid="settings-setup-card">
+                <div>
+                  <strong>Setup progress</strong>
+                  <p className="muted settings-premium-muted" style={{ margin: '4px 0 0 0' }}>Continue guided setup from the canonical checklist.</p>
+                </div>
+                <Link className="button secondary settings-premium-button" href="/dashboard/setup-wizard">Continue setup</Link>
+              </div>
+            ) : null}
+          </div>
+          <div className="settings-tab-grid" data-testid="settings-directory-search-grid">
+            {visibleSettingsDirectory.map((item) => (
+              <Link
+                key={item.key}
+                href={item.href}
+                className="tab-button settings-tab-button active mt-linkCard"
+                data-testid={`settings-directory-search-${item.key}`}
+              >
+                <strong>{item.title}</strong>
+                <span>{item.description}</span>
+              </Link>
+            ))}
+          </div>
+          {!visibleSettingsDirectory.length ? (
+            <div className="card settings-premium-card" data-testid="settings-search-empty">
+              <h2 style={{ marginTop: 0 }}>No settings match this search</h2>
+              <button className="button secondary settings-premium-button" type="button" onClick={() => setSettingsSearch('')}>Clear search</button>
+            </div>
+          ) : null}
+        </>
+      ) : null}
+      {!isBusinessProfilePage ? (
+        <>
       <GuidedSetupProgress enabled={guidedSetupEnabled} incomplete={!settings?.guidedSetupCompletedAt} compact />
       <div className="settings-command-strip" data-testid="settings-command-strip">
         <div className="settings-command-strip__item">
@@ -1997,7 +2059,10 @@ export default function SettingsPage() {
                     key={item.key}
                     data-testid={`settings-tab-${item.key}`}
                     className={`tab-button settings-tab-button ${tab === item.key ? 'active' : ''}`}
-                    onClick={() => setTab(item.key)}
+                    onClick={() => {
+                      setSettingsDirectoryDismissed(true);
+                      setTab(item.key);
+                    }}
                     type="button"
                   >
                     <strong>{item.label}</strong>
@@ -2009,15 +2074,19 @@ export default function SettingsPage() {
           ))}
         </div>
 
+      </div>
+        </>
+      ) : null}
+
         {tab === 'general' && (
           <>
-            <div className="card settings-premium-card" style={{ marginBottom: 12 }} {...getSectionProps('company-profile-hub')} data-testid="company-profile-hub">
+            <div className="card settings-premium-card" style={{ marginBottom: 12, display: settingsDirectoryMode || settingsSection === 'workspace-layout' ? 'none' : undefined }} {...getSectionProps('company-profile-hub')} data-testid="company-profile-hub">
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
                 <div>
-                  <p className="operator-eyebrow">Single source of truth</p>
-                  <h3 style={{ marginTop: 0 }}>Company Profile</h3>
+                  <p className="operator-eyebrow">Business identity</p>
+                  <h3 style={{ marginTop: 0 }}>Profile sections</h3>
                   <p className="muted settings-premium-muted">
-                    These saved settings prefill booking, invoices, job outputs, customer pages, trade pages, emails, and launch checks. Changes are saved through the tenant settings API and written to the audit log.
+                    Manage the details customers see on invoices, job outputs, booking confirmations, emails, and portal pages.
                   </p>
                 </div>
                 <button
@@ -2044,7 +2113,7 @@ export default function SettingsPage() {
               </p>
             </div>
 
-            <div className="card settings-premium-card" style={{ marginBottom: 12 }} {...getSectionProps('business-profile')}>
+            <div className="card settings-premium-card" style={{ marginBottom: 12, display: settingsDirectoryMode || settingsSection === 'workspace-layout' ? 'none' : undefined }} {...getSectionProps('business-profile')}>
               <h3 style={{ marginTop: 0 }}>Business details</h3>
               <p className="muted settings-premium-muted">Set the business identity and contact details operators and customers rely on every day.</p>
               <label className="settings-premium-label">Business name</label>
@@ -2175,7 +2244,7 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="card settings-premium-card" style={{ marginBottom: 12 }}>
+            <div className="card settings-premium-card" style={{ marginBottom: 12, display: settingsSection === 'business-profile' ? 'none' : undefined }}>
               <h3 style={{ marginTop: 0 }}>Operator defaults</h3>
               <p className="muted settings-premium-muted">Choose the first workspace view and keep navigation focused on the areas your team actually uses.</p>
               <label className="settings-premium-label">Default live board</label>
@@ -2212,7 +2281,7 @@ export default function SettingsPage() {
               ))}
             </div>
 
-            <div className="card settings-premium-card" style={{ marginBottom: 12 }} data-testid="settings-workspace-layout-card" {...getSectionProps('workspace-layout')}>
+            <div className="card settings-premium-card" style={{ marginBottom: 12, display: settingsSection === 'business-profile' ? 'none' : undefined }} data-testid="settings-workspace-layout-card" {...getSectionProps('workspace-layout')}>
               <h3 style={{ marginTop: 0 }}>Workspace layout</h3>
               <p className="muted settings-premium-muted">
                 Keep Live Work focused on active work only. Move saved board style and section visibility here instead of editing the live screen directly.
@@ -2334,7 +2403,7 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="card settings-premium-card" style={{ marginBottom: 12 }}>
+            <div className="card settings-premium-card" style={{ marginBottom: 12, display: settingsSection === 'business-profile' ? 'none' : undefined }}>
               <h3 style={{ marginTop: 0 }}>Dashboard & analytics layout</h3>
               <p className="muted settings-premium-muted">
                 Keep Analytics focused on insight. Change the saved default time window and which panels show up from here.
@@ -2456,11 +2525,9 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="card settings-premium-card" style={{ marginBottom: 12 }}>
+            <div className="card settings-premium-card" style={{ marginBottom: 12, display: settingsDirectoryMode || settingsSection === 'workspace-layout' ? 'none' : undefined }}>
               <h3 style={{ marginTop: 0 }}>Branding</h3>
-              <p className="muted settings-premium-muted">Keep the workspace and customer outputs visually consistent from one place.</p>
-              <label className="settings-premium-label">Logo link</label>
-              <input className="input settings-premium-input" value={form.logoUrl || ''} onChange={(e) => setForm({ ...form, logoUrl: e.target.value })} />
+              <p className="muted settings-premium-muted">Keep customer-facing outputs visually consistent.</p>
 
               <label className="settings-premium-label" htmlFor="tenant-logo-file">Upload logo (PNG, JPEG, or WebP)</label>
               <input id="tenant-logo-file" data-testid="tenant-logo-file-input" className="visually-hidden" type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => {
@@ -2529,15 +2596,15 @@ export default function SettingsPage() {
               <button
                 className="button settings-premium-button"
                 type="button"
-                disabled={!logoFile && !String(form.logoUrl || '').trim()}
+                disabled={!logoFile}
                 onClick={uploadLogo}
                 style={{ marginTop: 12 }}
               >
-                {logoFile ? 'Upload logo' : 'Save logo'}
+                Upload logo
               </button>
             </div>
 
-            <div className="card settings-premium-card" style={{ marginBottom: 12 }}>
+            <div className="card settings-premium-card" style={{ marginBottom: 12, display: settingsDirectoryMode || settingsSection === 'workspace-layout' ? 'none' : undefined }}>
               <h3 style={{ marginTop: 0 }}>Finance and tax defaults</h3>
               <p className="muted settings-premium-muted">Set the defaults new jobs and invoices inherit. This supports records and exports, not tax advice.</p>
               <label className="settings-premium-label">
@@ -2552,8 +2619,8 @@ export default function SettingsPage() {
 
               <div className="two-col">
                 <div>
-                  <label className="settings-premium-label">VAT rate (for example 2000 = 20%)</label>
-                  <input className="input settings-premium-input" type="number" min={0} value={form.vatRateBpsDefault || 0} onChange={(e) => setForm({ ...form, vatRateBpsDefault: Number(e.target.value) })} />
+                  <label className="settings-premium-label">VAT rate (%)</label>
+                  <input className="input settings-premium-input" type="number" min={0} step="0.01" value={Number(form.vatRateBpsDefault || 0) / 100} onChange={(e) => setForm({ ...form, vatRateBpsDefault: Math.round(Number(e.target.value || 0) * 100) })} />
                 </div>
                 <div>
                   <label className="settings-premium-label">Currency</label>
@@ -2638,8 +2705,8 @@ export default function SettingsPage() {
             </div>
 
             <div className="card settings-premium-card">
-              <h3 style={{ marginTop: 0 }}>Setup tools</h3>
-              <p className="muted settings-premium-muted">Use setup to guide the workspace without changing saved config paths.</p>
+              <h3 style={{ marginTop: 0 }}>Appearance and layout tools</h3>
+              <p className="muted settings-premium-muted">Theme, navigation, product tour, and setup shortcuts live in application settings.</p>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
                 <button
                   type="button"
@@ -5089,7 +5156,6 @@ export default function SettingsPage() {
           </button>
         </div>
 
-      </div>
       </div>
 </DashboardShell>
   );
