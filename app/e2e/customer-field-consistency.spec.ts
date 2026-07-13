@@ -161,6 +161,9 @@ test.describe("customer field consistency", () => {
     const primaryContact = page.getByLabel("Primary contact");
     const billingCity = page.getByLabel("Billing city");
 
+    await expect(primaryContact).toHaveValue("Jordan Lead");
+    await expect(billingCity).toHaveValue("Bradford");
+
     await primaryContact.fill("Avery Dispatcher");
     await billingCity.fill("Wakefield");
     await saveButton.click();

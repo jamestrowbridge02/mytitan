@@ -558,14 +558,20 @@ test.describe("dashboard workflows", () => {
     expect(revokeResponse.ok()).toBeTruthy();
 
     await page.goto("/dashboard/portal");
-    await expect(page.getByRole("heading", { name: "Portal Ops", exact: true })).toBeVisible();
-    const activeRow = page.locator(".operator-table__row", { hasText: fixtureRefs.portalActiveJobRef }).first();
-    const expiredRow = page.locator(".operator-table__row", { hasText: fixtureRefs.portalExpiredJobRef }).first();
+    await expect(page.getByRole("heading", { name: "Customer Portal", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Customer access/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Appearance/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Payments/i })).toBeVisible();
+    await page.getByRole("button", { name: /Portal links/i }).click();
+    const portalLinksPanel = page.getByTestId("portal-links-panel");
+    const activeRow = portalLinksPanel.locator(".operator-table__row", { hasText: fixtureRefs.portalActiveJobRef }).first();
     await expect(activeRow).toBeVisible();
+    await expect(activeRow).toContainText(/Active/i);
+    await portalLinksPanel.getByRole("button", { name: /Expired/i }).click();
+    const expiredRow = portalLinksPanel.locator(".operator-table__row", { hasText: fixtureRefs.portalExpiredJobRef }).first();
     await expect(expiredRow).toBeVisible();
-    await expect(activeRow).toContainText(/Link active/i);
     const expiredPortalState = expiredRow.locator(".operator-table__cell").nth(1);
-    await expect(expiredPortalState).toContainText(/Link expired|No active link|Regeneration required/i);
+    await expect(expiredPortalState).toContainText(/Expired|Not prepared/i);
     let recoveryButton = expiredRow
       .locator(
         `[data-testid="portal-regenerate-${fixtureRefs.portalExpiredJobId}"], [data-testid="portal-prepare-${fixtureRefs.portalExpiredJobId}"]`,
