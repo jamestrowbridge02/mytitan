@@ -62,8 +62,12 @@ async function resetAnalyticsWorkspace(request: any) {
 }
 
 async function waitForAnalyticsSurface(page: any) {
-  await expect(page.getByRole("heading", { name: "Analytics", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Reports", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Loading analytics", exact: true })).toHaveCount(0, { timeout: 30000 });
+}
+
+async function openReportTab(page: any, name: string) {
+  await page.getByRole("button", { name: new RegExp(`^${name}\\b`, "i") }).click();
 }
 
 test.describe("analytics and benchmarking", () => {
@@ -99,9 +103,11 @@ test.describe("analytics and benchmarking", () => {
     await expect(page.getByTestId("analytics-chart-technician-workload")).toContainText(/Technician workload/i);
     await expect(page.getByTestId("analytics-chart-job-pack-usage")).toContainText(/Job-pack usage/i);
     await expect(page.getByRole("heading", { name: "Pressure areas" })).toBeVisible();
+    await openReportTab(page, "Revenue");
     await expect(page.getByRole("heading", { name: "Revenue and collections" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Capacity and recurring execution" })).toBeVisible();
     await expect(page.getByTestId("analytics-revenue-panel").getByText(/overdue|invoice|quote/i).first()).toBeVisible();
+    await openReportTab(page, "Capacity");
+    await expect(page.getByRole("heading", { name: "Capacity and recurring execution" })).toBeVisible();
     await expect(page.getByTestId("analytics-capacity-panel").getByText(/unassigned due work|overloaded days|recurring/i).first()).toBeVisible();
   });
 
@@ -128,6 +134,7 @@ test.describe("analytics and benchmarking", () => {
     await expect(page.getByTestId("operator-notice-success")).toContainText(/settings saved/i, { timeout: 30000 });
     await page.goto("/dashboard/analytics");
     await waitForAnalyticsSurface(page);
+    await openReportTab(page, "Customers");
     await expect(page.getByTestId("analytics-customer-commercial-signals")).toHaveCount(0);
 
     await page.goto("/dashboard/settings?tab=general");
@@ -140,7 +147,8 @@ test.describe("analytics and benchmarking", () => {
     await page.getByTestId("settings-save-button").click();
     await expect(page.getByTestId("operator-notice-success")).toContainText(/settings saved/i, { timeout: 30000 });
     await page.goto("/dashboard/analytics");
-    await expect(page.getByRole("heading", { name: "Analytics", exact: true })).toBeVisible();
+    await waitForAnalyticsSurface(page);
+    await openReportTab(page, "Customers");
     await expect(page.getByTestId("analytics-customer-commercial-signals")).toBeVisible({ timeout: 20000 });
   });
 
@@ -155,6 +163,7 @@ test.describe("analytics and benchmarking", () => {
     await page.goto("/dashboard/analytics");
     await waitForAnalyticsSurface(page);
     await expect(page.getByTestId("analytics-window-range")).toHaveValue("60");
+    await openReportTab(page, "Customers");
     await expect(page.getByTestId("analytics-customer-commercial-signals")).toHaveCount(0);
     await page.goto("/dashboard/settings?tab=general");
     await expect(page.getByTestId("settings-analytics-layout-reset")).toBeVisible();
@@ -163,6 +172,7 @@ test.describe("analytics and benchmarking", () => {
     await expect(page.getByTestId("operator-notice-success")).toContainText(/settings saved/i, { timeout: 30000 });
     await page.goto("/dashboard/analytics");
     await expect(page.getByTestId("analytics-window-range")).toHaveValue("30");
+    await openReportTab(page, "Customers");
     await expect(page.getByTestId("analytics-customer-commercial-signals")).toBeVisible();
   });
 

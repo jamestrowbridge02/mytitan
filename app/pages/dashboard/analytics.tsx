@@ -10,7 +10,9 @@ import {
   OperatorDataTableHeader,
   OperatorDataTableRow,
   OperatorEmptyStateCard,
+  OperatorFilterField,
   OperatorPageHeader,
+  OperatorSavedViews,
 } from "../../components/ui/operator-page";
 import { apiFetch } from "../../lib/api";
 import { ANALYTICS_WIDGET_KEYS, getAnalyticsWorkspaceLayout, type AnalyticsWidgetKey } from "../../lib/business-config";
@@ -177,7 +179,7 @@ function wait(ms: number) {
 }
 
 function formatMetricValue(value: number | null | undefined, suffix = "") {
-  if (value === null || value === undefined) return "-";
+  if (value === null || value === undefined) return "Not enough data";
   return `${value}${suffix}`;
 }
 
@@ -229,6 +231,8 @@ export function AnalyticsPage({ forceExecutiveSummary = false }: { forceExecutiv
   const [activeLocationId, setActiveLocationId] = useState('all');
   const [loading, setLoading] = useState(true);
   const [savingLayout, setSavingLayout] = useState(false);
+  const [activeReportTab, setActiveReportTab] = useState("overview");
+  const [forecastEvidence, setForecastEvidence] = useState<any | null>(null);
   const { notice, showError, showSuccess, clearNotice } = useOperatorNotice();
 
   const canView = hasWorkspacePermission(permissions, "dashboard.view_intelligence");
@@ -741,22 +745,54 @@ export function AnalyticsPage({ forceExecutiveSummary = false }: { forceExecutiv
     updateWindowDays(30);
     void load(30);
   }
+
+  function exportSummaryCsv() {
+    const rows = [
+      ["Metric", "Value"],
+      ...stats.map((item) => [String(item.label), String(item.value)]),
+    ];
+    const csv = rows.map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `mytitan-reports-${windowDays}-days.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
   const stats = useMemo(() => {
-    if (!executive) return [];
-    return executive.summaryCards.map((card) => ({
-      label: card.label,
-      value: formatMetricValue(card.value, card.suffix || ""),
-      hint: card.detail,
-    }));
-  }, [executive]);
+    return [
+      {
+        label: "Revenue",
+        value: revenue ? formatMoney(revenue.overdueInvoices.amountCents) : "Not enough data",
+        hint: "Outstanding overdue invoice value in this reporting window.",
+      },
+      {
+        label: "Active customers",
+        value: customers ? String(customers.summary.activeCustomers) : "Not enough data",
+        hint: "Customers with active work, plans, or commercial activity.",
+      },
+      {
+        label: "Booking conversion",
+        value: operations ? formatMetricValue(operations.conversions.bookingsToJobsRate, "%") : "Not enough data",
+        hint: "Bookings converted to jobs in this window.",
+      },
+      {
+        label: "Scheduled utilisation",
+        value: capacity?.technicians?.length
+          ? formatMetricValue(Math.round(capacity.technicians.reduce((sum, row) => sum + Number(row.utilizationPct || 0), 0) / capacity.technicians.length), "%")
+          : "Not enough data",
+        hint: "Average utilisation from scheduled and available minutes.",
+      },
+    ];
+  }, [capacity, customers, operations, revenue]);
 
   if (!enabled) {
     return (
       <DashboardShell>
         <div className="operator-stack">
           <OperatorPageHeader
-            eyebrow="Overview"
-            title="Analytics"
+            title="Reports"
             subtitle="Enable Analytics V1 to open the business pulse and trend view."
             stats={[]}
           />
@@ -774,8 +810,7 @@ export function AnalyticsPage({ forceExecutiveSummary = false }: { forceExecutiv
       <DashboardShell>
         <div className="operator-stack">
           <OperatorPageHeader
-            eyebrow="Overview"
-            title="Analytics"
+            title="Reports"
             subtitle="Analytics is limited to roles with intelligence access."
             stats={[]}
           />
@@ -792,26 +827,69 @@ export function AnalyticsPage({ forceExecutiveSummary = false }: { forceExecutiv
     <DashboardShell>
       <div className="operator-stack">
         <OperatorPageHeader
-          eyebrow="Overview"
-          title="Analytics"
-          subtitle="Read the business pulse without reporting clutter getting in the way."
+          title="Reports"
           actions={[
-            ...(canManageRevenue ? [{ label: "Revenue", href: "/dashboard/revenue", variant: "secondary" as const }] : []),
-            { label: "Open schedule", href: "/dashboard/scheduling" },
+            { label: "Export", onClick: exportSummaryCsv },
+            ...(canManageLayout ? [{ label: "Customise", href: "/dashboard/settings?tab=general", variant: "secondary" as const }] : []),
           ]}
-          shortcuts={["Benchmarks compare this workspace with its own recent pace", "Only live workspace data is shown here"]}
           stats={stats}
         />
 
-        {activeLocationId !== "all" ? (
-          <div className="card" style={{ marginBottom: 16 }}>
-            <p className="muted" style={{ margin: 0 }}>This view is filtered to the active business location.</p>
-          </div>
-        ) : null}
-
         <OperatorNotice notice={savingLayout ? null : notice} onDismiss={clearNotice} />
 
-        {!loading && phase6ForecastCards.length ? (
+        <section className="card operator-section">
+          <div className="operator-section__header">
+            <div>
+              <h2 className="operator-section__title">Controls</h2>
+            </div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <OperatorFilterField label="Window">
+                <select
+                  id="analytics-window-range"
+                  className="input"
+                  data-testid="analytics-window-range"
+                  value={windowDays}
+                  onChange={(event) => {
+                    const nextWindowDays = Number(event.target.value);
+                    updateWindowDays(nextWindowDays);
+                    void load(nextWindowDays);
+                  }}
+                >
+                  <option value={7}>7 days</option>
+                  <option value={30}>30 days</option>
+                  <option value={60}>60 days</option>
+                  <option value={90}>90 days</option>
+                </select>
+              </OperatorFilterField>
+              <OperatorFilterField label="Location">
+                <span className="input" title="Filter this view by location.">
+                  {activeLocationId === "all" ? "All locations" : "Filtered location"}
+                </span>
+              </OperatorFilterField>
+            </div>
+          </div>
+          {activeLocationId !== "all" ? (
+            <p className="operator-section__subtitle" style={{ margin: "10px 0 0 0" }}>
+              This view is filtered to the active business location.
+            </p>
+          ) : null}
+        </section>
+
+        <OperatorSavedViews
+          label="Report tabs"
+          activeView={activeReportTab}
+          onChange={setActiveReportTab}
+          views={[
+            { id: "overview", label: "Overview" },
+            { id: "revenue", label: "Revenue" },
+            { id: "work", label: "Work" },
+            { id: "customers", label: "Customers" },
+            { id: "capacity", label: "Capacity" },
+            { id: "forecasts", label: "Forecasts" },
+          ]}
+        />
+
+        {!loading && activeReportTab === "forecasts" && phase6ForecastCards.length ? (
           <section className="card operator-section" data-testid="phase6-forecasting-engine">
             <div className="operator-section__header">
               <div>
@@ -823,61 +901,30 @@ export function AnalyticsPage({ forceExecutiveSummary = false }: { forceExecutiv
               </div>
               <a className="button secondary" href="/dashboard/analytics">Open reports</a>
             </div>
-            <div className="operator-grid operator-grid--four">
+            <OperatorDataTable columns="minmax(180px, 0.8fr) minmax(160px, 0.8fr) minmax(120px, 0.5fr) minmax(220px, 1fr) minmax(120px, auto)">
+              <OperatorDataTableHeader>
+                <div className="operator-table__cell">Signal</div>
+                <div className="operator-table__cell">Current indication</div>
+                <div className="operator-table__cell">Confidence</div>
+                <div className="operator-table__cell">Source</div>
+                <div className="operator-table__cell">Action</div>
+              </OperatorDataTableHeader>
               {phase6ForecastCards.map((card) => (
-                <a className="operator-mini-card mt-linkCard" href={card.href} key={card.key} data-testid={`phase6-forecast-${card.key}`}>
-                  <div className="operator-row">
-                    <strong>{card.title}</strong>
-                    <span className="operator-tag">{card.confidence}</span>
-                  </div>
-                  <p style={{ margin: "8px 0 0" }}><strong>{card.value}</strong></p>
-                  <p className="muted">Source data: {card.source}</p>
-                  <p className="muted">Assumption: {card.assumption}</p>
-                  <p className="muted">Limitation: {card.limitation}</p>
-                  <span className="mt-linkCard__action">Open source records</span>
-                </a>
+                <OperatorDataTableRow key={card.key} data-testid={`phase6-forecast-${card.key}`}>
+                  <div className="operator-table__cell"><strong>{card.title}</strong></div>
+                  <div className="operator-table__cell">{card.value}</div>
+                  <div className="operator-table__cell"><span className="operator-tag">{card.confidence}</span></div>
+                  <div className="operator-table__cell">{card.source}</div>
+                  <div className="operator-table__cell"><button className="button secondary" type="button" onClick={() => setForecastEvidence(card)}>View evidence</button></div>
+                </OperatorDataTableRow>
               ))}
-            </div>
+            </OperatorDataTable>
           </section>
         ) : null}
 
-        <section className="card operator-section">
-          <div className="operator-section__header">
-            <div>
-                <h2 className="operator-section__title">Window</h2>
-              <p className="operator-section__subtitle">Keep this page focused on live insight. Layout choices stay in Settings.</p>
-            </div>
-            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-              <label className="muted" htmlFor="analytics-window-range">Window</label>
-              <select
-                id="analytics-window-range"
-                className="input"
-                data-testid="analytics-window-range"
-                value={windowDays}
-                onChange={(event) => {
-                  const nextWindowDays = Number(event.target.value);
-                  updateWindowDays(nextWindowDays);
-                  void load(nextWindowDays);
-                }}
-              >
-                <option value={7}>7 days</option>
-                <option value={30}>30 days</option>
-                <option value={60}>60 days</option>
-                <option value={90}>90 days</option>
-              </select>
-              {canManageLayout ? <Link className="button secondary" href="/dashboard/settings?tab=general">Open layout settings</Link> : null}
-            </div>
-          </div>
-          <p className="muted" style={{ margin: 0 }}>
-            {canManageLayout
-              ? "Layout settings stay in Settings so this view stays focused on insight."
-              : "Your role can view analytics but cannot change the saved layout."}
-          </p>
-        </section>
-
         {loading ? <LoadingState title="Loading analytics" description="Bringing in live commercial, workload, and conversion signals." /> : null}
 
-        {!loading && phaseWidgets?.widgets?.length ? (
+        {!loading && activeReportTab === "overview" && phaseWidgets?.widgets?.length ? (
           <section className="card operator-section" data-testid="phase1k-custom-kpi-widgets">
             <div className="operator-section__header">
               <div>
@@ -904,7 +951,7 @@ export function AnalyticsPage({ forceExecutiveSummary = false }: { forceExecutiv
           />
         ) : null}
 
-        {!loading && ownerSnapshot.length ? (
+        {!loading && activeReportTab === "overview" && ownerSnapshot.length ? (
           <section className="card operator-section" data-testid="analytics-owner-snapshot">
             <div className="operator-section__header">
               <div>
@@ -948,7 +995,7 @@ export function AnalyticsPage({ forceExecutiveSummary = false }: { forceExecutiv
           </section>
         ) : null}
 
-        {!loading ? (
+        {!loading && (activeReportTab === "overview" || activeReportTab === "work") ? (
           <section className="card operator-section" data-testid="analytics-chart-suite">
             <div className="operator-section__header">
               <div>
@@ -971,7 +1018,7 @@ export function AnalyticsPage({ forceExecutiveSummary = false }: { forceExecutiv
           </section>
         ) : null}
 
-        {!loading && visibleWidgets.includes("executive-summary") && executive ? (
+        {!loading && activeReportTab === "overview" && visibleWidgets.includes("executive-summary") && executive ? (
           <section className="card operator-section" data-testid="analytics-executive-summary">
             <div className="operator-section__header">
               <div>
@@ -1005,7 +1052,7 @@ export function AnalyticsPage({ forceExecutiveSummary = false }: { forceExecutiv
           </section>
         ) : null}
 
-        {!loading && visibleWidgets.includes("pressure-panel") && executive && operations && customers ? (
+        {!loading && activeReportTab === "overview" && visibleWidgets.includes("pressure-panel") && executive && operations && customers ? (
           <section className="card operator-section" data-testid="analytics-pressure-panel">
             <div className="operator-section__header">
               <div>
@@ -1044,7 +1091,7 @@ export function AnalyticsPage({ forceExecutiveSummary = false }: { forceExecutiv
           </section>
         ) : null}
 
-        {!loading && visibleWidgets.includes("revenue-panel") ? (
+        {!loading && activeReportTab === "revenue" && visibleWidgets.includes("revenue-panel") ? (
           <section className="card operator-section" data-testid="analytics-revenue-panel">
             <div className="operator-section__header">
               <div>
@@ -1100,7 +1147,7 @@ export function AnalyticsPage({ forceExecutiveSummary = false }: { forceExecutiv
           </section>
         ) : null}
 
-        {!loading && visibleWidgets.includes("capacity-panel") && capacity && operations ? (
+        {!loading && activeReportTab === "capacity" && visibleWidgets.includes("capacity-panel") && capacity && operations ? (
           <section className="card operator-section" data-testid="analytics-capacity-panel">
             <div className="operator-section__header">
               <div>
@@ -1149,7 +1196,7 @@ export function AnalyticsPage({ forceExecutiveSummary = false }: { forceExecutiv
           </section>
         ) : null}
 
-        {!loading && visibleWidgets.includes("benchmark-delta") && benchmarks && operations && customers ? (
+        {!loading && activeReportTab === "overview" && visibleWidgets.includes("benchmark-delta") && benchmarks && operations && customers ? (
           <section className="card operator-section" data-testid="analytics-benchmark-delta">
             <div className="operator-section__header">
               <div>
@@ -1200,7 +1247,7 @@ export function AnalyticsPage({ forceExecutiveSummary = false }: { forceExecutiv
           </section>
         ) : null}
 
-        {!loading && visibleWidgets.includes("customer-commercial-signals") && customers ? (
+        {!loading && activeReportTab === "customers" && visibleWidgets.includes("customer-commercial-signals") && customers ? (
           <section className="card operator-section" data-testid="analytics-customer-commercial-signals">
             <div className="operator-section__header">
               <div>
@@ -1226,6 +1273,53 @@ export function AnalyticsPage({ forceExecutiveSummary = false }: { forceExecutiv
               })}
             </OperatorDataTable>
           </section>
+        ) : null}
+
+        {!loading && activeReportTab === "work" && operations ? (
+          <section className="card operator-section" data-testid="analytics-work-panel">
+            <div className="operator-section__header">
+              <div>
+                <h2 className="operator-section__title">Work</h2>
+              </div>
+              <Link className="button secondary" href="/dashboard/jobs">Open source records</Link>
+            </div>
+            <div className="analytics-stat-grid">
+              <div className="integration-card">
+                <div className="operator-page__statLabel">Bookings created</div>
+                <div className="operator-page__statValue">{operations.conversions.bookingsCreated}</div>
+              </div>
+              <div className="integration-card">
+                <div className="operator-page__statLabel">Converted to jobs</div>
+                <div className="operator-page__statValue">{operations.conversions.bookingsConverted}</div>
+              </div>
+              <div className="integration-card">
+                <div className="operator-page__statLabel">Recurring execution</div>
+                <div className="operator-page__statValue">{formatMetricValue(operations.servicePlans.executionRate, "%")}</div>
+              </div>
+              <div className="integration-card">
+                <div className="operator-page__statLabel">Unassigned due work</div>
+                <div className="operator-page__statValue">{operations.pressure.unassignedDueWork}</div>
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        {forecastEvidence ? (
+          <div role="dialog" aria-modal="true" aria-label="Forecast evidence" className="operator-modalBackdrop">
+            <section className="card operator-section operator-modalPanel">
+              <div className="operator-section__header">
+                <div>
+                  <h2 id="forecast-evidence-title" className="operator-section__title">{forecastEvidence.title}</h2>
+                </div>
+                <button className="button secondary" type="button" onClick={() => setForecastEvidence(null)}>Close</button>
+              </div>
+              <p><strong>Source:</strong> {forecastEvidence.source}</p>
+              <p><strong>Assumption:</strong> {forecastEvidence.assumption}</p>
+              <p><strong>Limitation:</strong> {forecastEvidence.limitation}</p>
+              <p><strong>Confidence:</strong> {forecastEvidence.confidence}</p>
+              <Link className="button" href={forecastEvidence.href}>Open source records</Link>
+            </section>
+          </div>
         ) : null}
       </div>
     </DashboardShell>
