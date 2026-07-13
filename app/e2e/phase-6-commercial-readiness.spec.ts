@@ -26,7 +26,8 @@ test.describe("phase 6 category leader commercial readiness", () => {
     await loginAs(page, request, defaultOperatorEmail, defaultOperatorPassword);
 
     await page.goto("/dashboard/users", { waitUntil: "networkidle" });
-    await expect(page.getByTestId("phase6-advanced-permissions")).toContainText(/Advanced role foundations/i);
+    await page.getByRole("button", { name: /^Roles & access\b/i }).click();
+    await expect(page.getByTestId("phase6-advanced-permissions")).toContainText(/Role and access matrix/i);
     for (const key of ["owner", "admin", "finance", "dispatcher", "field_worker", "viewer", "location_manager", "commercial_read_only"]) {
       await expect(page.getByTestId(`phase6-role-${key}`)).toBeVisible();
     }
@@ -38,13 +39,16 @@ test.describe("phase 6 category leader commercial readiness", () => {
     await loginAs(page, request, defaultOperatorEmail, defaultOperatorPassword);
 
     await page.goto("/dashboard/analytics", { waitUntil: "networkidle" });
+    await page.getByRole("button", { name: /^Forecasts\b/i }).click();
     await expect(page.getByTestId("phase6-forecasting-engine")).toContainText(/Real source data only/i);
     for (const key of ["revenue", "workload", "technician_capacity", "location_capacity", "invoice_risk", "stock_demand", "absence_impact", "completion_velocity"]) {
-      const card = page.getByTestId(`phase6-forecast-${key}`);
-      await expect(card).toBeVisible();
-      await expect(card).toContainText(/Source data:|Assumption:|Limitation:/i);
-      await expect(card).toContainText(/Low|Medium|High|Limited/i);
-      await expect(card).toHaveAttribute("href", /\/dashboard\//);
+      const row = page.getByTestId(`phase6-forecast-${key}`);
+      await expect(row).toBeVisible();
+      await expect(row).toContainText(/Low|Medium|High|Limited/i);
+      await row.getByRole("button", { name: "View evidence" }).click();
+      await expect(page.getByRole("dialog", { name: /forecast evidence/i })).toContainText(/Source|Assumption|Limitation/i);
+      await expect(page.getByRole("link", { name: "Open source records" })).toHaveAttribute("href", /\/dashboard\//);
+      await page.getByRole("button", { name: "Close" }).click();
     }
     await expect(page.getByTestId("phase6-forecasting-engine")).not.toContainText(/AI generated|guaranteed|fake/i);
   });

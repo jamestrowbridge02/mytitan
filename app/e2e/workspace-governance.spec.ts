@@ -26,8 +26,12 @@ test.describe("workspace governance", () => {
     await expect(page.getByTestId("settings-team-management-card")).toBeVisible();
     await page.getByTestId("settings-open-team-management").click();
 
-    await expect(page.getByRole("heading", { name: "Team management", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Team", exact: true })).toBeVisible();
+    await expect(page.getByTestId("team-members-panel")).toBeVisible();
+    await page.getByRole("button", { name: /^Invitations\b/i }).click();
     await expect(page.getByTestId("team-invite-card")).toBeVisible();
+    await page.getByRole("button", { name: /^Members\b/i }).click();
+    await page.locator(".operator-table__row").first().getByRole("button", { name: "Edit" }).click();
     await expect(page.locator('[data-testid^="team-role-select-"]').first()).toBeVisible();
   });
 
@@ -36,8 +40,11 @@ test.describe("workspace governance", () => {
     await loginAs(page, request, fixtureRefs.workspaceAdminEmail, fixtureRefs.workspaceAdminPassword);
 
     await page.goto("/dashboard/users");
-    await expect(page.getByRole("heading", { name: "Team management", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Team", exact: true })).toBeVisible();
+    await page.getByTestId("team-invite-open").click();
     await expect(page.getByTestId("team-invite-submit")).toBeVisible();
+    await page.getByRole("button", { name: "Close" }).click();
+    await page.locator(".operator-table__row").first().getByRole("button", { name: "Edit" }).click();
     await expect(page.locator('[data-testid^="team-role-select-"]').first()).toBeVisible();
   });
 
@@ -78,6 +85,7 @@ test.describe("workspace governance", () => {
     await loginAs(page, request, defaultOperatorEmail, defaultOperatorPassword);
 
     await page.goto("/dashboard/users");
+    await page.getByRole("button", { name: /^Invitations\b/i }).click();
     await expect(page.getByText(/MyTitan sends the setup email for team access/i)).toBeVisible();
     await expect(page.getByText(/workspace customer-email settings are not used here/i)).toBeVisible();
     await expect(page.getByText(/MyTitan sends the setup email when system email is ready/i)).toBeVisible();
@@ -100,11 +108,12 @@ test.describe("workspace governance", () => {
     });
 
     await page.goto("/dashboard/users");
+    await page.getByTestId("team-invite-open").click();
     await page.getByTestId("team-invite-email").fill(`invite-${Date.now()}@example.com`);
     await page.getByTestId("team-invite-submit").click();
 
     await expect(page.getByText(/MyTitan email is not set up yet\. Configure Email Provider in Platform Admin Infrastructure\./i)).toBeVisible();
-    await expect(page.getByTestId("team-invite-card")).toContainText(/workspace customer-email settings are not used here/i);
+    await expect(page.getByTestId("team-invite-dialog")).toContainText(/workspace customer-email settings are not used here/i);
   });
 
   test("finance roles can run billing actions but not portal lifecycle actions", async ({ page, request }) => {
