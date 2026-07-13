@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { AuditService } from '../audit/audit.service';
 import { AutomationsService } from '../automations/automations.service';
@@ -75,6 +75,14 @@ type NotificationEmailOptions = {
 };
 
 type NotificationDeliveryStatus = 'sent' | 'queued' | 'skipped_no_recipient' | 'unavailable_sender' | 'failed';
+type CommunicationEventClass =
+  | 'CUSTOMER_CONVERSATION'
+  | 'PORTAL_CONVERSATION'
+  | 'MANUAL_CUSTOMER_LOG'
+  | 'CUSTOMER_DELIVERY_EVENT'
+  | 'PLATFORM_OPERATIONAL_ALERT'
+  | 'VALIDATION_E2E_EVENT'
+  | 'INTERNAL_SYSTEM_EVENT';
 
 type OperationalAlertSeverity = 'info' | 'warning' | 'critical';
 type SupportRequestCategory = 'support' | 'billing' | 'integrations' | 'bug_report' | 'feature_request' | 'onboarding';
@@ -1798,6 +1806,7 @@ export class NotificationsService {
         entityId: input.entityId || null,
         metaJson: {
           reasonKey: `operational_alert.${input.reasonKey}`,
+          communicationEventClass: 'PLATFORM_OPERATIONAL_ALERT',
           category: input.category,
           severity,
           opsCategory,
@@ -1896,6 +1905,10 @@ export class NotificationsService {
   }
 
   async sendOperationalAlertSmokeTest(companyId: string) {
+    const runtimeEnv = String(process.env.MYTITAN_RUNTIME_ENV || process.env.MYTITAN_ENV || process.env.NODE_ENV || '').trim().toLowerCase();
+    if (runtimeEnv === 'production' || runtimeEnv === 'prod' || runtimeEnv === '') {
+      throw new BadRequestException('Operational alert smoke tests are disabled in production.');
+    }
     const result = await this.notifyOperationalAlert({
       companyId,
       category: 'workspace_alerts',
@@ -1908,7 +1921,7 @@ export class NotificationsService {
       emailBody: 'Operational alert smoke test\nThis is a sanitized MyTitan tenant ops alert smoke test.',
       entityType: 'tenant',
       entityId: companyId,
-      metaJson: { source: 'ops_alert_smoke_test' },
+      metaJson: { source: 'ops_alert_smoke_test', communicationEventClass: 'PLATFORM_OPERATIONAL_ALERT' },
     });
 
     return {
@@ -2900,6 +2913,54 @@ export class NotificationsService {
     };
   }
 
+  private classifyCommunicationEvent(row: any): CommunicationEventClass {
+    const meta = row?.metaJson || {};
+    const explicit = String(meta.communicationEventClass || '').trim().toUpperCase();
+    if (
+      [
+        'CUSTOMER_CONVERSATION',
+        'PORTAL_CONVERSATION',
+        'MANUAL_CUSTOMER_LOG',
+        'CUSTOMER_DELIVERY_EVENT',
+        'PLATFORM_OPERATIONAL_ALERT',
+        'VALIDATION_E2E_EVENT',
+        'INTERNAL_SYSTEM_EVENT',
+      ].includes(explicit)
+    ) {
+      return explicit as CommunicationEventClass;
+    }
+
+    const source = String(meta.source || '').trim().toLowerCase();
+    const reasonKey = String(meta.reasonKey || row?.type || '').trim().toLowerCase();
+    const type = String(row?.type || '').trim().toLowerCase();
+    const entityType = String(row?.entityType || '').trim().toLowerCase();
+    const channel = String(meta.channel || '').trim().toLowerCase();
+
+    if (source === 'ops_alert_smoke_test' || type === 'operational_alert' || reasonKey.startsWith('operational_alert.')) {
+      return 'PLATFORM_OPERATIONAL_ALERT';
+    }
+    if (source === 'e2e' || source === 'validation_e2e' || reasonKey.startsWith('e2e_') || reasonKey.includes('validation_e2e')) {
+      return 'VALIDATION_E2E_EVENT';
+    }
+    if (entityType === 'tenant' || entityType === 'platform' || reasonKey.includes('summary_dispatch') || reasonKey.startsWith('trial_')) {
+      return 'INTERNAL_SYSTEM_EVENT';
+    }
+    if (channel === 'in_app') return 'PORTAL_CONVERSATION';
+    if (channel === 'manual') return 'MANUAL_CUSTOMER_LOG';
+    if (['email', 'sms', 'whatsapp'].includes(channel)) return 'CUSTOMER_DELIVERY_EVENT';
+    if (['job', 'booking', 'customer', 'trade_account'].includes(entityType)) return 'CUSTOMER_CONVERSATION';
+    return 'INTERNAL_SYSTEM_EVENT';
+  }
+
+  private isTenantVisibleCommunication(row: any) {
+    return [
+      'CUSTOMER_CONVERSATION',
+      'PORTAL_CONVERSATION',
+      'MANUAL_CUSTOMER_LOG',
+      'CUSTOMER_DELIVERY_EVENT',
+    ].includes(this.classifyCommunicationEvent(row));
+  }
+
   async findByIdempotency(companyId: string, idempotencyKey: string) {
     const db = this.prisma as any;
     const row = await db.notification.findFirst({
@@ -2937,10 +2998,10 @@ export class NotificationsService {
     const rows = await db.notification.findMany({
       where,
       orderBy: { createdAt: 'desc' },
-      take,
+      take: Math.min(250, take * 3),
     });
 
-    return rows.map((row: any) => ({
+    return rows.filter((row: any) => this.isTenantVisibleCommunication(row)).slice(0, take).map((row: any) => ({
       id: row.id,
       title: this.sanitizeInAppMessage(row.title || row.type || 'Workspace message', 120),
       message: this.deriveNotificationBody(row),
@@ -2949,6 +3010,7 @@ export class NotificationsService {
       channel: row?.metaJson?.channel || 'in_app',
       status: row?.metaJson?.status || 'queued',
       reasonKey: row?.metaJson?.reasonKey || row.type,
+      eventClass: this.classifyCommunicationEvent(row),
       to: row?.metaJson?.to || null,
       context: this.sanitizeNotificationContext(row?.metaJson?.context || null),
       isRead: Boolean(row.isRead),
@@ -3040,6 +3102,7 @@ export class NotificationsService {
       channel,
       status: 'queued',
       reasonKey: templateKey,
+      communicationEventClass: channel === 'in_app' ? 'PORTAL_CONVERSATION' : channel === 'manual' ? 'MANUAL_CUSTOMER_LOG' : 'CUSTOMER_DELIVERY_EVENT',
       to: payload.to || null,
       context: payload.context || null,
       note,
