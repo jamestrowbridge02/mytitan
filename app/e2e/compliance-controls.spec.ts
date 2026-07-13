@@ -3,6 +3,10 @@ import { authFile, fixtureRefs, hasDashboardAuth, installApiProxy } from "./util
 
 test.use({ storageState: authFile });
 
+async function openComplianceTab(page: any, name: string) {
+  await page.getByRole("button", { name: new RegExp(`^${name}\\b`, "i") }).click();
+}
+
 test.describe("workflow SLA and compliance controls", () => {
   test.describe.configure({ mode: "serial" });
   test.skip(!hasDashboardAuth(), "Seed the E2E fixtures or provide dashboard credentials before running authenticated compliance tests.");
@@ -18,8 +22,10 @@ test.describe("workflow SLA and compliance controls", () => {
     }
     await expect(page.getByTestId("compliance-policy-list")).toContainText(fixtureRefs.complianceQuotePolicyName, { timeout: 20000 });
     await expect(page.getByTestId("compliance-policy-list")).toContainText(fixtureRefs.complianceServicePlanPolicyName);
+    await openComplianceTab(page, "Events");
     await expect(page.getByTestId("compliance-event-list")).toContainText(fixtureRefs.complianceBreachedQuoteNumber);
     await expect(page.getByTestId("compliance-event-list")).toContainText(fixtureRefs.complianceOpenServicePlanName);
+    await openComplianceTab(page, "Exceptions");
     await expect(page.getByTestId("compliance-exception-list")).toContainText(fixtureRefs.complianceOpenExceptionSummary);
     await expect(page.locator("body")).not.toContainText("ISO 27001 readiness");
     await expect(page.locator("body")).not.toContainText("AWS architecture notes");
@@ -33,7 +39,8 @@ test.describe("workflow SLA and compliance controls", () => {
     const suffix = Date.now().toString().slice(-6);
     const name = `E2E compliance policy ${suffix}`;
     const updatedName = `${name} updated`;
-    const form = page.getByTestId("compliance-policy-save");
+    await page.getByTestId("compliance-create-policy").click();
+    let form = page.getByTestId("compliance-policy-save");
     await form.getByPlaceholder("Policy name").fill(name);
     await form.getByRole("combobox").nth(0).selectOption("JOB");
     await form.getByPlaceholder("Trigger status").fill("SCHEDULED");
@@ -45,6 +52,7 @@ test.describe("workflow SLA and compliance controls", () => {
 
     const row = page.locator(".operator-table__row", { hasText: name }).first();
     await row.getByRole("button", { name: "Edit" }).evaluate((element: HTMLButtonElement) => element.click());
+    form = page.getByTestId("compliance-policy-save");
     await form.getByPlaceholder("Policy name").fill(updatedName);
     await page.getByRole("button", { name: "Save policy" }).evaluate((element: HTMLButtonElement) => element.click());
     await expect(page.getByTestId("operator-notice-success")).toContainText(/policy created|policy updated|SLA policy/i);
@@ -55,6 +63,7 @@ test.describe("workflow SLA and compliance controls", () => {
     await installApiProxy(page, request);
     await page.goto("/dashboard/compliance");
     await page.getByTestId("location-scope-switcher").locator("select").selectOption({ label: "All locations" });
+    await openComplianceTab(page, "Events");
     const servicePlanRow = page.locator(".operator-table__row", { hasText: fixtureRefs.complianceOpenServicePlanName }).first();
     await servicePlanRow.getByRole("link", { name: "Open" }).evaluate((element: HTMLAnchorElement) => element.click());
     await page.waitForURL(/\/dashboard\/service-plans$/);
@@ -65,6 +74,7 @@ test.describe("workflow SLA and compliance controls", () => {
     await installApiProxy(page, request);
     await page.goto("/dashboard/compliance");
     await page.getByTestId("location-scope-switcher").locator("select").selectOption({ label: "All locations" });
+    await openComplianceTab(page, "Exceptions");
     const exceptionRow = page.locator(".operator-table__row", { hasText: fixtureRefs.complianceOpenExceptionSummary }).first();
     await exceptionRow.getByRole("link", { name: /job/i }).evaluate((element: HTMLAnchorElement) => element.click());
     await page.waitForURL(new RegExp(`/dashboard/jobs/${fixtureRefs.financeJobId}$`));
@@ -75,6 +85,7 @@ test.describe("workflow SLA and compliance controls", () => {
     await installApiProxy(page, request);
     await page.goto("/dashboard/compliance");
     await page.getByTestId("location-scope-switcher").locator("select").selectOption({ label: "All locations" });
+    await openComplianceTab(page, "Exceptions");
     const token = await page.evaluate(() => window.localStorage.getItem("mytitan_token"));
     expect(token).toBeTruthy();
 
@@ -90,6 +101,7 @@ test.describe("workflow SLA and compliance controls", () => {
     expect(resolveResponse.ok()).toBeTruthy();
     await page.reload();
     await page.getByTestId("location-scope-switcher").locator("select").selectOption({ label: "All locations" });
+    await openComplianceTab(page, "Exceptions");
     await expect(resolveRow).toContainText("RESOLVED");
 
     const dismissRow = page.locator(".operator-table__row", { hasText: fixtureRefs.complianceDismissExceptionSummary }).first();
@@ -104,6 +116,7 @@ test.describe("workflow SLA and compliance controls", () => {
     expect(dismissResponse.ok()).toBeTruthy();
     await page.reload();
     await page.getByTestId("location-scope-switcher").locator("select").selectOption({ label: "All locations" });
+    await openComplianceTab(page, "Exceptions");
     await expect(dismissRow).toContainText("DISMISSED");
   });
 

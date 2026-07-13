@@ -7,8 +7,13 @@ import {
   OperatorDataTable,
   OperatorDataTableHeader,
   OperatorDataTableRow,
+  OperatorActiveFilters,
   OperatorEmptyStateCard,
+  OperatorFilterBar,
+  OperatorFilterField,
   OperatorPageHeader,
+  OperatorRowActions,
+  OperatorSavedViews,
 } from "../../components/ui/operator-page";
 import { apiFetch } from "../../lib/api";
 import { readActiveLocationId, subscribeActiveLocationId } from "../../lib/location-context";
@@ -37,6 +42,8 @@ export default function CompliancePage() {
   const [activeLocationId, setActiveLocationId] = useState("all");
   const [filters, setFilters] = useState({ entityType: "", severity: "", status: "" });
   const [policyForm, setPolicyForm] = useState<any>(DEFAULT_POLICY);
+  const [activeTab, setActiveTab] = useState<"policies" | "events" | "exceptions">("policies");
+  const [policyEditorOpen, setPolicyEditorOpen] = useState(false);
   const { notice, showError, showSuccess, clearNotice } = useOperatorNotice();
 
   const canView = hasWorkspacePermission(permissions, "dashboard.view_intelligence");
@@ -104,6 +111,7 @@ export default function CompliancePage() {
         body: JSON.stringify(payload),
       });
       setPolicyForm(DEFAULT_POLICY);
+      setPolicyEditorOpen(false);
       showSuccess(policyForm.id ? "SLA policy updated" : "SLA policy created");
       await load();
     } catch (error: any) {
@@ -126,7 +134,7 @@ export default function CompliancePage() {
   if (!canView && !loading) {
     return (
       <DashboardShell>
-        <OperatorPageHeader eyebrow="Governance" title="Compliance" subtitle="Workflow SLA and exception controls are restricted to operators with intelligence access." />
+        <OperatorPageHeader title="Compliance" subtitle="Workflow SLA and exception controls are restricted to authorised operators." />
         <OperatorEmptyStateCard title="Compliance access restricted" description="You do not currently have permission to view SLA and compliance controls." />
       </DashboardShell>
     );
@@ -136,9 +144,7 @@ export default function CompliancePage() {
     <DashboardShell>
       <div className="operator-stack">
         <OperatorPageHeader
-          eyebrow="Governance"
           title="Compliance"
-          subtitle="Track workflow deadlines and resolve operational exceptions."
           stats={[
             { label: "Active policies", value: String(summary?.totals?.activePolicies || 0), hint: "Enabled SLA rules" },
             { label: "Open events", value: String(summary?.totals?.openEvents || 0), hint: "SLA timers still running" },
@@ -146,59 +152,83 @@ export default function CompliancePage() {
             { label: "Open exceptions", value: String(summary?.totals?.openExceptions || 0), hint: "Workflow or evidence issues unresolved" },
           ]}
           actions={[
-            { label: "Intelligence", href: "/dashboard/intelligence", variant: "secondary" },
+            ...(canManage ? [{ label: "Create policy", onClick: () => { setPolicyForm(DEFAULT_POLICY); setPolicyEditorOpen(true); }, testId: "compliance-create-policy" }] : []),
             { label: "Analytics", href: "/dashboard/analytics", variant: "secondary" },
-            { label: "Command Centre", href: "/dashboard/command-centre-v2" },
+            { label: "Command Centre", href: "/dashboard/command-centre-v2", variant: "secondary" },
           ]}
         />
 
         <OperatorNotice notice={notice} onDismiss={clearNotice} />
 
+        <OperatorSavedViews
+          label="Compliance tabs"
+          activeView={activeTab}
+          onChange={(view) => setActiveTab(view as typeof activeTab)}
+          views={[
+            { id: "policies", label: "Policies", count: policies.length },
+            { id: "events", label: "Events", count: events.length },
+            { id: "exceptions", label: "Exceptions", count: exceptions.length },
+          ]}
+        />
+
         <section className="card operator-section">
           <div className="operator-section__header">
             <div>
               <h2 className="operator-section__title">Filters</h2>
-              <p className="operator-section__subtitle">Apply the current location scope and narrow the active queue by entity, severity, or state.</p>
             </div>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 12 }}>
-            <select data-testid="compliance-filter-entity" className="input" value={filters.entityType} onChange={(event) => setFilters((prev) => ({ ...prev, entityType: event.target.value }))}>
-              <option value="">All entity types</option>
-              <option value="JOB">Jobs</option>
-              <option value="BOOKING">Bookings</option>
-              <option value="QUOTE">Quotes</option>
-              <option value="APPROVAL">Approvals</option>
-              <option value="SERVICE_PLAN">Service plans</option>
-            </select>
-            <select data-testid="compliance-filter-severity" className="input" value={filters.severity} onChange={(event) => setFilters((prev) => ({ ...prev, severity: event.target.value }))}>
-              <option value="">All severities</option>
-              <option value="WARNING">Warning</option>
-              <option value="CRITICAL">Critical</option>
-            </select>
-            <select data-testid="compliance-filter-status" className="input" value={filters.status} onChange={(event) => setFilters((prev) => ({ ...prev, status: event.target.value }))}>
-              <option value="">All statuses</option>
-              <option value="OPEN">Open</option>
-              <option value="BREACHED">Breached</option>
-              <option value="MET">Met</option>
-              <option value="RESOLVED">Resolved</option>
-              <option value="DISMISSED">Dismissed</option>
-            </select>
-            <div className="integration-card">
-              <strong>Scoped location</strong>
-              <p className="muted" style={{ margin: "6px 0 0 0" }}>
-                {activeLocationId === "all" ? "All locations" : locations.find((row) => row.id === activeLocationId)?.name || "Scoped"}
-              </p>
-            </div>
-          </div>
+          <OperatorFilterBar
+            resultsLabel={`${activeTab === "policies" ? policies.length : activeTab === "events" ? events.length : exceptions.length} shown`}
+            actions={filters.entityType || filters.severity || filters.status ? [{ label: "Reset", variant: "secondary", onClick: () => setFilters({ entityType: "", severity: "", status: "" }) }] : []}
+          >
+            <OperatorFilterField label="Entity">
+              <select data-testid="compliance-filter-entity" className="input" value={filters.entityType} onChange={(event) => setFilters((prev) => ({ ...prev, entityType: event.target.value }))}>
+                <option value="">All entity types</option>
+                <option value="JOB">Jobs</option>
+                <option value="BOOKING">Bookings</option>
+                <option value="QUOTE">Quotes</option>
+                <option value="APPROVAL">Approvals</option>
+                <option value="SERVICE_PLAN">Service plans</option>
+              </select>
+            </OperatorFilterField>
+            <OperatorFilterField label="Severity">
+              <select data-testid="compliance-filter-severity" className="input" value={filters.severity} onChange={(event) => setFilters((prev) => ({ ...prev, severity: event.target.value }))}>
+                <option value="">All severities</option>
+                <option value="WARNING">Warning</option>
+                <option value="CRITICAL">Critical</option>
+              </select>
+            </OperatorFilterField>
+            <OperatorFilterField label="Status">
+              <select data-testid="compliance-filter-status" className="input" value={filters.status} onChange={(event) => setFilters((prev) => ({ ...prev, status: event.target.value }))}>
+                <option value="">All statuses</option>
+                <option value="OPEN">Open</option>
+                <option value="BREACHED">Breached</option>
+                <option value="MET">Met</option>
+                <option value="RESOLVED">Resolved</option>
+                <option value="DISMISSED">Dismissed</option>
+              </select>
+            </OperatorFilterField>
+            <OperatorFilterField label="Location">
+              <span className="input" title="Filter this view by location.">{activeLocationId === "all" ? "All locations" : locations.find((row) => row.id === activeLocationId)?.name || "Scoped"}</span>
+            </OperatorFilterField>
+          </OperatorFilterBar>
+          <OperatorActiveFilters
+            chips={[
+              filters.entityType ? { id: "entity", label: filters.entityType, onClear: () => setFilters((prev) => ({ ...prev, entityType: "" })) } : null,
+              filters.severity ? { id: "severity", label: filters.severity, onClear: () => setFilters((prev) => ({ ...prev, severity: "" })) } : null,
+              filters.status ? { id: "status", label: filters.status, onClear: () => setFilters((prev) => ({ ...prev, status: "" })) } : null,
+            ].filter(Boolean) as any}
+          />
         </section>
 
-        {canManage ? (
+        {policyEditorOpen && canManage ? (
+          <div role="dialog" aria-modal="true" aria-labelledby="compliance-policy-editor-title" className="operator-modalBackdrop">
           <section className="card operator-section">
             <div className="operator-section__header">
               <div>
-                <h2 className="operator-section__title">{policyForm.id ? "Edit SLA policy" : "Create SLA policy"}</h2>
-                <p className="operator-section__subtitle">Start a timer from a workflow state and resolve it when the target state is reached.</p>
+                <h2 id="compliance-policy-editor-title" className="operator-section__title">{policyForm.id ? "Edit policy" : "Create policy"}</h2>
               </div>
+              <button className="button secondary" type="button" onClick={() => { setPolicyEditorOpen(false); setPolicyForm(DEFAULT_POLICY); }}>Close</button>
             </div>
             <div data-testid="compliance-policy-save" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 12 }}>
               <input className="input" placeholder="Policy name" value={policyForm.name} onChange={(event) => setPolicyForm((prev: any) => ({ ...prev, name: event.target.value }))} />
@@ -224,12 +254,13 @@ export default function CompliancePage() {
             </div>
             <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
               <button className="button" type="button" onClick={savePolicy} disabled={saving || !String(policyForm.name || "").trim()}>{saving ? "Saving..." : "Save policy"}</button>
-              {policyForm.id ? <button className="button secondary" type="button" onClick={() => setPolicyForm(DEFAULT_POLICY)}>Cancel edit</button> : null}
+              {policyForm.id ? <button className="button secondary" type="button" onClick={() => setPolicyForm(DEFAULT_POLICY)}>Reset</button> : null}
             </div>
           </section>
+          </div>
         ) : null}
 
-        <section className="card operator-section" data-testid="compliance-policy-list">
+        {activeTab === "policies" ? <section className="card operator-section" data-testid="compliance-policy-list">
           <div className="operator-section__header">
             <div>
               <h2 className="operator-section__title">SLA policies</h2>
@@ -252,17 +283,17 @@ export default function CompliancePage() {
                   <div className="operator-table__cell">{policy.triggerStatus} to {policy.targetStatus}</div>
                   <div className="operator-table__cell">{policy.targetMinutes} mins</div>
                   <div className="operator-table__cell">
-                    {canManage ? <button className="button secondary" type="button" onClick={() => setPolicyForm({ ...policy })}>Edit</button> : <span className="muted">Read only</span>}
+                    {canManage ? <OperatorRowActions primaryAction={{ label: "Edit", onClick: () => { setPolicyForm({ ...policy }); setPolicyEditorOpen(true); } }} actions={[{ label: policy.active ? "Pause" : "Activate", onClick: () => { setPolicyForm({ ...policy, active: !policy.active }); setPolicyEditorOpen(true); } }]} /> : <span className="muted">Read only</span>}
                   </div>
                 </OperatorDataTableRow>
               ))}
             </OperatorDataTable>
           ) : (
-            <OperatorEmptyStateCard title="No SLA policies yet" description="Create one policy to start tracking workflow targets against real entity status transitions." />
+            <OperatorEmptyStateCard title="No policies yet" description="Create a policy to track workflow targets." eyebrow={null} actions={canManage ? [{ label: "Create policy", onClick: () => setPolicyEditorOpen(true) }] : []} />
           )}
-        </section>
+        </section> : null}
 
-        <section className="card operator-section" data-testid="compliance-event-list">
+        {activeTab === "events" ? <section className="card operator-section" data-testid="compliance-event-list">
           <div className="operator-section__header">
             <div>
               <h2 className="operator-section__title">SLA events</h2>
@@ -289,11 +320,11 @@ export default function CompliancePage() {
               ))}
             </OperatorDataTable>
           ) : (
-            <OperatorEmptyStateCard title="No SLA events in scope" description="Events appear when active policies encounter entities in their trigger states." />
+            <OperatorEmptyStateCard title="No events in this view" description="Events appear when active policies find matching work." eyebrow={null} />
           )}
-        </section>
+        </section> : null}
 
-        <section className="card operator-section" data-testid="compliance-exception-list">
+        {activeTab === "exceptions" ? <section className="card operator-section" data-testid="compliance-exception-list">
           <div className="operator-section__header">
             <div>
               <h2 className="operator-section__title">Compliance exceptions</h2>
@@ -314,7 +345,7 @@ export default function CompliancePage() {
                   <div className="operator-table__cell"><strong>{exception.summary}</strong><div className="muted">{exception.kind} · {exception.locationName || "Tenant-wide"}</div></div>
                   <div className="operator-table__cell">{exception.severity}</div>
                   <div className="operator-table__cell">{exception.status}</div>
-                  <div className="operator-table__cell"><Link href={exception.href}>{exception.entityType} {exception.entityId.slice(0, 8)}</Link></div>
+                  <div className="operator-table__cell"><Link href={exception.href}>{exception.entityType}</Link></div>
                   <div className="operator-table__cell">
                     {exception.status === "OPEN" && canManage ? (
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -329,9 +360,9 @@ export default function CompliancePage() {
               ))}
             </OperatorDataTable>
           ) : (
-            <OperatorEmptyStateCard title="No compliance exceptions in scope" description="Open exceptions will show up here as SLA breaches, missing approvals, or missing evidence are detected." />
+            <OperatorEmptyStateCard title="No open exceptions" description="Open exceptions will show up here." eyebrow={null} />
           )}
-        </section>
+        </section> : null}
       </div>
     </DashboardShell>
   );
