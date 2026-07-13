@@ -8,7 +8,7 @@ import {
   normalizePermissionSnapshot,
 } from "../../lib/workspace-permissions";
 
-type DirectoryStatus = "Connected" | "Setup required" | "Needs attention" | "Requires external account" | "Beta" | "Not implemented" | "Not available";
+type DirectoryStatus = "Connected" | "Available" | "Setup required" | "Requires external account" | "Limited / Beta" | "Action required" | "Not available";
 
 type DirectoryCard = {
   key: string;
@@ -57,15 +57,16 @@ const GROUPS: DirectoryCard["group"][] = [
   "Identity",
   "Developer Tools",
 ];
+const CATEGORY_FILTERS = ["All", ...GROUPS] as const;
 
 function statusTone(status: DirectoryStatus) {
   if (status === "Connected") return "success" as const;
-  if (status === "Needs attention") return "warning" as const;
+  if (status === "Action required" || status === "Setup required") return "warning" as const;
   return "neutral" as const;
 }
 
 function simpleConnectionStatus(status?: ConnectionStatus | null): DirectoryStatus {
-  if (status?.connectionState === "needs_reconnect") return "Needs attention";
+  if (status?.connectionState === "needs_reconnect") return "Action required";
   if (status?.connected) return "Connected";
   if (!status?.setupAvailable || status.allowed === false || status.enabled === false) return "Not available";
   return "Setup required";
@@ -81,6 +82,8 @@ export default function IntegrationsPage() {
   const [google, setGoogle] = useState<ConnectionStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [query, setQuery] = useState("");
+  const [category, setCategory] = useState<(typeof CATEGORY_FILTERS)[number]>("All");
 
   const canManage = hasWorkspacePermission(permissions, "settings.manage");
   const canManagePersonal = !["VIEWER", "READ_ONLY"].includes(role);
@@ -127,10 +130,10 @@ export default function IntegrationsPage() {
       ? "Connected"
       : stripe?.readinessState === "not_connected"
         ? "Setup required"
-        : "Needs attention";
+        : "Action required";
     const stripeDescription = stripeStatus === "Connected"
       ? "Customers can pay deposits online."
-      : "Stripe needs to be verified before customers can pay deposits online.";
+      : "Finish Stripe setup before online card payments are offered.";
     const bank = byogByProvider.get("bank-transfer");
     const terminal = byogByProvider.get("manual-card-terminal");
     const email = byogByProvider.get("workspace-sender") || byogByProvider.get("email-sender");
@@ -172,8 +175,8 @@ export default function IntegrationsPage() {
         group: "Payments",
         name: "SumUp",
         status: "Requires external account",
-        description: "Foundation exists for business-owned payment setup. Provider account and credentials are required before checkout can be enabled.",
-        action: "Review payment setup",
+        description: "Connect a supported business-owned SumUp account before taking payments.",
+        action: "View payment options",
         href: "/dashboard/settings/payments?provider=sumup",
         testId: "integration-workspace-row-sumup",
       },
@@ -182,8 +185,8 @@ export default function IntegrationsPage() {
         group: "Payments",
         name: "Square",
         status: "Requires external account",
-        description: "Provider credentials and webhook evidence are required before MyTitan can mark Square ready.",
-        action: "Review payment setup",
+        description: "Connect a supported business-owned Square account before taking payments.",
+        action: "View payment options",
         href: "/dashboard/settings/payments?provider=square",
         testId: "integration-workspace-row-square",
       },
@@ -192,8 +195,8 @@ export default function IntegrationsPage() {
         group: "Payments",
         name: "PayPal",
         status: "Requires external account",
-        description: "PayPal remains setup-gated until a business account, credentials, webhook signing, and payment canary are verified.",
-        action: "Review payment setup",
+        description: "Connect a supported business-owned PayPal account before taking payments.",
+        action: "View payment options",
         href: "/dashboard/settings/payments?provider=paypal-business",
         testId: "integration-workspace-row-paypal",
       },
@@ -202,8 +205,8 @@ export default function IntegrationsPage() {
         group: "Payments",
         name: "Zettle",
         status: "Requires external account",
-        description: "Zettle can be tracked as a business-owned provider, but live readiness requires external provider evidence.",
-        action: "Review payment setup",
+        description: "Connect a supported business-owned Zettle account before taking payments.",
+        action: "View payment options",
         href: "/dashboard/settings/payments?provider=zettle",
         testId: "integration-workspace-row-zettle",
       },
@@ -213,7 +216,7 @@ export default function IntegrationsPage() {
         name: "Xero",
         status: simpleConnectionStatus(xero),
         description: "Connect your accounts so invoices can sync when ready.",
-        action: xero?.connected ? "Manage Xero" : "Connect Xero",
+        action: xero?.connected ? "Manage Xero" : simpleConnectionStatus(xero) === "Not available" ? "Learn more" : "Connect Xero",
         href: "/dashboard/settings/integrations/xero",
         testId: "integration-workspace-row-xero",
       },
@@ -223,7 +226,7 @@ export default function IntegrationsPage() {
         name: "QuickBooks",
         status: simpleConnectionStatus(quickbooks),
         description: "Connect your accounts so invoices can sync when ready.",
-        action: quickbooks?.connected ? "Manage QuickBooks" : "Connect QuickBooks",
+        action: quickbooks?.connected ? "Manage QuickBooks" : simpleConnectionStatus(quickbooks) === "Not available" ? "Learn more" : "Connect QuickBooks",
         href: "/dashboard/settings/integrations/quickbooks",
         testId: "integration-workspace-row-quickbooks",
       },
@@ -231,9 +234,9 @@ export default function IntegrationsPage() {
         key: "sage",
         group: "Accounting",
         name: "Sage",
-        status: "Requires external account",
-        description: "Sage is a setup foundation. OAuth/app registration and tenant mapping evidence are required before sync is available.",
-        action: "Review Sage setup",
+        status: "Not available",
+        description: "Sage sync is not available yet.",
+        action: "Learn more",
         href: "/dashboard/settings/integrations/sage",
         testId: "integration-workspace-row-sage",
       },
@@ -243,7 +246,7 @@ export default function IntegrationsPage() {
         name: "Google Calendar",
         status: simpleConnectionStatus(google),
         description: "Keep supported appointments connected to your calendar.",
-        action: google?.connected ? "Manage Calendar" : "Connect Google Calendar",
+        action: google?.connected ? "Manage" : simpleConnectionStatus(google) === "Not available" ? "Learn more" : "Connect",
         href: "/dashboard/settings/integrations/google-calendar",
         testId: "integration-personal-row-google",
       },
@@ -251,9 +254,9 @@ export default function IntegrationsPage() {
         key: "microsoft-calendar",
         group: "Calendar",
         name: "Microsoft 365 Calendar",
-        status: "Requires external account",
-        description: "Microsoft calendar sync requires Entra app registration and tenant consent before appointments can sync.",
-        action: "Review calendar setup",
+        status: "Not available",
+        description: "Microsoft calendar sync is not available yet.",
+        action: "Learn more",
         href: "/dashboard/settings/integrations/microsoft-calendar",
         testId: "integration-workspace-row-microsoft-calendar",
       },
@@ -261,9 +264,9 @@ export default function IntegrationsPage() {
         key: "email-sender",
         group: "Communications",
         name: "Email sender",
-        status: email?.needsReauth ? "Needs attention" : email?.connected ? "Connected" : "Setup required",
-        description: "Send customer messages from your business address.",
-        action: "Configure Email",
+        status: email?.needsReauth ? "Action required" : email?.connected ? "Connected" : "Available",
+        description: "Send customer messages with MyTitan email delivery.",
+        action: email?.connected ? "Manage" : "Set up",
         href: "/dashboard/settings?tab=messages&section=notifications-email",
         testId: "integration-workspace-row-email",
       },
@@ -271,7 +274,7 @@ export default function IntegrationsPage() {
         key: "whatsapp-business",
         group: "Communications" as const,
         name: "WhatsApp Business",
-        status: whatsapp.needsReauth ? "Needs attention" as const : "Connected" as const,
+        status: whatsapp.needsReauth ? "Action required" as const : "Connected" as const,
         description: "Send supported customer updates through WhatsApp Business.",
         action: "Manage WhatsApp",
         href: "/dashboard/settings?tab=messages&section=notifications",
@@ -281,18 +284,18 @@ export default function IntegrationsPage() {
         key: "twilio-sms",
         group: "Communications" as const,
         name: "Twilio SMS",
-        status: "Requires external account" as const,
-        description: "SMS delivery requires a configured gateway, consent rules, delivery logs, and cost controls before use.",
-        action: "Review message setup",
+        status: "Setup required" as const,
+        description: "Set up SMS before sending customer text messages.",
+        action: "Set up",
         href: "/dashboard/settings?tab=messages&section=notifications",
         testId: "integration-workspace-row-twilio-sms",
       }, {
         key: "whatsapp-business-foundation",
         group: "Communications" as const,
         name: "WhatsApp Business",
-        status: "Requires external account" as const,
-        description: "WhatsApp Business requires provider credentials and webhook verification before it can be marked connected.",
-        action: "Review WhatsApp setup",
+        status: "Setup required" as const,
+        description: "Set up WhatsApp Business before sending customer updates.",
+        action: "Set up",
         href: "/dashboard/settings/integrations/whatsapp-business",
         testId: "integration-workspace-row-whatsapp-business-foundation",
       }] : []),
@@ -300,8 +303,8 @@ export default function IntegrationsPage() {
         key: "maps-directions",
         group: "Maps",
         name: "Provider-neutral directions",
-        status: "Beta",
-        description: "Safe Google, Apple, and provider-neutral directions links can open from saved addresses. Traffic-aware optimisation still needs a configured maps provider.",
+        status: "Limited / Beta",
+        description: "Open directions from saved addresses.",
         action: "Open scheduling",
         href: "/dashboard/scheduling",
         testId: "integration-workspace-row-directions",
@@ -310,9 +313,9 @@ export default function IntegrationsPage() {
         key: "google-maps",
         group: "Maps",
         name: "Google Maps",
-        status: "Requires external account",
-        description: "Travel times, geocoding, and live map views require a configured maps provider key and provider evidence.",
-        action: "Review maps readiness",
+        status: "Not available",
+        description: "Advanced maps and travel-time features are not yet available.",
+        action: "Learn more",
         href: "/dashboard/enterprise#maps",
         testId: "integration-workspace-row-google-maps",
       },
@@ -320,8 +323,8 @@ export default function IntegrationsPage() {
         key: "onedrive",
         group: "Storage",
         name: "OneDrive",
-        status: "Not implemented",
-        description: "External document storage is not active. Files remain in MyTitan storage until a provider-backed connector is implemented and verified.",
+        status: "Not available",
+        description: "External document storage is not yet available.",
         action: "View documents",
         href: "/dashboard/settings/documents-numbering",
         testId: "integration-workspace-row-onedrive",
@@ -330,8 +333,8 @@ export default function IntegrationsPage() {
         key: "google-drive",
         group: "Storage",
         name: "Google Drive",
-        status: "Not implemented",
-        description: "Google Drive export is not live. Provider credentials and sync boundaries are required before activation.",
+        status: "Not available",
+        description: "Google Drive storage is not yet available.",
         action: "View documents",
         href: "/dashboard/settings/documents-numbering",
         testId: "integration-workspace-row-google-drive",
@@ -340,8 +343,8 @@ export default function IntegrationsPage() {
         key: "dropbox",
         group: "Storage",
         name: "Dropbox",
-        status: "Not implemented",
-        description: "Dropbox storage is not implemented and is not shown as connected.",
+        status: "Not available",
+        description: "Dropbox storage is not yet available.",
         action: "View documents",
         href: "/dashboard/settings/documents-numbering",
         testId: "integration-workspace-row-dropbox",
@@ -350,8 +353,8 @@ export default function IntegrationsPage() {
         key: "zapier",
         group: "Automation",
         name: "Zapier",
-        status: canManage ? "Beta" : "Not available",
-        description: "Use scoped API keys and signed webhooks as the safe foundation for Zapier automation.",
+        status: canManage ? "Limited / Beta" : "Not available",
+        description: "Connect approved automations using API tokens and webhooks.",
         action: "Open Developer Tools",
         href: "/dashboard/settings/developer-tools#webhooks",
         testId: "integration-workspace-row-zapier",
@@ -360,8 +363,8 @@ export default function IntegrationsPage() {
         key: "make",
         group: "Automation",
         name: "Make",
-        status: canManage ? "Beta" : "Not available",
-        description: "Use signed webhooks and scoped API keys for Make scenarios. No provider-specific app claim is made.",
+        status: canManage ? "Limited / Beta" : "Not available",
+        description: "Connect approved scenarios using API tokens and webhooks.",
         action: "Open Developer Tools",
         href: "/dashboard/settings/developer-tools#webhooks",
         testId: "integration-workspace-row-make",
@@ -370,7 +373,7 @@ export default function IntegrationsPage() {
         key: "n8n",
         group: "Automation",
         name: "n8n",
-        status: canManage ? "Beta" : "Not available",
+        status: canManage ? "Limited / Beta" : "Not available",
         description: "Self-hosted automation can connect through scoped API keys and signed webhooks.",
         action: "Open Developer Tools",
         href: "/dashboard/settings/developer-tools#api-tokens",
@@ -380,9 +383,9 @@ export default function IntegrationsPage() {
         key: "google-sign-in",
         group: "Identity",
         name: "Google sign-in",
-        status: "Not implemented",
-        description: "Password login remains authoritative. Google sign-in needs OAuth registration, account linking, and security review before launch.",
-        action: "Review security",
+        status: "Not available",
+        description: "Google sign-in is not yet available.",
+        action: "Learn more",
         href: "/dashboard/compliance",
         testId: "integration-workspace-row-google-sign-in",
       },
@@ -390,9 +393,9 @@ export default function IntegrationsPage() {
         key: "microsoft-entra",
         group: "Identity",
         name: "Microsoft Entra ID",
-        status: "Not implemented",
-        description: "Enterprise SSO is a readiness item, not a live login path.",
-        action: "Review security",
+        status: "Not available",
+        description: "Microsoft SSO is not yet available.",
+        action: "Learn more",
         href: "/dashboard/compliance",
         testId: "integration-workspace-row-entra",
       },
@@ -400,9 +403,9 @@ export default function IntegrationsPage() {
         key: "saml-okta",
         group: "Identity",
         name: "SAML / Okta",
-        status: "Not implemented",
-        description: "SAML/Okta requires enterprise identity design, metadata exchange, and tenant-level enforcement before use.",
-        action: "Review security",
+        status: "Not available",
+        description: "SAML and Okta SSO are not yet available.",
+        action: "Learn more",
         href: "/dashboard/compliance",
         testId: "integration-workspace-row-saml-okta",
       },
@@ -412,7 +415,7 @@ export default function IntegrationsPage() {
         name: "API tokens",
         status: canManage ? "Connected" : "Not available",
         description: "Create secure tokens for approved external systems.",
-        action: "Manage Tokens",
+        action: "Manage",
         href: "/dashboard/settings/developer-tools#api-tokens",
         testId: "integration-developer-api-tokens",
       },
@@ -422,17 +425,25 @@ export default function IntegrationsPage() {
         name: "Webhooks",
         status: canManage ? "Connected" : "Not available",
         description: "Send selected business events to approved external systems.",
-        action: "Manage Webhooks",
+        action: "Manage",
         href: "/dashboard/settings/developer-tools#webhooks",
         testId: "integration-developer-webhooks",
       },
     ];
   }, [byogByProvider, canManage, google, quickbooks, stripe, xero]);
 
+  const filteredCards = useMemo(() => {
+    const cleanQuery = query.trim().toLowerCase();
+    return cards.filter((card) => {
+      const categoryMatch = category === "All" || card.group === category;
+      const searchMatch = !cleanQuery || `${card.name} ${card.description} ${card.group}`.toLowerCase().includes(cleanQuery);
+      return categoryMatch && searchMatch;
+    });
+  }, [cards, category, query]);
+
   return (
     <DashboardShell>
       <OperatorPageHeader
-        eyebrow="Settings"
         title="Connected tools"
         subtitle="Connect the services your business uses and go straight to the next setup action."
         actions={[
@@ -449,9 +460,33 @@ export default function IntegrationsPage() {
         </div>
       ) : null}
 
+      <div className="card settings-premium-card" data-testid="connected-tools-search">
+        <label className="settings-premium-label" htmlFor="connected-tools-query">Search tools</label>
+        <input
+          id="connected-tools-query"
+          className="input settings-premium-input"
+          placeholder="Search payments, Xero, email, webhooks..."
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+        />
+        <div className="settings-tab-grid" style={{ marginTop: 14 }} role="tablist" aria-label="Connected tool categories">
+          {CATEGORY_FILTERS.map((filter) => (
+            <button
+              key={filter}
+              type="button"
+              className={`tab-button settings-tab-button ${category === filter ? "active" : ""}`}
+              onClick={() => setCategory(filter)}
+              aria-selected={category === filter}
+            >
+              <strong>{filter}</strong>
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div data-testid="integrations-workspace-section" className="connected-tools-directory">
         {GROUPS.map((group) => {
-          const groupCards = cards.filter((card) => card.group === group);
+          const groupCards = filteredCards.filter((card) => card.group === group);
           if (!groupCards.length || (group === "Developer Tools" && !canManage)) return null;
           return (
             <section className="operator-section" key={group} data-testid={`connected-tools-group-${group.toLowerCase().replace(/\s+/g, "-")}`}>
@@ -489,6 +524,15 @@ export default function IntegrationsPage() {
             </section>
           );
         })}
+        {!filteredCards.length ? (
+          <div className="card settings-premium-card" data-testid="connected-tools-empty">
+            <h2 style={{ marginTop: 0 }}>No tools match this search</h2>
+            <button className="button secondary" type="button" onClick={() => {
+              setQuery("");
+              setCategory("All");
+            }}>Clear search</button>
+          </div>
+        ) : null}
       </div>
     </DashboardShell>
   );
