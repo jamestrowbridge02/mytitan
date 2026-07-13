@@ -11,12 +11,15 @@ test.describe("communications hub", () => {
     await page.goto("/dashboard/communications", { waitUntil: "networkidle" });
 
     await expect(page.getByTestId("communications-hub")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Communications", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Message customer" })).toBeVisible();
     await expect(page.getByTestId("communications-provider-status")).toContainText("Portal messages");
-    await expect(page.getByTestId("communications-provider-status")).toContainText("WhatsApp and SMS");
-    await expect(page.getByTestId("communications-provider-status")).toContainText("Setup only");
-    await expect(page.getByTestId("communications-provider-status").getByText("WhatsApp and SMS").locator("..")).not.toContainText("Ready");
+    await expect(page.getByTestId("communications-provider-status")).toContainText("WhatsApp");
+    await expect(page.getByTestId("communications-provider-status")).toContainText("Setup required");
+    await expect(page.getByTestId("communications-provider-status").getByText("WhatsApp").locator("..")).not.toContainText("Ready");
     await expect(page.getByTestId("communications-thread-view")).toBeVisible();
-    await expect(page.getByRole("link", { name: "Message settings" })).toHaveAttribute("href", "/dashboard/settings?tab=messages");
+    await expect(page.getByTestId("communications-hub").getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/dashboard/settings?tab=messages");
+    await expect(page.getByText(/Operational alert smoke test/i)).toHaveCount(0);
   });
 
   test("command palette exposes communications", async ({ page, request }) => {

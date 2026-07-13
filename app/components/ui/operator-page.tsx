@@ -648,14 +648,16 @@ export function OperatorEmptyStateCard({
   title,
   description,
   actions,
+  eyebrow = "Workspace",
 }: {
   title: string;
   description: string;
   actions?: OperatorAction[];
+  eyebrow?: string | null;
 }) {
   return (
     <div className="operator-empty app-state app-state--empty">
-      <div className="app-state__eyebrow">Workspace</div>
+      {eyebrow ? <div className="app-state__eyebrow">{eyebrow}</div> : null}
       <h3>{title}</h3>
       <p className="muted">{description}</p>
       {actions?.length ? (
