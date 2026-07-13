@@ -213,6 +213,9 @@ export default function Sidebar({
   const [workspaceRole, setWorkspaceRole] = React.useState<string | null>(null);
   const [platformAdmin, setPlatformAdmin] = React.useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = React.useState(false);
+  const [temporaryHoverOpen, setTemporaryHoverOpen] = React.useState(false);
+  const closeHoverTimerRef = React.useRef<number | null>(null);
+  const lastInteractionRef = React.useRef<"pointer" | "keyboard">("pointer");
   const terms = getBusinessTerms(settings);
   const moduleVisibility = getOptionalModuleVisibility(settings);
   const path = router.asPath || router.pathname || "";
@@ -259,10 +262,52 @@ export default function Sidebar({
     return () => window.removeEventListener("mytitan:command-palette-state", onCommandPaletteState);
   }, []);
 
+  React.useEffect(() => {
+    return () => {
+      if (closeHoverTimerRef.current) {
+        window.clearTimeout(closeHoverTimerRef.current);
+      }
+    };
+  }, []);
+
+  React.useEffect(() => {
+    setTemporaryHoverOpen(false);
+  }, [router.asPath]);
+
   if (!showSidebar) return null;
   if (mode === "mobile" && !open) return null;
 
   const isMobile = mode === "mobile";
+
+  function cancelHoverClose() {
+    if (closeHoverTimerRef.current) {
+      window.clearTimeout(closeHoverTimerRef.current);
+      closeHoverTimerRef.current = null;
+    }
+  }
+
+  function openTemporaryHover() {
+    if (isMobile) return;
+    lastInteractionRef.current = "pointer";
+    cancelHoverClose();
+    setTemporaryHoverOpen(true);
+  }
+
+  function scheduleTemporaryHoverClose() {
+    if (isMobile) return;
+    cancelHoverClose();
+    closeHoverTimerRef.current = window.setTimeout(() => {
+      closeHoverTimerRef.current = null;
+      setTemporaryHoverOpen(false);
+      if (lastInteractionRef.current === "pointer") {
+        const active = document.activeElement;
+        const sidebar = document.querySelector(".mt-sidebar--desktopRail");
+        if (active instanceof HTMLElement && sidebar?.contains(active)) {
+          active.blur();
+        }
+      }
+    }, 220);
+  }
 
   function openRouteSearch() {
     onClose?.();
@@ -345,9 +390,24 @@ export default function Sidebar({
     <aside
       aria-label={isMobile ? "Mobile navigation" : undefined}
       aria-hidden={commandPaletteOpen ? true : undefined}
+      aria-expanded={isMobile ? open : temporaryHoverOpen}
+      data-sidebar-mode={isMobile ? "MOBILE_DRAWER" : temporaryHoverOpen ? "TEMPORARY_HOVER" : "PINNED"}
+      data-testid={isMobile ? "mobile-sidebar" : "desktop-sidebar"}
+      onFocus={() => {
+        lastInteractionRef.current = "keyboard";
+        cancelHoverClose();
+      }}
+      onBlur={(event) => {
+        if (!isMobile && !event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          setTemporaryHoverOpen(false);
+        }
+      }}
+      onPointerEnter={openTemporaryHover}
+      onPointerLeave={scheduleTemporaryHoverClose}
       className={cx(
         "mt-sidebar fixed inset-y-0 left-0 h-screen shrink-0",
         isMobile ? "mt-sidebar--mobileDrawer z-[70] md:hidden" : "mt-sidebar--desktopRail z-40 hidden md:block",
+        temporaryHoverOpen && !isMobile && "is-temporary-open",
       )}
       id={isMobile ? "mt-mobile-nav" : undefined}
       style={

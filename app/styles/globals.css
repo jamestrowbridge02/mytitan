@@ -6534,7 +6534,7 @@ table th,
   transition: width 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
 }
 
-[data-shell="app"] .mt-sidebar.mt-sidebar--desktopRail:hover,
+[data-shell="app"] .mt-sidebar.mt-sidebar--desktopRail.is-temporary-open,
 [data-shell="app"] .mt-sidebar.mt-sidebar--desktopRail:focus-within {
   width: var(--mt-sidebar-expanded-width, 220px);
   box-shadow:
@@ -6601,6 +6601,22 @@ table th,
   margin-top: 4px;
 }
 
+.operator-modalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.48);
+}
+
+.operator-modalPanel {
+  width: min(720px, 100%);
+  max-height: min(720px, calc(100dvh - 40px));
+  overflow: auto;
+}
+
 [data-shell="app"] .mt-sidebar.mt-sidebar--desktopRail .mt-sidebar__group {
   display: flex;
   flex-direction: column;
@@ -6632,7 +6648,7 @@ table th,
   transition: max-width 180ms ease, opacity 140ms ease;
 }
 
-[data-shell="app"] .mt-sidebar.mt-sidebar--desktopRail:hover .mt-sidebar__groupTitle,
+[data-shell="app"] .mt-sidebar.mt-sidebar--desktopRail.is-temporary-open .mt-sidebar__groupTitle,
 [data-shell="app"] .mt-sidebar.mt-sidebar--desktopRail:focus-within .mt-sidebar__groupTitle {
   max-width: 160px;
   opacity: 1;
@@ -6739,8 +6755,8 @@ table th,
   transition: opacity 140ms ease, transform 140ms ease, max-width 180ms ease;
 }
 
-[data-shell="app"] .mt-sidebar.mt-sidebar--desktopRail:hover .mt-sidebar__item,
-[data-shell="app"] .mt-sidebar.mt-sidebar--desktopRail:hover .mt-sidebar__logout,
+[data-shell="app"] .mt-sidebar.mt-sidebar--desktopRail.is-temporary-open .mt-sidebar__item,
+[data-shell="app"] .mt-sidebar.mt-sidebar--desktopRail.is-temporary-open .mt-sidebar__logout,
 [data-shell="app"] .mt-sidebar.mt-sidebar--desktopRail:focus-within .mt-sidebar__item,
 [data-shell="app"] .mt-sidebar.mt-sidebar--desktopRail:focus-within .mt-sidebar__logout {
   grid-template-columns: 42px minmax(0, 1fr);
@@ -6749,7 +6765,7 @@ table th,
   padding-inline: 7px 9px;
 }
 
-[data-shell="app"] .mt-sidebar.mt-sidebar--desktopRail:hover .mt-sidebar__label,
+[data-shell="app"] .mt-sidebar.mt-sidebar--desktopRail.is-temporary-open .mt-sidebar__label,
 [data-shell="app"] .mt-sidebar.mt-sidebar--desktopRail:focus-within .mt-sidebar__label {
   max-width: 110px;
   opacity: 1;
@@ -6794,7 +6810,7 @@ table th,
   }
 }
 
-[data-shell="app"] .mt-sidebar.mt-sidebar--desktopRail:hover .mt-sidebar__groupDivider,
+[data-shell="app"] .mt-sidebar.mt-sidebar--desktopRail.is-temporary-open .mt-sidebar__groupDivider,
 [data-shell="app"] .mt-sidebar.mt-sidebar--desktopRail:focus-within .mt-sidebar__groupDivider {
   width: 100%;
 }
@@ -6867,7 +6883,7 @@ table th,
   font-weight: 700;
 }
 
-[data-shell="app"] .mt-sidebar.mt-sidebar--desktopRail:hover .mt-sidebar__searchText,
+[data-shell="app"] .mt-sidebar.mt-sidebar--desktopRail.is-temporary-open .mt-sidebar__searchText,
 [data-shell="app"] .mt-sidebar.mt-sidebar--desktopRail:focus-within .mt-sidebar__searchText {
   opacity: 1;
 }

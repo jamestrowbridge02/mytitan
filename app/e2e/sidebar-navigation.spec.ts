@@ -50,6 +50,12 @@ test.describe("sidebar navigation cleanup", () => {
     const expandedWidth = await sidebar.evaluate((node) => Math.round((node as HTMLElement).getBoundingClientRect().width));
     expect(expandedWidth).toBeGreaterThan(collapsedWidth);
     expect(expandedWidth).toBeLessThanOrEqual(220);
+    await page.mouse.move(520, 240);
+    await expect
+      .poll(async () => sidebar.evaluate((node) => Math.round((node as HTMLElement).getBoundingClientRect().width)), { timeout: 3000 })
+      .toBeLessThanOrEqual(collapsedWidth + 4);
+    await expect(sidebar).toHaveAttribute("data-sidebar-mode", "PINNED");
+    await sidebar.hover();
 
     const sidebarSearch = page.getByTestId("sidebar-global-search");
     await expect(sidebarSearch).toBeVisible();
