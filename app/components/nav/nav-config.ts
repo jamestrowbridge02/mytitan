@@ -61,7 +61,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     title: "Settings",
     items: [
-      { title: "Business Profile", description: "Business details, brand, hours, services, booking, portals, and communications", href: "/dashboard/settings?tab=general&section=company-profile-hub", icon: "settings" },
+      { title: "Business Profile", description: "Business identity, brand, regional defaults, and finance details", href: "/dashboard/settings?tab=general&section=business-profile", icon: "business-profile" },
       { title: "Settings", description: "Workspace controls and workflow preferences", href: "/dashboard/settings", icon: "settings" },
       { title: "Tools", description: "Connected tools and account health", href: "/dashboard/integrations", icon: "integrations" },
     ],

@@ -146,6 +146,8 @@ function shouldShowForRole(item: NavItem, roleMode: SidebarRoleMode) {
 function SidebarIcon({ icon }: { icon?: string }) {
   const common = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
   switch (icon) {
+    case "business-profile":
+      return <svg {...common}><circle cx="12" cy="8" r="3.6" /><path d="M5.5 20v-1.4A5.6 5.6 0 0 1 11.1 13h1.8a5.6 5.6 0 0 1 5.6 5.6V20" /></svg>;
     case "dashboard":
       return <svg {...common}><path d="M3 11.5 12 4l9 7.5" /><path d="M5 10.5V20h14v-9.5" /><path d="M10 20v-5h4v5" /></svg>;
     case "command":
@@ -195,6 +197,33 @@ function SidebarIcon({ icon }: { icon?: string }) {
   }
 }
 
+function BusinessProfileNavIcon({ logoUrl, businessName }: { logoUrl?: string | null; businessName?: string | null }) {
+  const [logoFailed, setLogoFailed] = React.useState(false);
+  const cleanLogoUrl = String(logoUrl || "").trim();
+  const cleanBusinessName = String(businessName || "Business").trim() || "Business";
+
+  React.useEffect(() => {
+    setLogoFailed(false);
+  }, [cleanLogoUrl]);
+
+  if (cleanLogoUrl && !logoFailed) {
+    return (
+      <span className="mt-sidebar__businessAvatar">
+        <img
+          src={cleanLogoUrl}
+          alt={`${cleanBusinessName} business profile`}
+          loading="lazy"
+          decoding="async"
+          onError={() => setLogoFailed(true)}
+          className="mt-sidebar__businessAvatarImage"
+        />
+      </span>
+    );
+  }
+
+  return <SidebarIcon icon="business-profile" />;
+}
+
 export default function Sidebar({
   desktopWidth = 88,
   mode = "desktop",
@@ -220,6 +249,7 @@ export default function Sidebar({
   const moduleVisibility = getOptionalModuleVisibility(settings);
   const path = router.asPath || router.pathname || "";
   const roleMode = resolveSidebarRoleMode(permissions, workspaceRole);
+  const businessName = settings?.companyName || "Business";
 
   const showSidebar = path.startsWith("/dashboard") || path === "/dashboard";
 
@@ -480,7 +510,11 @@ export default function Sidebar({
                         )}
                       >
                         <span className="mt-sidebar__icon" aria-hidden="true">
-                          <SidebarIcon icon={it.icon} />
+                          {it.icon === "business-profile" ? (
+                            <BusinessProfileNavIcon logoUrl={settings?.logoUrl} businessName={businessName} />
+                          ) : (
+                            <SidebarIcon icon={it.icon} />
+                          )}
                         </span>
                         <span className="mt-sidebar__label" aria-hidden="true">{sidebarLabel}</span>
                         <span className="mt-sidebar__dot h-1.5 w-1.5 rounded-full bg-[color:var(--brand-600)]" />

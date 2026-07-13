@@ -6709,6 +6709,24 @@ table th,
   height: 24px;
 }
 
+[data-shell="app"] .mt-sidebar__businessAvatar {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+[data-shell="app"] .mt-sidebar__businessAvatarImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
 [data-shell="app"] .mt-sidebar.mt-sidebar--desktopRail .mt-sidebar__item:hover .mt-sidebar__icon,
 [data-shell="app"] .mt-sidebar.mt-sidebar--desktopRail .mt-sidebar__logout:hover .mt-sidebar__icon {
   color: #0f172a;
