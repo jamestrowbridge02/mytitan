@@ -9,10 +9,36 @@ import {
   IsOptional,
   IsString,
   IsUrl,
+  Validate,
+  ValidatorConstraint,
+  type ValidatorConstraintInterface,
   Max,
   Min,
 } from 'class-validator';
 import { WHEEL_PRICING_MODES } from '../common/constants';
+
+@ValidatorConstraint({ name: 'isBusinessLogoReference', async: false })
+class IsBusinessLogoReferenceConstraint implements ValidatorConstraintInterface {
+  validate(value: unknown) {
+    if (value === null || value === undefined || value === '') return true;
+    if (typeof value !== 'string') return false;
+    const trimmed = value.trim();
+    if (!trimmed) return true;
+    if (/^\/tenant\/public-logo\/[A-Za-z0-9._~%-]+(\/[A-Za-z0-9._~%-]+)?$/.test(trimmed) && !trimmed.includes('..')) {
+      return true;
+    }
+    try {
+      const parsed = new URL(trimmed);
+      return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+    } catch {
+      return false;
+    }
+  }
+
+  defaultMessage() {
+    return 'logoUrl must be an HTTPS URL or a MyTitan public logo reference';
+  }
+}
 
 export class UpdateTenantSettingsDto {
   // Primary trade (feature-flagged)
@@ -76,7 +102,7 @@ export class UpdateTenantSettingsDto {
   businessDisplayJson?: Record<string, any>;
 
   @IsOptional()
-  @IsUrl({ require_tld: false })
+  @Validate(IsBusinessLogoReferenceConstraint)
   logoUrl?: string;
 
   @IsOptional()
@@ -264,6 +290,6 @@ export class UpdateTenantSettingsDto {
 
 export class SetLogoUrlDto {
   @IsOptional()
-  @IsUrl({ require_tld: false })
+  @Validate(IsBusinessLogoReferenceConstraint)
   logoUrl?: string;
 }

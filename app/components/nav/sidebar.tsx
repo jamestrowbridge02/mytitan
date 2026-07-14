@@ -7,7 +7,7 @@ import { getBusinessTerms, getOptionalModuleVisibility } from "../../lib/busines
 import { isLogoutV1Enabled } from "../../lib/feature-flags";
 import { useTenantSettings } from "../../lib/tenant-settings";
 import { emptyPermissionSnapshot, normalizePermissionSnapshot } from "../../lib/workspace-permissions";
-import MyTitanLogo from "../brand/mytitan-logo";
+import { resolveMediaUrl } from "../../lib/media";
 
 type SidebarRoleMode = "owner" | "finance" | "technician" | "operator";
 
@@ -197,31 +197,111 @@ function SidebarIcon({ icon }: { icon?: string }) {
   }
 }
 
-function BusinessProfileNavIcon({ logoUrl, businessName }: { logoUrl?: string | null; businessName?: string | null }) {
+function resolveBusinessInitials(name?: string | null) {
+  const cleanName = String(name || "").replace(/^__+/, "").trim();
+  if (!cleanName) return "";
+  const words = cleanName
+    .split(/[\s&+.,/-]+/)
+    .map((word) => word.trim())
+    .filter(Boolean);
+  if (!words.length) return "";
+  return words.slice(0, 2).map((word) => word[0]?.toUpperCase()).join("");
+}
+
+function ProfileFallbackIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="8" r="3.6" />
+      <path d="M5.5 20v-1.4A5.6 5.6 0 0 1 11.1 13h1.8a5.6 5.6 0 0 1 5.6 5.6V20" />
+    </svg>
+  );
+}
+
+function BusinessIdentityMark({
+  logoUrl,
+  businessName,
+  size = "nav",
+}: {
+  logoUrl?: string | null;
+  businessName?: string | null;
+  size?: "brand" | "nav";
+}) {
   const [logoFailed, setLogoFailed] = React.useState(false);
-  const cleanLogoUrl = String(logoUrl || "").trim();
-  const cleanBusinessName = String(businessName || "Business").trim() || "Business";
+  const cleanLogoUrl = resolveMediaUrl(logoUrl);
+  const cleanBusinessName = String(businessName || "").trim();
+  const initials = resolveBusinessInitials(cleanBusinessName);
 
   React.useEffect(() => {
     setLogoFailed(false);
   }, [cleanLogoUrl]);
 
-  if (cleanLogoUrl && !logoFailed) {
-    return (
-      <span className="mt-sidebar__businessAvatar">
+  return (
+    <span
+      className={cx("mt-sidebar__businessAvatar", size === "brand" && "mt-sidebar__businessAvatar--brand")}
+      data-testid="sidebar-business-identity-mark"
+      data-fallback={cleanLogoUrl && !logoFailed ? "logo" : initials ? "initials" : "profile"}
+      aria-hidden="true"
+    >
+      {cleanLogoUrl && !logoFailed ? (
         <img
           src={cleanLogoUrl}
-          alt={`${cleanBusinessName} business profile`}
+          alt=""
           loading="lazy"
           decoding="async"
           onError={() => setLogoFailed(true)}
           className="mt-sidebar__businessAvatarImage"
+          data-testid="sidebar-business-logo"
         />
-      </span>
-    );
-  }
+      ) : initials ? (
+        <span className="mt-sidebar__businessInitials" data-testid="sidebar-business-initials">
+          {initials}
+        </span>
+      ) : (
+        <span className="mt-sidebar__businessFallbackIcon" data-testid="sidebar-business-profile-fallback">
+          <ProfileFallbackIcon />
+        </span>
+      )}
+    </span>
+  );
+}
 
-  return <SidebarIcon icon="business-profile" />;
+function BusinessSidebarIdentity({
+  logoUrl,
+  businessName,
+  expanded,
+  onClose,
+}: {
+  logoUrl?: string | null;
+  businessName?: string | null;
+  expanded: boolean;
+  onClose?: () => void;
+}) {
+  const rawBusinessName = String(businessName || "").trim();
+  const displayBusinessName = rawBusinessName || "Business";
+  const label = `${displayBusinessName} — powered by MyTitan`;
+
+  return (
+    <Link
+      href="/dashboard/settings?tab=general&section=business-profile"
+      className={cx("mt-sidebar__brandLink", expanded && "is-expanded")}
+      aria-label={label}
+      title={label}
+      data-testid="sidebar-business-identity"
+      onClick={() => onClose?.()}
+    >
+      <BusinessIdentityMark logoUrl={logoUrl} businessName={rawBusinessName} size="brand" />
+      <span className="mt-sidebar__brandCopy" aria-hidden={!expanded}>
+        <span className="mt-sidebar__productName">MyTitan</span>
+        <span className="mt-sidebar__businessName" title={displayBusinessName} data-testid="sidebar-business-name">
+          {displayBusinessName}
+        </span>
+      </span>
+    </Link>
+  );
+}
+
+function BusinessProfileNavIcon({ logoUrl, businessName }: { logoUrl?: string | null; businessName?: string | null }) {
+  return <BusinessIdentityMark logoUrl={logoUrl} businessName={businessName} />;
 }
 
 export default function Sidebar({
@@ -249,7 +329,8 @@ export default function Sidebar({
   const moduleVisibility = getOptionalModuleVisibility(settings);
   const path = router.asPath || router.pathname || "";
   const roleMode = resolveSidebarRoleMode(permissions, workspaceRole);
-  const businessName = settings?.companyName || "Business";
+  const businessIdentity = settings as (typeof settings & { tradingName?: string | null; registeredBusinessName?: string | null });
+  const businessName = settings?.companyName || businessIdentity?.tradingName || businessIdentity?.registeredBusinessName || "";
 
   const showSidebar = path.startsWith("/dashboard") || path === "/dashboard";
 
@@ -450,9 +531,7 @@ export default function Sidebar({
       <div className="mt-sidebar__frame flex h-full min-h-0 flex-col px-2 py-2.5">
         {isMobile ? (
           <div className="mt-sidebar__mobileHeader">
-            <Link href="/dashboard" className="mt-sidebar__mobileBrand" aria-label="MyTitan dashboard home" onClick={() => onClose?.()}>
-              <MyTitanLogo variant="wordmark" size="md" />
-            </Link>
+            <BusinessSidebarIdentity logoUrl={settings?.logoUrl} businessName={businessName} expanded onClose={onClose} />
             <button type="button" className="mt-sidebar__mobileClose" onClick={onClose} aria-label="Close navigation">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M6 6l12 12" />
@@ -461,11 +540,11 @@ export default function Sidebar({
             </button>
           </div>
         ) : null}
-        <div className="mt-sidebar__brand rounded-[24px] px-1.5 py-1.5" data-testid="sidebar-brand">
-          <Link href="/dashboard" className="mt-sidebar__brandLink flex items-center justify-center" aria-label="MyTitan dashboard home" title="MyTitan dashboard home" onClick={() => onClose?.()}>
-            <MyTitanLogo variant={isMobile ? "wordmark" : "mark"} size={isMobile ? "md" : "lg"} className="mt-sidebar__brandLogo" />
-          </Link>
-        </div>
+        {!isMobile ? (
+          <div className="mt-sidebar__brand rounded-[24px] px-1.5 py-1.5" data-testid="sidebar-brand">
+            <BusinessSidebarIdentity logoUrl={settings?.logoUrl} businessName={businessName} expanded={temporaryHoverOpen} onClose={onClose} />
+          </div>
+        ) : null}
 
         <button
           type="button"

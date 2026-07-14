@@ -8,7 +8,6 @@ import { Role } from '../common/constants';
 import { classifyNonRoutableRecipientEmail } from '../common/email-recipient-hygiene';
 import { assertPermission } from '../common/permissions';
 import { DEFAULT_WORKSPACE_CURRENCY, DEFAULT_WORKSPACE_LOCALE, DEFAULT_WORKSPACE_TIMEZONE } from '../common/geo-defaults';
-import { buildApiUrl } from '../common/public-url';
 import {
   getInternalMonitoringSnapshot,
   type InternalMonitoringAction,
@@ -696,8 +695,7 @@ export class TenantService {
       throw new BadRequestException('File name is required');
     }
 
-    const logoPath = `/tenant/public-logo/${tenantId}/${encodeURIComponent(fileName)}`;
-    const logoUrl = buildApiUrl(logoPath);
+    const logoUrl = `/tenant/public-logo/${encodeURIComponent(fileName)}`;
     const updated = await db.tenantSetting.upsert({
       where: { tenantId },
       update: { logoUrl },

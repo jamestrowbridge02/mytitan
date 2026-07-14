@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { CustomFieldManager } from '../../components/custom-fields/CustomFieldManager';
@@ -6,6 +7,7 @@ import { OperatorNotice } from '../../components/feedback/OperatorNotice';
 import { useOperatorNotice } from '../../components/feedback/useOperatorNotice';
 import { DashboardShell } from '../../components/dashboard-shell';
 import { GuidedSetupProgress } from '../../components/guided-setup-progress';
+import { SafeImage } from '../../components/media/SafeImage';
 import { OperatorPageHeader } from '../../components/ui/operator-page';
 import { apiFetch } from '../../lib/api';
 import { UPLOAD_LIMITS, validateUploadFile } from '../../lib/upload-policy';
@@ -289,6 +291,11 @@ function normalizeOptionalString(value: unknown) {
   return next ? next : undefined;
 }
 
+function cloneJsonValue<T>(value: T): T {
+  if (value === undefined || value === null) return value;
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
 function getJobFieldCategory(type: string) {
   switch (String(type || '').toLowerCase()) {
     case 'checkbox':
@@ -462,6 +469,10 @@ function settingsValueContains(actual: any, expected: any): boolean {
     if (!actual || typeof actual !== 'object' || Array.isArray(actual)) return false;
     return Object.keys(expected).every((key) => settingsValueContains(actual[key], expected[key]));
   }
+  return JSON.stringify(canonicalSettingsValue(actual)) === JSON.stringify(canonicalSettingsValue(expected));
+}
+
+function settingsPayloadsMatch(actual: any, expected: any): boolean {
   return JSON.stringify(canonicalSettingsValue(actual)) === JSON.stringify(canonicalSettingsValue(expected));
 }
 
@@ -743,14 +754,34 @@ export default function SettingsPage() {
   const { settings, loading: settingsLoading, refresh, setLocalSettings } = useTenantSettings();
   const { features, planCode } = useEntitlements();
   const router = useRouter();
+  const routeSearchParams = useMemo(() => {
+    const query = String(router.asPath || '').split('?')[1]?.split('#')[0] || '';
+    return new URLSearchParams(query);
+  }, [router.asPath]);
   const guidedSetupEnabled = isGuidedSetupV2Enabled();
   const notificationsEnabled = isNotificationsV1Enabled();
   const automationsEnabled = isAutomationsV1Enabled();
   const [tab, setTab] = useState<TabKey>('general');
   const [settingsSearch, setSettingsSearch] = useState('');
   const [settingsDirectoryDismissed, setSettingsDirectoryDismissed] = useState(false);
-  const [form, setForm] = useState<any>({});
+  const [form, setFormState] = useState<any>({});
   const formRef = useRef<any>({});
+  const formRevisionRef = useRef(0);
+  const latestConfirmedSettingsPayloadRef = useRef<any | null>(null);
+  const savingSettingsRef = useRef(false);
+  const setForm = useCallback((nextFormOrUpdater: any, options?: { markDirty?: boolean }) => {
+    if (options?.markDirty !== false) {
+      formRevisionRef.current += 1;
+    }
+    const currentForm = formRef.current || {};
+    const nextForm =
+      typeof nextFormOrUpdater === 'function'
+        ? nextFormOrUpdater(currentForm)
+        : nextFormOrUpdater;
+    formRef.current = nextForm;
+    setFormState(nextForm);
+  }, []);
+  const [savedSettingsPayload, setSavedSettingsPayload] = useState<any | null>(null);
   const [emailReadiness, setEmailReadiness] = useState<EmailReadiness | null>(null);
   const [systemEmailReadiness, setSystemEmailReadiness] = useState<EmailReadiness | null>(null);
   const [summaryReadiness, setSummaryReadiness] = useState<any>(null);
@@ -761,6 +792,7 @@ export default function SettingsPage() {
   const [previewingSummary, setPreviewingSummary] = useState(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreviewUrl, setLogoPreviewUrl] = useState('');
+  const [logoUploading, setLogoUploading] = useState(false);
   const [geoDefaults, setGeoDefaults] = useState<GeoDefaults | null>(null);
   const [notificationPrefs, setNotificationPrefs] = useState<any>(null);
   const [serviceRecordRecipientDraft, setServiceRecordRecipientDraft] = useState('');
@@ -787,7 +819,7 @@ export default function SettingsPage() {
   const [templateActionLoading, setTemplateActionLoading] = useState('');
   const [permissions, setPermissions] = useState(() => emptyPermissionSnapshot());
   const [permissionsReady, setPermissionsReady] = useState(false);
-  const { notice, showSuccess, showError, clearNotice } = useOperatorNotice();
+  const { notice, showSuccess, showError, clearNotice } = useOperatorNotice(8000);
 
   const canManageSettings = hasWorkspacePermission(permissions, 'settings.manage');
   const canManageWorkflow = hasWorkspacePermission(permissions, 'workflow.manage');
@@ -811,13 +843,8 @@ export default function SettingsPage() {
   );
 
   const updateForm = useCallback((updater: any) => {
-    const next =
-      typeof updater === 'function'
-        ? updater(formRef.current || {})
-        : updater;
-    formRef.current = next;
-    setForm(next);
-  }, []);
+    setForm(updater);
+  }, [setForm]);
 
   useEffect(() => {
     formRef.current = form;
@@ -825,9 +852,20 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (settings) {
-      const nextForm = { ...settings };
+      const nextForm = cloneJsonValue(settings);
+      const incomingPayload = buildSettingsPayload(nextForm);
+      const latestConfirmedPayload = latestConfirmedSettingsPayloadRef.current;
+      const currentPayload = buildSettingsPayload(formRef.current || {});
+      if (
+        latestConfirmedPayload
+        && settingsPayloadsMatch(currentPayload, latestConfirmedPayload)
+        && !settingsPayloadsMatch(incomingPayload, latestConfirmedPayload)
+      ) {
+        return;
+      }
       formRef.current = nextForm;
-      setForm(nextForm);
+      setForm(nextForm, { markDirty: false });
+      setSavedSettingsPayload(cloneJsonValue(incomingPayload));
       setSelectedTemplateId(String(settings.activeJobSheetTemplateId || ''));
     }
   }, [settings]);
@@ -967,8 +1005,8 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (!router.isReady) return;
-    const queryTab = typeof router.query.tab === 'string' ? router.query.tab : '';
-    const querySection = typeof router.query.section === 'string' ? router.query.section : '';
+    const queryTab = typeof router.query.tab === 'string' ? router.query.tab : routeSearchParams.get('tab') || '';
+    const querySection = typeof router.query.section === 'string' ? router.query.section : routeSearchParams.get('section') || '';
     if (queryTab === 'integrations') {
       void router.replace('/dashboard/integrations');
       return;
@@ -977,7 +1015,7 @@ export default function SettingsPage() {
     if (normalizedTab && visibleTabs.some((item) => item.key === normalizedTab)) {
       setTab(normalizedTab);
     }
-  }, [router.isReady, router.query.section, router.query.tab, visibleTabs]);
+  }, [routeSearchParams, router.isReady, router.query.section, router.query.tab, visibleTabs]);
 
   useEffect(() => {
     setSettingsDirectoryDismissed(false);
@@ -1051,9 +1089,10 @@ export default function SettingsPage() {
   }, [tab]);
 
   const themeMode = form.themeMode === 'dark' || form.themeMode === 'system' ? form.themeMode : 'light';
-  const settingsSection = typeof router.query.section === 'string' ? router.query.section : '';
-  const settingsChannel = typeof router.query.channel === 'string' ? router.query.channel : '';
-  const templateTarget = typeof router.query.templateId === 'string' ? `template-${router.query.templateId}` : '';
+  const settingsSection = typeof router.query.section === 'string' ? router.query.section : routeSearchParams.get('section') || '';
+  const settingsChannel = typeof router.query.channel === 'string' ? router.query.channel : routeSearchParams.get('channel') || '';
+  const templateQueryId = typeof router.query.templateId === 'string' ? router.query.templateId : routeSearchParams.get('templateId') || '';
+  const templateTarget = templateQueryId ? `template-${templateQueryId}` : '';
   const channelTarget = settingsChannel === 'email' ? 'channel-email' : settingsChannel === 'summary' ? 'summary-email' : settingsChannel === 'ops' ? 'ops-alerts' : '';
   const { getSectionProps } = useSectionTargeting({
     targetKey: templateTarget || channelTarget || settingsSection,
@@ -1163,6 +1202,47 @@ export default function SettingsPage() {
       ...prev,
       businessConfigJson: updater((prev?.businessConfigJson && typeof prev.businessConfigJson === 'object') ? prev.businessConfigJson : {}),
     }));
+  }
+
+  function updateAnalyticsConfig(updater: (current: {
+    widgetOrder: AnalyticsWidgetKey[];
+    hiddenWidgets: AnalyticsWidgetKey[];
+    defaultWindowDays: number;
+  }) => {
+    widgetOrder?: AnalyticsWidgetKey[];
+    hiddenWidgets?: AnalyticsWidgetKey[];
+    defaultWindowDays?: number;
+  }) {
+    updateBusinessConfig((current) => {
+      const analytics = current.analytics && typeof current.analytics === 'object' ? current.analytics : {};
+      const currentOrder = Array.isArray((analytics as any).widgetOrder)
+        ? (analytics as any).widgetOrder
+            .map((value: unknown) => String(value || '').trim())
+            .filter((value: string): value is AnalyticsWidgetKey => ANALYTICS_WIDGET_KEYS.includes(value as AnalyticsWidgetKey))
+        : [];
+      const currentHidden = Array.isArray((analytics as any).hiddenWidgets)
+        ? (analytics as any).hiddenWidgets
+            .map((value: unknown) => String(value || '').trim())
+            .filter((value: string): value is AnalyticsWidgetKey => ANALYTICS_WIDGET_KEYS.includes(value as AnalyticsWidgetKey))
+        : [];
+      const next = updater({
+        widgetOrder: Array.from(new Set([...(currentOrder.length ? currentOrder : ANALYTICS_WIDGET_KEYS), ...ANALYTICS_WIDGET_KEYS])) as AnalyticsWidgetKey[],
+        hiddenWidgets: Array.from(new Set(currentHidden)) as AnalyticsWidgetKey[],
+        defaultWindowDays: Math.max(7, Math.min(90, Number((analytics as any).defaultWindowDays || 30))),
+      });
+      const nextOrder = Array.from(new Set([...(next.widgetOrder || currentOrder), ...ANALYTICS_WIDGET_KEYS])) as AnalyticsWidgetKey[];
+      const nextHidden = Array.from(new Set(next.hiddenWidgets || []))
+        .filter((value): value is AnalyticsWidgetKey => ANALYTICS_WIDGET_KEYS.includes(value as AnalyticsWidgetKey));
+      return {
+        ...current,
+        analytics: {
+          ...analytics,
+          widgetOrder: nextOrder,
+          hiddenWidgets: nextHidden,
+          defaultWindowDays: Math.max(7, Math.min(90, Number(next.defaultWindowDays ?? (analytics as any).defaultWindowDays ?? 30))),
+        },
+      };
+    });
   }
 
   function applyRegionDefaults(countryCode: string) {
@@ -1682,12 +1762,15 @@ export default function SettingsPage() {
     [form.bookingPublicEnabled, form.companyName, form.contactEmail, form.emailReplyTo, form.featureCustomerPortal, form.featurePayments, form.logoUrl, form.paymentsEnabled, form.brandPrimaryColor, form.taxLabel, form.taxRegistrationNumber],
   );
   const settingsPayload = useMemo(() => buildSettingsPayload(form), [form]);
-  const baselineSettingsPayload = useMemo(() => buildSettingsPayload(settings || {}), [settings]);
+  const providerSettingsPayload = useMemo(() => buildSettingsPayload(settings || {}), [settings]);
+  const baselineSettingsPayload = savedSettingsPayload || providerSettingsPayload;
   const settingsDirty = useMemo(
-    () => JSON.stringify(settingsPayload) !== JSON.stringify(baselineSettingsPayload),
+    () => !settingsPayloadsMatch(baselineSettingsPayload, settingsPayload),
     [baselineSettingsPayload, settingsPayload],
   );
-  const settingsDirectoryMode = router.isReady && !router.query.tab && !router.query.section && !settingsDirectoryDismissed;
+  const hasSettingsRouteTarget = Boolean(router.query.tab || router.query.section || routeSearchParams.get('tab') || routeSearchParams.get('section'));
+  const settingsDirectoryMode = router.isReady && !hasSettingsRouteTarget && !settingsDirectoryDismissed;
+  const focusedSettingsSection = Boolean(settingsSection);
   const isBusinessProfilePage = tab === 'general' && !settingsDirectoryMode && settingsSection === 'business-profile';
   const visibleSettingsDirectory = useMemo(() => {
     const query = settingsSearch.trim().toLowerCase();
@@ -1699,26 +1782,40 @@ export default function SettingsPage() {
   }, [settingsSearch]);
 
   async function saveSettings() {
+    if (savingSettingsRef.current) return;
     clearNotice();
-    const nextPayload = buildSettingsPayload(formRef.current || {});
-    const isDirty = JSON.stringify(nextPayload) !== JSON.stringify(baselineSettingsPayload);
-    if (!isDirty) {
-      showSuccess('No unsaved settings changes');
-      return;
-    }
-    setSavingSettings(true);
     try {
-      await apiFetch('/tenant/settings', {
+      const nextPayload = buildSettingsPayload(formRef.current || {});
+      const submittedRevision = formRevisionRef.current;
+      const isDirty = !settingsPayloadsMatch(baselineSettingsPayload, nextPayload);
+      if (!isDirty) {
+        showSuccess('No unsaved settings changes');
+        return;
+      }
+      savingSettingsRef.current = true;
+      setSavingSettings(true);
+      const updatedSettings = await apiFetch('/tenant/settings', {
         method: 'PUT',
         body: JSON.stringify(nextPayload),
       });
-      const persisted = await apiFetch('/tenant/settings');
-      const persistedPayload = buildSettingsPayload(persisted || {});
-      if (!settingsValueContains(persistedPayload, nextPayload)) {
-        throw new Error('Settings were not fully persisted. Reload and try again.');
+      const confirmedSettings = cloneJsonValue(updatedSettings || {});
+      const confirmedPayload = buildSettingsPayload(confirmedSettings);
+      latestConfirmedSettingsPayloadRef.current = cloneJsonValue(confirmedPayload);
+      const currentPayloadAtCompletion = buildSettingsPayload(formRef.current || {});
+      const hasNoNewMeaningfulEdits =
+        formRevisionRef.current === submittedRevision
+        || settingsPayloadsMatch(currentPayloadAtCompletion, nextPayload)
+        || settingsPayloadsMatch(currentPayloadAtCompletion, confirmedPayload);
+      if (hasNoNewMeaningfulEdits) {
+        flushSync(() => {
+          setSavedSettingsPayload(cloneJsonValue(confirmedPayload));
+          setForm(confirmedSettings, { markDirty: false });
+        });
+      } else {
+        setSavedSettingsPayload(cloneJsonValue(confirmedPayload));
       }
-      setForm(persisted);
-      setLocalSettings(persisted as TenantSettings);
+      setLocalSettings(confirmedSettings as TenantSettings);
+      showSuccess('Settings saved');
       if (tab === 'messages' && notificationsEnabled) {
         try {
           const refreshedStatus = await apiFetch('/notifications/ops-alerts/status');
@@ -1727,16 +1824,22 @@ export default function SettingsPage() {
           setOpsAlertStatus(null);
         }
       }
-      showSuccess('Settings saved');
     } catch (err: any) {
       showError(err.message || 'Failed to save settings');
     } finally {
+      savingSettingsRef.current = false;
       setSavingSettings(false);
     }
   }
 
+  function handleSettingsSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    void saveSettings();
+  }
+
   async function uploadLogo() {
     clearNotice();
+    setLogoUploading(true);
     try {
       if (logoFile) {
         const formData = new FormData();
@@ -1754,7 +1857,10 @@ export default function SettingsPage() {
       }
       const persisted = await apiFetch('/tenant/settings');
       if (!String(persisted?.logoUrl || '').trim()) throw new Error('The logo was not persisted.');
-      setForm(persisted);
+      const persistedPayload = buildSettingsPayload(persisted || {});
+      latestConfirmedSettingsPayloadRef.current = cloneJsonValue(persistedPayload);
+      setSavedSettingsPayload(cloneJsonValue(persistedPayload));
+      setForm(persisted, { markDirty: false });
       setLocalSettings(persisted as TenantSettings);
       showSuccess(`Logo saved${logoFile ? `: ${logoFile.name}` : ''}`);
       if (logoPreviewUrl) URL.revokeObjectURL(logoPreviewUrl);
@@ -1763,6 +1869,8 @@ export default function SettingsPage() {
       await refresh();
     } catch (err: any) {
       showError(err.message || 'Failed to upload logo');
+    } finally {
+      setLogoUploading(false);
     }
   }
 
@@ -1785,7 +1893,10 @@ export default function SettingsPage() {
       });
       const persisted = await apiFetch('/tenant/settings');
       if (persisted?.themeMode !== mode) throw new Error('The theme preference did not persist.');
-      setForm(persisted);
+      const persistedPayload = buildSettingsPayload(persisted || {});
+      latestConfirmedSettingsPayloadRef.current = cloneJsonValue(persistedPayload);
+      setSavedSettingsPayload(cloneJsonValue(persistedPayload));
+      setForm(persisted, { markDirty: false });
       setLocalSettings(persisted as TenantSettings);
       showSuccess(`Theme saved: ${mode === 'system' ? 'Use device setting' : mode}`);
     } catch (err: any) {
@@ -1952,7 +2063,7 @@ export default function SettingsPage() {
           ) : null}
         </>
       ) : null}
-      {!isBusinessProfilePage ? (
+      {!isBusinessProfilePage && !focusedSettingsSection ? (
         <>
       <GuidedSetupProgress enabled={guidedSetupEnabled} incomplete={!settings?.guidedSetupCompletedAt} compact />
       <div className="settings-command-strip" data-testid="settings-command-strip">
@@ -2080,7 +2191,7 @@ export default function SettingsPage() {
 
         {tab === 'general' && (
           <>
-            <div className="card settings-premium-card" style={{ marginBottom: 12, display: settingsDirectoryMode || settingsSection === 'workspace-layout' ? 'none' : undefined }} {...getSectionProps('company-profile-hub')} data-testid="company-profile-hub">
+            <form className="card settings-premium-card" style={{ marginBottom: 12, display: settingsDirectoryMode || settingsSection === 'workspace-layout' ? 'none' : undefined }} {...getSectionProps('company-profile-hub')} data-testid="company-profile-hub" onSubmit={handleSettingsSubmit}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
                 <div>
                   <p className="operator-eyebrow">Business identity</p>
@@ -2091,10 +2202,9 @@ export default function SettingsPage() {
                 </div>
                 <button
                   className="button settings-premium-button"
-                  type="button"
+                  type="submit"
                   data-testid="company-profile-save"
                   disabled={savingSettings || !settingsDirty}
-                  onClick={saveSettings}
                 >
                   {savingSettings ? 'Saving...' : settingsDirty ? 'Save profile' : 'Profile saved'}
                 </button>
@@ -2111,7 +2221,7 @@ export default function SettingsPage() {
               <p className="muted settings-premium-muted" data-testid="company-profile-saved-state" style={{ marginBottom: 0 }}>
                 Saved state: {settingsDirty ? 'Unsaved changes waiting' : 'All profile changes saved'}.
               </p>
-            </div>
+            </form>
 
             <div className="card settings-premium-card" style={{ marginBottom: 12, display: settingsDirectoryMode || settingsSection === 'workspace-layout' ? 'none' : undefined }} {...getSectionProps('business-profile')}>
               <h3 style={{ marginTop: 0 }}>Business details</h3>
@@ -2281,7 +2391,7 @@ export default function SettingsPage() {
               ))}
             </div>
 
-            <div className="card settings-premium-card" style={{ marginBottom: 12, display: settingsSection === 'business-profile' ? 'none' : undefined }} data-testid="settings-workspace-layout-card" {...getSectionProps('workspace-layout')}>
+            <form className="card settings-premium-card" style={{ marginBottom: 12, display: settingsSection === 'business-profile' ? 'none' : undefined }} data-testid="settings-workspace-layout-card" {...getSectionProps('workspace-layout')} onSubmit={handleSettingsSubmit}>
               <h3 style={{ marginTop: 0 }}>Workspace layout</h3>
               <p className="muted settings-premium-muted">
                 Keep Live Work focused on active work only. Move saved board style and section visibility here instead of editing the live screen directly.
@@ -2381,6 +2491,16 @@ export default function SettingsPage() {
                 })}
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+                {settingsSection === 'workspace-layout' ? (
+                  <button
+                    className="button settings-premium-button"
+                    type="submit"
+                    data-testid="settings-command-centre-layout-save"
+                    disabled={!settingsDirty || savingSettings}
+                  >
+                    {savingSettings ? 'Saving...' : settingsDirty ? 'Save changes' : 'Saved'}
+                  </button>
+                ) : null}
                 <button
                   className="button secondary settings-premium-button"
                   type="button"
@@ -2401,7 +2521,7 @@ export default function SettingsPage() {
                   Open Live Work
                 </Link>
               </div>
-            </div>
+            </form>
 
             <div className="card settings-premium-card" style={{ marginBottom: 12, display: settingsSection === 'business-profile' ? 'none' : undefined }}>
               <h3 style={{ marginTop: 0 }}>Dashboard & analytics layout</h3>
@@ -2413,12 +2533,9 @@ export default function SettingsPage() {
                 className="input settings-premium-input"
                 data-testid="settings-analytics-window-default"
                 value={analyticsLayout.defaultWindowDays}
-                onChange={(e) => updateBusinessConfig((current) => ({
+                onChange={(e) => updateAnalyticsConfig((current) => ({
                   ...current,
-                  analytics: {
-                    ...(current.analytics && typeof current.analytics === 'object' ? current.analytics : {}),
-                    defaultWindowDays: Number(e.target.value || 30),
-                  },
+                  defaultWindowDays: Number(e.target.value || 30),
                 }))}
               >
                 <option value={7}>7 days</option>
@@ -2447,17 +2564,13 @@ export default function SettingsPage() {
                           className="button secondary"
                           type="button"
                           disabled={index === 0}
-                          onClick={() => updateBusinessConfig((current) => {
-                            const analytics = current.analytics && typeof current.analytics === 'object' ? current.analytics : {};
-                            const currentOrder = Array.isArray((analytics as any).widgetOrder)
-                              ? (analytics as any).widgetOrder
-                              : analyticsLayout.widgetOrder;
-                            const nextOrder = [...currentOrder];
+                          onClick={() => updateAnalyticsConfig((current) => {
+                            const nextOrder = [...current.widgetOrder];
                             const currentIndex = nextOrder.indexOf(widgetKey);
                             if (currentIndex > 0) {
                               [nextOrder[currentIndex - 1], nextOrder[currentIndex]] = [nextOrder[currentIndex], nextOrder[currentIndex - 1]];
                             }
-                            return { ...current, analytics: { ...analytics, widgetOrder: nextOrder } };
+                            return { ...current, widgetOrder: nextOrder };
                           })}
                         >
                           Move up
@@ -2466,17 +2579,13 @@ export default function SettingsPage() {
                           className="button secondary"
                           type="button"
                           disabled={index === analyticsLayout.widgetOrder.length - 1}
-                          onClick={() => updateBusinessConfig((current) => {
-                            const analytics = current.analytics && typeof current.analytics === 'object' ? current.analytics : {};
-                            const currentOrder = Array.isArray((analytics as any).widgetOrder)
-                              ? (analytics as any).widgetOrder
-                              : analyticsLayout.widgetOrder;
-                            const nextOrder = [...currentOrder];
+                          onClick={() => updateAnalyticsConfig((current) => {
+                            const nextOrder = [...current.widgetOrder];
                             const currentIndex = nextOrder.indexOf(widgetKey);
                             if (currentIndex >= 0 && currentIndex < nextOrder.length - 1) {
                               [nextOrder[currentIndex + 1], nextOrder[currentIndex]] = [nextOrder[currentIndex], nextOrder[currentIndex + 1]];
                             }
-                            return { ...current, analytics: { ...analytics, widgetOrder: nextOrder } };
+                            return { ...current, widgetOrder: nextOrder };
                           })}
                         >
                           Move down
@@ -2484,15 +2593,11 @@ export default function SettingsPage() {
                         <button
                           className="button secondary"
                           type="button"
-                          onClick={() => updateBusinessConfig((current) => {
-                            const analytics = current.analytics && typeof current.analytics === 'object' ? current.analytics : {};
-                            const currentHidden = Array.isArray((analytics as any).hiddenWidgets)
-                              ? (analytics as any).hiddenWidgets
-                              : analyticsLayout.hiddenWidgets;
-                            const nextHidden = currentHidden.includes(widgetKey)
-                              ? currentHidden.filter((item: string) => item !== widgetKey)
-                              : [...currentHidden, widgetKey];
-                            return { ...current, analytics: { ...analytics, hiddenWidgets: nextHidden } };
+                          onClick={() => updateAnalyticsConfig((current) => {
+                            const nextHidden = current.hiddenWidgets.includes(widgetKey)
+                              ? current.hiddenWidgets.filter((item) => item !== widgetKey)
+                              : [...current.hiddenWidgets, widgetKey];
+                            return { ...current, hiddenWidgets: nextHidden };
                           })}
                         >
                           {hidden ? 'Show panel' : 'Hide panel'}
@@ -2507,14 +2612,10 @@ export default function SettingsPage() {
                   className="button secondary settings-premium-button"
                   type="button"
                   data-testid="settings-analytics-layout-reset"
-                  onClick={() => updateBusinessConfig((current) => ({
-                    ...current,
-                    analytics: {
-                      ...(current.analytics && typeof current.analytics === 'object' ? current.analytics : {}),
-                      widgetOrder: [...ANALYTICS_WIDGET_KEYS],
-                      hiddenWidgets: [],
-                      defaultWindowDays: 30,
-                    },
+                  onClick={() => updateAnalyticsConfig(() => ({
+                    widgetOrder: [...ANALYTICS_WIDGET_KEYS],
+                    hiddenWidgets: [],
+                    defaultWindowDays: 30,
                   }))}
                 >
                   Reset layout
@@ -2544,13 +2645,18 @@ export default function SettingsPage() {
               }} />
               <div className="integration-card" style={{ marginTop: 8 }}>
                 <label className="button secondary" htmlFor="tenant-logo-file">Choose image</label>
-                <span data-testid="tenant-logo-file-name">{logoFile ? logoFile.name : 'No image selected'}</span>
+                <span data-testid="tenant-logo-file-name">{logoFile ? logoFile.name : form.logoUrl ? 'Saved logo selected' : 'PNG, JPEG, or WebP up to 2 MB'}</span>
               </div>
               {logoFile ? (
                 <div className="integration-card" data-testid="logo-file-selection" style={{ marginTop: 10 }}>
-                  {logoPreviewUrl ? (
-                    <img src={logoPreviewUrl} alt="Selected logo preview" style={{ width: 180, height: 90, objectFit: 'contain' }} />
-                  ) : null}
+                  <div className="logo-preview-pair" data-testid="business-logo-preview-pair">
+                    <div className="logo-preview-surface logo-preview-surface--light">
+                      {logoPreviewUrl ? <SafeImage src={logoPreviewUrl} alt="Selected logo preview on light background" className="business-logo-preview-image" /> : null}
+                    </div>
+                    <div className="logo-preview-surface logo-preview-surface--dark">
+                      {logoPreviewUrl ? <SafeImage src={logoPreviewUrl} alt="Selected logo preview on dark background" className="business-logo-preview-image" /> : null}
+                    </div>
+                  </div>
                   <div>
                     <strong>{logoFile.name}</strong>
                     <p className="muted" style={{ margin: '4px 0' }}>{(logoFile.size / 1024).toFixed(1)} KB selected</p>
@@ -2563,8 +2669,15 @@ export default function SettingsPage() {
                 </div>
               ) : form.logoUrl ? (
                 <div className="integration-card" data-testid="saved-logo-preview" style={{ marginTop: 10 }}>
-                  <img src={form.logoUrl} alt="Current business logo" style={{ width: 180, height: 90, objectFit: 'contain' }} />
-                  <span className="muted">Saved logo</span>
+                  <div className="logo-preview-pair" data-testid="business-logo-preview-pair">
+                    <div className="logo-preview-surface logo-preview-surface--light">
+                      <SafeImage src={form.logoUrl} alt="Current business logo on light background" className="business-logo-preview-image" fallback={<span className="muted">Logo preview unavailable</span>} />
+                    </div>
+                    <div className="logo-preview-surface logo-preview-surface--dark">
+                      <SafeImage src={form.logoUrl} alt="Current business logo on dark background" className="business-logo-preview-image" fallback={<span className="muted">Logo preview unavailable</span>} />
+                    </div>
+                  </div>
+                  <span className="muted">Saved logo preview</span>
                 </div>
               ) : null}
 
@@ -2596,11 +2709,11 @@ export default function SettingsPage() {
               <button
                 className="button settings-premium-button"
                 type="button"
-                disabled={!logoFile}
+                disabled={!logoFile || logoUploading}
                 onClick={uploadLogo}
                 style={{ marginTop: 12 }}
               >
-                Upload logo
+                {logoUploading ? 'Uploading logo...' : form.logoUrl ? 'Replace logo' : 'Upload logo'}
               </button>
             </div>
 
@@ -3092,9 +3205,20 @@ export default function SettingsPage() {
                 <p className="muted settings-premium-muted" style={{ margin: 0 }}>
                   Saved active recipients: {internalNotificationSettings.internalRecipients.filter((recipient) => recipient.enabled).length}
                 </p>
-                <button className="button secondary" type="button" data-testid="internal-recipient-add" onClick={addInternalRecipient}>
-                  Add recipient
-                </button>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  <button className="button secondary" type="button" data-testid="internal-recipient-add" onClick={addInternalRecipient}>
+                    Add recipient
+                  </button>
+                  <button
+                    className="button settings-premium-button"
+                    data-testid="settings-save-button"
+                    type="button"
+                    onClick={saveSettings}
+                    disabled={!settingsDirty || savingSettings}
+                  >
+                    {savingSettings ? 'Saving...' : settingsDirty ? 'Save changes' : 'Saved'}
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -5144,6 +5268,7 @@ export default function SettingsPage() {
           </>
         )}
 
+        {!focusedSettingsSection ? (
         <div style={{ marginTop: 20 }}>
           <button
             className="button settings-premium-button"
@@ -5155,6 +5280,7 @@ export default function SettingsPage() {
             {savingSettings ? 'Saving...' : settingsDirty ? 'Save changes' : 'Saved'}
           </button>
         </div>
+        ) : null}
 
       </div>
 </DashboardShell>

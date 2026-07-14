@@ -890,7 +890,7 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
           <Link className="button" href={liveWorkRecommendation.href}>
             {liveWorkRecommendation.action}
           </Link>
-          <Link className="button secondary" href="/dashboard/settings?tab=general">
+          <Link className="button secondary" href="/dashboard/settings?tab=general&section=workspace-layout">
             Review workspace layout
           </Link>
         </div>
@@ -903,7 +903,7 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
               <h2 className="operator-section__title">Layout lives in Settings</h2>
               <p className="operator-section__subtitle">Live work stays focused on the queue. Save board style and section visibility from Workspace layout.</p>
             </div>
-            <Link className="button secondary ccv2-button" href="/dashboard/settings?tab=general">
+            <Link className="button secondary ccv2-button" href="/dashboard/settings?tab=general&section=workspace-layout">
               Open Workspace layout
             </Link>
           </div>
@@ -933,7 +933,7 @@ async function inlineSetStatus(jobId: string, nextStatus: string) {
               </div>
             </div>
           )) : (
-            <div className="muted">No new updates yet.</div>
+            <div className="ccv2-activity-stream__meta">No new updates yet.</div>
           )}
         </div>
       </div>

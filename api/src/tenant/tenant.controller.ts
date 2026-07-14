@@ -19,6 +19,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname, join } from 'path';
 import { promises as fs } from 'fs';
+import * as crypto from 'crypto';
 import type { Response } from 'express';
 import { JwtAuthGuard } from '../auth/auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -31,6 +32,7 @@ import { RolesGuard } from '../common/roles.guard';
 import { SetLogoUrlDto, UpdateTenantSettingsDto } from './tenant.dto';
 import { TenantService } from './tenant.service';
 import { assertUploadAllowed, UPLOAD_LIMITS } from '../common/upload-policy';
+import { inspectDecodedImage } from '../common/image-upload-validation';
 import { bookingMediaPath, safeBookingMediaSegment } from '../common/tenant-booking-media';
 
 const LOGO_MAX_BYTES = Number(process.env.TENANT_LOGO_MAX_BYTES ?? UPLOAD_LIMITS.logo);
@@ -40,8 +42,66 @@ function safeFileName(name: string) {
   return name.replace(/[^a-zA-Z0-9._-]/g, '_');
 }
 
+function contentTypeForLogo(fileName: string) {
+  const extension = extname(fileName).toLowerCase();
+  if (extension === '.png') return 'image/png';
+  if (extension === '.webp') return 'image/webp';
+  if (extension === '.jpg' || extension === '.jpeg') return 'image/jpeg';
+  return 'application/octet-stream';
+}
+
+async function sendPublicLogoFile(filePath: string, fileName: string, res: Response) {
+  let stat;
+  try {
+    stat = await fs.stat(filePath);
+  } catch {
+    throw new NotFoundException('Logo not found');
+  }
+  res.setHeader('Content-Type', contentTypeForLogo(fileName));
+  res.setHeader('Content-Length', String(stat.size));
+  res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+  res.setHeader('Last-Modified', stat.mtime.toUTCString());
+  res.setHeader('ETag', `"${stat.size.toString(16)}-${Math.floor(stat.mtimeMs).toString(16)}"`);
+  return res.sendFile(filePath);
+}
+
+async function findOpaquePublicLogo(fileName: string) {
+  const safeName = safeFileName(fileName);
+  if (!safeName || safeName !== fileName) {
+    throw new NotFoundException('Logo not found');
+  }
+  const root = join(process.cwd(), 'uploads', 'tenants');
+  let tenants: string[] = [];
+  try {
+    tenants = await fs.readdir(root);
+  } catch {
+    throw new NotFoundException('Logo not found');
+  }
+  for (const tenantDir of tenants) {
+    const safeTenantDir = safeFileName(tenantDir);
+    if (safeTenantDir !== tenantDir) continue;
+    const filePath = join(root, safeTenantDir, safeName);
+    try {
+      await fs.access(filePath);
+      return filePath;
+    } catch {
+      // Try the next tenant namespace.
+    }
+  }
+  throw new NotFoundException('Logo not found');
+}
+
 @Controller('tenant')
 export class TenantPublicAssetsController {
+  @Get('public-logo/:fileName')
+  async getOpaquePublicLogo(
+    @Param('fileName') fileName: string,
+    @Res() res: Response,
+  ) {
+    const filePath = await findOpaquePublicLogo(fileName);
+    return sendPublicLogoFile(filePath, fileName, res);
+  }
+
   @Get('public-logo/:tenantId/:fileName')
   async getPublicLogo(
     @Param('tenantId') tenantId: string,
@@ -51,12 +111,7 @@ export class TenantPublicAssetsController {
     const safeTenantId = safeFileName(tenantId);
     const safeName = safeFileName(fileName);
     const filePath = join(process.cwd(), 'uploads', 'tenants', safeTenantId, safeName);
-    try {
-      await fs.access(filePath);
-    } catch {
-      throw new NotFoundException('Logo not found');
-    }
-    return res.sendFile(filePath);
+    return sendPublicLogoFile(filePath, safeName, res);
   }
 
   @Get('public-booking-media/:tenantId/:fileName')
@@ -187,7 +242,8 @@ export class TenantController {
           }
         },
         filename: (req, file, cb) => {
-          const suffix = `${Date.now()}${extname(file.originalname || '') || '.png'}`;
+          const extension = extname(file.originalname || '').toLowerCase() || '.png';
+          const suffix = `${Date.now()}-${crypto.randomBytes(12).toString('hex')}${extension}`;
           cb(null, `logo-${safeFileName(suffix)}`);
         },
       }),
@@ -208,10 +264,16 @@ export class TenantController {
     @Body() dto: SetLogoUrlDto,
   ) {
     if (file) {
-      const policy = assertUploadAllowed(file);
-      if (policy.category !== 'image' || file.size > LOGO_MAX_BYTES) {
+      let imageInfo;
+      try {
+        const policy = assertUploadAllowed(file);
+        imageInfo = await inspectDecodedImage(file.path);
+        if (policy.category !== 'image' || imageInfo.mimeType !== file.mimetype || file.size > LOGO_MAX_BYTES) {
+          throw new BadRequestException('Choose a valid PNG, JPEG, or WebP logo under the upload limit.');
+        }
+      } catch (error) {
         await fs.unlink(file.path).catch(() => undefined);
-        throw new BadRequestException(`This file is too large. Maximum allowed is ${Math.round(LOGO_MAX_BYTES / 1024 / 1024)} MB for a logo.`);
+        throw error;
       }
       return this.tenantService.saveUploadedLogo(user.companyId, user.sub, file.filename);
     }

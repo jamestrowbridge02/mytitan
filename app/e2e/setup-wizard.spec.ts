@@ -33,11 +33,29 @@ async function resetGuidedSetup(request: any) {
   }
 }
 
+async function restoreSharedWorkspaceName(request: any) {
+  const token = await operatorToken();
+  const response = await request.put(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/tenant/settings`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    data: { companyName: "__E2E MyTitan Workspace" },
+  });
+  if (!response.ok()) {
+    throw new Error(`Unable to restore shared workspace name (${response.status()})`);
+  }
+}
+
 test.describe("guided setup continuity", () => {
   test.skip(!hasDashboardAuth(), "Seed the E2E fixtures or provide dashboard credentials before running authenticated workflow tests.");
 
   test.beforeEach(async ({ request }) => {
     await resetGuidedSetup(request);
+  });
+
+  test.afterEach(async ({ request }) => {
+    await restoreSharedWorkspaceName(request);
   });
 
   test("operator can save and resume guided setup without being trapped in legacy onboarding", async ({ page, request }) => {

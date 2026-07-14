@@ -82,6 +82,7 @@ export function EntityArtifactsCard({
   const [search, setSearch] = useState("");
   const [folderFilter, setFolderFilter] = useState("ALL");
   const [governance, setGovernance] = useState<MediaGovernance | null>(null);
+  const cardRef = useRef<HTMLElement | null>(null);
   const labelInputRef = useRef<HTMLInputElement | null>(null);
   const latestLabelRef = useRef("");
   const labelOverridesRef = useRef<Record<string, string>>({});
@@ -93,6 +94,20 @@ export function EntityArtifactsCard({
       const override = labelOverridesRef.current[item.id];
       return override ? { ...item, label: override } : item;
     });
+  }
+
+  function readCurrentLabel() {
+    const scopedLabel = cardRef.current
+      ? Array.from(cardRef.current.querySelectorAll<HTMLInputElement>(`input[data-testid="artifact-label-${entityType}"]`))
+          .map((input) => input.value)
+          .find((value) => String(value || "").trim())
+      : "";
+    const domLabel = typeof document !== "undefined"
+      ? Array.from(document.querySelectorAll<HTMLInputElement>(`input[data-testid="artifact-label-${entityType}"]`))
+          .map((input) => input.value)
+          .find((value) => String(value || "").trim())
+      : "";
+    return String(labelInputRef.current?.value || scopedLabel || domLabel || latestLabelRef.current || label || "").trim();
   }
 
   async function load() {
@@ -138,10 +153,7 @@ export function EntityArtifactsCard({
     setBusy(true);
     setError("");
     try {
-      const domLabel = typeof document !== "undefined"
-        ? document.querySelector<HTMLInputElement>(`input[data-testid="artifact-label-${entityType}"]`)?.value
-        : "";
-      const currentLabel = String(labelInputRef.current?.value || domLabel || latestLabelRef.current || label || "").trim();
+      const currentLabel = readCurrentLabel();
       pendingUploadLabelRef.current = currentLabel;
       const form = new FormData();
       if (currentLabel) form.append("label", currentLabel);
@@ -208,7 +220,7 @@ export function EntityArtifactsCard({
   });
 
   return (
-    <section className="card" data-testid={`artifact-card-${entityType}`}>
+    <section ref={cardRef} className="card" data-testid={`artifact-card-${entityType}`}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
         <div>
           <h3 style={{ marginTop: 0, marginBottom: 6 }}>{title}</h3>

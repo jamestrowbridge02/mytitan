@@ -3,6 +3,70 @@ import { authFile, fixtureRefs, hasDashboardAuth, installApiProxy, loginAs } fro
 
 test.use({ storageState: authFile });
 
+function rgbChannels(value: string) {
+  return (value.match(/\d+(?:\.\d+)?/g) || []).slice(0, 3).map(Number);
+}
+
+function luminance([r, g, b]: number[]) {
+  return [r, g, b]
+    .map((value) => {
+      const channel = value / 255;
+      return channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+    })
+    .reduce((sum, channel, index) => sum + channel * [0.2126, 0.7152, 0.0722][index], 0);
+}
+
+function contrastRatio(foreground: number[], background: number[]) {
+  const lighter = Math.max(luminance(foreground), luminance(background));
+  const darker = Math.min(luminance(foreground), luminance(background));
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+async function expectComputedContrast(locator: import("@playwright/test").Locator, minimum = 4.5, surface?: import("@playwright/test").Locator) {
+  const styles = surface
+    ? {
+        color: await locator.evaluate((element) => window.getComputedStyle(element).color),
+        backgroundColor: await surface.evaluate((element) => window.getComputedStyle(element).backgroundColor),
+      }
+    : await locator.evaluate((element) => {
+    const computed = window.getComputedStyle(element);
+    let parent: Element | null = element;
+    let backgroundColor = "";
+    while (parent) {
+      const candidate = window.getComputedStyle(parent).backgroundColor;
+      if (candidate && !/rgba?\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0\s*\)|transparent/i.test(candidate)) {
+        backgroundColor = candidate;
+        break;
+      }
+      parent = parent.parentElement;
+    }
+    return { color: computed.color, backgroundColor: backgroundColor || window.getComputedStyle(document.body).backgroundColor };
+  });
+  const ratio = contrastRatio(rgbChannels(styles.color), rgbChannels(styles.backgroundColor));
+  expect(ratio, `foreground=${styles.color} background=${styles.backgroundColor}`).toBeGreaterThanOrEqual(minimum);
+}
+
+async function mockTenantSettings(page: import("@playwright/test").Page, overrides: Record<string, unknown>) {
+  await page.route("**/api/tenant/settings", async (route) => {
+    if (route.request().method() !== "GET") return route.fallback();
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        companyName: "Wheel A&R",
+        tradingName: "Wheel A&R",
+        registeredBusinessName: "Wheel A&R Limited",
+        logoUrl: null,
+        featureBookings: true,
+        featureCustomerPortal: true,
+        featurePayments: true,
+        featureAccounting: true,
+        ...overrides,
+      }),
+    });
+  });
+}
+
 test.describe("sidebar navigation cleanup", () => {
   test.skip(!hasDashboardAuth(), "Seed the E2E fixtures or provide dashboard credentials before running authenticated workflow tests.");
 
@@ -73,6 +137,125 @@ test.describe("sidebar navigation cleanup", () => {
     await page.keyboard.press("Control+K");
     await expect(page.getByTestId("command-palette-search")).toBeVisible();
     await expect(page.getByLabel("Search workspace commands")).toHaveAttribute("placeholder", /Search customers, jobs, invoices/);
+  });
+
+  test("tenant sidebar uses business-first identity in collapsed, expanded, fallback, and mobile states", async ({ page, request }) => {
+    await mockTenantSettings(page, {
+      companyName: "Wheel A&R",
+      logoUrl: "/brand/mytitan-mark.svg",
+    });
+    await installApiProxy(page, request);
+    await page.goto("/dashboard");
+
+    const sidebar = page.getByTestId("desktop-sidebar");
+    const identity = page.getByTestId("sidebar-business-identity").first();
+    await expect(identity).toHaveAccessibleName("Wheel A&R — powered by MyTitan");
+    await expect(identity).toHaveAttribute("title", "Wheel A&R — powered by MyTitan");
+    await expect(identity.getByTestId("sidebar-business-logo")).toBeVisible();
+    const collapsedCopy = identity.locator(".mt-sidebar__brandCopy");
+    await expect
+      .poll(async () =>
+        collapsedCopy.evaluate((node) => {
+          const element = node as HTMLElement;
+          const style = window.getComputedStyle(element);
+          return {
+            opacity: Number(style.opacity),
+            width: Math.round(element.getBoundingClientRect().width),
+          };
+        }),
+      )
+      .toEqual({ opacity: 0, width: 0 });
+
+    await sidebar.hover();
+    await expect
+      .poll(async () => collapsedCopy.evaluate((node) => Math.round((node as HTMLElement).getBoundingClientRect().width)))
+      .toBeGreaterThan(20);
+    await expect(identity).toContainText("MyTitan");
+    await expect(identity.getByTestId("sidebar-business-name")).toContainText("Wheel A&R");
+    await expect(page.getByTestId("sidebar-logout")).toBeVisible();
+
+    await page.setViewportSize({ width: 390, height: 760 });
+    await page.getByLabel("Open navigation").click();
+    const mobile = page.getByTestId("mobile-sidebar");
+    const mobileIdentity = mobile.getByTestId("sidebar-business-identity");
+    await expect(mobileIdentity).toContainText("MyTitan");
+    await expect(mobileIdentity.getByTestId("sidebar-business-name")).toContainText("Wheel A&R");
+    await expect(mobileIdentity.getByTestId("sidebar-business-logo")).toBeVisible();
+  });
+
+  test("tenant sidebar falls back to initials or profile icon without leaking a broken logo", async ({ page, request }) => {
+    await mockTenantSettings(page, {
+      companyName: "North Star Services",
+      logoUrl: "",
+    });
+    await installApiProxy(page, request);
+    await page.goto("/dashboard");
+
+    const identity = page.getByTestId("sidebar-business-identity").first();
+    await expect(identity.getByTestId("sidebar-business-initials")).toHaveText("NS");
+    await expect(identity.getByTestId("sidebar-business-logo")).toHaveCount(0);
+    await expect(identity.getByTestId("sidebar-business-profile-fallback")).toHaveCount(0);
+
+    await page.unroute("**/api/tenant/settings");
+    await mockTenantSettings(page, {
+      companyName: "",
+      tradingName: "",
+      registeredBusinessName: "",
+      logoUrl: "",
+    });
+    await page.reload();
+    await expect(page.getByTestId("sidebar-business-identity").first().getByTestId("sidebar-business-profile-fallback")).toBeVisible();
+  });
+
+  test("tenant sidebar recovers safely from a broken business logo", async ({ page, request }) => {
+    await mockTenantSettings(page, {
+      companyName: "Broken Logo Co",
+      logoUrl: "/tenant/public-logo/missing-business-logo.png",
+    });
+    await page.route("**/tenant/public-logo/missing-business-logo.png", async (route) => {
+      await route.fulfill({ status: 404, body: "" });
+    });
+    await installApiProxy(page, request);
+    await page.goto("/dashboard");
+
+    const identity = page.getByTestId("sidebar-business-identity").first();
+    await expect(identity.getByTestId("sidebar-business-logo")).toHaveCount(0, { timeout: 5000 });
+    await expect(identity.getByTestId("sidebar-business-initials")).toHaveText("BL");
+  });
+
+  test("platform admin keeps MyTitan platform branding separate from tenant support context", async ({ page, request }) => {
+    await installApiProxy(page, request);
+    await loginAs(page, request, fixtureRefs.platformAdminEmail, fixtureRefs.platformAdminPassword);
+    await page.goto("/platform");
+
+    await expect(page.getByRole("heading", { name: "MyTitan Platform Admin" })).toBeVisible();
+    await expect(page.getByTestId("desktop-sidebar")).toHaveCount(0);
+    await expect(page.getByRole("link", { name: /Support Mode/i })).toBeVisible();
+    await expect(page.getByTestId("platform-tenant-search-input")).toBeVisible();
+    await page.getByTestId("platform-tenant-search-input").fill("E2E MyTitan Workspace");
+    await expect(page.getByRole("heading", { name: /__E2E MyTitan Workspace|E2E MyTitan Workspace/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "MyTitan Platform Admin" })).toBeVisible();
+  });
+
+  test("tenant sidebar identity remains readable in dark theme", async ({ page, request }) => {
+    await mockTenantSettings(page, {
+      companyName: "Wheel A&R",
+      logoUrl: "/tenant/public-logo/logo-dark-theme-test.png",
+    });
+    await installApiProxy(page, request);
+    await page.goto("/dashboard");
+    const sidebar = page.getByTestId("desktop-sidebar");
+    await sidebar.hover();
+    await expect(sidebar).toHaveAttribute("data-sidebar-mode", "TEMPORARY_HOVER");
+    await page.evaluate(() => {
+      document.documentElement.classList.add("dark");
+      document.documentElement.dataset.theme = "dark";
+    });
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    const identity = page.getByTestId("sidebar-business-identity").first();
+    const identitySurface = page.getByTestId("sidebar-brand");
+    await expectComputedContrast(identity.locator(".mt-sidebar__productName"), 4.5, identitySurface);
+    await expectComputedContrast(identity.locator(".mt-sidebar__businessName"), 4.5, identitySurface);
   });
 
   test("route search is role-safe and hides platform-only destinations from tenant users", async ({ page, request }) => {

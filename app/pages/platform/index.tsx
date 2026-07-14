@@ -3090,7 +3090,11 @@ export default function PlatformAdminPage() {
                 className="input"
                 data-testid="platform-tenant-search-input"
                 value={query}
-                onChange={(event) => setQuery(event.target.value)}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setQuery(value);
+                  void searchTenants(value);
+                }}
                 placeholder="Workspace or owner email"
               />
               <button className="button" type="button" data-testid="platform-tenant-search-submit" onClick={() => void searchTenants()} disabled={searching}>

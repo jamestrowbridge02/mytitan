@@ -1,44 +1,52 @@
 import { expect, test } from "@playwright/test";
-import { hasDashboardAuth, installApiProxy, loginAs } from "./utils";
+import { hasDashboardAuth, installApiProxy, loginAs, requestLocalApi } from "./utils";
 
 test.describe("final product experience polish", () => {
   test.skip(!hasDashboardAuth(), "Seed the E2E fixtures or provide dashboard credentials before running authenticated workflow tests.");
 
   test("company profile is the shared source for setup and dependent customer surfaces", async ({ page, request }) => {
     await installApiProxy(page, request);
-    await loginAs(page, request, "e2e.operator@mytitan.local", "MyTitanE2E!2026");
+    const token = await loginAs(page, request, "e2e.operator@mytitan.local", "MyTitanE2E!2026");
 
     const businessName = `E2E Profile ${Date.now()}`;
-    await page.goto("/dashboard/settings?tab=general&section=company-profile-hub", { waitUntil: "networkidle" });
+    try {
+      await page.goto("/dashboard/settings?tab=general&section=company-profile-hub", { waitUntil: "networkidle" });
 
-    const hub = page.getByTestId("company-profile-hub");
-    await expect(hub).toBeVisible();
-    for (const section of [
-      "business",
-      "brand",
-      "locations",
-      "staff",
-      "opening-hours",
-      "services",
-      "payments",
-      "tax",
-      "booking",
-      "customer-portal",
-      "trade-portal",
-      "communication",
-    ]) {
-      await expect(page.getByTestId(`company-profile-section-${section}`)).toBeVisible();
+      const hub = page.getByTestId("company-profile-hub");
+      await expect(hub).toBeVisible();
+      for (const section of [
+        "business",
+        "brand",
+        "locations",
+        "staff",
+        "opening-hours",
+        "services",
+        "payments",
+        "tax",
+        "booking",
+        "customer-portal",
+        "trade-portal",
+        "communication",
+      ]) {
+        await expect(page.getByTestId(`company-profile-section-${section}`)).toBeVisible();
+      }
+
+      await page.getByTestId("settings-business-name").fill(businessName);
+      await page.getByTestId("company-profile-save").click();
+      await expect(page.getByTestId("company-profile-saved-state")).toContainText("All profile changes saved");
+
+      await page.goto("/dashboard/setup-wizard?step=branding", { waitUntil: "networkidle" });
+      await expect(page.getByTestId("guided-setup-company-name")).toHaveValue(businessName);
+
+      await page.goto("/dashboard/booking/settings", { waitUntil: "networkidle" });
+      await expect(page.getByTestId("booking-public-preview")).toContainText(/Customer preview|Open public link|Copy public booking link/i);
+    } finally {
+      await requestLocalApi(request, "/tenant/settings", {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        data: { companyName: "__E2E MyTitan Workspace" },
+      });
     }
-
-    await page.getByTestId("settings-business-name").fill(businessName);
-    await page.getByTestId("company-profile-save").click();
-    await expect(page.getByTestId("company-profile-saved-state")).toContainText("All profile changes saved");
-
-    await page.goto("/dashboard/setup-wizard?step=branding", { waitUntil: "networkidle" });
-    await expect(page.getByTestId("guided-setup-company-name")).toHaveValue(businessName);
-
-    await page.goto("/dashboard/booking/settings", { waitUntil: "networkidle" });
-    await expect(page.getByTestId("booking-public-preview")).toContainText(/Customer preview|Open public link|Copy public booking link/i);
   });
 
   test("setup checklist has the launch steps and no dead setup actions", async ({ page, request }) => {

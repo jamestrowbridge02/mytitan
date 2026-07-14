@@ -25,20 +25,59 @@ test.describe("final real-world acceptance", () => {
   test("logo picker reports the selected image and persists the uploaded logo", async ({ page, request }) => {
     await installApiProxy(page, request);
     await loginAs(page, request, fixtureRefs.workspaceAdminEmail, fixtureRefs.workspaceAdminPassword);
-    await page.goto("/dashboard/settings?tab=general", { waitUntil: "networkidle" });
+    await page.goto("/dashboard/settings?tab=general&section=business-profile", { waitUntil: "networkidle" });
 
     const input = page.getByTestId("tenant-logo-file-input");
     await input.setInputFiles({ name: "wheel-ar-acceptance.png", mimeType: "image/png", buffer: tinyPng });
     await expect(page.getByTestId("tenant-logo-file-name")).toHaveText("wheel-ar-acceptance.png");
     await expect(page.getByTestId("logo-file-selection")).toContainText("wheel-ar-acceptance.png");
-    await expect(page.getByRole("button", { name: "Upload logo", exact: true })).toBeEnabled();
-    await page.getByRole("button", { name: "Upload logo", exact: true }).click();
-    await expect(page.getByText(/Logo saved: wheel-ar-acceptance.png/)).toBeVisible();
+    const logoAction = page.locator("button").filter({ hasText: /Upload logo|Replace logo/ });
+    await expect(logoAction).toBeEnabled();
+    await logoAction.click();
+    await expect(page.getByText(/Logo saved/)).toBeVisible();
 
     await page.reload({ waitUntil: "networkidle" });
-    const savedPreview = page.locator('img[alt="Current business logo"]');
+    const savedPreview = page.locator('img[alt="Current business logo on light background"]');
     await expect(savedPreview).toBeVisible();
     expect(await savedPreview.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBeTruthy();
+
+    const token = await adminToken(request);
+    const settingsResponse = await requestLocalApi(request, "/tenant/settings", { headers: { Authorization: `Bearer ${token}` } });
+    expect(settingsResponse.ok()).toBeTruthy();
+    const settings = await settingsResponse.json();
+    expect(String(settings.logoUrl || "")).toMatch(/^\/tenant\/public-logo\/logo-/);
+    expect(String(settings.logoUrl || "")).not.toMatch(/^\/tenant\/public-logo\/[^/]+\/logo-/);
+  });
+
+  test("business logo upload rejects corrupt and disguised image files", async ({ request }) => {
+    const token = await adminToken(request);
+    const headers = { Authorization: `Bearer ${token}` };
+
+    const corrupt = await requestLocalApi(request, "/tenant/settings/logo", {
+      method: "POST",
+      headers,
+      multipart: {
+        file: {
+          name: "corrupt.png",
+          mimeType: "image/png",
+          buffer: Buffer.from("not really a png"),
+        },
+      },
+    });
+    expect(corrupt.status()).toBeGreaterThanOrEqual(400);
+
+    const disguised = await requestLocalApi(request, "/tenant/settings/logo", {
+      method: "POST",
+      headers,
+      multipart: {
+        file: {
+          name: "../logo.svg",
+          mimeType: "image/png",
+          buffer: tinyPng,
+        },
+      },
+    });
+    expect(disguised.status()).toBeGreaterThanOrEqual(400);
   });
 
   test("theme and company profile are verified by API readback", async ({ request }) => {

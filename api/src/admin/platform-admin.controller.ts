@@ -133,6 +133,7 @@ export class PlatformAdminController {
     const results = await db.company.findMany({
       where: {
         OR: [
+          { id: { equals: query } },
           { name: { contains: query, mode: 'insensitive' } },
           {
             users: {

@@ -826,7 +826,7 @@ test.describe("dashboard workflows", () => {
     await expect(page.getByTestId("ccv2-layout-controls")).toHaveCount(0);
     await expect(page.getByTestId("ccv2-layout-settings-link")).toBeVisible();
     await page.getByRole("link", { name: /Open Workspace layout/i }).click();
-    await expect(page).toHaveURL(/\/dashboard\/settings\?tab=general$/);
+    await expect(page).toHaveURL(/\/dashboard\/settings\?tab=general&section=workspace-layout$/);
 
     await page.getByTestId("settings-command-centre-default-view").selectOption("list");
     const recentUpdatesRow = page.getByTestId("settings-command-centre-layout-row-recent-updates");

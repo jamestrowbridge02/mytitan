@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useRouter } from "next/router";
 import { getApiBase } from "../../../lib/api";
+import { resolveMediaUrl } from "../../../lib/media";
 import { isBookingProV1Enabled, isMarketplaceEnabled } from "../../../lib/feature-flags";
 
 const API_BASE = getApiBase();
@@ -131,10 +132,7 @@ type BookingQuestion = {
 };
 
 function resolvePublicAssetUrl(value?: string | null) {
-  const url = String(value || "").trim();
-  if (!url) return "";
-  if (/^(?:https?:|data:|blob:)/i.test(url)) return url;
-  return `${API_BASE}${url.startsWith("/") ? "" : "/"}${url}`;
+  return resolveMediaUrl(value);
 }
 
 function formatMoney(cents?: number | null) {

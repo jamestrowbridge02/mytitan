@@ -6552,15 +6552,189 @@ table th,
 }
 
 [data-shell="app"] .mt-sidebar.mt-sidebar--desktopRail .mt-sidebar__brand {
-  background:
-    radial-gradient(32px 26px at 50% 0%, rgba(17, 122, 120, 0.12), transparent 78%),
-    linear-gradient(180deg, #ffffff, #eef3fb);
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.07);
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
 }
 
-[data-shell="app"] .mt-sidebar.mt-sidebar--desktopRail .mt-sidebar__brandLogo {
-  transform: scale(1.08);
+[data-shell="app"] .mt-sidebar__brandLink {
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 0fr);
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding: 3px 6px;
+  border-radius: 16px;
+  color: #0f172a;
+  text-decoration: none;
+  overflow: hidden;
+  transition:
+    grid-template-columns 180ms ease,
+    gap 180ms ease,
+    padding 180ms ease,
+    background 140ms ease,
+    box-shadow 140ms ease;
+}
+
+[data-shell="app"] .mt-sidebar__brandLink:hover,
+[data-shell="app"] .mt-sidebar__brandLink:focus-visible {
+  background: rgba(29, 78, 216, 0.05);
+  outline: none;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+}
+
+[data-shell="app"] .mt-sidebar.mt-sidebar--desktopRail.is-temporary-open .mt-sidebar__brandLink,
+[data-shell="app"] .mt-sidebar.mt-sidebar--desktopRail:focus-within .mt-sidebar__brandLink,
+[data-shell="app"] .mt-sidebar__brandLink.is-expanded {
+  grid-template-columns: 42px minmax(0, 1fr);
+  justify-content: stretch;
+  gap: 9px;
+  padding-inline: 6px 9px;
+}
+
+[data-shell="app"] .mt-sidebar__brandCopy {
+  min-width: 0;
+  max-width: 0;
+  display: grid;
+  gap: 2px;
+  opacity: 0;
+  transform: translateX(-8px);
+  pointer-events: none;
+  overflow: hidden;
+  transition: opacity 140ms ease, transform 140ms ease, max-width 180ms ease;
+}
+
+[data-shell="app"] .mt-sidebar.mt-sidebar--desktopRail.is-temporary-open .mt-sidebar__brandCopy,
+[data-shell="app"] .mt-sidebar.mt-sidebar--desktopRail:focus-within .mt-sidebar__brandCopy,
+[data-shell="app"] .mt-sidebar__brandLink.is-expanded .mt-sidebar__brandCopy {
+  max-width: 128px;
+  opacity: 1;
+  transform: translateX(0);
+}
+
+[data-shell="app"] .mt-sidebar__productName,
+[data-shell="app"] .mt-sidebar__businessName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: 0;
+}
+
+[data-shell="app"] .mt-sidebar__productName {
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 850;
+  line-height: 1;
+}
+
+[data-shell="app"] .mt-sidebar__businessName {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1.1;
+}
+
+[data-shell="app"] .mt-sidebar__businessAvatar {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #ffffff, #edf3fb);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
+  color: #0f4aa3;
+  justify-self: center;
+}
+
+[data-shell="app"] .mt-sidebar__businessAvatar--brand {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  border-radius: 14px;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+}
+
+[data-shell="app"] .mt-sidebar__businessAvatarImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+[data-shell="app"] .mt-sidebar__businessInitials,
+[data-shell="app"] .mt-sidebar__businessFallbackIcon {
+  width: 100%;
+  height: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+[data-shell="app"] .mt-sidebar__businessInitials {
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+[data-shell="app"] .mt-sidebar__businessAvatar--brand .mt-sidebar__businessInitials {
+  font-size: 14px;
+}
+
+[data-shell="app"] .mt-sidebar__businessFallbackIcon svg {
+  width: 22px;
+  height: 22px;
+}
+
+[data-shell="app"] .mt-sidebar__businessAvatar--brand .mt-sidebar__businessFallbackIcon svg {
+  width: 24px;
+  height: 24px;
+}
+
+[data-shell="app"] .logo-preview-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  min-width: min(100%, 280px);
+}
+
+[data-shell="app"] .logo-preview-surface {
+  min-height: 96px;
+  border-radius: 14px;
+  border: 1px solid var(--mt-surface-border, rgba(148, 163, 184, 0.22));
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  overflow: hidden;
+}
+
+[data-shell="app"] .logo-preview-surface--light {
+  background: #ffffff;
+  color: #0f172a;
+}
+
+[data-shell="app"] .logo-preview-surface--dark {
+  background: #0f172a;
+  color: #f8fafc;
+}
+
+[data-shell="app"] .business-logo-preview-image {
+  width: min(100%, 180px);
+  height: 72px;
+  object-fit: contain;
+  display: block;
 }
 
 [data-shell="app"] .mt-sidebar.mt-sidebar--desktopRail .mt-sidebar__item {
@@ -6707,24 +6881,6 @@ table th,
 [data-shell="app"] .mt-sidebar.mt-sidebar--desktopRail .mt-sidebar__icon svg {
   width: 24px;
   height: 24px;
-}
-
-[data-shell="app"] .mt-sidebar__businessAvatar {
-  width: 32px;
-  height: 32px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  border-radius: 12px;
-  background: #ffffff;
-}
-
-[data-shell="app"] .mt-sidebar__businessAvatarImage {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
 }
 
 [data-shell="app"] .mt-sidebar.mt-sidebar--desktopRail .mt-sidebar__item:hover .mt-sidebar__icon,
@@ -7058,6 +7214,21 @@ table th,
 
 [data-shell="app"] .mt-sidebar.mt-sidebar--mobileDrawer .mt-sidebar__brand {
   display: none;
+}
+
+[data-shell="app"] .mt-sidebar.mt-sidebar--mobileDrawer .mt-sidebar__mobileHeader .mt-sidebar__brandLink {
+  flex: 1 1 auto;
+  min-width: 0;
+  grid-template-columns: 42px minmax(0, 1fr);
+  justify-content: stretch;
+  gap: 10px;
+  padding: 4px 8px 4px 4px;
+}
+
+[data-shell="app"] .mt-sidebar.mt-sidebar--mobileDrawer .mt-sidebar__mobileHeader .mt-sidebar__brandCopy {
+  max-width: none;
+  opacity: 1;
+  transform: none;
 }
 
 [data-shell="app"] .mt-sidebar.mt-sidebar--mobileDrawer .mt-sidebar__frame {
@@ -12104,6 +12275,94 @@ html[data-theme="dark"] [data-shell="app"] .button.secondary {
   background: #17243a;
   border-color: var(--mt-surface-border-strong);
   color: var(--text-primary);
+}
+
+html[data-theme="dark"] [data-shell="app"] .mt-sidebar__brandLink {
+  color: #f8fafc;
+}
+
+html[data-theme="dark"] .mt-sidebar__brand,
+html[data-theme="dark"] [data-shell="app"] .mt-sidebar__brand {
+  background: #17243a;
+  border-radius: 18px;
+}
+
+html[data-theme="dark"] .mt-sidebar__brandLink,
+html[data-theme="dark"] [data-shell="app"] .mt-sidebar__brandLink {
+  color: #f8fafc;
+}
+
+html[data-theme="dark"] .mt-sidebar__brandLink:hover,
+html[data-theme="dark"] .mt-sidebar__brandLink:focus-visible,
+html[data-theme="dark"] .mt-sidebar__brandLink.is-expanded,
+html[data-theme="dark"] [data-shell="app"] .mt-sidebar__brandLink:hover,
+html[data-theme="dark"] [data-shell="app"] .mt-sidebar__brandLink:focus-visible,
+html[data-theme="dark"] [data-shell="app"] .mt-sidebar__brandLink.is-expanded {
+  background: #17243a;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+}
+
+html[data-theme="dark"] .mt-sidebar__productName,
+html[data-theme="dark"] [data-shell="app"] .mt-sidebar__productName {
+  color: #f8fafc;
+}
+
+html[data-theme="dark"] .mt-sidebar__businessName,
+html[data-theme="dark"] [data-shell="app"] .mt-sidebar__businessName {
+  color: #e2e8f0;
+}
+
+html[data-theme="dark"] .mt-sidebar__businessAvatar,
+html[data-theme="dark"] [data-shell="app"] .mt-sidebar__businessAvatar {
+  background: linear-gradient(180deg, #1e293b, #0f172a);
+  border-color: rgba(203, 213, 225, 0.24);
+  color: #bfdbfe;
+}
+
+html[data-theme="dark"] [data-shell="app"] .muted,
+html[data-theme="dark"] [data-shell="app"] .settings-premium-muted,
+html[data-theme="dark"] [data-shell="app"] .operator-cellSubtle,
+html[data-theme="dark"] [data-shell="app"] .operator-cellMeta,
+html[data-theme="dark"] [data-shell="app"] .operator-row__subtitle,
+html[data-theme="dark"] [data-shell="app"] .operator-row__metaLine,
+html[data-theme="dark"] [data-shell="app"] .operator-section__subtitle,
+html[data-theme="dark"] [data-shell="app"] .operator-filterbar__results {
+  color: #cbd5e1;
+  opacity: 1;
+}
+
+html[data-theme="dark"] [data-shell="app"] label,
+html[data-theme="dark"] [data-shell="app"] .settings-premium-label,
+html[data-theme="dark"] [data-shell="app"] th,
+html[data-theme="dark"] [data-shell="app"] .operator-table__header,
+html[data-theme="dark"] [data-shell="app"] .operator-cellTitle,
+html[data-theme="dark"] [data-shell="app"] .operator-row__title {
+  color: #f8fafc;
+}
+
+html[data-theme="dark"] [data-shell="app"] input::placeholder,
+html[data-theme="dark"] [data-shell="app"] textarea::placeholder {
+  color: #94a3b8;
+  opacity: 1;
+}
+
+html[data-theme="dark"] [data-shell="app"] .dropdown-menu,
+html[data-theme="dark"] [data-shell="app"] [role="dialog"],
+html[data-theme="dark"] [data-shell="app"] .operator-rowActions__panel {
+  background: #0f172a;
+  color: #f8fafc;
+  border-color: rgba(203, 213, 225, 0.22);
+}
+
+html[data-theme="dark"] [data-shell="app"] button:disabled,
+html[data-theme="dark"] [data-shell="app"] .button:disabled,
+html[data-theme="dark"] [data-shell="app"] input:disabled,
+html[data-theme="dark"] [data-shell="app"] select:disabled,
+html[data-theme="dark"] [data-shell="app"] textarea:disabled {
+  background: #1e293b;
+  color: #cbd5e1;
+  border-color: rgba(203, 213, 225, 0.2);
+  opacity: 1;
 }
 
 .stripe-onboarding-page {
