@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { DashboardShell } from "../../../components/dashboard-shell";
 import { OperatorNotice } from "../../../components/feedback/OperatorNotice";
 import { useOperatorNotice } from "../../../components/feedback/useOperatorNotice";
+import { EntityImageUpload } from "../../../components/media/EntityImageUpload";
 import { apiFetch } from "../../../lib/api";
 import { isBookingProV1Enabled } from "../../../lib/feature-flags";
 import { UPLOAD_LIMITS, validateUploadFile } from "../../../lib/upload-policy";
@@ -434,8 +435,6 @@ export default function BookingProSettingsPage() {
   const [newBlackoutReason, setNewBlackoutReason] = useState("");
   const [serviceDraft, setServiceDraft] = useState<ServiceDraft>(EMPTY_SERVICE_DRAFT);
   const [serviceImageSelection, setServiceImageSelection] = useState<{ name: string; size: number } | null>(null);
-  const [folderImageFiles, setFolderImageFiles] = useState<Record<string, File>>({});
-  const [folderImagePreviews, setFolderImagePreviews] = useState<Record<string, string>>({});
   const [folders, setFolders] = useState<BookingFolder[]>([]);
   const [folderDraft, setFolderDraft] = useState<BookingFolder>(EMPTY_FOLDER);
   const [fields, setFields] = useState<BookingField[]>([]);
@@ -742,32 +741,34 @@ export default function BookingProSettingsPage() {
     }
   }
 
-  async function uploadFolderImage(category: string) {
-    const file = folderImageFiles[category];
-    if (!file) return;
+  async function uploadFolderImage(category: string, file: File) {
     setSavingArea(`folder:${category}`);
     clearNotice();
     try {
       const body = new FormData();
       body.append("category", category);
       body.append("file", file);
-      await apiFetch("/booking/folders/image", { method: "POST", body });
-      const previewUrl = folderImagePreviews[category];
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-      setFolderImageFiles((current) => {
-        const next = { ...current };
-        delete next[category];
-        return next;
-      });
-      setFolderImagePreviews((current) => {
-        const next = { ...current };
-        delete next[category];
-        return next;
-      });
-      await load();
+      const result = await apiFetch("/booking/folders/image", { method: "POST", body });
+      const imageUrl = result?.imageUrl || "";
+      setFolders((current) => current.map((folder) => (
+        folder.key === category ? { ...folder, imageUrl } : folder
+      )));
+      setSettings((current) => current
+        ? {
+            ...current,
+            folderImages: {
+              ...(current.folderImages || {}),
+              [category]: imageUrl,
+            },
+            folders: (current.folders || []).map((folder) => (
+              folder.key === category ? { ...folder, imageUrl } : folder
+            )),
+          }
+        : current);
       showSuccess(`${category} image updated.`);
     } catch (err: any) {
       showError(err?.message || "Failed to upload the service folder image");
+      throw err;
     } finally {
       setSavingArea("");
     }
@@ -1322,75 +1323,20 @@ export default function BookingProSettingsPage() {
                   <div className="operator-row__main">
                     <div className="operator-row__title">{folder.displayName}</div>
                     <div className="operator-row__subtitle">{folder.visibility === "PUBLIC" ? "Public booking" : folder.visibility === "TRADE" ? "Trade portal" : folder.visibility === "INTERNAL" ? "Internal only" : "Archived"}</div>
-                    {folderImagePreviews[folder.key] || folder.imageUrl || settings?.folderImages?.[folder.key] ? (
-                      <img
-                        src={folderImagePreviews[folder.key] || folder.imageUrl || settings?.folderImages?.[folder.key]}
-                        alt=""
-                        data-testid={`booking-folder-image-preview-${folder.key}`}
-                        style={{ width: 120, height: 72, objectFit: "cover", borderRadius: 12, marginTop: 8 }}
-                      />
-                    ) : null}
                   </div>
                   <div className="operator-row__actions">
-                    <input
-                      id={`booking-folder-image-${folder.key}`}
-                      className="visually-hidden"
-                      aria-label={`Upload image for ${folder.displayName}`}
-                      type="file"
-                      accept="image/png,image/jpeg,image/webp"
+                    <EntityImageUpload
+                      inputId={`booking-folder-image-${folder.key}`}
+                      fileNameTestId={`booking-folder-image-file-name-${folder.key}`}
+                      selectionTestId={`booking-folder-image-selection-${folder.key}`}
+                      previewTestId={`booking-folder-image-preview-${folder.key}`}
+                      inputAriaLabel={`Upload image for ${folder.displayName}`}
+                      currentImageUrl={folder.imageUrl || settings?.folderImages?.[folder.key] || ""}
+                      previewAlt={`${folder.displayName} preview`}
                       disabled={savingArea === `folder:${folder.key}`}
-                      onChange={(event) => {
-                        const file = event.target.files?.[0] || null;
-                        const validationError = file
-                          ? validateUploadFile(file, { category: "image", maxBytes: UPLOAD_LIMITS.image })
-                          : null;
-                        if (validationError) {
-                          showError(validationError);
-                          event.currentTarget.value = "";
-                          return;
-                        }
-                        const currentPreview = folderImagePreviews[folder.key];
-                        if (currentPreview) URL.revokeObjectURL(currentPreview);
-                        setFolderImageFiles((current) => ({ ...current, [folder.key]: file as File }));
-                        setFolderImagePreviews((current) => ({ ...current, [folder.key]: URL.createObjectURL(file as File) }));
-                      }}
+                      onUpload={(file) => uploadFolderImage(folder.key, file)}
+                      onError={showError}
                     />
-                    <label className="button secondary operator-compact-button" htmlFor={`booking-folder-image-${folder.key}`}>
-                      Choose image
-                    </label>
-                    <span data-testid={`booking-folder-image-file-name-${folder.key}`}>
-                      {folderImageFiles[folder.key]?.name || "No image selected"}
-                    </span>
-                    {folderImageFiles[folder.key] ? (
-                      <div data-testid={`booking-folder-image-selection-${folder.key}`}>
-                        <strong>{folderImageFiles[folder.key].name}</strong>
-                        <span className="muted" style={{ display: "block" }}>{(folderImageFiles[folder.key].size / 1024).toFixed(1)} KB selected</span>
-                      </div>
-                    ) : null}
-                    <button
-                      className="button secondary operator-compact-button"
-                      type="button"
-                      disabled={!folderImageFiles[folder.key] || savingArea === `folder:${folder.key}`}
-                      onClick={() => void uploadFolderImage(folder.key)}
-                    >
-                      {savingArea === `folder:${folder.key}` ? "Uploading..." : "Upload image"}
-                    </button>
-                    {folderImageFiles[folder.key] ? (
-                      <button className="button secondary operator-compact-button" type="button" onClick={() => {
-                        const previewUrl = folderImagePreviews[folder.key];
-                        if (previewUrl) URL.revokeObjectURL(previewUrl);
-                        setFolderImageFiles((current) => {
-                          const next = { ...current };
-                          delete next[folder.key];
-                          return next;
-                        });
-                        setFolderImagePreviews((current) => {
-                          const next = { ...current };
-                          delete next[folder.key];
-                          return next;
-                        });
-                      }}>Clear</button>
-                    ) : null}
                     <button className="button secondary operator-compact-button" type="button" onClick={() => setFolderDraft(folder)}>Edit</button>
                     <button className="button secondary operator-compact-button" type="button" disabled={index === 0} onClick={() => {
                       const next = moveItem(folders, index, -1);
@@ -1659,7 +1605,6 @@ export default function BookingProSettingsPage() {
                 </span>
                 {serviceImageSelection ? (
                   <div data-testid="booking-service-image-selection" style={{ marginTop: 8 }}>
-                    <strong>{serviceImageSelection.name}</strong>
                     <span className="muted" style={{ display: "block" }}>{(serviceImageSelection.size / 1024).toFixed(1)} KB selected</span>
                     {serviceDraft.imageUrl ? <img src={serviceDraft.imageUrl} alt="Selected service preview" style={{ width: 140, height: 84, objectFit: "cover", borderRadius: 12, marginTop: 8 }} /> : null}
                   </div>
