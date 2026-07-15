@@ -230,7 +230,7 @@ test.describe("Phase 1O catalog readiness and accounting OAuth onboarding", () =
     for (const provider of ["xero", "quickbooks"]) {
       await page.goto(`/dashboard/settings/integrations/${provider}`, { waitUntil: "networkidle" });
       await expect(page.getByTestId("provider-setup-wizard")).toBeVisible();
-      await expect(page.getByTestId("provider-setup-wizard")).toContainText(/Needs setup|Connected|Not available/);
+      await expect(page.getByTestId("provider-setup-wizard")).toContainText(/Available|Needs setup|Connected|Not available/);
       await expect(page.locator("body")).not.toContainText("access_token");
       await expect(page.locator("body")).not.toContainText("refresh_token");
       await expect(page.locator("body")).not.toContainText("client_secret");

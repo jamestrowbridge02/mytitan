@@ -68,8 +68,9 @@ function statusTone(status: DirectoryStatus) {
 function simpleConnectionStatus(status?: ConnectionStatus | null): DirectoryStatus {
   if (status?.connectionState === "needs_reconnect") return "Action required";
   if (status?.connected) return "Connected";
-  if (!status?.setupAvailable || status.allowed === false || status.enabled === false) return "Not available";
-  return "Setup required";
+  if (status?.allowed === false || status?.enabled === false) return "Not available";
+  if (!status?.setupAvailable) return "Setup required";
+  return "Available";
 }
 
 export default function IntegrationsPage() {
@@ -215,8 +216,8 @@ export default function IntegrationsPage() {
         group: "Accounting",
         name: "Xero",
         status: simpleConnectionStatus(xero),
-        description: "Connect your accounts so invoices can sync when ready.",
-        action: xero?.connected ? "Manage Xero" : simpleConnectionStatus(xero) === "Not available" ? "Learn more" : "Connect Xero",
+        description: "Sync customers, invoices and payments with your Xero organisation when setup is complete.",
+        action: xero?.connected ? "Manage Xero" : simpleConnectionStatus(xero) === "Setup required" ? "Setup required" : simpleConnectionStatus(xero) === "Not available" ? "Learn more" : "Connect Xero",
         href: "/dashboard/settings/integrations/xero",
         testId: "integration-workspace-row-xero",
       },
@@ -226,7 +227,7 @@ export default function IntegrationsPage() {
         name: "QuickBooks",
         status: simpleConnectionStatus(quickbooks),
         description: "Connect your accounts so invoices can sync when ready.",
-        action: quickbooks?.connected ? "Manage QuickBooks" : simpleConnectionStatus(quickbooks) === "Not available" ? "Learn more" : "Connect QuickBooks",
+        action: quickbooks?.connected ? "Manage QuickBooks" : simpleConnectionStatus(quickbooks) === "Available" ? "Connect QuickBooks" : "Learn more",
         href: "/dashboard/settings/integrations/quickbooks",
         testId: "integration-workspace-row-quickbooks",
       },

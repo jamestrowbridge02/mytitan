@@ -1,60 +1,30 @@
 # Xero Production Setup
 
-This runbook is for operator-controlled Xero activation. It must not be used to run automated live writes.
+This runbook is for operator-controlled Xero activation. Automated tests must use mocked provider responses and must not call live Xero.
 
-## 1. Xero Developer Application
+Required runtime values:
 
-- Create or confirm the MyTitan-owned Xero OAuth application.
-- Configure the production callback URI exactly as exposed by MyTitan: `/integrations/xero/callback` on the production API origin.
-- Request only required scopes:
-  - `offline_access`
-  - `accounting.transactions`
-  - `accounting.settings`
-  - `accounting.contacts`
-  - `accounting.reports.read`
-- Record the application environment as production or test.
-- Configure webhook signing only after the endpoint and signing key are available.
+- `XERO_CLIENT_ID`
+- `XERO_CLIENT_SECRET`
+- `XERO_REDIRECT_URI` or legacy `XERO_REDIRECT_URL`
+- `INTEGRATIONS_ENCRYPTION_KEY`
+- `API_PUBLIC_URL`
+- `APP_PUBLIC_URL`
 
-## 2. MyTitan Platform Configuration
+The Xero developer app callback must exactly match the API callback:
 
-- Store the Xero client ID and client secret through the approved encrypted platform/runtime configuration path.
-- Do not paste credentials into tenant-visible pages, documentation, logs, or tickets.
-- Confirm the runtime reports setup available on the Xero tenant setup page.
+`https://api.mytitan.co.uk/integrations/xero/callback`
 
-## 3. First Organisation Connection
+Tenant operator flow:
 
-- Sign in as an authorised MyTitan business admin.
-- Open `Dashboard -> Connected Tools -> Xero`.
-- Start Connect Xero.
-- Complete Xero OAuth as the Xero organisation owner or authorised delegate.
-- Return to MyTitan and explicitly select the Xero organisation shown on the setup page.
-- Run the read-only verification.
+1. Open Connected Tools.
+2. Open Accounting.
+3. Confirm Xero is `Available` or `Setup required`.
+4. Select Connect only when setup is available.
+5. Complete Xero OAuth manually.
+6. Return to MyTitan.
+7. Select the Xero organisation.
+8. Confirm the connection shows Connected.
 
-## 4. Mapping Wizard And Preview
+Never publish client secrets, access tokens, refresh tokens, raw tenant IDs, organisation IDs or encrypted payloads.
 
-- Configure sales account, payment/deposit account, tax rates, contact matching, invoice target state, tracking categories and reconciliation policy.
-- Keep MyTitan operational records authoritative unless an operator-approved policy says otherwise.
-- Use preview/dry-run output before any live export.
-
-## 5. Operator-Controlled Canaries
-
-- Contact canary: create or match only an approved test contact in the operator-owned Xero organisation.
-- Invoice canary: export only an approved draft test invoice; do not approve, email, void, pay, refund or reconcile automatically.
-- Reconciliation canary: import status/payment allocation only for the approved canary record.
-
-## 6. Disconnect / Reconnect Drill
-
-- Disconnect from MyTitan and confirm encrypted token material is removed.
-- Confirm MyTitan invoices, contacts, payments and audit records are preserved.
-- Reconnect and select the organisation again.
-
-## 7. Rollback
-
-- Disable live Xero sync flags.
-- Disconnect the Xero tenant connection from MyTitan.
-- Revoke the MyTitan OAuth app from Xero if required.
-- Keep audit and historical mapping records for investigation.
-
-## Status
-
-Code-controlled integration setup is ready for isolated validation. Live operational readiness still requires real Xero app configuration, organisation-owner approval, read-only verification and operator-controlled canaries.
