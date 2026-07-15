@@ -4,7 +4,7 @@ import { apiFetch } from '../../lib/api';
 import { isLocationsAdvancedV1Enabled, isLocationsV1Enabled } from '../../lib/feature-flags';
 import { DEFAULT_WORKSPACE_TIMEZONE, fetchGeoDefaults, type GeoDefaults } from '../../lib/geo-defaults';
 import { formatBusinessTime, parseBusinessTime, weekdayHours } from '../../lib/business-hours';
-import { UPLOAD_LIMITS, validateUploadFile } from '../../lib/upload-policy';
+import { EntityImageUpload } from '../../components/media/EntityImageUpload';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -102,9 +102,6 @@ export default function LocationsPage() {
   const [savedSnapshot, setSavedSnapshot] = useState(() => JSON.stringify(createLocationForm()));
   const [hourInputs, setHourInputs] = useState<Record<string, string>>({});
   const [copyHoursLocationId, setCopyHoursLocationId] = useState('');
-  const [locationImageFile, setLocationImageFile] = useState<File | null>(null);
-  const [locationImagePreviewUrl, setLocationImagePreviewUrl] = useState('');
-
   const isFormValid = useMemo(() => String(form.name || '').trim().length > 0, [form.name]);
   const isDirty = useMemo(() => JSON.stringify(form) !== savedSnapshot, [form, savedSnapshot]);
 
@@ -217,7 +214,6 @@ export default function LocationsPage() {
       setForm(nextForm);
       setSavedSnapshot(JSON.stringify(nextForm));
       setEditingId('');
-      setLocationImageFile(null);
       setHourInputs({});
       setStatus(editingId ? 'Saved. The location details are up to date.' : 'Saved. Add another location or continue to booking settings.');
       await load();
@@ -228,31 +224,41 @@ export default function LocationsPage() {
     }
   }
 
-  async function uploadLocationImage() {
-    if (!editingId || !locationImageFile) return;
+  async function uploadLocationImage(file: File) {
+    if (!editingId) return;
+    const wasDirty = isDirty;
     setSaving(true);
     setError('');
     setStatus('');
     try {
       const body = new FormData();
-      body.append('file', locationImageFile);
+      body.append('file', file);
       const result = await apiFetch(`/locations/${editingId}/image`, { method: 'POST', body });
+      const imageUrl = result?.imageUrl || null;
       const nextForm = {
         ...form,
         metadataJson: {
           ...(form.metadataJson && typeof form.metadataJson === 'object' ? form.metadataJson : {}),
-          imageUrl: result?.imageUrl || null,
+          imageUrl,
         },
       };
       setForm(nextForm);
-      setSavedSnapshot(JSON.stringify(nextForm));
-      setLocationImageFile(null);
-      if (locationImagePreviewUrl) URL.revokeObjectURL(locationImagePreviewUrl);
-      setLocationImagePreviewUrl('');
+      if (!wasDirty) setSavedSnapshot(JSON.stringify(nextForm));
+      setItems((current) => current.map((location) => (
+        location.id === editingId
+          ? {
+              ...location,
+              metadataJson: {
+                ...(location.metadataJson && typeof location.metadataJson === 'object' ? location.metadataJson : {}),
+                imageUrl,
+              },
+            }
+          : location
+      )));
       setStatus('Location image updated for public booking.');
-      await load();
     } catch (err: any) {
       setError(err?.message || 'Failed to upload the location image');
+      throw err;
     } finally {
       setSaving(false);
     }
@@ -397,7 +403,6 @@ export default function LocationsPage() {
   function editLocation(location: any) {
     const metadata = location.metadataJson && typeof location.metadataJson === 'object' ? location.metadataJson : {};
     setEditingId(location.id);
-    setLocationImageFile(null);
     const nextForm = {
       code: location.code || '',
       name: location.name || '',
@@ -532,62 +537,21 @@ export default function LocationsPage() {
               <div>
                 <strong>Public booking image</strong>
                 <p className="muted" style={{ margin: '4px 0 10px' }}>Shown on the location card. PNG, JPEG, or WebP up to 5 MB.</p>
-                {locationImagePreviewUrl || form.metadataJson?.imageUrl ? (
-                  <img
-                    src={locationImagePreviewUrl || String(form.metadataJson.imageUrl)}
-                    alt={`${form.name || 'Location'} preview`}
-                    data-testid="location-image-preview"
-                    style={{ width: 180, height: 110, objectFit: 'cover', borderRadius: 14, display: 'block' }}
-                  />
-                ) : null}
               </div>
-              <div className="integration-actions">
-                <input
-                  id="location-image-file"
-                  className="visually-hidden"
-                  data-testid="location-image-input"
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0] || null;
-                    const validationError = file
-                      ? validateUploadFile(file, { category: 'image', maxBytes: UPLOAD_LIMITS.image })
-                      : null;
-                    if (validationError) {
-                      setError(validationError);
-                      event.currentTarget.value = '';
-                      return;
-                    }
-                    if (locationImagePreviewUrl) URL.revokeObjectURL(locationImagePreviewUrl);
-                    setLocationImageFile(file);
-                    setLocationImagePreviewUrl(file ? URL.createObjectURL(file) : '');
-                  }}
-                />
-                <label className="button secondary" htmlFor="location-image-file">Choose image</label>
-                <span data-testid="location-image-file-name">
-                  {locationImageFile ? locationImageFile.name : 'No image selected'}
-                </span>
-                {locationImageFile ? (
-                  <div data-testid="location-image-selection">
-                    <strong>{locationImageFile.name}</strong>
-                    <span className="muted" style={{ display: 'block' }}>{(locationImageFile.size / 1024).toFixed(1)} KB selected</span>
-                    <button className="button secondary" type="button" onClick={() => {
-                      if (locationImagePreviewUrl) URL.revokeObjectURL(locationImagePreviewUrl);
-                      setLocationImagePreviewUrl('');
-                      setLocationImageFile(null);
-                    }}>Clear</button>
-                  </div>
-                ) : null}
-                <button
-                  className="button secondary"
-                  data-testid="location-image-upload"
-                  type="button"
-                  disabled={!locationImageFile || saving}
-                  onClick={() => void uploadLocationImage()}
-                >
-                  Upload image
-                </button>
-              </div>
+              <EntityImageUpload
+                inputId="location-image-file"
+                inputTestId="location-image-input"
+                fileNameTestId="location-image-file-name"
+                selectionTestId="location-image-selection"
+                previewTestId="location-image-preview"
+                uploadButtonTestId="location-image-upload"
+                inputAriaLabel={`Upload image for ${form.name || 'location'}`}
+                currentImageUrl={form.metadataJson?.imageUrl ? String(form.metadataJson.imageUrl) : ''}
+                previewAlt={`${form.name || 'Location'} preview`}
+                disabled={saving}
+                onUpload={uploadLocationImage}
+                onError={setError}
+              />
             </div>
           ) : null}
 
@@ -688,7 +652,6 @@ export default function LocationsPage() {
             {editingId ? <button className="button secondary" type="button" disabled={saving} onClick={() => {
               const nextForm = createLocationForm(geoDefaults);
               setEditingId('');
-              setLocationImageFile(null);
               setForm(nextForm);
               setSavedSnapshot(JSON.stringify(nextForm));
               setStatus('');
