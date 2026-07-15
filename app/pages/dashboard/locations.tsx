@@ -80,6 +80,25 @@ function VisibilityIconButton({
   );
 }
 
+function getLocationImageUrl(location: any): string {
+  const metadata = location?.metadataJson && typeof location.metadataJson === 'object' ? location.metadataJson : {};
+  return typeof metadata.imageUrl === 'string' ? metadata.imageUrl : '';
+}
+
+function mergeLocationImageState(current: any, persisted: any) {
+  const currentMetadata = current?.metadataJson && typeof current.metadataJson === 'object' ? current.metadataJson : {};
+  const persistedMetadata = persisted?.metadataJson && typeof persisted.metadataJson === 'object' ? persisted.metadataJson : {};
+  return {
+    ...current,
+    ...persisted,
+    memberships: persisted?.memberships ?? current?.memberships,
+    metadataJson: {
+      ...currentMetadata,
+      ...persistedMetadata,
+    },
+  };
+}
+
 export default function LocationsPage() {
   const enabled = isLocationsV1Enabled();
   const advancedEnabled = isLocationsAdvancedV1Enabled();
@@ -246,9 +265,8 @@ export default function LocationsPage() {
       if (!persistedLocation || !imageUrl) {
         throw new Error('Image upload could not be verified. The saved image was not changed.');
       }
-      const nextForm = {
-        ...form,
-        ...persistedLocation,
+      const nextForm = mergeLocationImageState(form, persistedLocation);
+      Object.assign(nextForm, {
         bookingCutoffMins: form.bookingCutoffMins,
         slotMinutes: form.slotMinutes,
         arrivalInstructions: form.arrivalInstructions,
@@ -256,13 +274,16 @@ export default function LocationsPage() {
         publicVisible: form.publicVisible,
         tradeVisible: form.tradeVisible,
         privateVisible: form.privateVisible,
-        metadataJson: persistedMetadata,
-      };
+        metadataJson: {
+          ...(nextForm.metadataJson && typeof nextForm.metadataJson === 'object' ? nextForm.metadataJson : {}),
+          imageUrl,
+        },
+      });
       setForm(nextForm);
       if (!wasDirty) setSavedSnapshot(JSON.stringify(nextForm));
       setItems((current) => current.map((location) => (
         location.id === editingId
-          ? persistedLocation
+          ? mergeLocationImageState(location, persistedLocation)
           : location
       )));
       setStatus('Location image updated for public booking.');
@@ -556,7 +577,7 @@ export default function LocationsPage() {
                 previewTestId="location-image-preview"
                 uploadButtonTestId="location-image-upload"
                 inputAriaLabel={`Upload image for ${form.name || 'location'}`}
-                currentImageUrl={form.metadataJson?.imageUrl ? String(form.metadataJson.imageUrl) : ''}
+                currentImageUrl={getLocationImageUrl(form)}
                 currentImageLabel="Current public booking image saved"
                 previewAlt={`${form.name || 'Location'} preview`}
                 disabled={saving}
