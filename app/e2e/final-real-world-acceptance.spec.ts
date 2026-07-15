@@ -26,6 +26,7 @@ test.describe("final real-world acceptance", () => {
     await installApiProxy(page, request);
     await loginAs(page, request, fixtureRefs.workspaceAdminEmail, fixtureRefs.workspaceAdminPassword);
     await page.goto("/dashboard/settings?tab=general&section=business-profile", { waitUntil: "networkidle" });
+    await page.getByTestId("business-profile-tab-brand").click();
 
     const input = page.getByTestId("tenant-logo-file-input");
     await input.setInputFiles({ name: "wheel-ar-acceptance.png", mimeType: "image/png", buffer: tinyPng });
@@ -37,7 +38,8 @@ test.describe("final real-world acceptance", () => {
     await expect(page.getByText(/Logo saved/)).toBeVisible();
 
     await page.reload({ waitUntil: "networkidle" });
-    const savedPreview = page.locator('img[alt="Current business logo on light background"]');
+    await page.getByTestId("business-profile-tab-brand").click();
+    const savedPreview = page.getByTestId("business-logo-preview-pair").locator("img").first();
     await expect(savedPreview).toBeVisible();
     expect(await savedPreview.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBeTruthy();
 

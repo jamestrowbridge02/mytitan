@@ -67,6 +67,15 @@ type TabKey =
   | 'bookings'
   | 'advanced';
 
+type ProfileTabKey = 'details' | 'brand' | 'regional' | 'finance';
+
+const PROFILE_TABS: Array<{ key: ProfileTabKey; label: string }> = [
+  { key: 'details', label: 'Details' },
+  { key: 'brand', label: 'Brand' },
+  { key: 'regional', label: 'Regional' },
+  { key: 'finance', label: 'Finance & tax' },
+];
+
 const TABS: Array<{ key: TabKey; label: string; description: string; group: 'Setup' | 'Settings' }> = [
   { key: 'jobs', label: 'Work & Job Sheet', description: 'Canonical job form, declaration, display defaults, and workflow steps', group: 'Setup' },
   { key: 'services', label: 'Services', description: 'Service catalogue and job defaults', group: 'Setup' },
@@ -762,6 +771,7 @@ export default function SettingsPage() {
   const notificationsEnabled = isNotificationsV1Enabled();
   const automationsEnabled = isAutomationsV1Enabled();
   const [tab, setTab] = useState<TabKey>('general');
+  const [profileTab, setProfileTab] = useState<ProfileTabKey>('details');
   const [settingsSearch, setSettingsSearch] = useState('');
   const [settingsDirectoryDismissed, setSettingsDirectoryDismissed] = useState(false);
   const [form, setFormState] = useState<any>({});
@@ -1744,23 +1754,20 @@ export default function SettingsPage() {
       { label: 'Plan', value: planCode || 'STANDARD', hint: 'Billing-controlled capability set' },
     ];
   }, [form.featureAI, form.featureAccounting, form.featureBookings, form.featurePayments, form.featureWhatsApp, planCode, themeMode]);
-  const companyProfileSections = useMemo(
-    () => [
-      { key: 'business', title: 'Business details', state: form.companyName ? 'Saved' : 'Needs business name', href: '/dashboard/settings?tab=general&section=business-profile' },
-      { key: 'brand', title: 'Brand', state: form.logoUrl || form.brandPrimaryColor ? 'Saved' : 'Add logo and colours', href: '/dashboard/settings?tab=general&section=workspace-layout' },
-      { key: 'locations', title: 'Locations', state: 'Managed in Locations', href: '/dashboard/locations' },
-      { key: 'staff', title: 'Staff', state: 'Managed in Team', href: '/dashboard/users' },
-      { key: 'opening-hours', title: 'Opening hours', state: 'Managed in Bookings', href: '/dashboard/booking/settings#hours' },
-      { key: 'services', title: 'Services', state: 'Managed in Services', href: '/dashboard/booking/settings#services' },
-      { key: 'payments', title: 'Payments', state: form.featurePayments || form.paymentsEnabled ? 'On' : 'Review setup', href: '/dashboard/settings/payments' },
-      { key: 'tax', title: 'Tax', state: form.taxRegistrationNumber || form.taxLabel ? 'Saved' : 'Add tax details', href: '/dashboard/settings?tab=general&section=business-profile' },
-      { key: 'booking', title: 'Booking', state: form.bookingPublicEnabled ? 'Public booking on' : 'Private until enabled', href: '/dashboard/booking/settings#workflow' },
-      { key: 'customer-portal', title: 'Customer portal', state: form.featureCustomerPortal ? 'On' : 'Review portal', href: '/dashboard/portal' },
-      { key: 'trade-portal', title: 'Trade portal', state: 'Managed in Trade accounts', href: '/dashboard/trade-accounts' },
-      { key: 'communication', title: 'Communication', state: form.emailReplyTo || form.contactEmail ? 'Reply path saved' : 'Add reply email', href: '/dashboard/settings?tab=messages&section=notifications-email' },
-    ],
-    [form.bookingPublicEnabled, form.companyName, form.contactEmail, form.emailReplyTo, form.featureCustomerPortal, form.featurePayments, form.logoUrl, form.paymentsEnabled, form.brandPrimaryColor, form.taxLabel, form.taxRegistrationNumber],
-  );
+  const profileRelatedLinks = [
+    { label: 'Locations', href: '/dashboard/locations' },
+    { label: 'Team', href: '/dashboard/users' },
+    { label: 'Services', href: '/dashboard/booking/settings#services' },
+    { label: 'Booking hours', href: '/dashboard/booking/settings#hours' },
+    { label: 'Payments', href: '/dashboard/settings/payments' },
+    { label: 'Customer Portal', href: '/dashboard/portal' },
+  ];
+  const companyProfileSections = profileRelatedLinks.map((item) => ({
+    key: item.label.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+    title: item.label,
+    state: 'Related setting',
+    href: item.href,
+  }));
   const settingsPayload = useMemo(() => buildSettingsPayload(form), [form]);
   const providerSettingsPayload = useMemo(() => buildSettingsPayload(settings || {}), [settings]);
   const baselineSettingsPayload = savedSettingsPayload || providerSettingsPayload;
@@ -1768,10 +1775,21 @@ export default function SettingsPage() {
     () => !settingsPayloadsMatch(baselineSettingsPayload, settingsPayload),
     [baselineSettingsPayload, settingsPayload],
   );
+  const profileAttentionItems = useMemo(() => {
+    return [
+      !String(form.companyName || '').trim() ? 'business name' : '',
+      !String(form.contactEmail || '').trim() ? 'contact email' : '',
+    ].filter(Boolean);
+  }, [form.companyName, form.contactEmail]);
+  const profileStatusLabel = settingsDirty
+    ? 'Unsaved changes'
+    : profileAttentionItems.length
+      ? `${profileAttentionItems.length} detail${profileAttentionItems.length === 1 ? '' : 's'} need attention`
+      : 'Profile complete';
   const hasSettingsRouteTarget = Boolean(router.query.tab || router.query.section || routeSearchParams.get('tab') || routeSearchParams.get('section'));
   const settingsDirectoryMode = router.isReady && !hasSettingsRouteTarget && !settingsDirectoryDismissed;
   const focusedSettingsSection = Boolean(settingsSection);
-  const isBusinessProfilePage = tab === 'general' && !settingsDirectoryMode && settingsSection === 'business-profile';
+  const isBusinessProfilePage = tab === 'general' && !settingsDirectoryMode && ['business-profile', 'company-profile-hub'].includes(settingsSection);
   const visibleSettingsDirectory = useMemo(() => {
     const query = settingsSearch.trim().toLowerCase();
     if (!query) return SETTINGS_DIRECTORY;
@@ -2191,6 +2209,346 @@ export default function SettingsPage() {
 
         {tab === 'general' && (
           <>
+            {isBusinessProfilePage ? (
+              <form
+                className="card settings-premium-card business-profile-workspace"
+                data-testid="company-profile-hub"
+                {...getSectionProps('company-profile-hub')}
+                onSubmit={handleSettingsSubmit}
+              >
+                <div className="business-profile-workspace__header">
+                  <div className="business-profile-workspace__identity">
+                    <div className="business-profile-workspace__logo" aria-hidden="true">
+                      {form.logoUrl ? (
+                        <SafeImage src={form.logoUrl} alt="" className="business-profile-workspace__logoImage" />
+                      ) : (
+                        <span>{String(form.companyName || 'MT').slice(0, 2).toUpperCase()}</span>
+                      )}
+                    </div>
+                    <div>
+                      <p className="operator-eyebrow">Business Profile</p>
+                      <h2>{form.companyName || 'Business identity'}</h2>
+                      <p className="muted settings-premium-muted">
+                        {form.registeredBusinessName && form.registeredBusinessName !== form.companyName ? form.registeredBusinessName : 'Business identity and customer-facing defaults'}
+                      </p>
+                      <div className="business-profile-workspace__meta">
+                        {form.contactEmail ? <span>{form.contactEmail}</span> : null}
+                        {form.contactPhone ? <span>{form.contactPhone}</span> : null}
+                        {form.companyNumber ? <span>Company {form.companyNumber}</span> : null}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="business-profile-workspace__save">
+                    <span className={`operator-statusBadge ${settingsDirty ? 'operator-statusBadge--warning' : 'operator-statusBadge--success'}`} role="status" aria-live="polite" data-testid="company-profile-saved-state">
+                      {savingSettings ? 'Saving...' : profileStatusLabel}
+                    </span>
+                    <button
+                      className="button settings-premium-button"
+                      type="submit"
+                      data-testid="company-profile-save"
+                      disabled={savingSettings || !settingsDirty}
+                    >
+                      {savingSettings ? 'Saving...' : 'Save changes'}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="business-profile-tabs" role="tablist" aria-label="Business profile sections">
+                  {PROFILE_TABS.map((item) => (
+                    <button
+                      key={item.key}
+                      type="button"
+                      role="tab"
+                      aria-selected={profileTab === item.key}
+                      className={`tab-button settings-tab-button ${profileTab === item.key ? 'active' : ''}`}
+                      data-testid={`business-profile-tab-${item.key}`}
+                      onClick={() => setProfileTab(item.key)}
+                    >
+                      <strong>{item.label}</strong>
+                    </button>
+                  ))}
+                </div>
+
+                {profileTab === 'details' ? (
+                  <div className="business-profile-panel" role="tabpanel" data-testid="business-profile-details-panel">
+                    <section className="settings-premium-subcard">
+                      <h3>Business</h3>
+                      <div className="two-col">
+                        <div>
+                          <label className="settings-premium-label">Business name</label>
+                          <input className="input settings-premium-input" data-testid="settings-business-name" value={form.companyName || ''} onChange={(e) => setForm({ ...form, companyName: e.target.value })} />
+                        </div>
+                        <div>
+                          <label className="settings-premium-label">Trading name</label>
+                          <input className="input settings-premium-input" data-testid="settings-trading-name" value={form.tradingName || ''} onChange={(e) => setForm({ ...form, tradingName: e.target.value })} />
+                        </div>
+                        <div>
+                          <label className="settings-premium-label">Registered business name</label>
+                          <input className="input settings-premium-input" data-testid="settings-registered-business-name" value={form.registeredBusinessName || ''} onChange={(e) => setForm({ ...form, registeredBusinessName: e.target.value })} />
+                        </div>
+                        <div>
+                          <label className="settings-premium-label">Company number</label>
+                          <input className="input settings-premium-input" data-testid="settings-company-number" value={form.companyNumber || ''} onChange={(e) => setForm({ ...form, companyNumber: e.target.value })} />
+                        </div>
+                        <div>
+                          <label className="settings-premium-label">VAT or tax registration number</label>
+                          <input className="input settings-premium-input" data-testid="settings-tax-registration-number" value={form.taxRegistrationNumber || ''} onChange={(e) => setForm({ ...form, taxRegistrationNumber: e.target.value })} />
+                        </div>
+                      </div>
+                    </section>
+                    <section className="settings-premium-subcard">
+                      <h3>Contact</h3>
+                      <div className="three-col">
+                        <div>
+                          <label className="settings-premium-label">Phone</label>
+                          <input className="input settings-premium-input" value={form.contactPhone || ''} onChange={(e) => setForm({ ...form, contactPhone: e.target.value })} />
+                        </div>
+                        <div>
+                          <label className="settings-premium-label">Support phone</label>
+                          <input className="input settings-premium-input" value={form.supportPhone || ''} onChange={(e) => setForm({ ...form, supportPhone: e.target.value })} />
+                        </div>
+                        <div>
+                          <label className="settings-premium-label">Email</label>
+                          <input className="input settings-premium-input" type="email" value={form.contactEmail || ''} onChange={(e) => setForm({ ...form, contactEmail: e.target.value })} />
+                        </div>
+                        <div>
+                          <label className="settings-premium-label">Website</label>
+                          <input className="input settings-premium-input" type="url" placeholder="https://" value={form.websiteUrl || ''} onChange={(e) => setForm({ ...form, websiteUrl: e.target.value })} />
+                        </div>
+                      </div>
+                    </section>
+                    <section className="settings-premium-subcard">
+                      <h3>Registered address</h3>
+                      <input className="input settings-premium-input" aria-label="Registered address line 1" placeholder="Address line 1" value={form.businessAddressLine1 || ''} onChange={(e) => setForm({ ...form, businessAddressLine1: e.target.value })} />
+                      <input className="input settings-premium-input" aria-label="Registered address line 2" placeholder="Address line 2 (optional)" value={form.businessAddressLine2 || ''} onChange={(e) => setForm({ ...form, businessAddressLine2: e.target.value })} style={{ marginTop: 8 }} />
+                      <div className="three-col">
+                        <input className="input settings-premium-input" aria-label="Business city" placeholder="Town or city" value={form.businessCity || ''} onChange={(e) => setForm({ ...form, businessCity: e.target.value })} />
+                        <input className="input settings-premium-input" aria-label="Business postcode" placeholder="Postcode" value={form.businessPostcode || ''} onChange={(e) => setForm({ ...form, businessPostcode: e.target.value })} />
+                        <input className="input settings-premium-input" aria-label="Business address country" placeholder="Country" value={form.businessCountry || ''} onChange={(e) => setForm({ ...form, businessCountry: e.target.value })} />
+                      </div>
+                    </section>
+                    <fieldset className="settings-premium-subcard" data-testid="settings-business-display-controls">
+                      <legend>Output visibility</legend>
+                      <div className="business-profile-output-grid">
+                        {[
+                          ['invoices', 'Invoices and estimates'],
+                          ['receipts', 'Receipts'],
+                          ['statements', 'Statements'],
+                          ['jobSheets', 'Job sheets and PDFs'],
+                          ['customerEmails', 'Customer emails'],
+                          ['customerPortal', 'Customer Portal'],
+                          ['booking', 'Booking confirmation'],
+                          ['tradePortal', 'Trade Portal'],
+                          ['legalFooter', 'Legal and footer documents'],
+                        ].map(([key, label]) => (
+                          <label key={key} className="operator-checkRow">
+                            <input
+                              type="checkbox"
+                              checked={form.businessDisplayJson?.[key] !== false}
+                              onChange={(event) => setForm((current: any) => ({
+                                ...current,
+                                businessDisplayJson: {
+                                  ...(current.businessDisplayJson || {}),
+                                  [key]: event.target.checked,
+                                },
+                              }))}
+                            />
+                            <span>{label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </fieldset>
+                  </div>
+                ) : null}
+
+                {profileTab === 'brand' ? (
+                  <div className="business-profile-panel" role="tabpanel" data-testid="business-profile-brand-panel">
+                    <section className="settings-premium-subcard business-profile-brand-grid">
+                      <div>
+                        <h3>Logo</h3>
+                        <label className="settings-premium-label" htmlFor="tenant-logo-file">Replace logo</label>
+                        <input id="tenant-logo-file" data-testid="tenant-logo-file-input" className="visually-hidden" type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => {
+                          const nextFile = e.target.files?.[0] || null;
+                          const validationError = nextFile ? validateUploadFile(nextFile, { category: 'image', maxBytes: UPLOAD_LIMITS.logo }) : null;
+                          if (validationError) {
+                            showError(validationError);
+                            e.target.value = '';
+                            return;
+                          }
+                          if (logoPreviewUrl) URL.revokeObjectURL(logoPreviewUrl);
+                          setLogoFile(validationError ? null : nextFile);
+                          setLogoPreviewUrl(nextFile ? URL.createObjectURL(nextFile) : '');
+                        }} />
+                        <div className="business-profile-upload-row">
+                          <label className="button secondary" htmlFor="tenant-logo-file">Choose image</label>
+                          <span data-testid="tenant-logo-file-name">{logoFile ? logoFile.name : form.logoUrl ? 'Saved logo selected' : 'PNG, JPEG, or WebP up to 2 MB'}</span>
+                          <button
+                            className="button settings-premium-button"
+                            type="button"
+                            disabled={!logoFile || logoUploading}
+                            onClick={uploadLogo}
+                          >
+                            {logoUploading ? 'Uploading logo...' : form.logoUrl ? 'Replace logo' : 'Upload logo'}
+                          </button>
+                        </div>
+                        {logoFile ? (
+                          <div className="integration-card" data-testid="logo-file-selection" style={{ marginTop: 10 }}>
+                            <strong className="visually-hidden">{logoFile.name}</strong>
+                            <p className="muted" style={{ margin: 0 }}>{(logoFile.size / 1024).toFixed(1)} KB selected</p>
+                            <button className="button secondary" type="button" onClick={() => {
+                              if (logoPreviewUrl) URL.revokeObjectURL(logoPreviewUrl);
+                              setLogoPreviewUrl('');
+                              setLogoFile(null);
+                            }}>Clear</button>
+                          </div>
+                        ) : null}
+                      </div>
+                      <div className="logo-preview-pair" data-testid="business-logo-preview-pair">
+                        <div className="logo-preview-surface logo-preview-surface--light">
+                          {logoPreviewUrl || form.logoUrl ? <SafeImage src={logoPreviewUrl || form.logoUrl} alt="Business logo preview on light background" className="business-logo-preview-image" fallback={<span className="muted">Logo preview unavailable</span>} /> : <span className="muted">Light preview</span>}
+                        </div>
+                        <div className="logo-preview-surface logo-preview-surface--dark">
+                          {logoPreviewUrl || form.logoUrl ? <SafeImage src={logoPreviewUrl || form.logoUrl} alt="Business logo preview on dark background" className="business-logo-preview-image" fallback={<span className="muted">Logo preview unavailable</span>} /> : <span className="muted">Dark preview</span>}
+                        </div>
+                      </div>
+                    </section>
+                    <section className="settings-premium-subcard">
+                      <h3>Colours and previews</h3>
+                      <div className="three-col">
+                        <div>
+                          <label className="settings-premium-label">Primary colour</label>
+                          <input className="input settings-premium-input" type="color" value={form.brandPrimaryColor || '#4fd1c5'} onChange={(e) => setForm({ ...form, brandPrimaryColor: e.target.value })} />
+                        </div>
+                        <div>
+                          <label className="settings-premium-label">Secondary colour</label>
+                          <input className="input settings-premium-input" type="color" value={form.brandSecondaryColor || '#1a1f36'} onChange={(e) => setForm({ ...form, brandSecondaryColor: e.target.value })} />
+                        </div>
+                        <div>
+                          <label className="settings-premium-label">Accent colour</label>
+                          <input className="input settings-premium-input" type="color" value={form.brandAccentColor || '#4fd1c5'} onChange={(e) => setForm({ ...form, brandAccentColor: e.target.value })} />
+                        </div>
+                      </div>
+                      <label className="settings-premium-label">Default appearance</label>
+                      <select className="input settings-premium-input" value={form.brandDefaultMode || 'dark'} onChange={(e) => setForm({ ...form, brandDefaultMode: e.target.value })}>
+                        <option value="dark">Dark</option>
+                        <option value="light">Light</option>
+                      </select>
+                      <p className="muted settings-premium-muted" data-testid="brand-contrast-warning">
+                        Brand colours are shown as accents. Body text uses MyTitan readable tokens when a brand colour is too low contrast.
+                      </p>
+                      <div className="business-profile-preview-grid">
+                        <div className="theme-preview business-profile-preview" style={{ background: preview.secondary }}>
+                          <strong style={{ color: preview.primary }}>Invoice header</strong>
+                          <p style={{ color: '#f8fafc', marginBottom: 0 }}>{form.companyName || 'Business name'}</p>
+                        </div>
+                        <div className="integration-card business-profile-preview">
+                          <strong>Booking card</strong>
+                          <p className="muted">{form.contactPhone || 'Primary phone'} · {form.contactEmail || 'Primary email'}</p>
+                        </div>
+                        <div className="business-profile-sidebar-preview">
+                          <span>{String(form.companyName || 'MT').slice(0, 2).toUpperCase()}</span>
+                          <strong>{form.companyName || 'Business name'}</strong>
+                        </div>
+                      </div>
+                    </section>
+                  </div>
+                ) : null}
+
+                {profileTab === 'regional' ? (
+                  <div className="business-profile-panel" role="tabpanel" data-testid="business-profile-regional-panel">
+                    <section className="settings-premium-subcard">
+                      <h3>Regional defaults</h3>
+                      <div className="two-col">
+                        <div>
+                          <label className="settings-premium-label">Country or region</label>
+                          <select className="input settings-premium-input" data-testid="settings-region-select" value={selectedRegionOption?.countryCode || ''} onChange={(e) => applyRegionDefaults(e.target.value)}>
+                            <option value="">Choose country or region</option>
+                            {REGION_OPTIONS.map((option) => (
+                              <option key={option.countryCode} value={option.countryCode}>{option.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="settings-premium-label">Timezone</label>
+                          <input className="input settings-premium-input" value={form.defaultTimezone || DEFAULT_WORKSPACE_TIMEZONE} onChange={(e) => setForm({ ...form, defaultTimezone: e.target.value })} />
+                        </div>
+                        <div>
+                          <label className="settings-premium-label">Locale code</label>
+                          <input className="input settings-premium-input" value={form.defaultLocale || DEFAULT_WORKSPACE_LOCALE} onChange={(e) => setForm({ ...form, defaultLocale: e.target.value })} />
+                        </div>
+                        <div>
+                          <label className="settings-premium-label">Public booking locale</label>
+                          <input className="input settings-premium-input" data-testid="settings-public-booking-locale" value={form.publicBookingLocale || form.defaultLocale || DEFAULT_WORKSPACE_LOCALE} onChange={(e) => setForm({ ...form, publicBookingLocale: e.target.value })} />
+                        </div>
+                        <div>
+                          <label className="settings-premium-label">Phone country default</label>
+                          <input className="input settings-premium-input" data-testid="settings-phone-country-code" placeholder="+44" value={form.phoneCountryCode || ''} onChange={(e) => setForm({ ...form, phoneCountryCode: e.target.value })} />
+                        </div>
+                        <div>
+                          <label className="settings-premium-label">Business currency</label>
+                          <input className="input settings-premium-input" value={form.defaultCurrency || DEFAULT_WORKSPACE_CURRENCY} onChange={(e) => setForm({ ...form, defaultCurrency: e.target.value.toUpperCase() })} />
+                        </div>
+                        <div>
+                          <label className="settings-premium-label">Invoice currency</label>
+                          <input className="input settings-premium-input" data-testid="settings-invoice-currency" value={form.invoiceCurrency || form.defaultCurrency || DEFAULT_WORKSPACE_CURRENCY} onChange={(e) => setForm({ ...form, invoiceCurrency: e.target.value.toUpperCase() })} />
+                        </div>
+                      </div>
+                    </section>
+                  </div>
+                ) : null}
+
+                {profileTab === 'finance' ? (
+                  <div className="business-profile-panel" role="tabpanel" data-testid="business-profile-finance-panel">
+                    <section className="settings-premium-subcard">
+                      <h3>Finance and tax defaults</h3>
+                      <p className="muted settings-premium-muted">MyTitan stores your defaults for records and invoices. This is not tax advice.</p>
+                      <label className="operator-checkRow">
+                        <input type="checkbox" checked={Boolean(form.vatEnabledDefault)} onChange={(e) => setForm({ ...form, vatEnabledDefault: e.target.checked })} />
+                        <span>VAT enabled by default</span>
+                      </label>
+                      <div className="two-col">
+                        <div>
+                          <label className="settings-premium-label">VAT rate (%)</label>
+                          <input className="input settings-premium-input" type="number" min={0} step="0.01" value={Number(form.vatRateBpsDefault || 0) / 100} onChange={(e) => setForm({ ...form, vatRateBpsDefault: Math.round(Number(e.target.value || 0) * 100) })} />
+                        </div>
+                        <div>
+                          <label className="settings-premium-label">Tax label</label>
+                          <input className="input settings-premium-input" data-testid="settings-tax-label" placeholder="VAT, GST, sales tax" value={form.taxLabel || ''} onChange={(e) => setForm({ ...form, taxLabel: e.target.value })} />
+                        </div>
+                        <div>
+                          <label className="settings-premium-label">VAT number</label>
+                          <input className="input settings-premium-input" value={String(form.businessConfigJson?.finance?.vatNumber || '')} onChange={(e) => updateBusinessConfig((current) => ({ ...current, finance: { ...(current.finance && typeof current.finance === 'object' ? current.finance : {}), vatNumber: e.target.value } }))} />
+                        </div>
+                        <div>
+                          <label className="settings-premium-label">VAT category</label>
+                          <input className="input settings-premium-input" value={String(form.businessConfigJson?.finance?.defaultVatCategory || '')} onChange={(e) => updateBusinessConfig((current) => ({ ...current, finance: { ...(current.finance && typeof current.finance === 'object' ? current.finance : {}), defaultVatCategory: e.target.value } }))} />
+                        </div>
+                        <div>
+                          <label className="settings-premium-label">Invoice prefix</label>
+                          <input className="input settings-premium-input" value={String(form.businessConfigJson?.finance?.invoiceNumberPrefix || '')} onChange={(e) => updateBusinessConfig((current) => ({ ...current, finance: { ...(current.finance && typeof current.finance === 'object' ? current.finance : {}), invoiceNumberPrefix: e.target.value } }))} />
+                        </div>
+                        <div>
+                          <label className="settings-premium-label">Payment terms in days</label>
+                          <input className="input settings-premium-input" type="number" min={0} value={Number(form.businessConfigJson?.finance?.paymentTermsDays || 7)} onChange={(e) => updateBusinessConfig((current) => ({ ...current, finance: { ...(current.finance && typeof current.finance === 'object' ? current.finance : {}), paymentTermsDays: Number(e.target.value || 0) } }))} />
+                        </div>
+                      </div>
+                      <label className="settings-premium-label">Invoice legal footer</label>
+                      <textarea className="input settings-premium-input" rows={3} value={form.invoiceLegalFooter || ''} onChange={(e) => setForm({ ...form, invoiceLegalFooter: e.target.value })} />
+                      <Link className="button secondary settings-premium-button" href="/dashboard/settings/payments">Payment setup</Link>
+                    </section>
+                  </div>
+                ) : null}
+
+                <div className="business-profile-related" aria-label="Related settings">
+                  {profileRelatedLinks.map((item) => (
+                    <Link key={item.href} className="button secondary settings-premium-button" href={item.href}>
+                      {item.label}
+                    </Link>
+                  ))}
+                </div>
+              </form>
+            ) : null}
+            {!isBusinessProfilePage ? (
             <form className="card settings-premium-card" style={{ marginBottom: 12, display: settingsDirectoryMode || settingsSection === 'workspace-layout' ? 'none' : undefined }} {...getSectionProps('company-profile-hub')} data-testid="company-profile-hub" onSubmit={handleSettingsSubmit}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
                 <div>
@@ -2222,7 +2580,9 @@ export default function SettingsPage() {
                 Saved state: {settingsDirty ? 'Unsaved changes waiting' : 'All profile changes saved'}.
               </p>
             </form>
+            ) : null}
 
+            {!isBusinessProfilePage ? (
             <div className="card settings-premium-card" style={{ marginBottom: 12, display: settingsDirectoryMode || settingsSection === 'workspace-layout' ? 'none' : undefined }} {...getSectionProps('business-profile')}>
               <h3 style={{ marginTop: 0 }}>Business details</h3>
               <p className="muted settings-premium-muted">Set the business identity and contact details operators and customers rely on every day.</p>
@@ -2353,6 +2713,7 @@ export default function SettingsPage() {
                 </span>
               </div>
             </div>
+            ) : null}
 
             <div className="card settings-premium-card" style={{ marginBottom: 12, display: settingsSection === 'business-profile' ? 'none' : undefined }}>
               <h3 style={{ marginTop: 0 }}>Operator defaults</h3>
@@ -2626,6 +2987,7 @@ export default function SettingsPage() {
               </div>
             </div>
 
+            {!isBusinessProfilePage ? (
             <div className="card settings-premium-card" style={{ marginBottom: 12, display: settingsDirectoryMode || settingsSection === 'workspace-layout' ? 'none' : undefined }}>
               <h3 style={{ marginTop: 0 }}>Branding</h3>
               <p className="muted settings-premium-muted">Keep customer-facing outputs visually consistent.</p>
@@ -2716,7 +3078,9 @@ export default function SettingsPage() {
                 {logoUploading ? 'Uploading logo...' : form.logoUrl ? 'Replace logo' : 'Upload logo'}
               </button>
             </div>
+            ) : null}
 
+            {!isBusinessProfilePage ? (
             <div className="card settings-premium-card" style={{ marginBottom: 12, display: settingsDirectoryMode || settingsSection === 'workspace-layout' ? 'none' : undefined }}>
               <h3 style={{ marginTop: 0 }}>Finance and tax defaults</h3>
               <p className="muted settings-premium-muted">Set the defaults new jobs and invoices inherit. This supports records and exports, not tax advice.</p>
@@ -2816,7 +3180,9 @@ export default function SettingsPage() {
                 Manage how this workspace takes customer payments.
               </p>
             </div>
+            ) : null}
 
+            {!isBusinessProfilePage ? (
             <div className="card settings-premium-card">
               <h3 style={{ marginTop: 0 }}>Appearance and layout tools</h3>
               <p className="muted settings-premium-muted">Theme, navigation, product tour, and setup shortcuts live in application settings.</p>
@@ -2858,6 +3224,7 @@ export default function SettingsPage() {
                 ) : null}
               </div>
             </div>
+            ) : null}
           </>
         )}
 

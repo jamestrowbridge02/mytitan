@@ -288,7 +288,7 @@ test.describe("Phase 11 launch design and Stripe action acceptance", () => {
     const originalMode = (await current.json()).themeMode || "light";
 
     try {
-      await page.goto("/dashboard/settings?tab=general&section=business-profile", { waitUntil: "networkidle" });
+      await page.goto("/dashboard/settings?tab=general", { waitUntil: "networkidle" });
       await page.getByTestId("settings-theme-light").click();
       await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
       await page.goto("/dashboard/settings/payments/stripe", { waitUntil: "networkidle" });
@@ -296,7 +296,7 @@ test.describe("Phase 11 launch design and Stripe action acceptance", () => {
       await page.reload({ waitUntil: "networkidle" });
       await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
 
-      await page.goto("/dashboard/settings?tab=general&section=business-profile", { waitUntil: "networkidle" });
+      await page.goto("/dashboard/settings?tab=general", { waitUntil: "networkidle" });
       await page.getByTestId("settings-theme-dark").click();
       await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
       await page.goto("/dashboard/settings/payments/stripe", { waitUntil: "networkidle" });
@@ -312,7 +312,7 @@ test.describe("Phase 11 launch design and Stripe action acceptance", () => {
       await page.goto("/dashboard/settings/payments/stripe", { waitUntil: "networkidle" });
       await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
 
-      await page.goto("/dashboard/settings?tab=general&section=business-profile", { waitUntil: "networkidle" });
+      await page.goto("/dashboard/settings?tab=general", { waitUntil: "networkidle" });
       await page.getByTestId("settings-theme-system").click();
       await page.emulateMedia({ colorScheme: "dark" });
       await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
@@ -382,10 +382,10 @@ test.describe("Phase 11 launch design and Stripe action acceptance", () => {
       await expect(page.getByTestId("settings-business-name")).toHaveValue(String(original.companyName || ""));
       await page.getByTestId("settings-business-name").fill(nextName);
       await page.getByTestId("settings-trading-name").fill(nextTradingName);
-      await expect(page.getByTestId("settings-business-save")).toContainText("Save business details");
-      await page.getByTestId("settings-business-save").click();
+      await expect(page.getByTestId("company-profile-save")).toContainText("Save changes");
+      await page.getByTestId("company-profile-save").click();
       await expect(page.getByTestId("operator-notice-success")).toContainText(/Settings saved/i);
-      await expect(page.getByTestId("settings-business-source-state")).toContainText("Saved details are reused");
+      await expect(page.getByTestId("company-profile-saved-state")).not.toContainText("Saving");
 
       await page.reload({ waitUntil: "networkidle" });
       await page.goto("/dashboard/settings?tab=general&section=business-profile", { waitUntil: "networkidle" });

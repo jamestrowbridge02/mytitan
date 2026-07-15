@@ -14,26 +14,18 @@ test.describe("final product experience polish", () => {
 
       const hub = page.getByTestId("company-profile-hub");
       await expect(hub).toBeVisible();
-      for (const section of [
-        "business",
-        "brand",
-        "locations",
-        "staff",
-        "opening-hours",
-        "services",
-        "payments",
-        "tax",
-        "booking",
-        "customer-portal",
-        "trade-portal",
-        "communication",
-      ]) {
-        await expect(page.getByTestId(`company-profile-section-${section}`)).toBeVisible();
-      }
+      await expect(page.getByRole("heading", { level: 1, name: "Business Profile" })).toBeVisible();
+      await expect(page.getByTestId("business-profile-tab-details")).toBeVisible();
+      await expect(page.getByTestId("business-profile-tab-brand")).toBeVisible();
+      await expect(page.getByTestId("business-profile-tab-regional")).toBeVisible();
+      await expect(page.getByTestId("business-profile-tab-finance")).toBeVisible();
+      await expect(page.getByText("Profile sections")).toHaveCount(0);
+      await expect(page.getByText("Saved state: All profile changes saved")).toHaveCount(0);
 
       await page.getByTestId("settings-business-name").fill(businessName);
       await page.getByTestId("company-profile-save").click();
-      await expect(page.getByTestId("company-profile-saved-state")).toContainText("All profile changes saved");
+      await expect(page.getByTestId("operator-notice-success")).toContainText(/Settings saved/i);
+      await expect(page.getByTestId("company-profile-saved-state")).not.toContainText("Saving");
 
       await page.goto("/dashboard/setup-wizard?step=branding", { waitUntil: "networkidle" });
       await expect(page.getByTestId("guided-setup-company-name")).toHaveValue(businessName);
