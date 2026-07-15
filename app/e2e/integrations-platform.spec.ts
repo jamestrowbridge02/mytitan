@@ -12,7 +12,7 @@ test.describe("integration platform foundation", () => {
     await expect(page.getByTestId("integrations-workspace-section")).toBeVisible();
     await expect(page.getByTestId("integration-admin-health")).toHaveCount(0);
     await expect(page.getByTestId("integration-owner-command")).toHaveCount(0);
-    await expect(page.getByTestId("integration-workspace-row-quickbooks")).toContainText(/Connected|Setup required|Requires external account|Needs attention|Not available/i);
+    await expect(page.getByTestId("integration-workspace-row-quickbooks")).toContainText(/Connected|Available|Setup required|Requires external account|Needs attention|Not available/i);
     await expect(page.locator("body")).not.toContainText(/OAuth verified|idempotency|provider mutation|metadata.only/i);
   });
 
@@ -32,6 +32,33 @@ test.describe("integration platform foundation", () => {
     await expect(googleRow).toBeVisible();
     const box = await googleRow.boundingBox();
     expect(box && box.y).toBeGreaterThan(32);
+  });
+
+  test("Xero tenant setup uses authoritative state and safe organisation selection", async ({ page, request }) => {
+    await installApiProxy(page, request);
+    const token = await loginAs(page, request, "e2e.operator@mytitan.local", "MyTitanE2E!2026");
+
+    const status = await requestLocalApi(request, "/integrations/xero/status", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(status.ok()).toBeTruthy();
+    const payload = await status.json();
+    expect(payload.tokensReturnedToClient).toBe(false);
+    expect(payload.externalTenantId).toBeNull();
+    expect(["setup_needed", "select_organisation", "needs_reconnect", "ready"]).toContain(payload.connectionState);
+    expect(payload.setupAvailable).toBe(true);
+
+    await page.goto("/dashboard/integrations");
+    const xeroRow = page.getByTestId("integration-workspace-row-xero");
+    await expect(xeroRow).toBeVisible();
+    await expect(xeroRow).toContainText(/Xero/);
+    await expect(xeroRow).toContainText(/Available|Connected|Setup required|Action required/);
+    await expect(xeroRow).not.toContainText(/tenantId|organisation ID|access token|refresh token/i);
+
+    await xeroRow.getByRole("link").click();
+    await expect(page).toHaveURL(/\/dashboard\/settings\/integrations\/xero/);
+    await expect(page.getByTestId("provider-setup-wizard")).toBeVisible();
+    await expect(page.locator("body")).not.toContainText(/access token|refresh token|tenant id|encrypted/i);
   });
 
   test("personal integration status is scoped to the current user only", async ({ request }) => {

@@ -89,11 +89,12 @@ export default function ProviderSetupPage() {
   }, [providerKey, router.isReady]);
 
   const state = useMemo(() => {
-    if (!status?.setupAvailable || status?.allowed === false || status?.enabled === false) return "Not available";
+    if (status?.allowed === false || status?.enabled === false) return "Not available";
+    if (!status?.setupAvailable) return "Setup required";
     if (status?.connectionState === "needs_reconnect") return "Needs attention";
     if (status?.connectionState === "select_organisation") return "Select organisation";
     if (status?.connected) return "Connected";
-    return "Needs setup";
+    return "Available";
   }, [status]);
 
   async function connect() {
@@ -214,8 +215,8 @@ export default function ProviderSetupPage() {
         {!status?.setupAvailable && providerKey === "xero" ? (
           <div className="operator-empty-state" data-testid="xero-platform-config-required">
             <h3>Xero app configuration required</h3>
-            <p>Platform Admin must configure the Xero client ID, client secret and redirect URI before tenant admins can connect.</p>
-            <p>Callback URL: <code>{typeof window === "undefined" ? "/integrations/xero/callback" : `${window.location.origin.replace(/\/+$/, "")}/integrations/xero/callback`}</code></p>
+            <p>Platform Admin must configure the Xero client ID, client secret and API redirect URI before tenant admins can connect.</p>
+            <p>Callback URL: <code>{status?.diagnostics?.callbackUrl || "/integrations/xero/callback on the API origin"}</code></p>
           </div>
         ) : null}
 

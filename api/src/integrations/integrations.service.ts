@@ -13,6 +13,7 @@ import { TenantService } from '../tenant/tenant.service';
 import { BYOG_PROVIDER_MAP, BYOG_PROVIDER_ORDER, resolveByogProvider, toByogProviderSlug, toByogScopeLabel } from './byog-integrations';
 import { IntegrationClientFactory } from './integration-client.factory';
 import { decryptText, encryptText } from './integrations.crypto';
+import { buildApiUrl } from '../common/public-url';
 
 export type IntegrationProviderKey = 'XERO' | 'QBO' | 'GOOGLE_CALENDAR';
 type IntegrationOwnership = 'WORKSPACE' | 'USER';
@@ -364,7 +365,7 @@ export class IntegrationsService {
     if (provider === 'XERO') {
       const clientId = process.env.XERO_CLIENT_ID?.trim();
       const clientSecret = process.env.XERO_CLIENT_SECRET?.trim();
-      const redirectUrl = process.env.XERO_REDIRECT_URL?.trim();
+      const redirectUrl = (process.env.XERO_REDIRECT_URI || process.env.XERO_REDIRECT_URL)?.trim();
       if (!clientId || !clientSecret || !redirectUrl) {
         const e2eConfig = this.isE2ETenant(tenantId) ? this.getE2EOAuthConfig(provider) : null;
         if (e2eConfig) return e2eConfig;
@@ -383,7 +384,7 @@ export class IntegrationsService {
     if (provider === 'QBO') {
       const clientId = process.env.QBO_CLIENT_ID?.trim();
       const clientSecret = process.env.QBO_CLIENT_SECRET?.trim();
-      const redirectUrl = process.env.QBO_REDIRECT_URL?.trim();
+      const redirectUrl = (process.env.QBO_REDIRECT_URI || process.env.QBO_REDIRECT_URL)?.trim();
       if (!clientId || !clientSecret || !redirectUrl) {
         const e2eConfig = this.isE2ETenant(tenantId) ? this.getE2EOAuthConfig(provider) : null;
         if (e2eConfig) return e2eConfig;
@@ -510,6 +511,13 @@ export class IntegrationsService {
       diagnostics:
         provider === 'XERO'
           ? {
+              callbackUrl: (() => {
+                try {
+                  return this.getProviderConfig(provider, tenantId).redirectUrl;
+                } catch {
+                  return buildApiUrl('/integrations/xero/callback');
+                }
+              })(),
               setupInstructions: setupAvailable
                 ? 'Connect Xero, select the organisation, then run read-only verification before enabling mapping previews.'
                 : 'Platform Admin must configure Xero client ID, client secret and redirect URI before tenant admins can connect.',
