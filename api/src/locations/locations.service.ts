@@ -263,8 +263,28 @@ export class LocationsService {
       where: { id },
       data: { metadataJson: { ...metadata, imageUrl } },
     });
+    const persisted = await db.location.findFirst({
+      where: { id, companyId },
+      include: {
+        businessHours: { orderBy: { weekday: 'asc' } },
+        staffAssignments: { include: { user: { select: { id: true, email: true, role: true } } } },
+        memberships: {
+          include: {
+            user: { select: { id: true, email: true, role: true } },
+          },
+          orderBy: { createdAt: 'asc' },
+        },
+        defaultAssignee: { select: { id: true, email: true } },
+      },
+    });
+    const persistedMetadata = persisted?.metadataJson && typeof persisted.metadataJson === 'object' && !Array.isArray(persisted.metadataJson)
+      ? persisted.metadataJson as Record<string, unknown>
+      : {};
+    if (!persisted || persistedMetadata.imageUrl !== imageUrl) {
+      throw new BadRequestException('Location image could not be verified after upload');
+    }
     await this.audit.log(companyId, 'location.image.upload', `Updated public image for ${location.name}`, userId);
-    return { imageUrl };
+    return { imageUrl, location: persisted };
   }
 
   async applyHoursToAll(companyId: string, userId: string, sourceLocationId: string) {

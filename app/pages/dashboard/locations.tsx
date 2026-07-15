@@ -234,25 +234,35 @@ export default function LocationsPage() {
       const body = new FormData();
       body.append('file', file);
       const result = await apiFetch(`/locations/${editingId}/image`, { method: 'POST', body });
-      const imageUrl = result?.imageUrl || null;
+      const persistedLocation = result?.location && typeof result.location === 'object' ? result.location : null;
+      const persistedMetadata = persistedLocation?.metadataJson && typeof persistedLocation.metadataJson === 'object'
+        ? persistedLocation.metadataJson
+        : {};
+      const imageUrl = typeof persistedMetadata.imageUrl === 'string' && persistedMetadata.imageUrl
+        ? persistedMetadata.imageUrl
+        : typeof result?.imageUrl === 'string' && result.imageUrl
+          ? result.imageUrl
+          : null;
+      if (!persistedLocation || !imageUrl) {
+        throw new Error('Image upload could not be verified. The saved image was not changed.');
+      }
       const nextForm = {
         ...form,
-        metadataJson: {
-          ...(form.metadataJson && typeof form.metadataJson === 'object' ? form.metadataJson : {}),
-          imageUrl,
-        },
+        ...persistedLocation,
+        bookingCutoffMins: form.bookingCutoffMins,
+        slotMinutes: form.slotMinutes,
+        arrivalInstructions: form.arrivalInstructions,
+        parkingInstructions: form.parkingInstructions,
+        publicVisible: form.publicVisible,
+        tradeVisible: form.tradeVisible,
+        privateVisible: form.privateVisible,
+        metadataJson: persistedMetadata,
       };
       setForm(nextForm);
       if (!wasDirty) setSavedSnapshot(JSON.stringify(nextForm));
       setItems((current) => current.map((location) => (
         location.id === editingId
-          ? {
-              ...location,
-              metadataJson: {
-                ...(location.metadataJson && typeof location.metadataJson === 'object' ? location.metadataJson : {}),
-                imageUrl,
-              },
-            }
+          ? persistedLocation
           : location
       )));
       setStatus('Location image updated for public booking.');
@@ -547,6 +557,7 @@ export default function LocationsPage() {
                 uploadButtonTestId="location-image-upload"
                 inputAriaLabel={`Upload image for ${form.name || 'location'}`}
                 currentImageUrl={form.metadataJson?.imageUrl ? String(form.metadataJson.imageUrl) : ''}
+                currentImageLabel="Current public booking image saved"
                 previewAlt={`${form.name || 'Location'} preview`}
                 disabled={saving}
                 onUpload={uploadLocationImage}

@@ -54,11 +54,35 @@ test.describe("multi-location operations", () => {
     await expect(createCard.getByTestId("location-image-preview")).toBeVisible();
     await createCard.getByTestId("location-image-upload").click();
     await expect(createCard.getByTestId("location-image-preview")).toBeVisible();
+    await expect(createCard.getByTestId("location-image-selection")).toContainText("Current public booking image saved");
     await expect(page.getByText("Location image updated for public booking.")).toBeVisible();
     await createCard.getByTestId("location-name-input").fill(updatedName);
     await page.getByTestId("location-save").evaluate((element: HTMLButtonElement) => element.click());
     await expect(page.getByTestId("location-list")).toContainText(updatedName);
     await expect(page.getByTestId("location-list").locator(".integration-card", { hasText: updatedName })).toContainText("Hidden from public");
+  });
+
+  test("location image upload does not report success without canonical read-back", async ({ page, request }) => {
+    await installApiProxy(page, request);
+    await page.goto("/dashboard/locations");
+    const createCard = page.getByTestId("location-create");
+    const row = page.getByTestId("location-list").locator(".integration-card", { hasText: fixtureRefs.hqLocationName }).first();
+    await row.getByRole("button", { name: "Edit" }).evaluate((element: HTMLButtonElement) => element.click());
+    await page.route("**/locations/*/image", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ imageUrl: "https://api.mytitan.test/tenant/public-booking-media/redacted/location.png" }),
+      });
+    });
+    await createCard.getByTestId("location-image-input").setInputFiles({
+      name: "location.png",
+      mimeType: "image/png",
+      buffer: tinyPng,
+    });
+    await createCard.getByTestId("location-image-upload").click();
+    await expect(createCard.getByRole("alert")).toContainText("Image upload could not be verified. The saved image was not changed.");
+    await expect(createCard).not.toContainText("Image saved");
   });
 
   test("operator can assign a location membership", async ({ page, request }) => {
