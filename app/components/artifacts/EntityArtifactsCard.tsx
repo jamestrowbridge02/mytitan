@@ -153,7 +153,7 @@ export function EntityArtifactsCard({
     setBusy(true);
     setError("");
     try {
-      const currentLabel = readCurrentLabel();
+      const currentLabel = readCurrentLabel() || pendingUploadLabelRef.current;
       pendingUploadLabelRef.current = currentLabel;
       const form = new FormData();
       if (currentLabel) form.append("label", currentLabel);
@@ -343,6 +343,7 @@ export function EntityArtifactsCard({
                 setFile(null);
                 return;
               }
+              pendingUploadLabelRef.current = readCurrentLabel();
               const validationError = validateUploadFile(nextFile);
               flushSync(() => {
                 setError(validationError || "");
