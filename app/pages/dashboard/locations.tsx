@@ -5,6 +5,7 @@ import { isLocationsAdvancedV1Enabled, isLocationsV1Enabled } from '../../lib/fe
 import { DEFAULT_WORKSPACE_TIMEZONE, fetchGeoDefaults, type GeoDefaults } from '../../lib/geo-defaults';
 import { formatBusinessTime, parseBusinessTime, weekdayHours } from '../../lib/business-hours';
 import { EntityImageUpload } from '../../components/media/EntityImageUpload';
+import { SafeImage } from '../../components/media/SafeImage';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -735,47 +736,54 @@ export default function LocationsPage() {
       <div className="card" data-testid="location-list">
         <h2 style={{ marginTop: 0 }}>Your Locations</h2>
         <div className="list">
-          {items.map((loc) => (
-            <div key={loc.id} className="integration-card">
-              <div>
-                {loc.metadataJson?.imageUrl ? (
-                  <img
-                    src={String(loc.metadataJson.imageUrl)}
-                    alt=""
-                    loading="lazy"
-                    style={{ width: 92, height: 64, objectFit: 'cover', borderRadius: 12, marginBottom: 8 }}
-                  />
-                ) : null}
-                <strong style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span aria-hidden="true" style={{ width: 12, height: 12, borderRadius: 999, background: loc.color || '#C2410C', border: '1px solid currentColor' }} />
-                  {loc.name}
-                </strong>
-                <p className="muted" style={{ margin: '4px 0 0 0' }}>
-                  {[loc.code, loc.kind, loc.addressLine1, loc.addressLine2, loc.city, loc.state, loc.postalCode, loc.country].filter(Boolean).join(' • ')}
-                </p>
-                {advancedEnabled ? (
-                  <p className="muted" style={{ margin: '4px 0 0 0' }}>
-                    TZ: {loc.timezone || '—'} • Lead: {Number(loc.bookingLeadTimeMins || 0)} mins • Staff: {loc.memberships?.filter((membership: any) => membership.active).length || 0}
-                  </p>
-                ) : null}
-                <p className="muted visibility-state-row" style={{ margin: '6px 0 0 0' }} data-testid="location-visibility-state">
-                  <span className={`visibility-state-pill ${loc.metadataJson?.publicVisible === false ? 'is-hidden' : 'is-visible'}`}>
-                    <VisibilityEyeIcon hidden={loc.metadataJson?.publicVisible === false} />
-                    {loc.metadataJson?.publicVisible === false ? 'Hidden from public' : 'Visible publicly'}
-                  </span>
-                  <span className={`visibility-state-pill ${loc.metadataJson?.tradeVisible === false ? 'is-hidden' : 'is-visible'}`}>
-                    <VisibilityEyeIcon hidden={loc.metadataJson?.tradeVisible === false} />
-                    {loc.metadataJson?.tradeVisible === false ? 'Hidden from trade/private' : 'Trade-visible'}
-                  </span>
-                </p>
+          {items.map((loc) => {
+            const locationImageUrl = getLocationImageUrl(loc);
+            return (
+              <div key={loc.id} className="integration-card" data-testid={`location-card-${loc.id}`}>
+                <div style={{ display: 'grid', gridTemplateColumns: locationImageUrl ? '92px minmax(0, 1fr)' : '1fr', gap: 12, alignItems: 'start', minWidth: 0 }}>
+                  {locationImageUrl ? (
+                    <SafeImage
+                      src={locationImageUrl}
+                      alt={`${loc.name || 'Location'} public booking image`}
+                      loading="lazy"
+                      data-testid="location-card-image"
+                      style={{ width: 92, height: 64, objectFit: 'cover', borderRadius: 10, display: 'block', background: 'var(--surface-muted)' }}
+                      fallback={<span className="muted" data-testid="location-card-image-fallback" style={{ width: 92, minHeight: 64, display: 'grid', placeItems: 'center', border: '1px dashed var(--border)', borderRadius: 10 }}>Image unavailable</span>}
+                    />
+                  ) : null}
+                  <div style={{ minWidth: 0 }}>
+                    <strong style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span aria-hidden="true" style={{ width: 12, height: 12, borderRadius: 999, background: loc.color || '#C2410C', border: '1px solid currentColor', flex: '0 0 auto' }} />
+                      {loc.name}
+                    </strong>
+                    <p className="muted" style={{ margin: '4px 0 0 0' }}>
+                      {[loc.code, loc.kind, loc.addressLine1, loc.addressLine2, loc.city, loc.state, loc.postalCode, loc.country].filter(Boolean).join(' • ')}
+                    </p>
+                    {advancedEnabled ? (
+                      <p className="muted" style={{ margin: '4px 0 0 0' }}>
+                        TZ: {loc.timezone || '—'} • Lead: {Number(loc.bookingLeadTimeMins || 0)} mins • Staff: {loc.memberships?.filter((membership: any) => membership.active).length || 0}
+                      </p>
+                    ) : null}
+                    <p className="muted visibility-state-row" style={{ margin: '6px 0 0 0' }} data-testid="location-visibility-state">
+                      <span className={`visibility-state-pill ${loc.metadataJson?.publicVisible === false ? 'is-hidden' : 'is-visible'}`}>
+                        <VisibilityEyeIcon hidden={loc.metadataJson?.publicVisible === false} />
+                        {loc.metadataJson?.publicVisible === false ? 'Hidden from public' : 'Visible publicly'}
+                      </span>
+                      <span className={`visibility-state-pill ${loc.metadataJson?.tradeVisible === false ? 'is-hidden' : 'is-visible'}`}>
+                        <VisibilityEyeIcon hidden={loc.metadataJson?.tradeVisible === false} />
+                        {loc.metadataJson?.tradeVisible === false ? 'Hidden from trade/private' : 'Trade-visible'}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+                <div className="integration-actions">
+                  <span className={`badge ${loc.isActive ? '' : 'warn'}`}>{loc.isActive ? 'Active' : 'Archived'}</span>
+                  <button className="button secondary" type="button" onClick={() => editLocation(loc)}>Edit</button>
+                  <button className="button secondary" type="button" onClick={() => archive(loc.id, !loc.isActive)}>{loc.isActive ? 'Archive' : 'Unarchive'}</button>
+                </div>
               </div>
-              <div className="integration-actions">
-                <span className={`badge ${loc.isActive ? '' : 'warn'}`}>{loc.isActive ? 'Active' : 'Archived'}</span>
-                <button className="button secondary" type="button" onClick={() => editLocation(loc)}>Edit</button>
-                <button className="button secondary" type="button" onClick={() => archive(loc.id, !loc.isActive)}>{loc.isActive ? 'Archive' : 'Unarchive'}</button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
           {items.length === 0 ? <p className="muted">No locations yet.</p> : null}
         </div>
       </div>

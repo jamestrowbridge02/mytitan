@@ -17,6 +17,8 @@ test.describe("multi-location operations", () => {
     await expect(page.getByTestId("location-list")).toContainText(fixtureRefs.hqLocationName);
     await expect(page.getByTestId("location-list")).toContainText(fixtureRefs.northLocationName);
     await expect(page.getByTestId("location-scope-switcher")).toBeVisible();
+    await expect(page.getByText("Locationi")).toHaveCount(0);
+    await expect(page.getByLabel("Filter Dashboard metrics and work by location.")).toBeVisible();
   });
 
   test("operator can create and edit a business location", async ({ page, request }) => {
@@ -55,11 +57,14 @@ test.describe("multi-location operations", () => {
     await createCard.getByTestId("location-image-upload").click();
     await expect(createCard.getByTestId("location-image-preview")).toBeVisible();
     await expect(createCard.getByTestId("location-image-selection")).toContainText("Current public booking image saved");
+    await expect(row.getByTestId("location-card-image")).toBeVisible();
     await expect(page.getByText("Location image updated for public booking.")).toBeVisible();
     await createCard.getByTestId("location-name-input").fill(updatedName);
     await page.getByTestId("location-save").evaluate((element: HTMLButtonElement) => element.click());
     await expect(page.getByTestId("location-list")).toContainText(updatedName);
-    await expect(page.getByTestId("location-list").locator(".integration-card", { hasText: updatedName })).toContainText("Hidden from public");
+    const updatedRow = page.getByTestId("location-list").locator(".integration-card", { hasText: updatedName }).first();
+    await expect(updatedRow).toContainText("Hidden from public");
+    await expect(updatedRow.getByTestId("location-card-image")).toBeVisible();
   });
 
   test("location image upload does not report success without canonical read-back", async ({ page, request }) => {
