@@ -107,7 +107,7 @@ export function EntityArtifactsCard({
           .map((input) => input.value)
           .find((value) => String(value || "").trim())
       : "";
-    return String(labelInputRef.current?.value || scopedLabel || domLabel || latestLabelRef.current || label || "").trim();
+    return String(latestLabelRef.current || labelInputRef.current?.value || scopedLabel || domLabel || label || "").trim();
   }
 
   async function load() {
@@ -376,7 +376,10 @@ export function EntityArtifactsCard({
             <button
               className="button"
               type="button"
-              onClick={() => void upload()}
+              onClick={() => {
+                pendingUploadLabelRef.current = readCurrentLabel();
+                void upload();
+              }}
               disabled={busy || !file}
               data-testid={`artifact-upload-${entityType}`}
             >

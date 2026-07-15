@@ -21,6 +21,7 @@ type EntityImageUploadProps = {
   uploadButtonTestId?: string;
   inputAriaLabel: string;
   currentImageUrl?: string | null;
+  currentImageLabel?: string;
   previewAlt: string;
   disabled?: boolean;
   maxBytes?: number;
@@ -50,6 +51,7 @@ export function EntityImageUpload({
   uploadButtonTestId,
   inputAriaLabel,
   currentImageUrl,
+  currentImageLabel = "Current image saved",
   previewAlt,
   disabled = false,
   maxBytes = UPLOAD_LIMITS.image,
@@ -124,6 +126,7 @@ export function EntityImageUpload({
 
   const previewUrl = pending.previewUrl || currentImageUrl || "";
   const selected = pending.file;
+  const hasCurrentImage = Boolean(currentImageUrl);
 
   return (
     <div className="entity-image-upload" data-upload-status={pending.status}>
@@ -156,7 +159,7 @@ export function EntityImageUpload({
           Choose image
         </label>
         <div data-testid={selectionTestId} aria-live="polite">
-          <span data-testid={fileNameTestId}>{selected ? selected.name : "No image selected"}</span>
+          <span data-testid={fileNameTestId}>{selected ? selected.name : hasCurrentImage ? currentImageLabel : "No image selected"}</span>
           {selected ? (
             <span className="muted" style={{ display: "block" }}>
               {(selected.size / 1024).toFixed(1)} KB selected
@@ -177,7 +180,7 @@ export function EntityImageUpload({
             Clear
           </button>
         ) : null}
-        {pending.status === "success" ? <span className="muted">Image uploaded</span> : null}
+        {pending.status === "success" && hasCurrentImage ? <span className="muted">Image saved</span> : null}
         {pending.status === "error" && pending.error ? (
           <span className="muted" role="alert">
             {pending.error}
