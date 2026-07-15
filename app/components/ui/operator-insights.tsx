@@ -16,6 +16,19 @@ function clampPercentage(value: number) {
   return value;
 }
 
+function buildPolyline(rows: InsightChartRow[], width: number, height: number) {
+  const maxValue = Math.max(...rows.map((row) => row.value), 0);
+  if (!rows.length || maxValue <= 0) return "";
+  const step = rows.length > 1 ? width / (rows.length - 1) : width;
+  return rows
+    .map((row, index) => {
+      const x = rows.length > 1 ? index * step : width / 2;
+      const y = height - (row.value / maxValue) * height;
+      return `${x.toFixed(1)},${Math.max(0, Math.min(height, y)).toFixed(1)}`;
+    })
+    .join(" ");
+}
+
 function toneClassName(tone?: InsightTone) {
   return tone ? ` operator-insight-icon--${tone}` : "";
 }
@@ -130,6 +143,9 @@ export function OperatorChartCard({
   testId?: string;
 }) {
   const maxValue = Math.max(...rows.map((row) => row.value), 0);
+  const chartRows = rows.filter((row) => Number.isFinite(row.value));
+  const hasUsefulChart = chartRows.some((row) => row.value > 0);
+  const polyline = buildPolyline(chartRows, 240, 72);
 
   return (
     <section className="platform-admin-card-stack platform-admin-card-stack--chart operator-chart-card" data-testid={testId}>
@@ -145,24 +161,45 @@ export function OperatorChartCard({
       </div>
 
       {rows.length ? (
-        <div className="billing-readiness-bars">
-          {rows.map((row) => {
-            const width = maxValue > 0 ? clampPercentage((row.value / maxValue) * 100) : 0;
-            const tone = row.tone === "critical" ? "warn" : row.tone || "info";
-            return (
-              <div key={row.label} className="billing-readiness-bars__row">
-                <div className="billing-readiness-bars__meta">
-                  <span>{row.label}</span>
-                  <strong>{row.value}</strong>
+        <>
+          {hasUsefulChart ? (
+            <div className="operator-chart-card__visual" role="img" aria-label={`${title} chart`}>
+              <svg viewBox="0 0 260 92" focusable="false">
+                <line x1="10" y1="82" x2="250" y2="82" />
+                <line x1="10" y1="10" x2="10" y2="82" />
+                {polyline ? <polyline points={polyline.split(" ").map((point) => {
+                  const [x, y] = point.split(",").map(Number);
+                  return `${x + 10},${y + 10}`;
+                }).join(" ")} /> : null}
+                {chartRows.map((row, index) => {
+                  const x = chartRows.length > 1 ? 10 + (index * 240) / (chartRows.length - 1) : 130;
+                  const y = maxValue > 0 ? 82 - (row.value / maxValue) * 72 : 82;
+                  return <circle key={`${row.label}-point`} cx={x} cy={Math.max(10, Math.min(82, y))} r="3.5" />;
+                })}
+              </svg>
+            </div>
+          ) : (
+            <p className="muted operator-chart-card__empty">No activity in this period.</p>
+          )}
+          <div className="billing-readiness-bars">
+            {rows.map((row) => {
+              const width = maxValue > 0 ? clampPercentage((row.value / maxValue) * 100) : 0;
+              const tone = row.tone === "critical" ? "warn" : row.tone || "info";
+              return (
+                <div key={row.label} className="billing-readiness-bars__row">
+                  <div className="billing-readiness-bars__meta">
+                    <span>{row.label}</span>
+                    <strong>{row.value}</strong>
+                  </div>
+                  <div className="billing-readiness-bars__track" style={{ "--operator-chart-fill": `${width}%` } as CSSProperties}>
+                    <span className={`billing-readiness-bars__fill billing-readiness-bars__fill--${tone}`} style={{ width: `${width}%` }} />
+                  </div>
+                  {row.detail ? <p className="operator-chart-card__detail muted">{row.detail}</p> : null}
                 </div>
-                <div className="billing-readiness-bars__track" style={{ "--operator-chart-fill": `${width}%` } as CSSProperties}>
-                  <span className={`billing-readiness-bars__fill billing-readiness-bars__fill--${tone}`} style={{ width: `${width}%` }} />
-                </div>
-                {row.detail ? <p className="operator-chart-card__detail muted">{row.detail}</p> : null}
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        </>
       ) : (
         <p className="muted">{emptyText}</p>
       )}
