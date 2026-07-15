@@ -31,6 +31,7 @@ test.describe("Phase 1P operational hardening", () => {
       MYTITAN_EXTERNAL_UPTIME_MONITOR_URL: "",
       MYTITAN_EXTERNAL_UPTIME_MONITOR_PROVIDER: "",
       MYTITAN_EXTERNAL_UPTIME_MONITOR_STATE: "",
+      MYTITAN_READINESS_IGNORE_ENV_FILES: "1",
     });
     expect(unconfigured).toContain("EXTERNAL_MONITOR_STATUS:not_configured");
     expect(unconfigured).toContain("No external uptime monitor is declared");
@@ -39,6 +40,7 @@ test.describe("Phase 1P operational hardening", () => {
       MYTITAN_EXTERNAL_UPTIME_MONITOR_NAME: "Phase 1P monitor",
       MYTITAN_EXTERNAL_UPTIME_MONITOR_PROVIDER: "uptime-kuma",
       MYTITAN_EXTERNAL_UPTIME_MONITOR_STATE: "",
+      MYTITAN_READINESS_IGNORE_ENV_FILES: "1",
     });
     expect(configured).toContain("EXTERNAL_MONITOR_STATUS:configured");
     expect(configured).toContain("EXTERNAL_MONITOR_PROVIDER:configured");
@@ -46,18 +48,21 @@ test.describe("Phase 1P operational hardening", () => {
     const verifying = runScript("./scripts/external-monitoring-status.sh", {
       MYTITAN_EXTERNAL_UPTIME_MONITOR_NAME: "Phase 1P monitor",
       MYTITAN_EXTERNAL_UPTIME_MONITOR_STATE: "verifying",
+      MYTITAN_READINESS_IGNORE_ENV_FILES: "1",
     });
     expect(verifying).toContain("EXTERNAL_MONITOR_STATUS:verifying");
 
     const healthy = runScript("./scripts/external-monitoring-status.sh", {
       MYTITAN_EXTERNAL_UPTIME_MONITOR_NAME: "Phase 1P monitor",
       MYTITAN_EXTERNAL_UPTIME_MONITOR_STATE: "healthy",
+      MYTITAN_READINESS_IGNORE_ENV_FILES: "1",
     });
     expect(healthy).toContain("EXTERNAL_MONITOR_STATUS:healthy");
 
     const degraded = runScript("./scripts/external-monitoring-status.sh", {
       MYTITAN_EXTERNAL_UPTIME_MONITOR_NAME: "Phase 1P monitor",
       MYTITAN_EXTERNAL_UPTIME_MONITOR_STATE: "degraded",
+      MYTITAN_READINESS_IGNORE_ENV_FILES: "1",
     });
     expect(degraded).toContain("EXTERNAL_MONITOR_STATUS:degraded");
     expect(`${configured}${verifying}${healthy}${degraded}`).not.toContain("sk_live_");

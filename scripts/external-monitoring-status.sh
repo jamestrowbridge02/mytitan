@@ -9,6 +9,9 @@ read_env_value() {
     printf '%s' "${!name}"
     return 0
   fi
+  if [[ "${MYTITAN_READINESS_IGNORE_ENV_FILES:-}" == "1" ]]; then
+    return 1
+  fi
   local env_file line value
   for env_file in "${BASE}/.env.local" "${BASE}/.env"; do
     [[ -f "${env_file}" ]] || continue

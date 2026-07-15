@@ -118,6 +118,7 @@ test.describe("phase 18 evidence-based certification gate", () => {
       MYTITAN_EXTERNAL_UPTIME_MONITOR_URL: "",
       MYTITAN_EXTERNAL_UPTIME_MONITOR_PROVIDER: "",
       MYTITAN_EXTERNAL_UPTIME_MONITOR_STATE: "",
+      MYTITAN_READINESS_IGNORE_ENV_FILES: "1",
     });
     expect(output).toContain("EXTERNAL_MONITOR_STATUS:not_configured");
     expect(output).toContain("No external uptime monitor is declared");
