@@ -587,7 +587,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             aria-label="Filter Dashboard metrics and work by location."
             title="Filter Dashboard metrics and work by location."
           >
-            i
+            <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false" width="14" height="14">
+              <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="2" />
+              <path d="M12 10v7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              <circle cx="12" cy="7" r="1.25" fill="currentColor" />
+            </svg>
           </span>
         </div>
         <select
