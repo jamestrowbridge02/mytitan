@@ -2658,7 +2658,7 @@ export default function SettingsPage() {
                     </div>
                   </div>
                   <div>
-                    <strong>{logoFile.name}</strong>
+                    <strong className="visually-hidden">{logoFile.name}</strong>
                     <p className="muted" style={{ margin: '4px 0' }}>{(logoFile.size / 1024).toFixed(1)} KB selected</p>
                     <button className="button secondary" type="button" onClick={() => {
                       if (logoPreviewUrl) URL.revokeObjectURL(logoPreviewUrl);
