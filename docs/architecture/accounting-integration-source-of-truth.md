@@ -11,8 +11,8 @@ For Xero:
 - `metadataJson.pendingOrganisations` is used only to create redacted selection tokens.
 - `accessTokenEncrypted` and `refreshTokenEncrypted` must never leave the API.
 
-QuickBooks remains truthful to deployment readiness. It may show a connect action only when the OAuth setup route is actually configured.
+QuickBooks remains truthful to deployment readiness. It may show a native connect action only when the OAuth setup route is actually configured. Until then, the primary tenant route is the universal API/file pathway through scoped API tokens, signed webhooks and Finance exports.
 
-Sage has no tenant OAuth journey in this release and must remain coming soon.
+Sage has no tenant OAuth journey in this release. It is shown as file exchange/API compatible rather than as a native connector.
 
-Connected Tools must distinguish native Finance, native OAuth providers, import/export paths, API/webhook-compatible paths and planned providers. Catalogue cards may describe alternatives, but they must not show Connected without `IntegrationConnection` evidence, must not show Connect without a real usable route, and must not expose raw provider IDs, tenant IDs, access tokens, refresh tokens or encrypted payloads.
+Connected Tools must distinguish native Finance, native OAuth providers, file exchange, API/webhook-compatible paths and gated native provider plans. Catalogue cards may describe alternatives, but they must not show Connected without `IntegrationConnection` evidence, must not show native Connect without a real usable route, and must not expose raw provider IDs, tenant IDs, access tokens, refresh tokens or encrypted payloads.

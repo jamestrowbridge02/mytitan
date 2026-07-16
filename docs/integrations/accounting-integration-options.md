@@ -10,14 +10,18 @@ MyTitan Finance supports invoices, payment requests, balances, statements, finan
 
 Xero has a real OAuth and organisation-selection implementation. In the current production baseline it is shown as Setup required because production credentials are absent.
 
-## Planned Providers
+## Universal Provider Routes
 
-QuickBooks, Sage, FreeAgent, FreshBooks, Zoho Books, KashFlow, Dynamics 365 Business Central, NetSuite, SAP Business One, Oracle accounting/ERP and MYOB are visible only with truthful Coming soon or API/webhook-compatible alternatives. They do not show fake Connect actions.
+QuickBooks, FreeAgent, FreshBooks, Zoho Books, Dynamics 365 Business Central, NetSuite, SAP Business One, Oracle accounting/ERP, MYOB, Odoo and Exact Online use scoped API tokens, signed webhooks and validated finance exports unless a native connector is later verified.
+
+Sage and KashFlow use file exchange first, with API token and webhook routes available for approved external workflows.
+
+These providers do not show fake native Connect actions.
 
 ## Flexible Connections
 
-Finance export, scoped API tokens and signed webhooks are the current external-system path. Custom accounting systems should use approved API tokens and signed webhook deliveries, with secrets configured only in the dedicated developer tools flow.
+Finance export, scoped API tokens and signed webhooks are the current external-system path. Custom accounting systems should use approved API tokens and signed webhook deliveries, with secrets configured only in the dedicated developer tools flow. Accounting imports are not shown where validation, preview, dry run and confirmation are not implemented.
 
 ## Requesting A Provider
 
-The marketplace request form captures provider name, business reason, records to synchronise, one-way/two-way preference, current accounting software and optional contact permission. It does not request secrets or promise a delivery date.
+The marketplace request form is available from the detail drawer as a secondary native-connector request. It captures provider name, business reason, records to synchronise, one-way/two-way preference, current accounting software and optional contact permission. It does not request secrets or promise a delivery date.

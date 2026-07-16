@@ -14,17 +14,19 @@ Baseline candidate: v1.0.1-rc4
 | --- | --- | --- |
 | MyTitan Finance | Built in | `/dashboard/finance` supports invoices, payments, statements, balances, VAT record support and finance reporting. No external accounting connection is required. |
 | Xero | Setup required in current production baseline | OAuth routes, callback, encrypted token storage and organisation selection exist. Production env lacks `XERO_CLIENT_ID`, `XERO_CLIENT_SECRET` and redirect config, so tenant Connect must not show until setup is active. |
-| QuickBooks | Coming soon unless a verified tenant connection already exists | QBO OAuth scaffolding exists, but this release does not present a production-ready QuickBooks tenant connection path when credentials are absent. No fake Connect is shown. |
-| Sage | Coming soon | BYOG descriptor exists, but no tenant OAuth journey or verified sync implementation exists. |
-| FreeAgent | Coming soon | No implementation found in app/API routes or provider descriptors. |
-| FreshBooks | Coming soon | No implementation found in app/API routes or provider descriptors. |
-| Zoho Books | Coming soon | No implementation found in app/API routes or provider descriptors. |
-| KashFlow | Coming soon | No implementation found in app/API routes or provider descriptors. |
-| Microsoft Dynamics 365 Business Central | Coming soon | No native connector found. Custom API/webhook option is available. |
-| NetSuite | Coming soon | No native connector found. Custom API/webhook option is available. |
-| SAP Business One | Coming soon | No native connector found. Custom API/webhook option is available. |
-| Oracle accounting/ERP | Coming soon | No native connector found. Custom API/webhook option is available. |
-| MYOB | Coming soon | No native connector found. Custom API/webhook option is available. |
+| QuickBooks | API connection unless a verified native tenant connection already exists | QBO OAuth scaffolding exists, but the tenant-facing primary route is scoped API tokens, signed webhooks and Finance exports until native readiness is verified. No fake native Connect is shown. |
+| Sage | File exchange | BYOG descriptor exists, but no tenant OAuth journey or verified sync implementation exists. Finance exports, API tokens and webhooks are the usable route. |
+| FreeAgent | API connection | No native implementation found. Scoped API tokens, signed webhooks and finance exports are available as universal routes. |
+| FreshBooks | API connection | No native implementation found. Scoped API tokens, signed webhooks and finance exports are available as universal routes. |
+| Zoho Books | API connection | No native implementation found. Scoped API tokens, signed webhooks and finance exports are available as universal routes. |
+| KashFlow | File exchange | No native implementation found. Finance exports are the first route with API/webhook options. |
+| Microsoft Dynamics 365 Business Central | API connection | No native connector found. Custom API/webhook option is available. |
+| NetSuite | API connection | No native connector found. Custom API/webhook option is available. |
+| SAP Business One | API connection | No native connector found. Custom API/webhook option is available. |
+| Oracle accounting/ERP | API connection | No native connector found. Custom API/webhook option is available. |
+| MYOB | API connection | No native connector found. Custom API/webhook option is available. |
+| Odoo | API connection | No native connector found. Custom API/webhook option is available. |
+| Exact Online | API connection | No native connector found. Custom API/webhook option is available. |
 | CSV import/export | Import/export available | Finance exports are surfaced through the Finance workflow. Imports are not claimed from the catalogue. |
 | API tokens | Available for permitted users | `/dashboard/settings/developer-tools#api-tokens`, `/integrations/api-tokens`, reveal-once token creation and audit logging exist. |
 | Signed webhooks | Available for permitted users | `/dashboard/settings/developer-tools#webhooks`, `/integrations/webhooks`, delivery logs, test and retry controls exist. |

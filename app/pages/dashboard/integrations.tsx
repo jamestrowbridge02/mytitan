@@ -8,13 +8,13 @@ import {
   normalizePermissionSnapshot,
 } from "../../lib/workspace-permissions";
 
-type DirectoryStatus = "Built in" | "Connected" | "Available" | "Setup required" | "Continue setup" | "Requires external account" | "Limited / Beta" | "Action required" | "Import/export available" | "API/webhook compatible" | "Coming soon" | "Not available";
+type DirectoryStatus = "Built in" | "Connected" | "Available" | "Setup required" | "Continue setup" | "Requires external account" | "Limited / Beta" | "Action required" | "Native" | "Connect now" | "API connection" | "Webhook connection" | "File exchange" | "Calendar standard" | "Payment link" | "Manual collection" | "Built in alternative";
 type AccountingSection = "Recommended" | "Popular accounting" | "Enterprise accounting" | "Flexible connections";
-type AccountingFilter = "All" | "Native" | "Available" | "Import & export" | "API & webhooks" | "Coming soon";
+type ConnectionFilter = "All" | "Built in" | "Native" | "Connect now" | "API" | "Webhooks" | "File exchange" | "Calendar standard" | "Manual" | "Connected";
 
 type DirectoryCard = {
   key: string;
-  group: "Payments" | "Accounting" | "Calendar" | "Communications" | "Maps" | "Storage" | "Automation" | "Identity" | "Developer Tools";
+  group: "Payments" | "Accounting" | "Calendar" | "Communications" | "Storage" | "Automation" | "CRM" | "Identity" | "Developer";
   name: string;
   status: DirectoryStatus;
   description: string;
@@ -25,7 +25,7 @@ type DirectoryCard = {
   providerIcon?: string;
   secondaryAction?: string;
   secondaryHref?: string;
-  filters?: AccountingFilter[];
+  filters?: ConnectionFilter[];
   primaryMode?: "link" | "details" | "request";
   availableNow?: string[];
   notSupported?: string[];
@@ -61,23 +61,13 @@ type StripeReadiness = {
   tenantAction?: string;
 };
 
-const GROUPS: DirectoryCard["group"][] = [
-  "Payments",
-  "Accounting",
-  "Calendar",
-  "Communications",
-  "Maps",
-  "Storage",
-  "Automation",
-  "Identity",
-  "Developer Tools",
-];
+const GROUPS: DirectoryCard["group"][] = ["Payments", "Accounting", "Calendar", "Communications", "Storage", "Automation", "CRM", "Identity", "Developer"];
 const CATEGORY_FILTERS = ["All", ...GROUPS] as const;
-const ACCOUNTING_FILTERS: AccountingFilter[] = ["All", "Native", "Available", "Import & export", "API & webhooks", "Coming soon"];
+const CONNECTION_FILTERS: ConnectionFilter[] = ["All", "Built in", "Native", "Connect now", "API", "Webhooks", "File exchange", "Calendar standard", "Manual", "Connected"];
 const ACCOUNTING_SECTIONS: AccountingSection[] = ["Recommended", "Popular accounting", "Enterprise accounting", "Flexible connections"];
 
 function statusTone(status: DirectoryStatus) {
-  if (status === "Built in" || status === "Connected" || status === "Available" || status === "Import/export available" || status === "API/webhook compatible") return "success" as const;
+  if (status === "Built in" || status === "Connected" || status === "Available" || status === "Native" || status === "Connect now" || status === "API connection" || status === "Webhook connection" || status === "File exchange" || status === "Calendar standard" || status === "Payment link" || status === "Manual collection" || status === "Built in alternative") return "success" as const;
   if (status === "Action required" || status === "Setup required" || status === "Continue setup") return "warning" as const;
   return "neutral" as const;
 }
@@ -101,17 +91,77 @@ function xeroAction(status?: ConnectionStatus | null) {
 }
 
 const CAPABILITY_MATRIX = [
-  { row: "Invoices", finance: "Included", xero: "Supported", quickbooks: "Planned", sage: "Planned", custom: "Supported" },
-  { row: "Customers/contacts", finance: "Included", xero: "Supported", quickbooks: "Planned", sage: "Planned", custom: "Supported" },
-  { row: "Payment status", finance: "Included", xero: "Limited", quickbooks: "Planned", sage: "Planned", custom: "Limited" },
-  { row: "Tax data", finance: "Included", xero: "Limited", quickbooks: "Planned", sage: "Planned", custom: "Export only" },
-  { row: "Services/items", finance: "Included", xero: "Limited", quickbooks: "Planned", sage: "Planned", custom: "Limited" },
-  { row: "Credit notes", finance: "Included", xero: "Not supported", quickbooks: "Planned", sage: "Planned", custom: "Not supported" },
-  { row: "Two-way sync", finance: "Included", xero: "Not supported", quickbooks: "Planned", sage: "Planned", custom: "Not supported" },
-  { row: "Scheduled sync", finance: "Included", xero: "Not supported", quickbooks: "Planned", sage: "Planned", custom: "Not supported" },
+  { row: "Invoices", finance: "Included", xero: "Supported", quickbooks: "Limited", sage: "Export only", custom: "Supported" },
+  { row: "Customers/contacts", finance: "Included", xero: "Supported", quickbooks: "Limited", sage: "Export only", custom: "Supported" },
+  { row: "Payment status", finance: "Included", xero: "Limited", quickbooks: "Limited", sage: "Export only", custom: "Limited" },
+  { row: "Tax data", finance: "Included", xero: "Limited", quickbooks: "Export only", sage: "Export only", custom: "Export only" },
+  { row: "Services/items", finance: "Included", xero: "Limited", quickbooks: "Limited", sage: "Export only", custom: "Limited" },
+  { row: "Credit notes", finance: "Included", xero: "Not supported", quickbooks: "Not supported", sage: "Not supported", custom: "Not supported" },
+  { row: "Two-way sync", finance: "Included", xero: "Not supported", quickbooks: "Not supported", sage: "Not supported", custom: "Not supported" },
+  { row: "Scheduled sync", finance: "Included", xero: "Not supported", quickbooks: "Not supported", sage: "Not supported", custom: "Not supported" },
   { row: "CSV export", finance: "Included", xero: "Export only", quickbooks: "Export only", sage: "Export only", custom: "Export only" },
   { row: "API/webhooks", finance: "Included", xero: "Limited", quickbooks: "Limited", sage: "Limited", custom: "Supported" },
 ];
+
+const ACCOUNTING_API_PROVIDERS = [
+  ["quickbooks", "QuickBooks", "QB", "Popular accounting"],
+  ["freeagent", "FreeAgent", "FA", "Popular accounting"],
+  ["freshbooks", "FreshBooks", "FB", "Popular accounting"],
+  ["zoho-books", "Zoho Books", "ZB", "Popular accounting"],
+  ["dynamics-365-business-central", "Microsoft Dynamics 365 Business Central", "BC", "Enterprise accounting"],
+  ["netsuite", "NetSuite", "NS", "Enterprise accounting"],
+  ["sap-business-one", "SAP Business One", "SB", "Enterprise accounting"],
+  ["oracle-accounting-erp", "Oracle accounting/ERP", "OR", "Enterprise accounting"],
+  ["myob", "MYOB", "MY", "Enterprise accounting"],
+  ["odoo", "Odoo", "OD", "Enterprise accounting"],
+  ["exact-online", "Exact Online", "EX", "Enterprise accounting"],
+] as const;
+
+const ACCOUNTING_FILE_PROVIDERS = [
+  ["sage", "Sage", "SA", "Set up file exchange"],
+  ["kashflow", "KashFlow", "KF", "Set up connection"],
+] as const;
+
+const PAYMENT_PROVIDER_CARDS = [
+  ["paypal-business", "PayPal", "PP", "Payment link", "Use provider-hosted PayPal payment links now, or configure an approved API/webhook route.", "Set up PayPal"],
+  ["square", "Square", "SQ", "Payment link", "Use Square payment links, terminal recording, or reconciliation reports without using MyTitan billing Stripe.", "Set up Square"],
+  ["sumup", "SumUp", "SU", "Manual collection", "Record SumUp terminal payments or configure provider-hosted payment requests.", "Set up SumUp"],
+  ["zettle", "Zettle", "ZT", "Manual collection", "Record Zettle terminal payments and reconcile provider reports.", "Set up Zettle"],
+  ["gocardless", "GoCardless", "GC", "Payment link", "Use provider-hosted payment instructions and reconcile verified provider reports.", "Set up GoCardless"],
+  ["worldpay", "Worldpay", "WP", "Payment link", "Use Worldpay payment links, signed webhook events, or reconciliation imports where approved.", "Set up Worldpay"],
+  ["adyen", "Adyen", "AD", "Payment link", "Use provider-hosted payment links and reviewed settlement imports.", "Set up Adyen"],
+  ["checkout-com", "Checkout.com", "CO", "Payment link", "Use provider-hosted payment links and reviewed settlement imports.", "Set up Checkout.com"],
+  ["mollie", "Mollie", "MO", "Payment link", "Use provider-hosted payment links and reviewed settlement imports.", "Set up Mollie"],
+  ["braintree", "Braintree", "BT", "Payment link", "Use provider-hosted payment links and verified reconciliation before marking payments paid.", "Set up Braintree"],
+  ["opayo", "Opayo", "OP", "Payment link", "Use provider-hosted payment links and reviewed settlement imports.", "Set up Opayo"],
+  ["elavon", "Elavon", "EL", "Manual collection", "Record terminal payments and reconcile provider settlement reports.", "Set up Elavon"],
+  ["global-payments", "Global Payments", "GP", "Manual collection", "Record terminal payments and reconcile provider settlement reports.", "Set up Global Payments"],
+  ["dojo", "Dojo", "DO", "Manual collection", "Record Dojo terminal payments and reconcile provider reports.", "Set up Dojo"],
+  ["tyl", "Tyl", "TY", "Manual collection", "Record terminal payments and reconcile provider reports.", "Set up Tyl"],
+  ["takepayments", "Takepayments", "TP", "Manual collection", "Record terminal payments and reconcile provider reports.", "Set up Takepayments"],
+  ["barclaycard", "Barclaycard", "BC", "Manual collection", "Record terminal payments and reconcile provider reports.", "Set up Barclaycard"],
+  ["lloyds-cardnet", "Lloyds Cardnet", "LC", "Manual collection", "Record terminal payments and reconcile provider reports.", "Set up Lloyds Cardnet"],
+] as const;
+
+const CALENDAR_STANDARD_CARDS = [
+  ["microsoft-calendar", "Microsoft 365 Calendar", "M365", "Subscribe to a secure MyTitan calendar feed or use approved API/webhook events. Native Microsoft OAuth is not claimed here."],
+  ["outlook", "Outlook", "OU", "Subscribe to a secure MyTitan calendar feed. Native Outlook OAuth is not claimed here."],
+  ["exchange", "Exchange", "EX", "Subscribe to a secure MyTitan calendar feed or configure an approved scheduling API route."],
+  ["apple-calendar", "Apple Calendar", "AC", "Subscribe using a secure MyTitan ICS calendar feed."],
+  ["generic-ics-calendar", "Generic ICS calendar", "ICS", "Subscribe to MyTitan bookings with a revocable ICS feed."],
+  ["caldav", "CalDAV", "CD", "Use the MyTitan ICS feed now. CalDAV remains separately gated until secure discovery and sync are complete."],
+] as const;
+
+const SCHEDULING_API_CARDS = [
+  ["calendly", "Calendly", "CL"],
+  ["cal-com", "Cal.com", "CC"],
+  ["deputy", "Deputy", "DP"],
+  ["rotacloud", "RotaCloud", "RC"],
+  ["when-i-work", "When I Work", "WI"],
+  ["sling", "Sling", "SL"],
+  ["humanity", "Humanity", "HU"],
+  ["custom-scheduling-system", "Custom scheduling system", "CS"],
+] as const;
 
 export default function IntegrationsPage() {
   const [permissions, setPermissions] = useState(emptyPermissionSnapshot());
@@ -126,7 +176,7 @@ export default function IntegrationsPage() {
   const [requestMessage, setRequestMessage] = useState("");
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<(typeof CATEGORY_FILTERS)[number]>("All");
-  const [accountingFilter, setAccountingFilter] = useState<AccountingFilter>("All");
+  const [connectionFilter, setConnectionFilter] = useState<ConnectionFilter>("All");
   const [selectedCard, setSelectedCard] = useState<DirectoryCard | null>(null);
   const [requestCard, setRequestCard] = useState<DirectoryCard | null>(null);
   const [requestBusy, setRequestBusy] = useState(false);
@@ -193,9 +243,8 @@ export default function IntegrationsPage() {
     const whatsapp = byogByProvider.get("whatsapp-business");
 
     const xeroStatus = simpleConnectionStatus(xero);
-    const qboStatus = quickbooks?.connected ? "Connected" : "Coming soon";
-    const qboPrimaryMode = quickbooks?.connected ? "link" : "request";
-    const qboAction = quickbooks?.connected ? "Manage" : "Request integration";
+    const qboStatus: DirectoryStatus = quickbooks?.connected ? "Connected" : "API connection";
+    const qboAction = quickbooks?.connected ? "Manage" : "Configure API connection";
     const accountingCards: DirectoryCard[] = [
       {
         key: "mytitan-finance",
@@ -210,7 +259,7 @@ export default function IntegrationsPage() {
         secondaryAction: "Finance settings",
         secondaryHref: "/dashboard/settings?section=finance",
         testId: "integration-workspace-row-mytitan-finance",
-        filters: ["Native", "Available"],
+        filters: ["Built in", "Connect now"],
         availableNow: ["Invoices", "payment requests", "balances", "statements", "VAT record support", "finance reports"],
         notSupported: ["Tax filing", "professional tax advice", "regulated accounting-service claims"],
         primaryMode: "link",
@@ -228,7 +277,7 @@ export default function IntegrationsPage() {
         action: xeroAction(xero),
         href: "/dashboard/settings/integrations/xero",
         testId: "integration-workspace-row-xero",
-        filters: ["Available"],
+        filters: ["Native", "Connect now"],
         availableNow: ["OAuth setup route", "organisation selection", "encrypted token storage", "read-only verification", "mapping preview gate"],
         notSupported: ["Automatic live mutation without explicit activation", "two-way sync", "tax filing"],
         setupRequirements: xeroStatus === "Setup required" ? ["Platform Admin must configure Xero client ID, client secret and redirect URI."] : ["Select the correct Xero organisation before verification completes."],
@@ -246,77 +295,53 @@ export default function IntegrationsPage() {
         status: qboStatus,
         description: quickbooks?.connected
           ? "QuickBooks connection is verified for this workspace."
-          : "QuickBooks connection is planned. Use MyTitan Finance, exports, API tokens, or webhooks in the meantime.",
+          : "Connect supported accounting records through a governed API connection, or use validated finance exports.",
         action: qboAction,
-        href: "/dashboard/settings/integrations/quickbooks",
-        secondaryAction: quickbooks?.connected ? "Check setup" : "View options",
-        secondaryHref: "/dashboard/settings/integrations/quickbooks",
+        href: quickbooks?.connected ? "/dashboard/settings/integrations/quickbooks" : "/dashboard/settings/developer-tools#api-tokens",
+        secondaryAction: quickbooks?.connected ? "Check setup" : "Use file exchange",
+        secondaryHref: quickbooks?.connected ? "/dashboard/settings/integrations/quickbooks" : "/dashboard/finance",
         testId: "integration-workspace-row-quickbooks",
-        filters: quickbooks?.connected ? ["Available"] : ["Coming soon", "API & webhooks", "Import & export"],
-        availableNow: ["Request integration", "CSV export alternatives", "API tokens", "signed webhooks"],
-        notSupported: quickbooks?.connected ? ["Automatic two-way sync"] : ["Tenant OAuth connection in production", "fake Connect action", "delivery date promise"],
-        primaryMode: qboPrimaryMode,
+        filters: quickbooks?.connected ? ["Connected"] : ["API", "File exchange", "Connect now"],
+        availableNow: ["Scoped API tokens", "signed webhooks", "finance CSV exports", "dry-run export queues"],
+        notSupported: quickbooks?.connected ? ["Automatic two-way sync"] : ["Native tenant OAuth connection", "fake QuickBooks Connect action", "delivery date promise"],
+        setupRequirements: ["Create scoped API credentials or export finance records before exchanging data with QuickBooks."],
+        primaryMode: "link",
       },
-      {
-        key: "sage",
-        group: "Accounting",
-        section: "Popular accounting",
-        name: "Sage",
-        providerIcon: "SA",
-        status: "Coming soon",
-        description: "Sage connection is planned. Use MyTitan Finance, exports, API tokens, or webhooks in the meantime.",
-        action: "Request integration",
-        secondaryAction: "View options",
-        secondaryHref: "/dashboard/settings/developer-tools",
-        href: "/dashboard/integrations?request=sage",
-        testId: "integration-workspace-row-sage",
-        filters: ["Coming soon", "API & webhooks", "Import & export"],
-        availableNow: ["Request integration", "CSV export alternatives", "API tokens", "signed webhooks"],
-        notSupported: ["Tenant OAuth connection", "fake Connect action", "delivery date promise"],
-        primaryMode: "request",
-      },
-      ...[
-        ["freeagent", "FreeAgent", "FA"],
-        ["freshbooks", "FreshBooks", "FB"],
-        ["zoho-books", "Zoho Books", "ZB"],
-        ["kashflow", "KashFlow", "KF"],
-      ].map(([key, name, icon]) => ({
+      ...ACCOUNTING_FILE_PROVIDERS.map(([key, name, icon, action]) => ({
         key,
         group: "Accounting" as const,
         section: "Popular accounting" as const,
         name,
         providerIcon: icon,
-        status: "Coming soon" as const,
-        description: `${name} connection is not implemented yet. Request it or use MyTitan Finance and developer options.`,
-        action: "Request integration",
-        href: `/dashboard/integrations?request=${key}`,
+        status: "File exchange" as const,
+        description: `${name} can use validated finance exports now, with API tokens and webhooks available for approved external workflows.`,
+        action,
+        href: "/dashboard/finance",
+        secondaryAction: "Configure API",
+        secondaryHref: "/dashboard/settings/developer-tools#api-tokens",
         testId: `integration-workspace-row-${key}`,
-        filters: ["Coming soon", "API & webhooks", "Import & export"] as AccountingFilter[],
-        availableNow: ["Request integration", "CSV export alternatives", "API tokens", "signed webhooks"],
-        notSupported: ["Native OAuth connection", "official partnership claim"],
-        primaryMode: "request" as const,
+        filters: ["File exchange", "API", "Webhooks", "Connect now"] as ConnectionFilter[],
+        availableNow: ["Finance CSV exports", "scoped API tokens", "signed webhooks", "manual review before external posting"],
+        notSupported: ["Native OAuth connection", "fake Connect action", "delivery date promise"],
+        primaryMode: "link" as const,
       })),
-      ...[
-        ["dynamics-365-business-central", "Microsoft Dynamics 365 Business Central", "BC"],
-        ["netsuite", "NetSuite", "NS"],
-        ["sap-business-one", "SAP Business One", "SB"],
-        ["oracle-accounting-erp", "Oracle accounting/ERP", "OR"],
-        ["myob", "MYOB", "MY"],
-      ].map(([key, name, icon]) => ({
+      ...ACCOUNTING_API_PROVIDERS.filter(([key]) => key !== "quickbooks").map(([key, name, icon, section]) => ({
         key,
         group: "Accounting" as const,
-        section: "Enterprise accounting" as const,
+        section: section as AccountingSection,
         name,
         providerIcon: icon,
-        status: "Coming soon" as const,
-        description: `${name} is not implemented as a native connector in this release. Use scoped APIs and signed webhooks for approved external systems.`,
-        action: "Request integration",
-        href: `/dashboard/integrations?request=${key}`,
+        status: "API connection" as const,
+        description: `Connect ${name} through scoped API tokens, signed webhooks or validated file exchange without claiming a native connector.`,
+        action: "Configure API connection",
+        href: "/dashboard/settings/developer-tools#api-tokens",
+        secondaryAction: "Use file exchange",
+        secondaryHref: "/dashboard/finance",
         testId: `integration-workspace-row-${key}`,
-        filters: ["Coming soon", "API & webhooks"] as AccountingFilter[],
-        availableNow: ["Request integration", "API-token guidance", "signed webhook guidance"],
-        notSupported: ["Native connector", "two-way sync", "official partnership claim"],
-        primaryMode: "request" as const,
+        filters: ["API", "Webhooks", "File exchange", "Connect now"] as ConnectionFilter[],
+        availableNow: ["Scoped API tokens", "signed webhook events", "finance CSV exports", "request native connector from Details"],
+        notSupported: ["Native connector", "provider password collection", "two-way sync", "official partnership claim"],
+        primaryMode: "link" as const,
       })),
       {
         key: "csv-export",
@@ -324,12 +349,12 @@ export default function IntegrationsPage() {
         section: "Flexible connections",
         name: "CSV import/export",
         providerIcon: "CSV",
-        status: "Import/export available",
+        status: "File exchange",
         description: "Export supported finance records for accountants or external accounting tools. Imports are not shown unless implemented.",
         action: "Open Finance exports",
         href: "/dashboard/finance",
         testId: "integration-workspace-row-csv-export",
-        filters: ["Import & export", "Available"],
+        filters: ["File exchange", "Connect now"],
         availableNow: ["Invoices", "customers", "finance records", "payment status where recorded", "VAT/tax record support"],
         notSupported: ["Accounting CSV import from this catalogue"],
         primaryMode: "link",
@@ -340,12 +365,12 @@ export default function IntegrationsPage() {
         section: "Flexible connections",
         name: "API tokens",
         providerIcon: "API",
-        status: canManage ? "Available" : "Not available",
+        status: "API connection",
         description: "Create scoped API tokens for approved external systems without exposing provider secrets.",
         action: "Manage API tokens",
         href: "/dashboard/settings/developer-tools#api-tokens",
         testId: "integration-workspace-row-accounting-api-tokens",
-        filters: ["API & webhooks", "Available"],
+        filters: ["API", "Connect now"],
         availableNow: ["Reveal-once API tokens", "tenant-scoped access", "audit logging"],
         notSupported: ["Raw provider secret storage in catalogue cards"],
         permissions: ["settings.manage"],
@@ -357,12 +382,12 @@ export default function IntegrationsPage() {
         section: "Flexible connections",
         name: "Signed webhooks",
         providerIcon: "WH",
-        status: canManage ? "Available" : "Not available",
+        status: "Webhook connection",
         description: "Send selected business events to approved external accounting workflows using signed deliveries.",
         action: "Manage webhooks",
         href: "/dashboard/settings/developer-tools#webhooks",
         testId: "integration-workspace-row-accounting-webhooks",
-        filters: ["API & webhooks", "Available"],
+        filters: ["Webhooks", "Connect now"],
         availableNow: ["Webhook endpoints", "test delivery", "delivery logs", "retry controls"],
         notSupported: ["Unsigned delivery", "secret values after creation"],
         permissions: ["settings.manage"],
@@ -374,16 +399,16 @@ export default function IntegrationsPage() {
         section: "Flexible connections",
         name: "Custom accounting system",
         providerIcon: "CA",
-        status: "API/webhook compatible",
+        status: "Connect now",
         description: "Connect an approved external system using scoped API tokens and signed webhooks.",
         action: "Developer tools",
         href: "/dashboard/settings/developer-tools",
         secondaryAction: "Integration guide",
         secondaryHref: "/dashboard/help?category=integrations",
         testId: "integration-workspace-row-custom-accounting-system",
-        filters: ["API & webhooks", "Available"],
-        availableNow: ["Scoped API tokens", "signed webhook delivery", "support request path"],
-        notSupported: ["Unreviewed external write access", "raw technical configuration in catalogue cards"],
+        filters: ["API", "Webhooks", "File exchange", "Connect now"],
+        availableNow: ["Scoped API tokens", "signed webhook delivery", "finance exports", "request native connector from Details"],
+        notSupported: ["Unreviewed external write access", "provider password collection", "raw technical configuration in catalogue cards"],
         primaryMode: "link",
       },
     ];
@@ -398,66 +423,63 @@ export default function IntegrationsPage() {
         action: stripeStatus === "Connected" ? "Manage Stripe" : "Fix Stripe setup",
         href: "/dashboard/settings/payments/stripe",
         testId: "integration-workspace-row-stripe",
+        filters: ["Native", "Connected"],
       },
       {
         key: "bank-transfer",
         group: "Payments",
         name: "Bank transfer",
-        status: bank?.connected ? "Connected" : "Setup required",
+        status: bank?.connected ? "Connected" : "Manual collection",
         description: "Add bank details for invoices and payment requests.",
         action: bank?.connected ? "Manage Bank Details" : "Add Bank Details",
         href: "/dashboard/settings/payments?provider=bank-transfer",
         testId: "integration-workspace-row-bank-transfer",
+        filters: ["Manual", "Connect now"],
       },
       {
         key: "manual-card-terminal",
         group: "Payments",
         name: "Manual card terminal",
-        status: terminal?.connected ? "Connected" : "Setup required",
+        status: terminal?.connected ? "Connected" : "Manual collection",
         description: "Record payments collected through your own card terminal.",
         action: terminal?.connected ? "Manage Terminal" : "Configure Terminal",
         href: "/dashboard/settings/payments?provider=manual-card-terminal",
         testId: "integration-workspace-row-manual-card-terminal",
+        filters: ["Manual", "Connect now"],
       },
+      ...PAYMENT_PROVIDER_CARDS.map(([key, name, icon, status, description, action]) => ({
+        key,
+        group: "Payments" as const,
+        name,
+        providerIcon: icon,
+        status: status as DirectoryStatus,
+        description,
+        action,
+        href: `/dashboard/settings/payments?provider=${key}`,
+        secondaryAction: status === "Manual collection" ? "Open Finance" : "Manage webhooks",
+        secondaryHref: status === "Manual collection" ? "/dashboard/finance" : "/dashboard/settings/developer-tools#webhooks",
+        testId: key === "paypal-business" ? "integration-workspace-row-paypal" : `integration-workspace-row-${key}`,
+        filters: status === "Manual collection" ? ["Manual", "Connect now"] as ConnectionFilter[] : ["Connect now", "Webhooks"] as ConnectionFilter[],
+        availableNow: ["Provider-hosted payment links or instructions", "manual collection recording", "signed webhook or reconciliation review where configured"],
+        notSupported: ["Using MyTitan subscription Stripe for customer funds", "marking paid from unverified webhook", "collecting provider passwords"],
+        primaryMode: "link" as const,
+      })),
       {
-        key: "sumup",
+        key: "custom-payment-provider",
         group: "Payments",
-        name: "SumUp",
-        status: "Requires external account",
-        description: "Connect a supported business-owned SumUp account before taking payments.",
-        action: "View payment options",
-        href: "/dashboard/settings/payments?provider=sumup",
-        testId: "integration-workspace-row-sumup",
-      },
-      {
-        key: "square",
-        group: "Payments",
-        name: "Square",
-        status: "Requires external account",
-        description: "Connect a supported business-owned Square account before taking payments.",
-        action: "View payment options",
-        href: "/dashboard/settings/payments?provider=square",
-        testId: "integration-workspace-row-square",
-      },
-      {
-        key: "paypal-business",
-        group: "Payments",
-        name: "PayPal",
-        status: "Requires external account",
-        description: "Connect a supported business-owned PayPal account before taking payments.",
-        action: "View payment options",
-        href: "/dashboard/settings/payments?provider=paypal-business",
-        testId: "integration-workspace-row-paypal",
-      },
-      {
-        key: "zettle",
-        group: "Payments",
-        name: "Zettle",
-        status: "Requires external account",
-        description: "Connect a supported business-owned Zettle account before taking payments.",
-        action: "View payment options",
-        href: "/dashboard/settings/payments?provider=zettle",
-        testId: "integration-workspace-row-zettle",
+        name: "Custom payment provider",
+        providerIcon: "CP",
+        status: "Connect now",
+        description: "Use payment links, signed webhooks, reconciliation imports or manual collection.",
+        action: "Configure provider",
+        href: "/dashboard/settings/payments?provider=custom",
+        secondaryAction: "Manage webhooks",
+        secondaryHref: "/dashboard/settings/developer-tools#webhooks",
+        testId: "integration-workspace-row-custom-payment-provider",
+        filters: ["Connect now", "Webhooks", "Manual"],
+        availableNow: ["Payment-link tracking", "manual payment recording", "signed webhook review", "reconciliation import review"],
+        notSupported: ["Provider password collection", "unverified payment completion", "MyTitan Billing Stripe for tenant funds"],
+        primaryMode: "link",
       },
       ...accountingCards,
       {
@@ -466,20 +488,45 @@ export default function IntegrationsPage() {
         name: "Google Calendar",
         status: simpleConnectionStatus(google),
         description: "Keep supported appointments connected to your calendar.",
-        action: google?.connected ? "Manage" : simpleConnectionStatus(google) === "Not available" ? "Learn more" : "Connect",
+        action: google?.connected ? "Manage" : "Connect",
         href: "/dashboard/settings/integrations/google-calendar",
         testId: "integration-personal-row-google",
+        filters: ["Native", "Connected"],
       },
-      {
-        key: "microsoft-calendar",
-        group: "Calendar",
-        name: "Microsoft 365 Calendar",
-        status: "Not available",
-        description: "Microsoft calendar sync is not available yet.",
-        action: "Learn more",
-        href: "/dashboard/settings/integrations/microsoft-calendar",
-        testId: "integration-workspace-row-microsoft-calendar",
-      },
+      ...CALENDAR_STANDARD_CARDS.map(([key, name, icon, description]) => ({
+        key,
+        group: "Calendar" as const,
+        name,
+        providerIcon: icon,
+        status: "Calendar standard" as const,
+        description,
+        action: "Add calendar feed",
+        href: "/dashboard/bookings",
+        secondaryAction: "Booking settings",
+        secondaryHref: "/dashboard/booking/settings",
+        testId: `integration-workspace-row-${key}`,
+        filters: ["Calendar standard", "Connect now"] as ConnectionFilter[],
+        availableNow: ["Outbound ICS feed", "copy feed URL from Bookings", "tenant-scoped booking visibility", "revocable booking settings token"],
+        notSupported: ["Fake provider OAuth", "two-way calendar sync from ICS alone", key === "caldav" ? "CalDAV discovery and sync in this release" : "Native provider connector unless separately configured"],
+        primaryMode: "link" as const,
+      })),
+      ...SCHEDULING_API_CARDS.map(([key, name, icon]) => ({
+        key,
+        group: "Calendar" as const,
+        name,
+        providerIcon: icon,
+        status: "API connection" as const,
+        description: `${name} can exchange approved scheduling events through scoped API tokens and signed webhooks.`,
+        action: "Configure scheduling API",
+        href: "/dashboard/settings/developer-tools#api-tokens",
+        secondaryAction: "Add calendar feed",
+        secondaryHref: "/dashboard/bookings",
+        testId: `integration-workspace-row-${key}`,
+        filters: ["API", "Webhooks", "Calendar standard", "Connect now"] as ConnectionFilter[],
+        availableNow: ["Scoped API tokens", "signed webhook events", "outbound ICS feed for calendar visibility"],
+        notSupported: ["Fake native OAuth", "silent inbound booking creation without validation", "two-way sync unless explicitly implemented"],
+        primaryMode: "link" as const,
+      })),
       {
         key: "email-sender",
         group: "Communications",
@@ -521,7 +568,7 @@ export default function IntegrationsPage() {
       }] : []),
       {
         key: "maps-directions",
-        group: "Maps",
+        group: "Automation",
         name: "Provider-neutral directions",
         status: "Limited / Beta",
         description: "Open directions from saved addresses.",
@@ -531,123 +578,184 @@ export default function IntegrationsPage() {
       },
       {
         key: "google-maps",
-        group: "Maps",
+        group: "Automation",
         name: "Google Maps",
-        status: "Not available",
-        description: "Advanced maps and travel-time features are not yet available.",
-        action: "Learn more",
-        href: "/dashboard/enterprise#maps",
+        status: "API connection",
+        description: "Use provider-neutral directions now, or connect approved map data through scoped APIs when reviewed.",
+        action: "Open scheduling",
+        href: "/dashboard/scheduling",
+        secondaryAction: "Developer tools",
+        secondaryHref: "/dashboard/settings/developer-tools#api-tokens",
         testId: "integration-workspace-row-google-maps",
+        filters: ["API", "Connect now"],
       },
       {
         key: "onedrive",
         group: "Storage",
         name: "OneDrive",
-        status: "Not available",
-        description: "External document storage is not yet available.",
+        status: "API connection",
+        description: "Connect document workflows through scoped API tokens and signed webhooks; MyTitan documents remain available now.",
         action: "View documents",
         href: "/dashboard/settings/documents-numbering",
+        secondaryAction: "Developer tools",
+        secondaryHref: "/dashboard/settings/developer-tools#api-tokens",
         testId: "integration-workspace-row-onedrive",
+        filters: ["API", "Webhooks", "Connect now"],
       },
       {
         key: "google-drive",
         group: "Storage",
         name: "Google Drive",
-        status: "Not available",
-        description: "Google Drive storage is not yet available.",
+        status: "API connection",
+        description: "Connect document workflows through scoped API tokens and signed webhooks; MyTitan documents remain available now.",
         action: "View documents",
         href: "/dashboard/settings/documents-numbering",
+        secondaryAction: "Developer tools",
+        secondaryHref: "/dashboard/settings/developer-tools#api-tokens",
         testId: "integration-workspace-row-google-drive",
+        filters: ["API", "Webhooks", "Connect now"],
       },
       {
         key: "dropbox",
         group: "Storage",
         name: "Dropbox",
-        status: "Not available",
-        description: "Dropbox storage is not yet available.",
+        status: "API connection",
+        description: "Connect document workflows through scoped API tokens and signed webhooks; MyTitan documents remain available now.",
         action: "View documents",
         href: "/dashboard/settings/documents-numbering",
+        secondaryAction: "Developer tools",
+        secondaryHref: "/dashboard/settings/developer-tools#api-tokens",
         testId: "integration-workspace-row-dropbox",
+        filters: ["API", "Webhooks", "Connect now"],
       },
       {
         key: "zapier",
         group: "Automation",
         name: "Zapier",
-        status: canManage ? "Limited / Beta" : "Not available",
+        status: "Webhook connection",
         description: "Connect approved automations using API tokens and webhooks.",
         action: "Open Developer Tools",
         href: "/dashboard/settings/developer-tools#webhooks",
         testId: "integration-workspace-row-zapier",
+        filters: ["Webhooks", "API", "Connect now"],
       },
       {
         key: "make",
         group: "Automation",
         name: "Make",
-        status: canManage ? "Limited / Beta" : "Not available",
+        status: "Webhook connection",
         description: "Connect approved scenarios using API tokens and webhooks.",
         action: "Open Developer Tools",
         href: "/dashboard/settings/developer-tools#webhooks",
         testId: "integration-workspace-row-make",
+        filters: ["Webhooks", "API", "Connect now"],
       },
       {
         key: "n8n",
         group: "Automation",
         name: "n8n",
-        status: canManage ? "Limited / Beta" : "Not available",
+        status: "API connection",
         description: "Self-hosted automation can connect through scoped API keys and signed webhooks.",
         action: "Open Developer Tools",
         href: "/dashboard/settings/developer-tools#api-tokens",
         testId: "integration-workspace-row-n8n",
+        filters: ["API", "Webhooks", "Connect now"],
+      },
+      {
+        key: "custom-connection",
+        group: "Automation",
+        name: "Custom connection",
+        providerIcon: "CC",
+        status: "Connect now",
+        description: "Build a governed connection using REST API guidance, API tokens, signed webhooks, file exchange, ICS, payment links or manual collection.",
+        action: "Configure",
+        href: "/dashboard/settings/developer-tools#api-tokens",
+        secondaryAction: "Open Finance exports",
+        secondaryHref: "/dashboard/finance",
+        testId: "integration-workspace-row-custom-connection",
+        filters: ["API", "Webhooks", "File exchange", "Calendar standard", "Manual", "Connect now"],
+        availableNow: ["Scoped API tokens", "signed webhooks", "file exchange", "ICS feeds", "payment-link tracking", "manual payment recording"],
+        notSupported: ["Arbitrary code execution", "unreviewed REST calls from MyTitan servers", "provider password collection"],
+        primaryMode: "link",
+      },
+      {
+        key: "hubspot",
+        group: "CRM",
+        name: "HubSpot",
+        providerIcon: "HS",
+        status: "API connection",
+        description: "Exchange approved customer and activity records through scoped API tokens and signed webhooks.",
+        action: "Configure API connection",
+        href: "/dashboard/settings/developer-tools#api-tokens",
+        testId: "integration-workspace-row-hubspot",
+        filters: ["API", "Webhooks", "Connect now"],
+      },
+      {
+        key: "salesforce",
+        group: "CRM",
+        name: "Salesforce",
+        providerIcon: "SF",
+        status: "API connection",
+        description: "Exchange approved customer and activity records through scoped API tokens and signed webhooks.",
+        action: "Configure API connection",
+        href: "/dashboard/settings/developer-tools#api-tokens",
+        testId: "integration-workspace-row-salesforce",
+        filters: ["API", "Webhooks", "Connect now"],
       },
       {
         key: "google-sign-in",
         group: "Identity",
         name: "Google sign-in",
-        status: "Not available",
-        description: "Google sign-in is not yet available.",
-        action: "Learn more",
+        status: "Built in alternative",
+        description: "Use MyTitan sign-in and workspace RBAC now; external identity can be reviewed as an enterprise API/security request.",
+        action: "Manage users",
         href: "/dashboard/compliance",
         testId: "integration-workspace-row-google-sign-in",
+        filters: ["Built in"],
       },
       {
         key: "microsoft-entra",
         group: "Identity",
         name: "Microsoft Entra ID",
-        status: "Not available",
-        description: "Microsoft SSO is not yet available.",
-        action: "Learn more",
+        status: "Built in alternative",
+        description: "Use MyTitan sign-in and workspace RBAC now; Entra SSO remains an enterprise security review item.",
+        action: "Manage users",
         href: "/dashboard/compliance",
         testId: "integration-workspace-row-entra",
+        filters: ["Built in"],
       },
       {
         key: "saml-okta",
         group: "Identity",
         name: "SAML / Okta",
-        status: "Not available",
-        description: "SAML and Okta SSO are not yet available.",
-        action: "Learn more",
+        status: "Built in alternative",
+        description: "Use MyTitan sign-in and workspace RBAC now; SAML can be reviewed as an enterprise security request.",
+        action: "Manage users",
         href: "/dashboard/compliance",
         testId: "integration-workspace-row-saml-okta",
+        filters: ["Built in"],
       },
       {
         key: "api-tokens",
-        group: "Developer Tools",
+        group: "Developer",
         name: "API tokens",
-        status: canManage ? "Connected" : "Not available",
+        status: "API connection",
         description: "Create secure tokens for approved external systems.",
         action: "Manage",
         href: "/dashboard/settings/developer-tools#api-tokens",
         testId: "integration-developer-api-tokens",
+        filters: ["API", "Connect now"],
       },
       {
         key: "webhooks",
-        group: "Developer Tools",
+        group: "Developer",
         name: "Webhooks",
-        status: canManage ? "Connected" : "Not available",
+        status: "Webhook connection",
         description: "Send selected business events to approved external systems.",
         action: "Manage",
         href: "/dashboard/settings/developer-tools#webhooks",
         testId: "integration-developer-webhooks",
+        filters: ["Webhooks", "Connect now"],
       },
     ];
   }, [byogByProvider, canManage, google, quickbooks, stripe, xero]);
@@ -656,11 +764,11 @@ export default function IntegrationsPage() {
     const cleanQuery = query.trim().toLowerCase();
     return cards.filter((card) => {
       const categoryMatch = category === "All" || card.group === category;
-      const accountingMatch = card.group !== "Accounting" || accountingFilter === "All" || card.filters?.includes(accountingFilter);
+      const connectionMatch = connectionFilter === "All" || card.filters?.includes(connectionFilter);
       const searchMatch = !cleanQuery || `${card.name} ${card.description} ${card.group} ${card.section || ""}`.toLowerCase().includes(cleanQuery);
-      return categoryMatch && accountingMatch && searchMatch;
+      return categoryMatch && connectionMatch && searchMatch;
     });
-  }, [accountingFilter, cards, category, query]);
+  }, [cards, category, connectionFilter, query]);
 
   const accountingCards = filteredCards.filter((card) => card.group === "Accounting");
 
@@ -729,7 +837,8 @@ export default function IntegrationsPage() {
   }
 
   function renderCard(card: DirectoryCard) {
-    const disabled = card.status === "Not available" || (card.primaryMode !== "request" && (card.key !== "google-calendar" ? !canManage && !["mytitan-finance", "csv-export", "custom-accounting-system"].includes(card.key) : !canManagePersonal));
+    const publicActions = ["mytitan-finance", "csv-export", "custom-accounting-system", "apple-calendar", "generic-ics-calendar", "caldav"];
+    const disabled = card.primaryMode !== "request" && (card.key !== "google-calendar" ? !canManage && !publicActions.includes(card.key) : !canManagePersonal);
     return (
       <article className="integration-card connected-tool-card" key={card.key} data-testid={card.testId}>
         <div className="connected-tool-card__header">
@@ -790,21 +899,19 @@ export default function IntegrationsPage() {
             </button>
           ))}
         </div>
-        {(category === "All" || category === "Accounting") ? (
-          <div className="settings-tab-grid" style={{ marginTop: 14 }} role="tablist" aria-label="Accounting integration filters">
-            {ACCOUNTING_FILTERS.map((filter) => (
+        <div className="settings-tab-grid" style={{ marginTop: 14 }} role="tablist" aria-label="Connection method filters">
+            {CONNECTION_FILTERS.map((filter) => (
               <button
                 key={filter}
                 type="button"
-                className={`tab-button settings-tab-button ${accountingFilter === filter ? "active" : ""}`}
-                onClick={() => setAccountingFilter(filter)}
-                aria-selected={accountingFilter === filter}
+                className={`tab-button settings-tab-button ${connectionFilter === filter ? "active" : ""}`}
+                onClick={() => setConnectionFilter(filter)}
+                aria-selected={connectionFilter === filter}
               >
                 <strong>{filter}</strong>
               </button>
             ))}
-          </div>
-        ) : null}
+        </div>
       </div>
 
       <div data-testid="integrations-workspace-section" className="connected-tools-directory">
@@ -863,14 +970,14 @@ export default function IntegrationsPage() {
         {GROUPS.map((group) => {
           if (group === "Accounting") return null;
           const groupCards = filteredCards.filter((card) => card.group === group);
-          if (!groupCards.length || (group === "Developer Tools" && !canManage)) return null;
+          if (!groupCards.length || (group === "Developer" && !canManage)) return null;
           return (
             <section className="operator-section" key={group} data-testid={`connected-tools-group-${group.toLowerCase().replace(/\s+/g, "-")}`}>
               <div className="operator-section__header">
                 <div>
                   <h2 className="operator-section__title">{group}</h2>
                   <p className="operator-section__subtitle">
-                    {group === "Developer Tools" ? "Technical connections for approved external systems." : `Manage your ${group.toLowerCase()} connections.`}
+                    {group === "Developer" ? "Technical connections for approved external systems." : `Manage your ${group.toLowerCase()} connections.`}
                   </p>
                 </div>
               </div>
@@ -886,6 +993,7 @@ export default function IntegrationsPage() {
             <button className="button secondary" type="button" onClick={() => {
               setQuery("");
               setCategory("All");
+              setConnectionFilter("All");
             }}>Clear search</button>
           </div>
         ) : null}
@@ -908,7 +1016,15 @@ export default function IntegrationsPage() {
             <p className="muted">Last successful sync: {selectedCard.lastSuccessfulSyncAt || "Not recorded"}</p>
             <p className="muted">Recent safe error: {selectedCard.recentSafeError || "None shown"}</p>
             <div className="billing-page-actions">
-              {cardAction(selectedCard, selectedCard.status === "Not available")}
+              {cardAction(selectedCard, false)}
+              {selectedCard.key !== "mytitan-finance" ? (
+                <button className="button secondary" type="button" onClick={() => {
+                  setRequestCard(selectedCard);
+                  setSelectedCard(null);
+                }}>
+                  Request native integration
+                </button>
+              ) : null}
               <button className="button secondary" type="button" onClick={() => setSelectedCard(null)}>Close</button>
             </div>
           </section>

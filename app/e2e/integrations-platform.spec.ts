@@ -12,7 +12,7 @@ test.describe("integration platform foundation", () => {
     await expect(page.getByTestId("integrations-workspace-section")).toBeVisible();
     await expect(page.getByTestId("integration-admin-health")).toHaveCount(0);
     await expect(page.getByTestId("integration-owner-command")).toHaveCount(0);
-    await expect(page.getByTestId("integration-workspace-row-quickbooks")).toContainText(/Connected|Coming soon/i);
+    await expect(page.getByTestId("integration-workspace-row-quickbooks")).toContainText(/Connected|API connection/i);
     await expect(page.locator("body")).not.toContainText(/OAuth verified|idempotency|provider mutation|metadata.only/i);
   });
 
@@ -25,10 +25,12 @@ test.describe("integration platform foundation", () => {
     await expect(page.getByTestId("integration-workspace-row-mytitan-finance")).toContainText(/MyTitan Finance|Built in|Open Finance/);
     await expect(page.getByTestId("integration-workspace-row-xero")).toContainText(/Xero|Setup required|Available|Continue setup|Connected|Action required/);
     await expect(page.getByTestId("integration-workspace-row-xero")).not.toContainText("Not available");
-    await expect(page.getByTestId("integration-workspace-row-quickbooks")).toContainText(/QuickBooks|Coming soon|Request integration/);
-    await expect(page.getByTestId("integration-workspace-row-sage")).toContainText(/Sage|Coming soon|Request integration/);
+    await expect(page.getByTestId("integration-workspace-row-quickbooks")).toContainText(/QuickBooks|API connection|Configure API connection/);
+    await expect(page.getByTestId("integration-workspace-row-sage")).toContainText(/Sage|File exchange|Set up file exchange/);
     await expect(page.getByTestId("integration-workspace-row-quickbooks")).not.toContainText("Connect QuickBooks");
     await expect(page.getByTestId("integration-workspace-row-sage")).not.toContainText("Connect Sage");
+    await expect(page.getByTestId("integration-workspace-row-quickbooks")).not.toContainText("Request integration");
+    await expect(page.getByTestId("integration-workspace-row-sage")).not.toContainText("Request integration");
 
     for (const testId of [
       "integration-workspace-row-freeagent",
@@ -40,6 +42,8 @@ test.describe("integration platform foundation", () => {
       "integration-workspace-row-sap-business-one",
       "integration-workspace-row-oracle-accounting-erp",
       "integration-workspace-row-myob",
+      "integration-workspace-row-odoo",
+      "integration-workspace-row-exact-online",
       "integration-workspace-row-csv-export",
       "integration-workspace-row-accounting-api-tokens",
       "integration-workspace-row-accounting-webhooks",
@@ -48,8 +52,33 @@ test.describe("integration platform foundation", () => {
       await expect(page.getByTestId(testId)).toBeVisible();
     }
 
-    await expect(page.getByTestId("accounting-capability-matrix")).toContainText(/Two-way sync|Not supported|Planned|API\/webhooks/);
+    await expect(page.getByTestId("accounting-capability-matrix")).toContainText(/Two-way sync|Not supported|Export only|API\/webhooks/);
     await expect(page.locator("body")).not.toContainText(/access token|refresh token|client secret|organisation ID|tenant ID/i);
+  });
+
+  test("universal marketplace gives every major provider family an actionable path", async ({ page, request }) => {
+    await installApiProxy(page, request);
+    await loginAs(page, request, "e2e.operator@mytitan.local", "MyTitanE2E!2026");
+    await page.goto("/dashboard/integrations", { waitUntil: "networkidle" });
+
+    for (const [testId, pattern] of [
+      ["integration-workspace-row-paypal", /Payment link|Set up PayPal/],
+      ["integration-workspace-row-sumup", /Manual collection|Set up SumUp/],
+      ["integration-workspace-row-square", /Payment link|Set up Square/],
+      ["integration-workspace-row-custom-payment-provider", /Configure provider/],
+      ["integration-workspace-row-apple-calendar", /Calendar standard|Add calendar feed/],
+      ["integration-workspace-row-generic-ics-calendar", /Calendar standard|Add calendar feed/],
+      ["integration-workspace-row-calendly", /API connection|Configure scheduling API/],
+      ["integration-workspace-row-custom-scheduling-system", /API connection|Configure scheduling API/],
+      ["integration-workspace-row-custom-connection", /Connect now|Configure/],
+      ["integration-workspace-row-hubspot", /API connection|Configure API connection/],
+    ] as const) {
+      await expect(page.getByTestId(testId)).toContainText(pattern);
+    }
+
+    const primaryButtons = await page.locator(".connected-tool-card__actions .button:first-child").allInnerTexts();
+    expect(primaryButtons.join("\n")).not.toMatch(/^Request integration$/m);
+    await expect(page.locator("body")).not.toContainText(/Not implemented|Coming soon|Not available/i);
   });
 
   test("provider-specific deep links land on exact readiness and connection rows", async ({ page, request }) => {
@@ -59,8 +88,8 @@ test.describe("integration platform foundation", () => {
     await page.goto("/dashboard/integrations", { waitUntil: "domcontentloaded" });
     const quickbooksRow = page.getByTestId("integration-workspace-row-quickbooks");
     await expect(quickbooksRow).toBeVisible();
-    await quickbooksRow.getByRole("link").click();
-    await expect(page).toHaveURL(/\/dashboard\/settings\/integrations\/quickbooks/);
+    await quickbooksRow.getByRole("link", { name: /Manage|Configure API connection/ }).click();
+    await expect(page).toHaveURL(/\/dashboard\/settings\/(integrations\/quickbooks|developer-tools#api-tokens)/);
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/dashboard/integrations", { waitUntil: "domcontentloaded" });
@@ -198,6 +227,25 @@ test.describe("integration platform foundation", () => {
     await expect(guidance).toHaveCount(0);
     await expect(page.locator("body")).not.toContainText("INTEGRATIONS_ENCRYPTION_KEY");
     await expect(createButton).toBeEnabled();
+  });
+
+  test("webhook endpoint creation rejects unsafe SSRF destinations", async ({ request }) => {
+    const operatorLogin = await request.post(`${process.env.PLAYWRIGHT_API_BASE_URL || "http://127.0.0.1:3000"}/auth/login`, {
+      data: { email: "e2e.operator@mytitan.local", password: "MyTitanE2E!2026" },
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(operatorLogin.ok()).toBeTruthy();
+    const operatorToken = String((await operatorLogin.json())?.token || "");
+
+    for (const url of ["http://127.0.0.1:8080/hook", "https://169.254.169.254/latest/meta-data", "https://localhost/webhook"]) {
+      const response = await requestLocalApi(request, "/integrations/webhooks", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${operatorToken}`, "Content-Type": "application/json" },
+        data: { name: "Blocked webhook", url, subscribedEventTypes: ["integration.test"] },
+      });
+      expect(response.status()).toBe(400);
+      expect(JSON.stringify(await response.json())).not.toMatch(/INTEGRATIONS_ENCRYPTION_KEY|secret|token/i);
+    }
   });
 
   test("failed webhook deliveries reflect webhook-secret readiness safely", async ({ page, request }) => {
