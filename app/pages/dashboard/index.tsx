@@ -376,7 +376,7 @@ export default function Dashboard() {
           <>
             <section className="dashboard-snapshot" aria-labelledby="dashboard-snapshot-title">
               <div className="dashboard-section-heading">
-                <h2 id="dashboard-snapshot-title" className="visually-hidden">Business snapshot</h2>
+                <h2 id="dashboard-snapshot-title">Business snapshot</h2>
                 <Link href="/dashboard/analytics">Open analytics</Link>
               </div>
               <div className="dashboard-snapshot-grid" data-testid="dashboard-snapshot-grid">

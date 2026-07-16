@@ -12785,6 +12785,14 @@ html[data-theme="dark"] .stripe-action-result span {
   --mt-success: #047857;
   --mt-warning: #a16207;
   --mt-error: #b91c1c;
+  --mt-heading-primary: var(--heading-primary, #0f172a);
+  --mt-heading-secondary: var(--heading-secondary, #1f2a3d);
+  --mt-heading-on-dark: var(--heading-on-dark, #f8fafc);
+  --mt-dark-surface-text-primary: var(--dark-surface-text-primary, #f8fafc);
+  --mt-dark-surface-text-secondary: var(--dark-surface-text-secondary, #dbeafe);
+  --mt-dark-surface-text-muted: var(--dark-surface-text-muted, #cbd5e1);
+  --mt-dark-surface-link: var(--dark-surface-link, #93c5fd);
+  --mt-dark-surface-border: var(--dark-surface-border, rgba(203, 213, 225, 0.24));
 }
 
 html[data-theme="dark"] {
@@ -12820,6 +12828,14 @@ html[data-theme="dark"] {
   --mt-success: #86efac;
   --mt-warning: #fde68a;
   --mt-error: #fecaca;
+  --mt-heading-primary: var(--heading-primary, #f8fafc);
+  --mt-heading-secondary: var(--heading-secondary, #e2e8f0);
+  --mt-heading-on-dark: var(--heading-on-dark, #f8fafc);
+  --mt-dark-surface-text-primary: var(--dark-surface-text-primary, #f8fafc);
+  --mt-dark-surface-text-secondary: var(--dark-surface-text-secondary, #dbeafe);
+  --mt-dark-surface-text-muted: var(--dark-surface-text-muted, #cbd5e1);
+  --mt-dark-surface-link: var(--dark-surface-link, #93c5fd);
+  --mt-dark-surface-border: var(--dark-surface-border, rgba(203, 213, 225, 0.24));
 }
 
 [data-shell="app"],
@@ -12868,6 +12884,29 @@ html[data-theme="dark"] {
 [data-shell="app"] .calendar-premium-header p,
 [data-shell="app"] .customers-premium-header p {
   color: var(--mt-page-subtitle-text);
+}
+
+html[data-theme="dark"] [data-shell="app"] .dashboard-premium-header {
+  color: var(--mt-dark-surface-text-primary);
+}
+
+html[data-theme="dark"] [data-shell="app"] .dashboard-premium-title,
+html[data-theme="dark"] [data-shell="app"] .dashboard-premium-greeting {
+  color: var(--mt-heading-on-dark);
+}
+
+html[data-theme="dark"] [data-shell="app"] .dashboard-premium-meta,
+html[data-theme="dark"] [data-shell="app"] .dashboard-location-select {
+  color: var(--mt-dark-surface-text-secondary);
+}
+
+html[data-theme="dark"] [data-shell="app"] .dashboard-section-heading h2 {
+  color: var(--mt-dark-surface-text-primary);
+}
+
+html[data-theme="dark"] [data-shell="app"] .dashboard-section-heading a,
+html[data-theme="dark"] [data-shell="app"] .dashboard-secondary-links a {
+  color: var(--mt-dark-surface-link);
 }
 
 [data-shell="app"] .operator-viewTabs {
@@ -13280,7 +13319,7 @@ html[data-theme="dark"] {
 .dashboard-location-select {
   display: grid;
   gap: 5px;
-  color: var(--mt-text-secondary, var(--text-secondary));
+  color: var(--control-muted, var(--mt-text-secondary, var(--text-secondary)));
   font-size: 0.82rem;
   font-weight: 800;
 }
@@ -13288,6 +13327,9 @@ html[data-theme="dark"] {
 .dashboard-location-select select {
   min-width: 210px;
   min-height: 44px;
+  border-color: var(--control-border, var(--mt-border, var(--border)));
+  background: var(--control-background, var(--mt-input-bg, var(--surface)));
+  color: var(--control-text, var(--mt-text-primary, var(--text)));
 }
 
 .dashboard-skeleton,
@@ -13499,7 +13541,7 @@ html[data-theme="dark"] {
 
 .dashboard-section-heading a,
 .dashboard-secondary-links a {
-  color: var(--mt-link, var(--link));
+  color: var(--mt-readable-link, var(--mt-link, var(--link-on-light, var(--link))));
   font-weight: 800;
 }
 
