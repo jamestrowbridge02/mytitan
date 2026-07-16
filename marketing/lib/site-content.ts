@@ -16,7 +16,7 @@ export const BESPOKE_ACCOUNT_URL = "/bespoke-account";
 export const ENTERPRISE_ACCOUNT_URL = "/bespoke-account?account=enterprise";
 
 export type GovernancePageContent = {
-  slug: "privacy" | "terms" | "cookies" | "data-retention";
+  slug: "privacy" | "terms" | "cookies" | "data-retention" | "accessibility";
   title: string;
   summary: string;
   statusLabel: string;
@@ -139,6 +139,31 @@ export const governancePages: GovernancePageContent[] = [
         body: [
           "The operator should keep the published retention windows for customer data, audit history, backups, and finance records aligned with real operating requirements.",
           "If refunded or reversed commercial events affect allowance or billing state, the product reflects that operational truth instead of silently masking it.",
+        ],
+      },
+    ],
+  },
+  {
+    slug: "accessibility",
+    title: "Accessibility",
+    summary: "How MyTitan approaches readable, keyboard-accessible, and operator-reviewable product and marketing surfaces.",
+    statusLabel: "Operator approved.",
+    statusNote:
+      "This page is approved for publication as the current accessibility statement and should be updated when product support, themes, or assistive-technology coverage materially changes.",
+    lastUpdated: "July 16, 2026",
+    sections: [
+      {
+        title: "Current accessibility approach",
+        body: [
+          "MyTitan targets readable foreground and background combinations, visible focus states, keyboard-operable navigation, and semantic labels across product and public surfaces.",
+          "The product keeps theme choices explicit and verifies representative light, dark, and system-theme routes with rendered contrast checks.",
+        ],
+      },
+      {
+        title: "Support and review",
+        body: [
+          "Operators can report accessibility issues through support so they can be reviewed against the live product and public pages.",
+          `For accessibility support, contact ${SALES_EMAIL}.`,
         ],
       },
     ],

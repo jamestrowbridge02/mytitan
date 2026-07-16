@@ -10,7 +10,7 @@ const NAV_ITEMS = [
   { href: "/solutions", label: "Solutions", detail: "Fit for office, field, and finance teams" },
   { href: "/#features", label: "Features", detail: "Booking, jobs, portal, stock, and reporting" },
   { href: "/pricing", label: "Pricing", detail: "Clear completed-job allowances" },
-  { href: "/#integrations", label: "Integrations", detail: "Connected and readiness-gated providers" },
+  { href: "/integrations", label: "Integrations", detail: "Connected and readiness-gated providers" },
   { href: "/security", label: "Resources", detail: "Security, controls, and governance" },
   { href: "/contact", label: "Contact", detail: "Real support and commercial routes" },
 ];
@@ -149,7 +149,7 @@ export default function MarketingShell({ children }: { children: React.ReactNode
               <h3>Product</h3>
               <Link href="/#features">Features</Link>
               <Link href="/pricing">Pricing</Link>
-              <Link href="/#integrations">Integrations</Link>
+              <Link href="/integrations">Integrations</Link>
             </div>
             <div className="mkt-siteFooter__column">
               <h3>Company</h3>
@@ -161,6 +161,7 @@ export default function MarketingShell({ children }: { children: React.ReactNode
               <Link href="/privacy">Privacy</Link>
               <Link href="/terms">Terms</Link>
               <Link href="/cookies">Cookies</Link>
+              <Link href="/accessibility">Accessibility</Link>
               <Link href="/data-retention">Data retention</Link>
             </div>
             <div className="mkt-siteFooter__column mkt-siteFooter__column--contact">
