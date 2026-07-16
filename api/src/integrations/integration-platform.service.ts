@@ -6,6 +6,8 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import * as crypto from 'crypto';
+import { promises as dns } from 'dns';
+import * as net from 'net';
 import { AuditService } from '../audit/audit.service';
 import { EmailService } from '../email/email.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -110,6 +112,42 @@ export class IntegrationPlatformService {
     return normalized;
   }
 
+  private isForbiddenHostname(hostname: string) {
+    const host = hostname.trim().toLowerCase().replace(/\.$/, '');
+    return (
+      host === 'localhost' ||
+      host.endsWith('.localhost') ||
+      host.endsWith('.local') ||
+      host === 'metadata.google.internal' ||
+      host === '169.254.169.254'
+    );
+  }
+
+  private isForbiddenIpAddress(value: string) {
+    const ipVersion = net.isIP(value);
+    if (ipVersion === 4) {
+      const parts = value.split('.').map((part) => Number(part));
+      const [a, b] = parts;
+      return (
+        a === 0 ||
+        a === 10 ||
+        a === 127 ||
+        (a === 169 && b === 254) ||
+        (a === 172 && b >= 16 && b <= 31) ||
+        (a === 192 && b === 168) ||
+        (a === 100 && b >= 64 && b <= 127) ||
+        (a === 192 && b === 0) ||
+        (a === 198 && (b === 18 || b === 19)) ||
+        a >= 224
+      );
+    }
+    if (ipVersion === 6) {
+      const clean = value.toLowerCase();
+      return clean === '::1' || clean.startsWith('fe80:') || clean.startsWith('fc') || clean.startsWith('fd') || clean === '::';
+    }
+    return false;
+  }
+
   private normalizeWebhookUrl(value: string) {
     let url: URL;
     try {
@@ -120,7 +158,30 @@ export class IntegrationPlatformService {
     if (!['http:', 'https:'].includes(url.protocol)) {
       throw new BadRequestException('Webhook URL must use http or https');
     }
+    if (process.env.NODE_ENV === 'production' && url.protocol !== 'https:') {
+      throw new BadRequestException('Webhook URL must use https in production');
+    }
+    if (url.username || url.password) {
+      throw new BadRequestException('Webhook URL must not include credentials');
+    }
+    if (process.env.NODE_ENV === 'production' && url.port && url.port !== '443') {
+      throw new BadRequestException('Webhook URL must use the default HTTPS port in production');
+    }
+    if (this.isForbiddenHostname(url.hostname) || this.isForbiddenIpAddress(url.hostname)) {
+      throw new BadRequestException('Webhook URL must not target localhost, private networks, or metadata endpoints');
+    }
     return url.toString();
+  }
+
+  private async assertWebhookUrlDnsSafe(normalizedUrl: string) {
+    const url = new URL(normalizedUrl);
+    if (net.isIP(url.hostname)) return;
+    const resolved = await dns.lookup(url.hostname, { all: true, verbatim: true }).catch(() => {
+      throw new BadRequestException('Webhook URL hostname could not be verified safely');
+    });
+    if (!resolved.length || resolved.some((entry) => this.isForbiddenIpAddress(entry.address))) {
+      throw new BadRequestException('Webhook URL resolved to a blocked network address');
+    }
   }
 
   private generatePublicId() {
@@ -475,11 +536,13 @@ export class IntegrationPlatformService {
     input: { name: string; url: string; subscribedEventTypes: unknown; active?: boolean },
   ) {
     const secret = this.buildWebhookSecret();
+    const url = this.normalizeWebhookUrl(input.url);
+    await this.assertWebhookUrlDnsSafe(url);
     const created = await (this.prisma as any).webhookEndpoint.create({
       data: {
         tenantId,
         name: this.cleanName(input.name, 'Webhook name'),
-        url: this.normalizeWebhookUrl(input.url),
+        url,
         subscribedEventTypes: this.normalizeEventTypes(input.subscribedEventTypes),
         active: input.active !== false,
         secretEncrypted: encryptText(secret),
@@ -507,11 +570,13 @@ export class IntegrationPlatformService {
       throw new NotFoundException('Webhook endpoint not found');
     }
     const nextSecret = input.rotateSecret ? this.buildWebhookSecret() : null;
+    const nextUrl = input.url !== undefined ? this.normalizeWebhookUrl(input.url) : null;
+    if (nextUrl) await this.assertWebhookUrlDnsSafe(nextUrl);
     const updated = await (this.prisma as any).webhookEndpoint.update({
       where: { id: endpointId },
       data: {
         name: input.name !== undefined ? this.cleanName(input.name, 'Webhook name') : undefined,
-        url: input.url !== undefined ? this.normalizeWebhookUrl(input.url) : undefined,
+        url: nextUrl || undefined,
         subscribedEventTypes:
           input.subscribedEventTypes !== undefined ? this.normalizeEventTypes(input.subscribedEventTypes) : undefined,
         active: input.active !== undefined ? Boolean(input.active) : undefined,
@@ -675,9 +740,42 @@ export class IntegrationPlatformService {
           lastSafeVerification: 'presence_and_connection_count_only',
         },
         unsupportedProviders: [
-          { provider: 'QuickBooks', implementationState: 'planned_or_scaffolded', owner: 'Accounting integrations', readinessRequirements: ['production OAuth credentials', 'mapping review', 'tenant-gated sync tests'], requestCount: accountingRequestEvents, roadmapClassification: 'coming_soon' },
-          { provider: 'Sage', implementationState: 'not_implemented', owner: 'Accounting integrations', readinessRequirements: ['OAuth journey', 'mapping review', 'tenant-gated sync tests'], requestCount: accountingRequestEvents, roadmapClassification: 'coming_soon' },
+          { provider: 'QuickBooks', implementationState: 'universal_api_file_route_available', owner: 'Accounting integrations', readinessRequirements: ['native OAuth credentials', 'mapping review', 'tenant-gated sync tests'], requestCount: accountingRequestEvents, roadmapClassification: 'native_connector_requested' },
+          { provider: 'Sage', implementationState: 'universal_file_api_route_available', owner: 'Accounting integrations', readinessRequirements: ['native OAuth journey', 'mapping review', 'tenant-gated sync tests'], requestCount: accountingRequestEvents, roadmapClassification: 'native_connector_requested' },
         ],
+      },
+      universalConnectorReadiness: {
+        allowedConnectionTypes: [
+          'NATIVE_OAUTH',
+          'API_TOKEN',
+          'SIGNED_WEBHOOK',
+          'SCHEDULED_EXPORT',
+          'CSV_EXCHANGE',
+          'ICS_SUBSCRIPTION',
+          'PAYMENT_LINK',
+          'MANUAL_COLLECTION',
+          'BUILT_IN',
+        ],
+        disabledUntilSecurityReview: ['GENERIC_OAUTH2', 'REST_API', 'SCHEDULED_IMPORT', 'CALDAV'],
+        endpointRestrictions: {
+          httpsRequiredInProduction: true,
+          localhostPrivateAndMetadataBlocked: true,
+          credentialsInUrlBlocked: true,
+          productionPortPolicy: 'default_https_only',
+          dnsResolutionChecked: true,
+        },
+        templateCounts: {
+          accounting: 1,
+          payments: 1,
+          calendar: 1,
+          developer: 2,
+        },
+        requestCount: accountingRequestEvents,
+        errorQueue: {
+          webhookFailuresInRecentWindow: failedRecentDeliveries,
+          importFailuresInRecentWindow: 0,
+          reconciliationIssuesInRecentWindow: 0,
+        },
       },
     };
   }
