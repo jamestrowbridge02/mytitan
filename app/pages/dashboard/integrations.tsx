@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { DashboardShell } from "../../components/dashboard-shell";
 import { OperatorPageHeader, OperatorStatusBadge } from "../../components/ui/operator-page";
 import { apiFetch } from "../../lib/api";
@@ -8,7 +8,9 @@ import {
   normalizePermissionSnapshot,
 } from "../../lib/workspace-permissions";
 
-type DirectoryStatus = "Connected" | "Available" | "Setup required" | "Requires external account" | "Limited / Beta" | "Action required" | "Not available";
+type DirectoryStatus = "Built in" | "Connected" | "Available" | "Setup required" | "Continue setup" | "Requires external account" | "Limited / Beta" | "Action required" | "Import/export available" | "API/webhook compatible" | "Coming soon" | "Not available";
+type AccountingSection = "Recommended" | "Popular accounting" | "Enterprise accounting" | "Flexible connections";
+type AccountingFilter = "All" | "Native" | "Available" | "Import & export" | "API & webhooks" | "Coming soon";
 
 type DirectoryCard = {
   key: string;
@@ -19,6 +21,18 @@ type DirectoryCard = {
   action: string;
   href: string;
   testId: string;
+  section?: AccountingSection;
+  providerIcon?: string;
+  secondaryAction?: string;
+  secondaryHref?: string;
+  filters?: AccountingFilter[];
+  primaryMode?: "link" | "details" | "request";
+  availableNow?: string[];
+  notSupported?: string[];
+  setupRequirements?: string[];
+  permissions?: string[];
+  lastSuccessfulSyncAt?: string | null;
+  recentSafeError?: string | null;
 };
 
 type ByogRow = {
@@ -37,6 +51,7 @@ type ConnectionStatus = {
   setupAvailable?: boolean;
   allowed?: boolean;
   enabled?: boolean;
+  lastSuccessfulSyncAt?: string | null;
 };
 
 type StripeReadiness = {
@@ -58,20 +73,45 @@ const GROUPS: DirectoryCard["group"][] = [
   "Developer Tools",
 ];
 const CATEGORY_FILTERS = ["All", ...GROUPS] as const;
+const ACCOUNTING_FILTERS: AccountingFilter[] = ["All", "Native", "Available", "Import & export", "API & webhooks", "Coming soon"];
+const ACCOUNTING_SECTIONS: AccountingSection[] = ["Recommended", "Popular accounting", "Enterprise accounting", "Flexible connections"];
 
 function statusTone(status: DirectoryStatus) {
-  if (status === "Connected") return "success" as const;
-  if (status === "Action required" || status === "Setup required") return "warning" as const;
+  if (status === "Built in" || status === "Connected" || status === "Available" || status === "Import/export available" || status === "API/webhook compatible") return "success" as const;
+  if (status === "Action required" || status === "Setup required" || status === "Continue setup") return "warning" as const;
   return "neutral" as const;
 }
 
 function simpleConnectionStatus(status?: ConnectionStatus | null): DirectoryStatus {
   if (status?.connectionState === "needs_reconnect") return "Action required";
+  if (status?.connectionState === "select_organisation") return "Continue setup";
   if (status?.connected) return "Connected";
-  if (status?.allowed === false || status?.enabled === false) return "Not available";
+  if (status?.allowed === false || status?.enabled === false) return "Setup required";
   if (!status?.setupAvailable) return "Setup required";
   return "Available";
 }
+
+function xeroAction(status?: ConnectionStatus | null) {
+  const state = simpleConnectionStatus(status);
+  if (state === "Connected") return "Manage";
+  if (state === "Continue setup") return "Select organisation";
+  if (state === "Action required") return "Reconnect";
+  if (state === "Setup required") return "View setup status";
+  return "Connect";
+}
+
+const CAPABILITY_MATRIX = [
+  { row: "Invoices", finance: "Included", xero: "Supported", quickbooks: "Planned", sage: "Planned", custom: "Supported" },
+  { row: "Customers/contacts", finance: "Included", xero: "Supported", quickbooks: "Planned", sage: "Planned", custom: "Supported" },
+  { row: "Payment status", finance: "Included", xero: "Limited", quickbooks: "Planned", sage: "Planned", custom: "Limited" },
+  { row: "Tax data", finance: "Included", xero: "Limited", quickbooks: "Planned", sage: "Planned", custom: "Export only" },
+  { row: "Services/items", finance: "Included", xero: "Limited", quickbooks: "Planned", sage: "Planned", custom: "Limited" },
+  { row: "Credit notes", finance: "Included", xero: "Not supported", quickbooks: "Planned", sage: "Planned", custom: "Not supported" },
+  { row: "Two-way sync", finance: "Included", xero: "Not supported", quickbooks: "Planned", sage: "Planned", custom: "Not supported" },
+  { row: "Scheduled sync", finance: "Included", xero: "Not supported", quickbooks: "Planned", sage: "Planned", custom: "Not supported" },
+  { row: "CSV export", finance: "Included", xero: "Export only", quickbooks: "Export only", sage: "Export only", custom: "Export only" },
+  { row: "API/webhooks", finance: "Included", xero: "Limited", quickbooks: "Limited", sage: "Limited", custom: "Supported" },
+];
 
 export default function IntegrationsPage() {
   const [permissions, setPermissions] = useState(emptyPermissionSnapshot());
@@ -83,8 +123,20 @@ export default function IntegrationsPage() {
   const [google, setGoogle] = useState<ConnectionStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [requestMessage, setRequestMessage] = useState("");
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<(typeof CATEGORY_FILTERS)[number]>("All");
+  const [accountingFilter, setAccountingFilter] = useState<AccountingFilter>("All");
+  const [selectedCard, setSelectedCard] = useState<DirectoryCard | null>(null);
+  const [requestCard, setRequestCard] = useState<DirectoryCard | null>(null);
+  const [requestBusy, setRequestBusy] = useState(false);
+  const [requestForm, setRequestForm] = useState({
+    businessReason: "",
+    records: "Invoices, customers, payment status",
+    syncPreference: "One-way export or sync",
+    currentSoftware: "",
+    contactPermission: false,
+  });
 
   const canManage = hasWorkspacePermission(permissions, "settings.manage");
   const canManagePersonal = !["VIEWER", "READ_ONLY"].includes(role);
@@ -139,6 +191,202 @@ export default function IntegrationsPage() {
     const terminal = byogByProvider.get("manual-card-terminal");
     const email = byogByProvider.get("workspace-sender") || byogByProvider.get("email-sender");
     const whatsapp = byogByProvider.get("whatsapp-business");
+
+    const xeroStatus = simpleConnectionStatus(xero);
+    const qboStatus = quickbooks?.connected ? "Connected" : "Coming soon";
+    const qboPrimaryMode = quickbooks?.connected ? "link" : "request";
+    const qboAction = quickbooks?.connected ? "Manage" : "Request integration";
+    const accountingCards: DirectoryCard[] = [
+      {
+        key: "mytitan-finance",
+        group: "Accounting",
+        section: "Recommended",
+        name: "MyTitan Finance",
+        providerIcon: "MF",
+        status: "Built in",
+        description: "Create invoices, track payments, manage balances, statements, VAT records and payment requests in MyTitan.",
+        action: "Open Finance",
+        href: "/dashboard/finance",
+        secondaryAction: "Finance settings",
+        secondaryHref: "/dashboard/settings?section=finance",
+        testId: "integration-workspace-row-mytitan-finance",
+        filters: ["Native", "Available"],
+        availableNow: ["Invoices", "payment requests", "balances", "statements", "VAT record support", "finance reports"],
+        notSupported: ["Tax filing", "professional tax advice", "regulated accounting-service claims"],
+        primaryMode: "link",
+      },
+      {
+        key: "xero",
+        group: "Accounting",
+        section: "Recommended",
+        name: "Xero",
+        providerIcon: "XE",
+        status: xeroStatus,
+        description: xeroStatus === "Setup required"
+          ? "Connect your Xero account after the MyTitan Xero app is activated."
+          : "Sync supported accounting records with your selected Xero organisation.",
+        action: xeroAction(xero),
+        href: "/dashboard/settings/integrations/xero",
+        testId: "integration-workspace-row-xero",
+        filters: ["Available"],
+        availableNow: ["OAuth setup route", "organisation selection", "encrypted token storage", "read-only verification", "mapping preview gate"],
+        notSupported: ["Automatic live mutation without explicit activation", "two-way sync", "tax filing"],
+        setupRequirements: xeroStatus === "Setup required" ? ["Platform Admin must configure Xero client ID, client secret and redirect URI."] : ["Select the correct Xero organisation before verification completes."],
+        permissions: ["Workspace owner or admin", "Accounting feature access"],
+        lastSuccessfulSyncAt: xero?.lastSuccessfulSyncAt || null,
+        recentSafeError: xeroStatus === "Action required" ? "Stored connection needs reconnect." : null,
+        primaryMode: "link",
+      },
+      {
+        key: "quickbooks",
+        group: "Accounting",
+        section: "Popular accounting",
+        name: "QuickBooks",
+        providerIcon: "QB",
+        status: qboStatus,
+        description: quickbooks?.connected
+          ? "QuickBooks connection is verified for this workspace."
+          : "QuickBooks connection is planned. Use MyTitan Finance, exports, API tokens, or webhooks in the meantime.",
+        action: qboAction,
+        href: "/dashboard/settings/integrations/quickbooks",
+        secondaryAction: quickbooks?.connected ? "Check setup" : "View options",
+        secondaryHref: "/dashboard/settings/integrations/quickbooks",
+        testId: "integration-workspace-row-quickbooks",
+        filters: quickbooks?.connected ? ["Available"] : ["Coming soon", "API & webhooks", "Import & export"],
+        availableNow: ["Request integration", "CSV export alternatives", "API tokens", "signed webhooks"],
+        notSupported: quickbooks?.connected ? ["Automatic two-way sync"] : ["Tenant OAuth connection in production", "fake Connect action", "delivery date promise"],
+        primaryMode: qboPrimaryMode,
+      },
+      {
+        key: "sage",
+        group: "Accounting",
+        section: "Popular accounting",
+        name: "Sage",
+        providerIcon: "SA",
+        status: "Coming soon",
+        description: "Sage connection is planned. Use MyTitan Finance, exports, API tokens, or webhooks in the meantime.",
+        action: "Request integration",
+        secondaryAction: "View options",
+        secondaryHref: "/dashboard/settings/developer-tools",
+        href: "/dashboard/integrations?request=sage",
+        testId: "integration-workspace-row-sage",
+        filters: ["Coming soon", "API & webhooks", "Import & export"],
+        availableNow: ["Request integration", "CSV export alternatives", "API tokens", "signed webhooks"],
+        notSupported: ["Tenant OAuth connection", "fake Connect action", "delivery date promise"],
+        primaryMode: "request",
+      },
+      ...[
+        ["freeagent", "FreeAgent", "FA"],
+        ["freshbooks", "FreshBooks", "FB"],
+        ["zoho-books", "Zoho Books", "ZB"],
+        ["kashflow", "KashFlow", "KF"],
+      ].map(([key, name, icon]) => ({
+        key,
+        group: "Accounting" as const,
+        section: "Popular accounting" as const,
+        name,
+        providerIcon: icon,
+        status: "Coming soon" as const,
+        description: `${name} connection is not implemented yet. Request it or use MyTitan Finance and developer options.`,
+        action: "Request integration",
+        href: `/dashboard/integrations?request=${key}`,
+        testId: `integration-workspace-row-${key}`,
+        filters: ["Coming soon", "API & webhooks", "Import & export"] as AccountingFilter[],
+        availableNow: ["Request integration", "CSV export alternatives", "API tokens", "signed webhooks"],
+        notSupported: ["Native OAuth connection", "official partnership claim"],
+        primaryMode: "request" as const,
+      })),
+      ...[
+        ["dynamics-365-business-central", "Microsoft Dynamics 365 Business Central", "BC"],
+        ["netsuite", "NetSuite", "NS"],
+        ["sap-business-one", "SAP Business One", "SB"],
+        ["oracle-accounting-erp", "Oracle accounting/ERP", "OR"],
+        ["myob", "MYOB", "MY"],
+      ].map(([key, name, icon]) => ({
+        key,
+        group: "Accounting" as const,
+        section: "Enterprise accounting" as const,
+        name,
+        providerIcon: icon,
+        status: "Coming soon" as const,
+        description: `${name} is not implemented as a native connector in this release. Use scoped APIs and signed webhooks for approved external systems.`,
+        action: "Request integration",
+        href: `/dashboard/integrations?request=${key}`,
+        testId: `integration-workspace-row-${key}`,
+        filters: ["Coming soon", "API & webhooks"] as AccountingFilter[],
+        availableNow: ["Request integration", "API-token guidance", "signed webhook guidance"],
+        notSupported: ["Native connector", "two-way sync", "official partnership claim"],
+        primaryMode: "request" as const,
+      })),
+      {
+        key: "csv-export",
+        group: "Accounting",
+        section: "Flexible connections",
+        name: "CSV import/export",
+        providerIcon: "CSV",
+        status: "Import/export available",
+        description: "Export supported finance records for accountants or external accounting tools. Imports are not shown unless implemented.",
+        action: "Open Finance exports",
+        href: "/dashboard/finance",
+        testId: "integration-workspace-row-csv-export",
+        filters: ["Import & export", "Available"],
+        availableNow: ["Invoices", "customers", "finance records", "payment status where recorded", "VAT/tax record support"],
+        notSupported: ["Accounting CSV import from this catalogue"],
+        primaryMode: "link",
+      },
+      {
+        key: "accounting-api-tokens",
+        group: "Accounting",
+        section: "Flexible connections",
+        name: "API tokens",
+        providerIcon: "API",
+        status: canManage ? "Available" : "Not available",
+        description: "Create scoped API tokens for approved external systems without exposing provider secrets.",
+        action: "Manage API tokens",
+        href: "/dashboard/settings/developer-tools#api-tokens",
+        testId: "integration-workspace-row-accounting-api-tokens",
+        filters: ["API & webhooks", "Available"],
+        availableNow: ["Reveal-once API tokens", "tenant-scoped access", "audit logging"],
+        notSupported: ["Raw provider secret storage in catalogue cards"],
+        permissions: ["settings.manage"],
+        primaryMode: "link",
+      },
+      {
+        key: "accounting-webhooks",
+        group: "Accounting",
+        section: "Flexible connections",
+        name: "Signed webhooks",
+        providerIcon: "WH",
+        status: canManage ? "Available" : "Not available",
+        description: "Send selected business events to approved external accounting workflows using signed deliveries.",
+        action: "Manage webhooks",
+        href: "/dashboard/settings/developer-tools#webhooks",
+        testId: "integration-workspace-row-accounting-webhooks",
+        filters: ["API & webhooks", "Available"],
+        availableNow: ["Webhook endpoints", "test delivery", "delivery logs", "retry controls"],
+        notSupported: ["Unsigned delivery", "secret values after creation"],
+        permissions: ["settings.manage"],
+        primaryMode: "link",
+      },
+      {
+        key: "custom-accounting-system",
+        group: "Accounting",
+        section: "Flexible connections",
+        name: "Custom accounting system",
+        providerIcon: "CA",
+        status: "API/webhook compatible",
+        description: "Connect an approved external system using scoped API tokens and signed webhooks.",
+        action: "Developer tools",
+        href: "/dashboard/settings/developer-tools",
+        secondaryAction: "Integration guide",
+        secondaryHref: "/dashboard/help?category=integrations",
+        testId: "integration-workspace-row-custom-accounting-system",
+        filters: ["API & webhooks", "Available"],
+        availableNow: ["Scoped API tokens", "signed webhook delivery", "support request path"],
+        notSupported: ["Unreviewed external write access", "raw technical configuration in catalogue cards"],
+        primaryMode: "link",
+      },
+    ];
 
     return [
       {
@@ -211,36 +459,7 @@ export default function IntegrationsPage() {
         href: "/dashboard/settings/payments?provider=zettle",
         testId: "integration-workspace-row-zettle",
       },
-      {
-        key: "xero",
-        group: "Accounting",
-        name: "Xero",
-        status: simpleConnectionStatus(xero),
-        description: "Sync customers, invoices and payments with your Xero organisation when setup is complete.",
-        action: xero?.connected ? "Manage Xero" : simpleConnectionStatus(xero) === "Setup required" ? "Setup required" : simpleConnectionStatus(xero) === "Not available" ? "Learn more" : "Connect Xero",
-        href: "/dashboard/settings/integrations/xero",
-        testId: "integration-workspace-row-xero",
-      },
-      {
-        key: "quickbooks",
-        group: "Accounting",
-        name: "QuickBooks",
-        status: simpleConnectionStatus(quickbooks),
-        description: "Connect your accounts so invoices can sync when ready.",
-        action: quickbooks?.connected ? "Manage QuickBooks" : simpleConnectionStatus(quickbooks) === "Available" ? "Connect QuickBooks" : "Learn more",
-        href: "/dashboard/settings/integrations/quickbooks",
-        testId: "integration-workspace-row-quickbooks",
-      },
-      {
-        key: "sage",
-        group: "Accounting",
-        name: "Sage",
-        status: "Not available",
-        description: "Sage sync is not available yet.",
-        action: "Learn more",
-        href: "/dashboard/settings/integrations/sage",
-        testId: "integration-workspace-row-sage",
-      },
+      ...accountingCards,
       {
         key: "google-calendar",
         group: "Calendar",
@@ -437,10 +656,98 @@ export default function IntegrationsPage() {
     const cleanQuery = query.trim().toLowerCase();
     return cards.filter((card) => {
       const categoryMatch = category === "All" || card.group === category;
-      const searchMatch = !cleanQuery || `${card.name} ${card.description} ${card.group}`.toLowerCase().includes(cleanQuery);
-      return categoryMatch && searchMatch;
+      const accountingMatch = card.group !== "Accounting" || accountingFilter === "All" || card.filters?.includes(accountingFilter);
+      const searchMatch = !cleanQuery || `${card.name} ${card.description} ${card.group} ${card.section || ""}`.toLowerCase().includes(cleanQuery);
+      return categoryMatch && accountingMatch && searchMatch;
     });
-  }, [cards, category, query]);
+  }, [accountingFilter, cards, category, query]);
+
+  const accountingCards = filteredCards.filter((card) => card.group === "Accounting");
+
+  async function submitIntegrationRequest(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!requestCard || requestBusy) return;
+    setRequestBusy(true);
+    setRequestMessage("");
+    try {
+      const response = await apiFetch("/notifications/support-request", {
+        method: "POST",
+        body: JSON.stringify({
+          category: "integrations",
+          subject: `Accounting integration request: ${requestCard.name}`,
+          message: [
+            `Provider: ${requestCard.name}`,
+            `Business reason: ${requestForm.businessReason}`,
+            `Records to synchronise: ${requestForm.records}`,
+            `Sync preference: ${requestForm.syncPreference}`,
+            `Current accounting software: ${requestForm.currentSoftware || "Not provided"}`,
+            `Contact permission: ${requestForm.contactPermission ? "yes" : "no"}`,
+            "No secrets were requested or submitted from this marketplace flow.",
+          ].join("\n"),
+        }),
+      });
+      setRequestMessage(response?.message || "Integration request recorded.");
+      setRequestCard(null);
+      setRequestForm({
+        businessReason: "",
+        records: "Invoices, customers, payment status",
+        syncPreference: "One-way export or sync",
+        currentSoftware: "",
+        contactPermission: false,
+      });
+    } catch (nextError: any) {
+      setRequestMessage(nextError?.message || "Integration request could not be sent.");
+    } finally {
+      setRequestBusy(false);
+    }
+  }
+
+  function cardAction(card: DirectoryCard, disabled: boolean) {
+    if (card.primaryMode === "request") {
+      return (
+        <button className="button" type="button" disabled={disabled} onClick={() => setRequestCard(card)}>
+          {card.action}
+        </button>
+      );
+    }
+    if (card.primaryMode === "details") {
+      return (
+        <button className="button" type="button" disabled={disabled} onClick={() => setSelectedCard(card)}>
+          {card.action}
+        </button>
+      );
+    }
+    return disabled ? (
+      <button className="button disabled" type="button" disabled>
+        {card.action}
+      </button>
+    ) : (
+      <a className="button" href={card.href}>
+        {card.action}
+      </a>
+    );
+  }
+
+  function renderCard(card: DirectoryCard) {
+    const disabled = card.status === "Not available" || (card.primaryMode !== "request" && (card.key !== "google-calendar" ? !canManage && !["mytitan-finance", "csv-export", "custom-accounting-system"].includes(card.key) : !canManagePersonal));
+    return (
+      <article className="integration-card connected-tool-card" key={card.key} data-testid={card.testId}>
+        <div className="connected-tool-card__header">
+          <span className="connected-tool-card__title">
+            <span className="connected-tool-card__icon" aria-hidden="true">{card.providerIcon || card.name.slice(0, 2).toUpperCase()}</span>
+            <strong>{card.name}</strong>
+          </span>
+          <OperatorStatusBadge label={loading ? "Checking" : card.status} tone={statusTone(card.status)} />
+        </div>
+        <p className="muted">{card.description}</p>
+        <div className="billing-page-actions connected-tool-card__actions">
+          {cardAction(card, disabled)}
+          <button className="button secondary" type="button" onClick={() => setSelectedCard(card)}>Details</button>
+          {card.secondaryAction && card.secondaryHref ? <a className="button secondary" href={card.secondaryHref}>{card.secondaryAction}</a> : null}
+        </div>
+      </article>
+    );
+  }
 
   return (
     <DashboardShell>
@@ -462,11 +769,11 @@ export default function IntegrationsPage() {
       ) : null}
 
       <div className="card settings-premium-card" data-testid="connected-tools-search">
-        <label className="settings-premium-label" htmlFor="connected-tools-query">Search tools</label>
+        <label className="settings-premium-label" htmlFor="connected-tools-query">{category === "Accounting" ? "Search accounting tools" : "Search tools"}</label>
         <input
           id="connected-tools-query"
           className="input settings-premium-input"
-          placeholder="Search payments, Xero, email, webhooks..."
+          placeholder={category === "Accounting" ? "Search accounting tools..." : "Search payments, Xero, email, webhooks..."}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
@@ -483,10 +790,78 @@ export default function IntegrationsPage() {
             </button>
           ))}
         </div>
+        {(category === "All" || category === "Accounting") ? (
+          <div className="settings-tab-grid" style={{ marginTop: 14 }} role="tablist" aria-label="Accounting integration filters">
+            {ACCOUNTING_FILTERS.map((filter) => (
+              <button
+                key={filter}
+                type="button"
+                className={`tab-button settings-tab-button ${accountingFilter === filter ? "active" : ""}`}
+                onClick={() => setAccountingFilter(filter)}
+                aria-selected={accountingFilter === filter}
+              >
+                <strong>{filter}</strong>
+              </button>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       <div data-testid="integrations-workspace-section" className="connected-tools-directory">
+        {(category === "All" || category === "Accounting") && accountingCards.length ? (
+          <section className="operator-section" data-testid="connected-tools-group-accounting">
+            <div className="operator-section__header">
+              <div>
+                <h2 className="operator-section__title">Accounting</h2>
+                <p className="operator-section__subtitle">Connect MyTitan with your accounts, or manage invoicing and payments directly in MyTitan.</p>
+              </div>
+            </div>
+            {requestMessage ? <div className="alert info" role="status">{requestMessage}</div> : null}
+            {ACCOUNTING_SECTIONS.map((section) => {
+              const sectionCards = accountingCards.filter((card) => card.section === section);
+              if (!sectionCards.length) return null;
+              return (
+                <div className="operator-subsection" key={section} data-testid={`accounting-section-${section.toLowerCase().replace(/\s+/g, "-")}`}>
+                  <h3>{section.toUpperCase()}</h3>
+                  <div className="connected-tools-grid">
+                    {sectionCards.map(renderCard)}
+                  </div>
+                </div>
+              );
+            })}
+            <div className="card settings-premium-card" data-testid="accounting-capability-matrix">
+              <h3 style={{ marginTop: 0 }}>Capability matrix</h3>
+              <div className="settings-table-scroll">
+                <table className="settings-table">
+                  <thead>
+                    <tr>
+                      <th>Capability</th>
+                      <th>MyTitan Finance</th>
+                      <th>Xero</th>
+                      <th>QuickBooks</th>
+                      <th>Sage</th>
+                      <th>Custom API</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {CAPABILITY_MATRIX.map((row) => (
+                      <tr key={row.row}>
+                        <td>{row.row}</td>
+                        <td>{row.finance}</td>
+                        <td>{row.xero}</td>
+                        <td>{row.quickbooks}</td>
+                        <td>{row.sage}</td>
+                        <td>{row.custom}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+        ) : null}
         {GROUPS.map((group) => {
+          if (group === "Accounting") return null;
           const groupCards = filteredCards.filter((card) => card.group === group);
           if (!groupCards.length || (group === "Developer Tools" && !canManage)) return null;
           return (
@@ -500,27 +875,7 @@ export default function IntegrationsPage() {
                 </div>
               </div>
               <div className="connected-tools-grid">
-                {groupCards.map((card) => {
-                  const disabled = card.status === "Not available" || (card.key !== "google-calendar" ? !canManage : !canManagePersonal);
-                  return (
-                    <article className="integration-card connected-tool-card" key={card.key} data-testid={card.testId}>
-                      <div className="connected-tool-card__header">
-                        <strong>{card.name}</strong>
-                        <OperatorStatusBadge label={loading ? "Checking" : card.status} tone={statusTone(card.status)} />
-                      </div>
-                      <p className="muted">{card.description}</p>
-                      {disabled ? (
-                        <button className="button disabled" type="button" disabled>
-                          {card.action}
-                        </button>
-                      ) : (
-                        <a className="button" href={card.href}>
-                          {card.action}
-                        </a>
-                      )}
-                    </article>
-                  );
-                })}
+                {groupCards.map(renderCard)}
               </div>
             </section>
           );
@@ -535,6 +890,53 @@ export default function IntegrationsPage() {
           </div>
         ) : null}
       </div>
+
+      {selectedCard ? (
+        <div className="modal-backdrop" role="presentation" onClick={() => setSelectedCard(null)}>
+          <section className="modal-panel accounting-detail-drawer" role="dialog" aria-modal="true" aria-label={`${selectedCard.name} details`} onClick={(event) => event.stopPropagation()} data-testid="accounting-detail-drawer">
+            <div className="connected-tool-card__header">
+              <h2 style={{ margin: 0 }}>{selectedCard.name}</h2>
+              <OperatorStatusBadge label={selectedCard.status} tone={statusTone(selectedCard.status)} />
+            </div>
+            <p className="muted">{selectedCard.description}</p>
+            <div className="settings-tab-grid">
+              <div><strong>Available now</strong><p className="muted">{(selectedCard.availableNow || ["No live capability is claimed for this card."]).join(", ")}</p></div>
+              <div><strong>Not currently supported</strong><p className="muted">{(selectedCard.notSupported || ["No unsupported items recorded."]).join(", ")}</p></div>
+              <div><strong>Setup requirements</strong><p className="muted">{(selectedCard.setupRequirements || ["No additional setup requirement shown in this catalogue."]).join(" ")}</p></div>
+              <div><strong>Permissions/scopes</strong><p className="muted">{(selectedCard.permissions || ["Use normal workspace permissions for the linked workflow."]).join(", ")}</p></div>
+            </div>
+            <p className="muted">Last successful sync: {selectedCard.lastSuccessfulSyncAt || "Not recorded"}</p>
+            <p className="muted">Recent safe error: {selectedCard.recentSafeError || "None shown"}</p>
+            <div className="billing-page-actions">
+              {cardAction(selectedCard, selectedCard.status === "Not available")}
+              <button className="button secondary" type="button" onClick={() => setSelectedCard(null)}>Close</button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {requestCard ? (
+        <div className="modal-backdrop" role="presentation" onClick={() => setRequestCard(null)}>
+          <form className="modal-panel accounting-detail-drawer" role="dialog" aria-modal="true" aria-label={`Request ${requestCard.name}`} onSubmit={submitIntegrationRequest} onClick={(event) => event.stopPropagation()} data-testid="accounting-request-integration-form">
+            <h2 style={{ marginTop: 0 }}>Request integration</h2>
+            <label>Provider name<input className="input" value={requestCard.name} readOnly /></label>
+            <label>Business reason<textarea className="input" minLength={12} required value={requestForm.businessReason} onChange={(event) => setRequestForm((current) => ({ ...current, businessReason: event.target.value }))} /></label>
+            <label>Records to synchronise<input className="input" required value={requestForm.records} onChange={(event) => setRequestForm((current) => ({ ...current, records: event.target.value }))} /></label>
+            <label>One-way or two-way preference<select className="input" value={requestForm.syncPreference} onChange={(event) => setRequestForm((current) => ({ ...current, syncPreference: event.target.value }))}>
+              <option>One-way export or sync</option>
+              <option>Two-way preference for future review</option>
+              <option>Unsure</option>
+            </select></label>
+            <label>Current accounting software<input className="input" value={requestForm.currentSoftware} onChange={(event) => setRequestForm((current) => ({ ...current, currentSoftware: event.target.value }))} /></label>
+            <label className="settings-checkbox-row"><input type="checkbox" checked={requestForm.contactPermission} onChange={(event) => setRequestForm((current) => ({ ...current, contactPermission: event.target.checked }))} /> MyTitan may contact me about this request.</label>
+            <p className="muted">Do not enter passwords, API keys, client secrets, tokens, organisation references, or workspace identifiers.</p>
+            <div className="billing-page-actions">
+              <button className="button" type="submit" disabled={requestBusy || requestForm.businessReason.trim().length < 12}>{requestBusy ? "Sending..." : "Send request"}</button>
+              <button className="button secondary" type="button" onClick={() => setRequestCard(null)}>Cancel</button>
+            </div>
+          </form>
+        </div>
+      ) : null}
     </DashboardShell>
   );
 }

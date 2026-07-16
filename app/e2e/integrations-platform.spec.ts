@@ -12,8 +12,44 @@ test.describe("integration platform foundation", () => {
     await expect(page.getByTestId("integrations-workspace-section")).toBeVisible();
     await expect(page.getByTestId("integration-admin-health")).toHaveCount(0);
     await expect(page.getByTestId("integration-owner-command")).toHaveCount(0);
-    await expect(page.getByTestId("integration-workspace-row-quickbooks")).toContainText(/Connected|Available|Setup required|Requires external account|Needs attention|Not available/i);
+    await expect(page.getByTestId("integration-workspace-row-quickbooks")).toContainText(/Connected|Coming soon/i);
     await expect(page.locator("body")).not.toContainText(/OAuth verified|idempotency|provider mutation|metadata.only/i);
+  });
+
+  test("Accounting marketplace exposes truthful native, provider, export, API and webhook options", async ({ page, request }) => {
+    await installApiProxy(page, request);
+    await loginAs(page, request, "e2e.operator@mytitan.local", "MyTitanE2E!2026");
+    await page.goto("/dashboard/integrations", { waitUntil: "networkidle" });
+
+    await expect(page.getByTestId("connected-tools-group-accounting")).toContainText("Connect MyTitan with your accounts");
+    await expect(page.getByTestId("integration-workspace-row-mytitan-finance")).toContainText(/MyTitan Finance|Built in|Open Finance/);
+    await expect(page.getByTestId("integration-workspace-row-xero")).toContainText(/Xero|Setup required|Available|Continue setup|Connected|Action required/);
+    await expect(page.getByTestId("integration-workspace-row-xero")).not.toContainText("Not available");
+    await expect(page.getByTestId("integration-workspace-row-quickbooks")).toContainText(/QuickBooks|Coming soon|Request integration/);
+    await expect(page.getByTestId("integration-workspace-row-sage")).toContainText(/Sage|Coming soon|Request integration/);
+    await expect(page.getByTestId("integration-workspace-row-quickbooks")).not.toContainText("Connect QuickBooks");
+    await expect(page.getByTestId("integration-workspace-row-sage")).not.toContainText("Connect Sage");
+
+    for (const testId of [
+      "integration-workspace-row-freeagent",
+      "integration-workspace-row-freshbooks",
+      "integration-workspace-row-zoho-books",
+      "integration-workspace-row-kashflow",
+      "integration-workspace-row-dynamics-365-business-central",
+      "integration-workspace-row-netsuite",
+      "integration-workspace-row-sap-business-one",
+      "integration-workspace-row-oracle-accounting-erp",
+      "integration-workspace-row-myob",
+      "integration-workspace-row-csv-export",
+      "integration-workspace-row-accounting-api-tokens",
+      "integration-workspace-row-accounting-webhooks",
+      "integration-workspace-row-custom-accounting-system",
+    ]) {
+      await expect(page.getByTestId(testId)).toBeVisible();
+    }
+
+    await expect(page.getByTestId("accounting-capability-matrix")).toContainText(/Two-way sync|Not supported|Planned|API\/webhooks/);
+    await expect(page.locator("body")).not.toContainText(/access token|refresh token|client secret|organisation ID|tenant ID/i);
   });
 
   test("provider-specific deep links land on exact readiness and connection rows", async ({ page, request }) => {

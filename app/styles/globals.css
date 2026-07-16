@@ -2411,9 +2411,72 @@ a { color: var(--tenant-accent); text-decoration: none; }
   gap: 12px;
 }
 
+.connected-tool-card__title {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+}
+
+.connected-tool-card__icon {
+  display: inline-grid;
+  min-width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface) 70%, var(--card));
+  color: var(--text);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
 .connected-tool-card .muted {
   flex: 1;
   margin: 0;
+}
+
+.connected-tool-card__actions {
+  width: 100%;
+  justify-content: flex-start;
+}
+
+.settings-table-scroll {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.settings-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+}
+
+.settings-table th,
+.settings-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.settings-table th {
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
+.settings-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.accounting-detail-drawer {
+  display: grid;
+  max-height: min(760px, calc(100vh - 40px));
+  overflow: auto;
+  gap: 14px;
 }
 
 .developer-tools-form {
