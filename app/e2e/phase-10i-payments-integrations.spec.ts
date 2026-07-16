@@ -13,17 +13,20 @@ test.describe("Phase 10I payments and integrations launch UX", () => {
     await page.goto("/dashboard/integrations", { waitUntil: "networkidle" });
 
     await expect(page.getByRole("heading", { name: "Connected tools", exact: true })).toBeVisible();
-    for (const group of ["Payments", "Accounting", "Calendar", "Communications", "Maps", "Storage", "Automation", "Identity", "Developer Tools"]) {
+    for (const group of ["Payments", "Accounting", "Calendar", "Communications", "Storage", "Automation", "CRM", "Identity", "Developer"]) {
       await expect(page.getByRole("heading", { name: group, exact: true })).toBeVisible();
     }
     await expect(page.getByTestId("connected-tools-group-communications")).toContainText(/Twilio SMS|WhatsApp Business/i);
-    await expect(page.getByTestId("connected-tools-group-maps")).toContainText(/Provider-neutral directions|Google Maps|Requires external account/i);
-    await expect(page.getByTestId("connected-tools-group-storage")).toContainText(/OneDrive|Google Drive|Dropbox|Not implemented/i);
+    await expect(page.getByTestId("connected-tools-group-automation")).toContainText(/Provider-neutral directions|Google Maps|Zapier|Make|n8n/i);
+    await expect(page.getByTestId("connected-tools-group-storage")).toContainText(/OneDrive|Google Drive|Dropbox|API connection/i);
     await expect(page.getByTestId("connected-tools-group-automation")).toContainText(/Zapier|Make|n8n/i);
+    await expect(page.getByTestId("connected-tools-group-crm")).toContainText(/HubSpot|Salesforce/i);
     await expect(page.getByTestId("connected-tools-group-identity")).toContainText(/Google sign-in|Microsoft Entra ID|SAML/i);
+    await expect(page.getByTestId("integration-workspace-row-paypal")).toContainText(/Payment link|Set up PayPal/i);
+    await expect(page.getByTestId("integration-workspace-row-apple-calendar")).toContainText(/Calendar standard|Add calendar feed/i);
 
     const body = await page.locator("body").innerText();
-    expect(body).not.toMatch(/OAuth verified|tokens returned|explicit live flag|live provider mutation|idempotency|metadata.only|deployment setup needed|provider mutation/i);
+    expect(body).not.toMatch(/OAuth verified|tokens returned|explicit live flag|live provider mutation|idempotency|metadata.only|deployment setup needed|provider mutation|Not implemented|Coming soon|Not available/i);
     await expect(page.getByTestId("integration-admin-health")).toHaveCount(0);
     await expect(page.getByTestId("sync-control-room")).toHaveCount(0);
     await expect(page.getByTestId("integration-api-token-create")).toHaveCount(0);

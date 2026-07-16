@@ -77,11 +77,12 @@ test.describe("Phase 10 launch readiness", () => {
     await expect(page.getByTestId("integrations-workspace-section")).toBeVisible();
     await expect(page.getByTestId("integration-advanced-details")).toHaveCount(0);
     await expect(page.getByTestId("integration-admin-health")).toHaveCount(0);
-    await expect(page.getByTestId("integration-workspace-row-sumup")).toContainText("Requires external account");
-    await expect(page.getByTestId("integration-workspace-row-quickbooks")).toContainText("Coming soon");
-    await expect(page.getByTestId("integration-workspace-row-sage")).toContainText("Coming soon");
+    await expect(page.getByTestId("integration-workspace-row-sumup")).toContainText("Manual collection");
+    await expect(page.getByTestId("integration-workspace-row-quickbooks")).toContainText("API connection");
+    await expect(page.getByTestId("integration-workspace-row-sage")).toContainText("File exchange");
     await expect(page.getByTestId("integration-workspace-row-quickbooks")).not.toContainText("Connect QuickBooks");
     await expect(page.getByTestId("integration-workspace-row-sage")).not.toContainText("Connect Sage");
+    await expect(page.getByTestId("integration-workspace-row-apple-calendar")).toContainText("Add calendar feed");
     await expect(page.locator("body")).not.toContainText("tokens returned:");
   });
 
