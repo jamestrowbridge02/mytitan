@@ -78,7 +78,10 @@ test.describe("Phase 10 launch readiness", () => {
     await expect(page.getByTestId("integration-advanced-details")).toHaveCount(0);
     await expect(page.getByTestId("integration-admin-health")).toHaveCount(0);
     await expect(page.getByTestId("integration-workspace-row-sumup")).toContainText("Requires external account");
-    await expect(page.getByText(/coming soon/i)).toHaveCount(0);
+    await expect(page.getByTestId("integration-workspace-row-quickbooks")).toContainText("Coming soon");
+    await expect(page.getByTestId("integration-workspace-row-sage")).toContainText("Coming soon");
+    await expect(page.getByTestId("integration-workspace-row-quickbooks")).not.toContainText("Connect QuickBooks");
+    await expect(page.getByTestId("integration-workspace-row-sage")).not.toContainText("Connect Sage");
     await expect(page.locator("body")).not.toContainText("tokens returned:");
   });
 

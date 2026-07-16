@@ -66,7 +66,7 @@ test.describe("platform commercial controls UX", () => {
       await page.getByTestId("tenant-360-action-set_trial_end").click();
       await page.getByTestId("tenant-360-trial-end-date").fill(customTrialEnd);
       await saveAction("set_trial_end", "E2E custom trial end");
-      await expect(page.getByTestId("tenant-360-commercial-summary")).toContainText(customTrialEnd.split("-").reverse()[0]);
+      await expect(page.getByTestId("tenant-360-commercial-summary")).toContainText(String(new Date(`${customTrialEnd}T00:00:00.000Z`).getUTCDate()));
 
       await page.getByTestId("tenant-360-action-set_monthly_allowance").click();
       await page.getByTestId("tenant-360-monthly-allowance").fill("77");

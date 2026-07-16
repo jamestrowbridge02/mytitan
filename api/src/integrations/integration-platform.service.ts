@@ -9,6 +9,7 @@ import * as crypto from 'crypto';
 import { AuditService } from '../audit/audit.service';
 import { EmailService } from '../email/email.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { buildApiUrl } from '../common/public-url';
 import { resolveBookingsEnabled } from '../common/workspace-features';
 import { decryptText, encryptText } from './integrations.crypto';
 
@@ -559,7 +560,7 @@ export class IntegrationPlatformService {
   }
 
   async getAdminHealth(tenantId: string) {
-    const [tenantSetting, automationsSetting, endpoints, recentDeliveries] = await Promise.all([
+    const [tenantSetting, automationsSetting, endpoints, recentDeliveries, xeroConnections, xeroPendingSelections, xeroErrorConnections, accountingRequestEvents] = await Promise.all([
       this.prisma.tenantSetting.findUnique({
         where: { tenantId },
         select: {
@@ -587,6 +588,22 @@ export class IntegrationPlatformService {
         take: 20,
         select: {
           status: true,
+        },
+      }),
+      (this.prisma as any).integrationConnection.count({
+        where: { tenantId, provider: 'XERO' },
+      }),
+      (this.prisma as any).integrationConnection.count({
+        where: { tenantId, provider: 'XERO', status: 'organization_selection_required' },
+      }),
+      (this.prisma as any).integrationConnection.count({
+        where: { tenantId, provider: 'XERO', OR: [{ status: { in: ['needs_reconnect', 'needs_reauth'] } }, { healthState: { in: ['error', 'needs_attention'] } }] },
+      }),
+      (this.prisma as any).auditEvent.count({
+        where: {
+          companyId: tenantId,
+          type: 'support.request',
+          message: { contains: 'Integration' },
         },
       }),
     ]);
@@ -642,6 +659,25 @@ export class IntegrationPlatformService {
       moduleFlags: {
         bookingsEnabled: resolveBookingsEnabled(tenantSetting),
         accountingEnabled: Boolean(tenantSetting?.featureAccounting ?? tenantSetting?.accountingEnabled),
+      },
+      accountingReadiness: {
+        xero: {
+          clientIdPresent: Boolean(String(process.env.XERO_CLIENT_ID || '').trim()),
+          clientSecretPresent: Boolean(String(process.env.XERO_CLIENT_SECRET || '').trim()),
+          redirectUrl: String(process.env.XERO_REDIRECT_URI || process.env.XERO_REDIRECT_URL || '').trim() || buildApiUrl('/integrations/xero/callback'),
+          encryptionKeyPresent: Boolean(String(process.env.INTEGRATIONS_ENCRYPTION_KEY || '').trim()),
+          callbackReachability: 'configured_route',
+          connectionStateCounts: {
+            total: xeroConnections,
+            pendingOrganisationSelections: xeroPendingSelections,
+            staleOrErrorConnections: xeroErrorConnections,
+          },
+          lastSafeVerification: 'presence_and_connection_count_only',
+        },
+        unsupportedProviders: [
+          { provider: 'QuickBooks', implementationState: 'planned_or_scaffolded', owner: 'Accounting integrations', readinessRequirements: ['production OAuth credentials', 'mapping review', 'tenant-gated sync tests'], requestCount: accountingRequestEvents, roadmapClassification: 'coming_soon' },
+          { provider: 'Sage', implementationState: 'not_implemented', owner: 'Accounting integrations', readinessRequirements: ['OAuth journey', 'mapping review', 'tenant-gated sync tests'], requestCount: accountingRequestEvents, roadmapClassification: 'coming_soon' },
+        ],
       },
     };
   }

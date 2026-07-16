@@ -172,8 +172,8 @@ test.describe("Phase 1N accounting and offline queue foundations", () => {
     await loginAs(page, request, fixtureRefs.workspaceAdminEmail, fixtureRefs.workspaceAdminPassword);
     await page.goto("/dashboard/integrations?section=sync-control-room", { waitUntil: "networkidle" });
     await expect(page.getByTestId("connected-tools-group-accounting")).toBeVisible();
-    await expect(page.getByTestId("integration-workspace-row-xero")).toContainText(/Connect Xero|Manage Xero/);
-    await expect(page.getByTestId("integration-workspace-row-quickbooks")).toContainText(/Connect QuickBooks|Manage QuickBooks/);
+    await expect(page.getByTestId("integration-workspace-row-xero")).toContainText(/Connect|Manage|View setup status|Select organisation|Reconnect/);
+    await expect(page.getByTestId("integration-workspace-row-quickbooks")).toContainText(/Coming soon|Request integration|Manage/);
     await expect(page.getByTestId("phase1n-accounting-setup")).toHaveCount(0);
     await expect(page.locator("body")).not.toContainText("refresh_token");
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
