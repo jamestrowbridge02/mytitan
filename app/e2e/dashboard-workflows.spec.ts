@@ -1,5 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
+import { expectReadable } from "./contrast-utils";
 import { authFile, fixtureRefs, hasDashboardAuth, installApiProxy, requestLocalApi } from "./utils";
 
 test.use({ storageState: authFile });
@@ -92,7 +93,9 @@ test.describe("dashboard workflows", () => {
     expect(headerBox?.height || 0).toBeLessThan(120);
     await expectReadableText(page.locator(".dashboard-premium-header h1"));
     await expectReadableText(page.locator(".dashboard-premium-greeting"));
-    await expect(page.locator("#dashboard-snapshot-title")).toHaveClass(/visually-hidden/);
+    await expect(page.locator("#dashboard-snapshot-title")).toBeVisible();
+    await expectReadableText(page.locator("#dashboard-snapshot-title"));
+    await expectReadable(page.getByRole("link", { name: "Open analytics" }), "Open analytics link", "/dashboard");
     await expect(page.getByTestId("dashboard-primary-action")).toBeVisible();
     await expect(page.getByTestId("dashboard-snapshot-grid").locator("a")).toHaveCount(4);
     await expect(page.getByTestId("dashboard-priority-action")).toBeVisible();
